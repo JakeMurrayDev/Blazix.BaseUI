@@ -396,7 +396,7 @@
         var args = new TooltipOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }

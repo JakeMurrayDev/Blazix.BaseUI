@@ -589,12 +589,12 @@
         var args = new PopoverOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
 
-        if (!nextOpen && args.UnmountPrevented)
+        if (!nextOpen && args.PreventUnmount)
         {
             preventUnmountingOnClose = true;
         }

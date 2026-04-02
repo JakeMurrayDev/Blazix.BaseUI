@@ -363,7 +363,7 @@
         var args = new PreviewCardOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }

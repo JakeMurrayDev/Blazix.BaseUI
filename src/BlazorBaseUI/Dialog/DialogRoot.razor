@@ -592,7 +592,7 @@
         var args = new DialogOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
@@ -615,7 +615,7 @@
         }
         else
         {
-            if (args.PreventUnmountingOnClose)
+            if (args.PreventUnmount)
             {
                 context.PreventUnmountingOnClose = true;
             }
