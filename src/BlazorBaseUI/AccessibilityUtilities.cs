@@ -19,11 +19,11 @@ internal static class AccessibilityUtilities
 
         if (disabled && !focusableWhenDisabled)
         {
-            attributes["aria-disabled"] = true;
+            attributes["aria-disabled"] = "true";
         }
         else if (disabled && focusableWhenDisabled)
         {
-            attributes["aria-disabled"] = true;
+            attributes["aria-disabled"] = "true";
             attributes["tabindex"] = 0;
         }
         else
@@ -63,7 +63,7 @@ internal static class AccessibilityUtilities
         if (focusableWhenDisabled)
         {
             attributes.Remove("disabled");
-            attributes["aria-disabled"] = true;
+            attributes["aria-disabled"] = "true";
         }
         else if (isNativeButton)
         {
@@ -71,7 +71,7 @@ internal static class AccessibilityUtilities
         }
         else
         {
-            attributes["aria-disabled"] = true;
+            attributes["aria-disabled"] = "true";
         }
     }
 }
