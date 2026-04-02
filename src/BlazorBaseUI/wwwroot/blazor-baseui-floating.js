@@ -6,6 +6,8 @@
  * Uses vendored Floating UI library for positioning.
  */
 
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
+
 const STATE_KEY = Symbol.for('BlazorBaseUI.Floating.State');
 
 if (!window[STATE_KEY]) {
@@ -897,6 +899,213 @@ export function getMaxTransitionDuration(element) {
     const minTimeout = 100;
     const maxTimeout = 10000;
     return Math.max(minTimeout, Math.min(withBuffer, maxTimeout));
+}
+
+// ============================================================================
+// Shared Transition Helpers
+// ============================================================================
+
+/**
+ * Cleans up any pending transition/animation listeners and fallback timeouts
+ * on a rootState object.
+ * @param {Object} rootState - Must have transitionCleanup and fallbackTimeoutId properties
+ */
+export function cleanupTransitionState(rootState) {
+    if (rootState.transitionCleanup) {
+        rootState.transitionCleanup();
+        rootState.transitionCleanup = null;
+    }
+    if (rootState.fallbackTimeoutId) {
+        clearTimeout(rootState.fallbackTimeoutId);
+        rootState.fallbackTimeoutId = null;
+    }
+}
+
+/**
+ * Sets up transitionend/animationend listeners on the popup element with a
+ * fallback timeout. Calls rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen)
+ * when the transition completes.
+ * @param {Object} rootState - Must have popupElement, dotNetRef, transitionCleanup, fallbackTimeoutId
+ * @param {boolean} isOpen - Whether the transition is for opening or closing
+ */
+export function setupTransitionEndListener(rootState, isOpen) {
+    const popupElement = rootState.popupElement;
+    if (!popupElement) return;
+
+    cleanupTransitionState(rootState);
+
+    let called = false;
+    const handleEnd = (event) => {
+        if (event.target !== popupElement) return;
+        if (called) return;
+        called = true;
+        cleanup();
+        if (rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
+        }
+    };
+
+    const cleanup = () => {
+        popupElement.removeEventListener('transitionend', handleEnd);
+        popupElement.removeEventListener('animationend', handleEnd);
+        if (rootState.fallbackTimeoutId) {
+            clearTimeout(rootState.fallbackTimeoutId);
+            rootState.fallbackTimeoutId = null;
+        }
+        rootState.transitionCleanup = null;
+    };
+
+    popupElement.addEventListener('transitionend', handleEnd);
+    popupElement.addEventListener('animationend', handleEnd);
+
+    rootState.transitionCleanup = cleanup;
+
+    const fallbackTimeout = getMaxTransitionDuration(popupElement);
+    rootState.fallbackTimeoutId = setTimeout(() => {
+        if (!called && rootState.dotNetRef) {
+            called = true;
+            cleanup();
+            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
+        }
+    }, fallbackTimeout);
+}
+
+/**
+ * Waits for a popup element to appear on rootState, then starts the transition.
+ * Updates hover interaction with the popup element when found.
+ * @param {Object} rootState - Must have popupElement, pendingOpen, dotNetRef, hoverInteraction
+ * @param {boolean} isOpen - Whether transitioning to open or closed
+ * @param {Function} startTransitionFn - The startTransition function to call once popup is found
+ */
+export function waitForPopupAndStartTransition(rootState, isOpen, startTransitionFn) {
+    const popupElement = rootState.popupElement;
+
+    if (popupElement) {
+        startTransitionFn(rootState, isOpen);
+        return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    function checkForPopup() {
+        attempts++;
+        const element = rootState.popupElement;
+
+        if (element) {
+            // Update hover interaction with the new popup element
+            if (rootState.hoverInteraction) {
+                rootState.hoverInteraction.setFloatingElement(element);
+            }
+            if (rootState.pendingOpen === isOpen) {
+                startTransitionFn(rootState, isOpen);
+            }
+        } else if (attempts < maxAttempts && rootState.pendingOpen === isOpen) {
+            requestAnimationFrame(checkForPopup);
+        } else if (rootState.dotNetRef && rootState.pendingOpen === isOpen) {
+            rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
+        }
+    }
+
+    requestAnimationFrame(checkForPopup);
+}
+
+/**
+ * Starts a simple open/close transition for tooltip/preview-card style components.
+ * Uses double-RAF for open transitions to ensure starting styles are applied.
+ * @param {Object} rootState - Must have popupElement, pendingOpen, dotNetRef
+ * @param {boolean} isOpen - Whether transitioning to open or closed
+ */
+export async function startSimpleTransition(rootState, isOpen) {
+    const popupElement = rootState.popupElement;
+
+    if (!popupElement) {
+        if (rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
+        }
+        return;
+    }
+
+    const hasTransition = checkForTransitionOrAnimation(popupElement);
+
+    if (isOpen) {
+        await requestDoubleAnimationFrame();
+
+        if (rootState.pendingOpen !== isOpen) {
+            return;
+        }
+        if (hasTransition) {
+            setupTransitionEndListener(rootState, isOpen);
+        }
+        if (rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
+        }
+    } else {
+        if (hasTransition) {
+            setupTransitionEndListener(rootState, isOpen);
+        } else {
+            if (rootState.dotNetRef) {
+                rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
+            }
+        }
+    }
+}
+
+/**
+ * Creates a keydown handler that closes the first open root on Escape.
+ * @param {Map} roots - The component's roots Map
+ * @param {string} methodName - The .NET method to invoke (e.g. 'OnEscapeKey')
+ * @returns {Function} The keydown event handler
+ */
+export function createEscapeKeyHandler(roots, methodName) {
+    return function handleKeyDown(e) {
+        if (e.key !== 'Escape') return;
+
+        for (const [id, rootState] of roots) {
+            if (rootState.isOpen && rootState.dotNetRef) {
+                rootState.dotNetRef.invokeMethodAsync(methodName).catch(() => { });
+                break;
+            }
+        }
+    };
+}
+
+/**
+ * Disposes a hover interaction on a root state if present.
+ * @param {Map} roots - The component's roots Map
+ * @param {string} rootId - The root ID
+ */
+export function disposeHoverInteractionOnRoot(roots, rootId) {
+    const rootState = roots.get(rootId);
+    if (rootState?.hoverInteraction) {
+        rootState.hoverInteraction.cleanup();
+        rootState.hoverInteraction = null;
+    }
+}
+
+/**
+ * Updates the floating element reference on a hover interaction.
+ * @param {Map} roots - The component's roots Map
+ * @param {string} rootId - The root ID
+ */
+export function updateHoverInteractionFloatingOnRoot(roots, rootId) {
+    const rootState = roots.get(rootId);
+    if (rootState?.hoverInteraction && rootState.popupElement) {
+        rootState.hoverInteraction.setFloatingElement(rootState.popupElement);
+    }
+}
+
+/**
+ * Sets the open state on a hover interaction.
+ * @param {Map} roots - The component's roots Map
+ * @param {string} rootId - The root ID
+ * @param {boolean} isOpen - Whether the interaction is open
+ */
+export function setHoverInteractionOpenOnRoot(roots, rootId, isOpen) {
+    const rootState = roots.get(rootId);
+    if (rootState?.hoverInteraction) {
+        rootState.hoverInteraction.setOpen(isOpen);
+    }
 }
 
 // ============================================================================

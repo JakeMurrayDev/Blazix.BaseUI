@@ -1,7 +1,11 @@
 import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
 import {
     createFloatingFocusManager,
-    disposeFloatingFocusManager
+    disposeFloatingFocusManager,
+    checkForTransitionOrAnimation,
+    setupTransitionEndListener,
+    cleanupTransitionState
 } from './blazor-baseui-floating.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Dialog.State');
@@ -62,7 +66,7 @@ export function disposeRoot(rootId) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         cleanupFocusManager(rootState);
-        cleanupTransition(rootState);
+        cleanupTransitionState(rootState);
         cleanupOutsideClick(rootState);
         cleanupBackdropClick(rootState);
         rootState.compositeKeyCleanup?.();
@@ -159,7 +163,7 @@ function waitForPopupAndStartTransition(rootState, isOpen) {
     requestAnimationFrame(checkForPopup);
 }
 
-function startTransition(rootState, isOpen) {
+async function startTransition(rootState, isOpen) {
     const popupElement = rootState.popupElement;
 
     if (!popupElement) {
@@ -172,34 +176,32 @@ function startTransition(rootState, isOpen) {
     const hasTransition = checkForTransitionOrAnimation(popupElement);
 
     if (isOpen) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (rootState.pendingOpen !== isOpen) {
-                    return;
-                }
+        await requestDoubleAnimationFrame();
 
-                // Set up outside click listener for non-modal dialogs
-                if (rootState.modal === 'false') {
-                    setupOutsideClickListener(rootState);
-                }
+        if (rootState.pendingOpen !== isOpen) {
+            return;
+        }
 
-                // Set up backdrop click listener for modal dialogs (source: useDialogRoot outsidePress guard)
-                if (rootState.modal === 'true' || rootState.modal === 'trap-focus') {
-                    setupBackdropClickListener(rootState);
-                }
+        // Set up outside click listener for non-modal dialogs
+        if (rootState.modal === 'false') {
+            setupOutsideClickListener(rootState);
+        }
 
-                // Focus custom element or default behavior
-                focusPopup(rootState, popupElement);
+        // Set up backdrop click listener for modal dialogs (source: useDialogRoot outsidePress guard)
+        if (rootState.modal === 'true' || rootState.modal === 'trap-focus') {
+            setupBackdropClickListener(rootState);
+        }
 
-                if (hasTransition) {
-                    setupTransitionEndListener(rootState, isOpen);
-                }
+        // Focus custom element or default behavior
+        focusPopup(rootState, popupElement);
 
-                if (rootState.dotNetRef) {
-                    rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
-                }
-            });
-        });
+        if (hasTransition) {
+            setupTransitionEndListener(rootState, isOpen);
+        }
+
+        if (rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
+        }
     } else {
         if (hasTransition) {
             setupTransitionEndListener(rootState, isOpen);
@@ -365,113 +367,6 @@ function cleanupBackdropClick(rootState) {
     }
 }
 
-function cleanupTransition(rootState) {
-    if (rootState.transitionCleanup) {
-        rootState.transitionCleanup();
-        rootState.transitionCleanup = null;
-    }
-    if (rootState.fallbackTimeoutId) {
-        clearTimeout(rootState.fallbackTimeoutId);
-        rootState.fallbackTimeoutId = null;
-    }
-}
-
-function checkForTransitionOrAnimation(element) {
-    const style = getComputedStyle(element);
-
-    const transitionDuration = parseCssDuration(style.transitionDuration);
-    const hasTransition = transitionDuration > 0;
-
-    const animationName = style.animationName;
-    const animationDuration = parseCssDuration(style.animationDuration);
-    const hasAnimation = animationName && animationName !== 'none' && animationDuration > 0;
-
-    return hasTransition || hasAnimation;
-}
-
-function parseCssDuration(durationStr) {
-    if (!durationStr || durationStr === 'none') return 0;
-
-    const durations = durationStr.split(',').map(d => d.trim());
-    let maxMs = 0;
-
-    for (const duration of durations) {
-        let ms = 0;
-        if (duration.endsWith('ms')) {
-            ms = parseFloat(duration);
-        } else if (duration.endsWith('s')) {
-            ms = parseFloat(duration) * 1000;
-        }
-        if (!isNaN(ms) && ms > maxMs) {
-            maxMs = ms;
-        }
-    }
-
-    return maxMs;
-}
-
-function getMaxTransitionDuration(element) {
-    const style = getComputedStyle(element);
-
-    const transitionDuration = parseCssDuration(style.transitionDuration);
-    const transitionDelay = parseCssDuration(style.transitionDelay);
-    const totalTransition = transitionDuration + transitionDelay;
-
-    const animationDuration = parseCssDuration(style.animationDuration);
-    const animationDelay = parseCssDuration(style.animationDelay);
-    const totalAnimation = animationDuration + animationDelay;
-
-    const maxDuration = Math.max(totalTransition, totalAnimation);
-    const withBuffer = maxDuration + 50;
-    const minTimeout = 100;
-    const maxTimeout = 10000;
-
-    return Math.max(minTimeout, Math.min(withBuffer, maxTimeout));
-}
-
-function setupTransitionEndListener(rootState, isOpen) {
-    const popupElement = rootState.popupElement;
-    if (!popupElement) return;
-
-    cleanupTransition(rootState);
-
-    let called = false;
-    const handleEnd = (event) => {
-        if (event.target !== popupElement) return;
-        if (called) return;
-        called = true;
-
-        cleanup();
-
-        if (rootState.dotNetRef) {
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    };
-
-    const cleanup = () => {
-        popupElement.removeEventListener('transitionend', handleEnd);
-        popupElement.removeEventListener('animationend', handleEnd);
-        if (rootState.fallbackTimeoutId) {
-            clearTimeout(rootState.fallbackTimeoutId);
-            rootState.fallbackTimeoutId = null;
-        }
-        rootState.transitionCleanup = null;
-    };
-
-    popupElement.addEventListener('transitionend', handleEnd);
-    popupElement.addEventListener('animationend', handleEnd);
-
-    rootState.transitionCleanup = cleanup;
-
-    const fallbackTimeout = getMaxTransitionDuration(popupElement);
-    rootState.fallbackTimeoutId = setTimeout(() => {
-        if (!called && rootState.dotNetRef) {
-            called = true;
-            cleanup();
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    }, fallbackTimeout);
-}
 
 export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
