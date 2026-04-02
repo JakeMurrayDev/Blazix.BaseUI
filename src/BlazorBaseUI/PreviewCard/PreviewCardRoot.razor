@@ -294,13 +294,14 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
         dotNetRef?.Dispose();
     }
 
-    void IPreviewCardHandleSubscriber.OnTriggerRegistered(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -310,13 +311,13 @@
         }
     }
 
-    void IPreviewCardHandleSubscriber.OnTriggerUnregistered(string triggerId)
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
         triggerElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
     }
 
-    void IPreviewCardHandleSubscriber.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -326,7 +327,7 @@
         }
     }
 
-    void IPreviewCardHandleSubscriber.OnOpenChangeRequested(bool open, PreviewCardOpenChangeReason reason, string? triggerId)
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnOpenChangeRequested(bool open, PreviewCardOpenChangeReason reason, string? triggerId, string? interactionType)
     {
         _ = InvokeAsync(async () =>
         {
@@ -341,7 +342,7 @@
         });
     }
 
-    void IPreviewCardHandleSubscriber.OnStateChanged()
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
     }
@@ -429,6 +430,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -557,6 +559,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -569,6 +572,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -581,6 +585,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 

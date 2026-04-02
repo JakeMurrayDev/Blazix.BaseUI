@@ -322,13 +322,14 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
         dotNetRef?.Dispose();
     }
 
-    void ITooltipHandleSubscriber.OnTriggerRegistered(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<TooltipOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -338,13 +339,13 @@
         }
     }
 
-    void ITooltipHandleSubscriber.OnTriggerUnregistered(string triggerId)
+    void IComponentHandleSubscriberBase<TooltipOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
         triggerElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
     }
 
-    void ITooltipHandleSubscriber.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<TooltipOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -354,7 +355,7 @@
         }
     }
 
-    void ITooltipHandleSubscriber.OnOpenChangeRequested(bool open, TooltipOpenChangeReason reason, string? triggerId)
+    void IComponentHandleSubscriberBase<TooltipOpenChangeReason>.OnOpenChangeRequested(bool open, TooltipOpenChangeReason reason, string? triggerId, string? interactionType)
     {
         _ = InvokeAsync(async () =>
         {
@@ -369,7 +370,7 @@
         });
     }
 
-    void ITooltipHandleSubscriber.OnStateChanged()
+    void IComponentHandleSubscriberBase<TooltipOpenChangeReason>.OnStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
     }
@@ -464,6 +465,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -582,6 +584,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -594,6 +597,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -606,6 +610,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 

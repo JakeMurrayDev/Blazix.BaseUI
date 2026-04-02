@@ -776,7 +776,7 @@
         }
     }
 
-    void IMenuHandleSubscriber.OnTriggerRegistered(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         if (element.HasValue)
         {
@@ -784,11 +784,11 @@
         }
     }
 
-    void IMenuHandleSubscriber.OnTriggerUnregistered(string triggerId)
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
     }
 
-    void IMenuHandleSubscriber.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
         if (element.HasValue)
         {
@@ -796,7 +796,7 @@
         }
     }
 
-    void IMenuHandleSubscriber.OnOpenChangeRequested(bool open, MenuOpenChangeReason reason, string? triggerId)
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnOpenChangeRequested(bool open, MenuOpenChangeReason reason, string? triggerId, string? interactionType)
     {
         var payload = Handle?.GetTriggerPayloadAsObject(triggerId);
         _ = SetOpenAsync(open, reason, payload, triggerId);
@@ -813,7 +813,7 @@
         Handle?.SyncState(open, triggerId, payload);
     }
 
-    void IMenuHandleSubscriber.OnStateChanged()
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnStateChanged()
     {
         StateHasChanged();
     }

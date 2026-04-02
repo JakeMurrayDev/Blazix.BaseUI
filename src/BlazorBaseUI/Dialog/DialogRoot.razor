@@ -5,12 +5,14 @@
 
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="defaultRoleContext" IsFixed="true">
-    <CascadingValue Value="context" IsFixed="true">
-        @if (ChildContent is not null)
-        {
-            @ChildContent(new DialogRootPayloadContext(payload))
-        }
+<CascadingValue TValue="IFloatingRootContext" Value="context.FloatingRootContext" IsFixed="true">
+    <CascadingValue Value="defaultRoleContext" IsFixed="true">
+        <CascadingValue Value="context" IsFixed="true">
+            @if (ChildContent is not null)
+            {
+                @ChildContent(new DialogRootPayloadContext(payload))
+            }
+        </CascadingValue>
     </CascadingValue>
 </CascadingValue>
 
@@ -31,7 +33,7 @@
     private string? descriptionId;
     private string? activeTriggerId;
     private ElementReference? popupElement;
-    private OpenChangeReason openChangeReason = OpenChangeReason.None;
+    private DialogOpenChangeReason openChangeReason = DialogOpenChangeReason.None;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private object? payload;
     private DialogRootState state;
@@ -68,10 +70,10 @@
 
     /// <summary>
     /// Gets or sets the modal behavior of the dialog.
-    /// Defaults to <see cref="ModalMode.True"/>.
+    /// Defaults to <see cref="DialogModalMode.True"/>.
     /// </summary>
     [Parameter]
-    public ModalMode Modal { get; set; } = ModalMode.True;
+    public DialogModalMode Modal { get; set; } = DialogModalMode.True;
 
     /// <summary>
     /// Gets or sets a reference to imperative actions for controlling the dialog programmatically.
@@ -154,7 +156,7 @@
             Role = ResolvedRole,
             DisablePointerDismissal = DisablePointerDismissal,
             NestedDialogCount = nestedCount,
-            OpenChangeReason = openChangeReason,
+            DialogOpenChangeReason = openChangeReason,
             TransitionStatus = transitionStatus,
             TitleId = titleId,
             DescriptionId = descriptionId,
@@ -178,6 +180,8 @@
             ForceUnmount = ForceUnmount
         };
 
+        context.FloatingRootContext = new DialogFloatingRootContextAdapter(context);
+
         context.SetBackdropElement = el =>
         {
             context.BackdropElement = el;
@@ -194,7 +198,7 @@
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ImperativeAction);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, DialogOpenChangeReason.ImperativeAction);
         }
 
         SubscribeToHandle();
@@ -219,8 +223,8 @@
             context.Open = currentOpen;
             context.Mounted = isMounted;
             context.TransitionStatus = transitionStatus;
-            openChangeReason = OpenChangeReason.None;
-            context.OpenChangeReason = openChangeReason;
+            openChangeReason = DialogOpenChangeReason.None;
+            context.DialogOpenChangeReason = openChangeReason;
 
             if (hasRendered)
             {
@@ -240,7 +244,7 @@
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ImperativeAction);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, DialogOpenChangeReason.ImperativeAction);
         }
 
         if (Handle != subscribedHandle)
@@ -268,6 +272,7 @@
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
         }
@@ -281,6 +286,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -293,7 +299,7 @@
     {
         if (!DisablePointerDismissal)
         {
-            await SetOpenAsync(false, OpenChangeReason.OutsidePress);
+            await SetOpenAsync(false, DialogOpenChangeReason.OutsidePress);
         }
     }
 
@@ -303,7 +309,7 @@
     [JSInvokable]
     public async Task OnEscapeKey()
     {
-        await SetOpenAsync(false, OpenChangeReason.EscapeKey);
+        await SetOpenAsync(false, DialogOpenChangeReason.EscapeKey);
     }
 
     /// <summary>
@@ -312,7 +318,7 @@
     [JSInvokable]
     public async Task OnFocusOut()
     {
-        await SetOpenAsync(false, OpenChangeReason.FocusOut);
+        await SetOpenAsync(false, DialogOpenChangeReason.FocusOut);
     }
 
     /// <summary>
@@ -375,23 +381,24 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
         dotNetRef?.Dispose();
     }
 
-    void IDialogHandleSubscriber.OnTriggerRegistered(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         RegisterTriggerElement(triggerId, element);
     }
 
-    void IDialogHandleSubscriber.OnTriggerUnregistered(string triggerId)
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
         UnregisterTriggerElement(triggerId);
     }
 
-    void IDialogHandleSubscriber.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -401,7 +408,7 @@
         }
     }
 
-    void IDialogHandleSubscriber.OnOpenChangeRequested(bool open, OpenChangeReason reason, string? triggerId, string? interactionType)
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnOpenChangeRequested(bool open, DialogOpenChangeReason reason, string? triggerId, string? interactionType)
     {
         _ = InvokeAsync(async () =>
         {
@@ -429,7 +436,7 @@
         });
     }
 
-    void IDialogHandleSubscriber.OnOpenWithPayloadRequested(object? requestedPayload, OpenChangeReason reason)
+    void IDialogHandleSubscriber.OnOpenWithPayloadRequested(object? requestedPayload, DialogOpenChangeReason reason)
     {
         _ = InvokeAsync(async () =>
         {
@@ -444,7 +451,7 @@
         });
     }
 
-    void IDialogHandleSubscriber.OnStateChanged()
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
     }
@@ -510,6 +517,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -534,6 +542,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -556,6 +565,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -568,10 +578,11 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
-    private async Task SetOpenAsync(bool nextOpen, OpenChangeReason reason)
+    private async Task SetOpenAsync(bool nextOpen, DialogOpenChangeReason reason)
     {
         if (CurrentOpen == nextOpen)
         {
@@ -587,7 +598,7 @@
         }
 
         openChangeReason = reason;
-        context.OpenChangeReason = reason;
+        context.DialogOpenChangeReason = reason;
 
         if (nextOpen)
         {
@@ -652,6 +663,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -667,14 +679,14 @@
         StateHasChanged();
     }
 
-    private async Task SetOpenWithPayloadAsync(object? newPayload, OpenChangeReason reason)
+    private async Task SetOpenWithPayloadAsync(object? newPayload, DialogOpenChangeReason reason)
     {
         payload = newPayload;
         context.Payload = newPayload;
         await SetOpenAsync(true, reason);
     }
 
-    private async Task SetOpenWithTriggerIdAsync(string? triggerId, object? newPayload, OpenChangeReason reason)
+    private async Task SetOpenWithTriggerIdAsync(string? triggerId, object? newPayload, DialogOpenChangeReason reason)
     {
         if (!IsTriggerIdControlled)
         {
@@ -700,7 +712,7 @@
         await SetOpenAsync(true, reason);
     }
 
-    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, OpenChangeReason reason)
+    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, DialogOpenChangeReason reason)
     {
         try
         {
@@ -714,7 +726,7 @@
 
     private void Close()
     {
-        _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ClosePress);
+        _ = SetOpenWithExceptionHandlingAsync(false, DialogOpenChangeReason.ClosePress);
     }
 
     private void ForceUnmount()
