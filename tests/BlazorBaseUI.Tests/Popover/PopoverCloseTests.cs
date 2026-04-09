@@ -13,6 +13,8 @@ public class PopoverCloseTests : BunitContext, IPopoverCloseContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateCloseInPopover(
@@ -26,7 +28,7 @@ public class PopoverCloseTests : BunitContext, IPopoverCloseContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -148,7 +150,7 @@ public class PopoverCloseTests : BunitContext, IPopoverCloseContract
                     closeRequested = true;
                 }
             }));
-            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -224,15 +226,4 @@ public class PopoverCloseTests : BunitContext, IPopoverCloseContract
         return Task.CompletedTask;
     }
 
-    [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverClose>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Close"))
-        );
-
-        cut.Find("button").ShouldNotBeNull();
-
-        return Task.CompletedTask;
-    }
 }

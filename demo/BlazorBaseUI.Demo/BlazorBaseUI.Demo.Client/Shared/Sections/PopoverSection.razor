@@ -316,7 +316,7 @@
 
     <DemoSection Title="Modal Mode"
                  Description="When modal is true, an internal backdrop is rendered and focus is trapped within the popover.">
-        <PopoverRoot Modal="ModalMode.True">
+        <PopoverRoot Modal="PopoverModalMode.True">
             <PopoverTrigger ClassValue="@(state => TriggerClass(state))">
                 Open Modal Popover
             </PopoverTrigger>
@@ -465,7 +465,7 @@
             </div>
 
             <PopoverRoot Handle="@detachedPopoverHandle">
-                <ChildContentWithPayload>
+                <ChildContent>
                     @{
                         var handlePayloadContext = context;
                     }
@@ -482,7 +482,7 @@
                             </PopoverPopup>
                         </PopoverPositioner>
                     </PopoverPortal>
-                </ChildContentWithPayload>
+                </ChildContent>
             </PopoverRoot>
 
             <div class="flex gap-2">
@@ -519,7 +519,7 @@
             </div>
 
             <PopoverRoot Handle="@typedPopoverHandle">
-                <ChildContentWithPayload>
+                <ChildContent>
                     @{
                         var typedPayloadContext = context;
                         var itemInfo = typedPayloadContext.Payload as ItemInfo;
@@ -548,7 +548,7 @@
                             </PopoverPopup>
                         </PopoverPositioner>
                     </PopoverPortal>
-                </ChildContentWithPayload>
+                </ChildContent>
             </PopoverRoot>
         </div>
         <div class="mt-3 rounded bg-gray-100 p-3 text-sm text-gray-700">
@@ -610,7 +610,7 @@
     public bool IsWasmMode { get; set; }
 
     private bool controlledOpen;
-    private OpenChangeReason? lastReason;
+    private PopoverOpenChangeReason? lastReason;
 
     // Handle for detached triggers demo (string payload)
     private readonly PopoverHandle<string> detachedPopoverHandle = new();

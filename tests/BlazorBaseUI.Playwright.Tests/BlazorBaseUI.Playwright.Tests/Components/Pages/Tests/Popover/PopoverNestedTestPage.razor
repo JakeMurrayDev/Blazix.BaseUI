@@ -5,9 +5,9 @@
 <PageTitle>Popover Nested Test Page (Server)</PageTitle>
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
-    <PopoverRoot
+    <PopoverRoot Context="_"
         @bind-Open="parentOpen"
-        Modal="@(ParentModal ? ModalMode.True : ModalMode.False)">
+        Modal="@(ParentModal ? PopoverModalMode.True : PopoverModalMode.False)">
         <PopoverTrigger data-testid="parent-trigger">Open Parent</PopoverTrigger>
         <PopoverPortal>
             @if (ParentModal)
@@ -19,9 +19,9 @@
                     <div data-testid="parent-content">Parent Content</div>
                     <PopoverClose data-testid="parent-close">Close Parent</PopoverClose>
 
-                    <PopoverRoot
+                    <PopoverRoot Context="__"
                         @bind-Open="childOpen"
-                        Modal="@(ChildModal ? ModalMode.True : ModalMode.False)">
+                        Modal="@(ChildModal ? PopoverModalMode.True : PopoverModalMode.False)">
                         <PopoverTrigger data-testid="child-trigger">Open Child</PopoverTrigger>
                         <PopoverPortal>
                             <PopoverPositioner data-testid="child-positioner">

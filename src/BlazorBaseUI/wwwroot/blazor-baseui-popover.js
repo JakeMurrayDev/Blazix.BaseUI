@@ -12,8 +12,7 @@ const PATIENT_CLICK_THRESHOLD = 500;
 import {
     TABBABLE_SELECTOR,
     getTabbableElements,
-    createFloatingFocusManager,
-    disposeFloatingFocusManager,
+    getPreviousTabbable,
     createHoverInteraction,
     checkForTransitionOrAnimation,
     setupTransitionEndListener,
@@ -39,11 +38,15 @@ if (!window[STATE_KEY]) {
 }
 const state = window[STATE_KEY];
 
+// Track where the pointer press started for intentional-mode drag-out suppression
+let pointerDownTarget = null;
+
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
     document.addEventListener('keydown', handleGlobalKeyDown);
-    document.addEventListener('mousedown', handleGlobalMouseDown);
+    document.addEventListener('pointerdown', handleGlobalPointerDown);
+    document.addEventListener('click', handleGlobalClick);
     state.globalListenersInitialized = true;
 }
 
@@ -116,6 +119,41 @@ export function setHoverInteractionOpen(rootId, isOpen) {
     setHoverInteractionOpenOnRoot(state.roots, rootId, isOpen);
 }
 
+// ============================================================================
+// Trigger Focus Guard Support
+// ============================================================================
+
+/**
+ * Focuses the previous tabbable element before the given guard element.
+ * Used by the trigger's pre-focus guard on Shift+Tab.
+ */
+export function focusPreviousTabbable(guardElement) {
+    const prev = getPreviousTabbable(guardElement, document.body, document.body);
+    if (prev) prev.focus();
+}
+
+/**
+ * Redirects focus into the popover content.
+ * Finds the FloatingFocusManager's before-content guard inside the positioner
+ * and focuses it, which in turn redirects to the first tabbable in the popup.
+ * Used by the trigger's post-focus guard on Tab forward.
+ */
+export function focusPopoverContent(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState?.positionerElement) return;
+
+    const beforeContentGuard = rootState.positionerElement.querySelector(
+        '[data-blazor-base-ui-focus-guard-type="inside"]'
+    );
+    if (beforeContentGuard) {
+        beforeContentGuard.focus();
+        return;
+    }
+
+    const tabbable = getTabbableElements(rootState.positionerElement);
+    if (tabbable.length > 0) tabbable[0].focus();
+}
+
 function handleGlobalKeyDown(e) {
     if (e.key !== 'Escape') return;
 
@@ -135,11 +173,23 @@ function handleGlobalKeyDown(e) {
     }
 }
 
-function handleGlobalMouseDown(e) {
-    // Collect open roots sorted by open order descending (topmost first)
+function isInsideRootElements(target, rootState) {
+    const { triggerElement, popupElement, positionerElement } = rootState;
+    return (positionerElement && positionerElement.contains(target))
+        || (popupElement && popupElement.contains(target))
+        || (triggerElement && triggerElement.contains(target));
+}
+
+/**
+ * Shared outside-press processing loop.
+ * @param {Event} e - The pointer or click event.
+ * @param {function} rootFilter - Predicate selecting which roots to process.
+ * @param {boolean} checkDragOut - When true, suppress if pointerdown started inside.
+ */
+function processOutsidePressForRoots(e, rootFilter, checkDragOut) {
     const openRoots = [];
     for (const [id, rootState] of state.roots) {
-        if (rootState.isOpen && rootState.dotNetRef) {
+        if (rootState.isOpen && rootState.dotNetRef && rootFilter(rootState)) {
             openRoots.push({ id, rootState });
         }
     }
@@ -148,30 +198,54 @@ function handleGlobalMouseDown(e) {
 
     openRoots.sort((a, b) => b.rootState.openOrderStamp - a.rootState.openOrderStamp);
 
-    // Process from topmost to outermost — stop once a root "contains" the click
+    // Process from topmost to outermost — stop once a root "contains" the press
     for (const { id, rootState } of openRoots) {
-        const { triggerElement, popupElement, positionerElement, internalBackdropElement } = rootState;
+        if (isInsideRootElements(e.target, rootState)) break;
 
-        const clickedInsidePopup = (positionerElement && positionerElement.contains(e.target))
-            || (popupElement && popupElement.contains(e.target));
-        const clickedOnTrigger = triggerElement && triggerElement.contains(e.target);
-        const clickedOnOwnBackdrop = internalBackdropElement
-            && (internalBackdropElement === e.target || internalBackdropElement.contains(e.target));
-
-        if (clickedInsidePopup || clickedOnTrigger) {
-            // Click is inside this root's elements — this root and all parents are safe
+        // Drag-out suppression: pointerdown started inside but click landed outside
+        if (checkDragOut && pointerDownTarget && isInsideRootElements(pointerDownTarget, rootState)) {
             break;
         }
 
+        const clickedOnOwnBackdrop = rootState.internalBackdropElement
+            && (rootState.internalBackdropElement === e.target
+                || rootState.internalBackdropElement.contains(e.target));
+
         if (clickedOnOwnBackdrop) {
-            // Click on own backdrop = outside press for this root, continue to parents
+            // Press on own backdrop = outside press for this root, continue to parents
             rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
             continue;
         }
 
-        // Click is outside this popover — close it
+        // Press is outside this popover — close it
         rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
     }
+}
+
+/**
+ * Sloppy mode: fires immediately on pointerdown.
+ * Applied to trap-focus roots (any pointer type) and all roots on touch/pen.
+ */
+function handleGlobalPointerDown(e) {
+    pointerDownTarget = e.target;
+
+    const isTouchOrPen = e.pointerType === 'touch' || e.pointerType === 'pen';
+    processOutsidePressForRoots(e,
+        (rs) => rs.modal === 'trap-focus' || isTouchOrPen,
+        false
+    );
+}
+
+/**
+ * Intentional mode: fires on click (mousedown + mouseup pair).
+ * Applied to non-trap-focus roots. Suppresses drag-out (pointerdown inside, click outside).
+ */
+function handleGlobalClick(e) {
+    processOutsidePressForRoots(e,
+        (rs) => rs.modal !== 'trap-focus',
+        true
+    );
+    pointerDownTarget = null;
 }
 
 // ============================================================================
@@ -224,7 +298,6 @@ export function disposeRoot(rootId) {
 
         // Clean up focus management
         cleanupFocusTrap(rootState);
-        cleanupFocusManager(rootState);
         cleanupFocusOutListener(rootState);
 
         // Clean up composite key suppression
@@ -316,18 +389,9 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
             rootState.releaseScrollLock = null;
         }
 
-        // Clean up focus management (FocusManager dispose handles return focus)
+        // Clean up focus management
         cleanupFocusTrap(rootState);
         cleanupFocusOutListener(rootState);
-        if (reason !== 'trigger-hover') {
-            cleanupFocusManager(rootState);
-        } else {
-            // For hover-opened, dispose without returning focus
-            if (rootState.focusManagerId) {
-                disposeFloatingFocusManager(rootState.focusManagerId, false);
-                rootState.focusManagerId = null;
-            }
-        }
 
         startTransition(rootState, isOpen);
     }
@@ -359,7 +423,7 @@ export function consumeStickIfOpen(rootId) {
 }
 
 // ============================================================================
-// Focus Management (delegated to shared FloatingFocusManager — Gap 7)
+// Tab Index Management
 // ============================================================================
 
 function handleTabIndex(popupElement) {
@@ -378,67 +442,7 @@ function handleTabIndex(popupElement) {
     } else {
         if (currentTabIndex !== '-1') {
             popupElement.setAttribute('tabindex', '-1');
-            popupElement.setAttribute('data-tabindex', '-1');
         }
-    }
-}
-
-function setupFocusManagement(rootState, popupElement) {
-    cleanupFocusManager(rootState);
-
-    const isModal = rootState.modal === 'true' || rootState.modal === 'trap-focus';
-
-    // Resolve initial focus target:
-    //   false  → no focus movement (FocusTarget.None)
-    //   element → focus that element (FocusTarget.Element)
-    //   null   → default behavior, focus first tabbable
-    let initialFocus;
-    if (rootState.initialFocusElement === false) {
-        initialFocus = false;
-    } else if (rootState.initialFocusElement instanceof HTMLElement || (rootState.initialFocusElement && rootState.initialFocusElement !== null)) {
-        initialFocus = rootState.initialFocusElement;
-    } else {
-        initialFocus = true;
-    }
-
-    // Resolve return focus target (same logic)
-    let returnFocusTarget;
-    if (rootState.finalFocusElement === false) {
-        returnFocusTarget = false;
-    } else if (rootState.finalFocusElement instanceof HTMLElement || (rootState.finalFocusElement && rootState.finalFocusElement !== null)) {
-        returnFocusTarget = rootState.finalFocusElement;
-    } else {
-        returnFocusTarget = true;
-    }
-
-    // iOS Safari hitslop detection for touch focus suppression
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const effectiveInteractionType = rootState.interactionType ||
-        (isIOS ? 'touch' : null);
-
-    rootState.focusManagerId = createFloatingFocusManager({
-        floatingElement: popupElement,
-        triggerElement: rootState.triggerElement,
-        modal: isModal,
-        initialFocus,
-        returnFocus: returnFocusTarget,
-        interactionType: effectiveInteractionType || '',
-        closeOnFocusOut: rootState.modal === 'false',
-        onClose: () => {
-            if (rootState.dotNetRef) {
-                rootState.dotNetRef.invokeMethodAsync('OnFocusOut').catch(() => { });
-            }
-        }
-    });
-
-    handleTabIndex(popupElement);
-}
-
-function cleanupFocusManager(rootState) {
-    if (rootState.focusManagerId) {
-        disposeFloatingFocusManager(rootState.focusManagerId, true);
-        rootState.focusManagerId = null;
     }
 }
 
@@ -536,13 +540,7 @@ async function startTransition(rootState, isOpen) {
             return;
         }
 
-        // Skip focus management for hover-opened popovers
-        const isHoverOpen = rootState.openReason === 'trigger-hover';
-
-        if (!isHoverOpen) {
-            // Delegate to shared FloatingFocusManager (Gap 7)
-            setupFocusManagement(rootState, popupElement);
-        }
+        handleTabIndex(popupElement);
 
         if (hasTransition) {
             setupTransitionEndListener(rootState, isOpen);
@@ -599,12 +597,12 @@ function buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign
     };
 }
 
-export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasSideOffsetFn, hasAlignOffsetFn) {
+export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
     // Build optional position update callback when dotNetRef is provided
     let onPositionUpdated = null;
     if (dotNetRef) {
-        onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden) => {
-            dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden).catch(() => { });
+        onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
+            dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden, arrowUncentered).catch(() => { });
         };
     }
 
@@ -626,7 +624,8 @@ export async function initializePositioner(positionerElement, triggerElement, si
         onPositionUpdated,
         dotNetRef: dotNetRef || null,
         hasSideOffsetFn: hasSideOffsetFn || false,
-        hasAlignOffsetFn: hasAlignOffsetFn || false
+        hasAlignOffsetFn: hasAlignOffsetFn || false,
+        hasViewport: hasViewport || false
     });
 
     if (positionerId) {
@@ -636,7 +635,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
     return positionerId;
 }
 
-export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, hasSideOffsetFn, hasAlignOffsetFn) {
+export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
     await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
@@ -651,7 +650,8 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
         positionMethod: positionMethod || 'fixed',
         collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback),
         hasSideOffsetFn: hasSideOffsetFn || false,
-        hasAlignOffsetFn: hasAlignOffsetFn || false
+        hasAlignOffsetFn: hasAlignOffsetFn || false,
+        hasViewport: hasViewport || false
     });
 }
 
@@ -903,6 +903,38 @@ function cleanupPopupAutoResize(rootState) {
     rootState.liveDimensions = null;
 }
 
+function remeasurePopupAutoResize(rootState) {
+    const { popupElement, positionerElement } = rootState;
+    if (!popupElement || !positionerElement) return;
+
+    const previousDimensions = rootState.autoResizeCommitted || rootState.liveDimensions;
+
+    setPopupCssSize(popupElement, 'auto');
+    setPositionerCssSize(positionerElement, 'max-content');
+    const newDimensions = getCssDimensions(popupElement);
+    rootState.autoResizeCommitted = newDimensions;
+
+    if (!previousDimensions) {
+        setPositionerCssSize(positionerElement, newDimensions);
+        return;
+    }
+
+    setPopupCssSize(popupElement, previousDimensions);
+    setPositionerCssSize(positionerElement, newDimensions);
+
+    requestAnimationFrame(() => {
+        setPopupCssSize(popupElement, newDimensions);
+        const animations = popupElement.getAnimations?.() || [];
+        if (animations.length > 0) {
+            Promise.all(animations.map(a => a.finished.catch(() => {}))).then(() => {
+                setPopupCssSize(popupElement, 'auto');
+            });
+        } else {
+            setPopupCssSize(popupElement, 'auto');
+        }
+    });
+}
+
 export function initializeAutoResize(rootId, side, direction) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
@@ -935,10 +967,9 @@ export function initializeViewport(rootId, viewportElement, dotNetRef) {
 export function disposeViewport(rootId) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
-        // Remove any leftover cloned elements
-        if (rootState.viewportElement?.parentNode) {
-            const parent = rootState.viewportElement.parentNode;
-            const clones = parent.querySelectorAll('[data-previous]');
+        // Remove any leftover cloned elements inside the viewport
+        if (rootState.viewportElement) {
+            const clones = rootState.viewportElement.querySelectorAll('[data-previous]');
             clones.forEach(clone => clone.remove());
         }
         rootState.viewportElement = null;
@@ -950,21 +981,22 @@ export async function onViewportTriggerChange(rootId, previousTriggerElement, ne
     const rootState = state.roots.get(rootId);
     if (!rootState?.viewportElement || !rootState.viewportDotNetRef) return;
 
-    const currentContainer = rootState.viewportElement;
-    const parent = currentContainer.parentNode;
-    if (!parent) return;
+    const viewport = rootState.viewportElement;
+    const currentDiv = viewport.querySelector('[data-current]');
+    if (!currentDiv) return;
 
-    // Clone the current container as the "previous" content
-    const clone = currentContainer.cloneNode(true);
+    // Clone the inner data-current div as "previous" content
+    const clone = currentDiv.cloneNode(true);
     clone.removeAttribute('data-current');
     clone.setAttribute('data-previous', '');
     clone.setAttribute('inert', '');
 
     // Set dimensions on the clone for CSS transition use
-    const width = currentContainer.offsetWidth;
-    const height = currentContainer.offsetHeight;
+    const width = currentDiv.offsetWidth;
+    const height = currentDiv.offsetHeight;
     clone.style.setProperty('--popup-width', `${width}px`);
     clone.style.setProperty('--popup-height', `${height}px`);
+    clone.style.position = 'absolute';
 
     // Calculate activation direction from trigger positions
     const prevRect = previousTriggerElement.getBoundingClientRect();
@@ -983,21 +1015,24 @@ export async function onViewportTriggerChange(rootId, previousTriggerElement, ne
     const vertical = Math.abs(dy) < DIRECTION_TOLERANCE ? '' : (dy > 0 ? 'down' : 'up');
     const direction = `${horizontal} ${vertical}`.trim() || 'none';
 
-    // Apply transition-hint data attributes (matching React's data-ending-style on previous, data-starting-style on current)
-    clone.setAttribute('data-ending-style', '');
-    currentContainer.setAttribute('data-starting-style', '');
+    // Frame 0: only data-starting-style on current (data-ending-style is staggered to next frame)
+    currentDiv.setAttribute('data-starting-style', '');
 
-    // Insert clone before current container
-    parent.insertBefore(clone, currentContainer);
+    // Insert clone inside viewport, before the current div
+    viewport.insertBefore(clone, currentDiv);
 
     // Notify Blazor of transition start
     rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionStart', direction).catch(() => { });
 
-    // Wait two rAF frames then listen for transition/animation end
+    // Remeasure auto-resize for the new content dimensions
+    remeasurePopupAutoResize(rootState);
+
+    // Wait two rAF frames then apply ending/remove starting style attributes
     await requestDoubleAnimationFrame();
 
-    // Remove data-starting-style from the current container after 2 rAF frames
-    currentContainer.removeAttribute('data-starting-style');
+    // Staggered: apply data-ending-style on clone and remove data-starting-style from current
+    clone.setAttribute('data-ending-style', '');
+    currentDiv.removeAttribute('data-starting-style');
     let ended = false;
     const onEnd = (event) => {
         if (event && event.target !== clone) return;

@@ -21,15 +21,16 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
-    private bool isMounted;
+    private readonly TransitionLifecycleManager transition = new();
     private string? titleId;
     private string? descriptionId;
     private string? activeTriggerId;
     private ElementReference? triggerElement;
+    private ElementReference? triggerFocusTargetElement;
     private ElementReference? positionerElement;
     private ElementReference? popupElement;
+    private ElementReference? backdropElement;
     private PopoverOpenChangeReason openChangeReason = PopoverOpenChangeReason.None;
-    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private PopoverInstantType instantType = PopoverInstantType.None;
     private string? interactionType;
     private object? payload;
@@ -129,7 +130,12 @@
     protected override void OnInitialized()
     {
         isOpen = DefaultOpen;
-        isMounted = CurrentOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
         activeTriggerId = DefaultTriggerId;
         previousModal = Modal;
         state = new PopoverRootState(CurrentOpen);
@@ -137,31 +143,36 @@
         {
             RootId = rootId,
             Open = CurrentOpen,
-            Mounted = isMounted,
+            Mounted = transition.IsMounted,
             Modal = Modal,
             PopoverOpenChangeReason = openChangeReason,
-            TransitionStatus = transitionStatus,
+            TransitionStatus = transition.TransitionStatus,
             PopoverInstantType = instantType,
             TitleId = titleId,
             DescriptionId = descriptionId,
             ActiveTriggerId = activeTriggerId,
             Payload = payload,
             GetOpen = () => CurrentOpen,
-            GetMounted = () => isMounted,
+            GetMounted = () => transition.IsMounted,
             GetTriggerElement = GetTriggerElement,
+            GetTriggerFocusTarget = () => triggerFocusTargetElement,
             GetPositionerElement = () => positionerElement,
             GetPopupElement = () => popupElement,
+            GetBackdropElement = () => backdropElement,
             SetTitleId = SetTitleId,
             SetDescriptionId = SetDescriptionId,
             SetTriggerElement = SetTriggerElement,
+            SetTriggerFocusTarget = el => triggerFocusTargetElement = el,
             SetPositionerElement = SetPositionerElement,
             SetPopupElement = SetPopupElement,
+            SetBackdropElement = SetBackdropElement,
             SetOpenAsync = SetOpenAsyncFromContext,
             SetInteractionType = SetInteractionType,
             Close = Close,
             ForceUnmount = ForceUnmount,
             SetHasViewport = SetHasViewport,
-            SetPopoverInstantType = SetPopoverInstantTypeValue
+            SetPopoverInstantType = SetPopoverInstantTypeValue,
+            RegisterClosePart = RegisterClosePartImpl
         };
 
         context.FloatingRootContext = new PopoverFloatingRootContextAdapter(context);
@@ -184,10 +195,10 @@
             state = new PopoverRootState(currentOpen);
             if (currentOpen)
             {
-                isMounted = true;
+                transition.BeginOpen();
             }
             context.Open = currentOpen;
-            context.Mounted = isMounted;
+            context.Mounted = transition.IsMounted;
         }
 
         if (TriggerId is not null)
@@ -295,6 +306,17 @@
         StateHasChanged();
     }
 
+    private Action RegisterClosePartImpl()
+    {
+        context.ClosePartCount++;
+        StateHasChanged();
+        return () =>
+        {
+            context.ClosePartCount = Math.Max(0, context.ClosePartCount - 1);
+            StateHasChanged();
+        };
+    }
+
     private void SetInteractionType(string? type)
     {
         interactionType = type;
@@ -327,6 +349,11 @@
     private void SetPositionerElement(ElementReference? element)
     {
         positionerElement = element;
+    }
+
+    private void SetBackdropElement(ElementReference? element)
+    {
+        backdropElement = element;
     }
 
     private void SetPopupElement(ElementReference? element)
@@ -364,10 +391,9 @@
 
     private void ForceUnmount()
     {
-        isMounted = false;
+        transition.ForceUnmount();
         context.Mounted = false;
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        context.TransitionStatus = transition.TransitionStatus;
         activeTriggerId = null;
         context.ActiveTriggerId = null;
         payload = null;
@@ -404,10 +430,9 @@
     [JSInvokable]
     public void OnStartingStyleApplied()
     {
-        if (transitionStatus == TransitionStatus.Starting)
+        if (transition.HandleStartingStyleApplied())
         {
-            transitionStatus = TransitionStatus.Undefined;
-            context.TransitionStatus = transitionStatus;
+            context.TransitionStatus = transition.TransitionStatus;
             StateHasChanged();
         }
     }
@@ -447,8 +472,8 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        var unmounted = transition.HandleTransitionEnd(open, preventUnmountingOnClose);
+        context.TransitionStatus = transition.TransitionStatus;
 
         if (!open)
         {
@@ -456,9 +481,8 @@
             {
                 preventUnmountingOnClose = false;
             }
-            else
+            else if (unmounted)
             {
-                isMounted = false;
                 context.Mounted = false;
                 activeTriggerId = null;
                 context.ActiveTriggerId = null;
@@ -624,21 +648,20 @@
             }
 
             instantType = isKeyboardClick ? PopoverInstantType.Click : PopoverInstantType.None;
-            transitionStatus = TransitionStatus.Starting;
-            isMounted = true;
+            transition.BeginOpen();
         }
         else
         {
             instantType = isKeyboardClick ? PopoverInstantType.Click
-                : reason == PopoverOpenChangeReason.EscapeKey ? PopoverInstantType.Dismiss
+                : reason is PopoverOpenChangeReason.EscapeKey or PopoverOpenChangeReason.None ? PopoverInstantType.Dismiss
                 : reason == PopoverOpenChangeReason.FocusOut ? PopoverInstantType.Focus
                 : PopoverInstantType.None;
-            transitionStatus = TransitionStatus.Ending;
+            transition.BeginClose();
         }
 
         context.PopoverInstantType = instantType;
-        context.TransitionStatus = transitionStatus;
-        context.Mounted = isMounted;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
 
         if (!IsControlled)
         {

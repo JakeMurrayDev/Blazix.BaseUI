@@ -8,5 +8,4 @@ public interface IPopoverArrowContract
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task HasDataSideAttribute();
-    Task RequiresContext();
 }

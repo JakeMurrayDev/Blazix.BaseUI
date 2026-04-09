@@ -9,9 +9,6 @@ public interface IPopoverPositionerContract
     Task HasDataAlignAttribute();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
-    Task RequiresContext();
-    Task ForwardsSideOffsetToInitializePositioner();
-    Task ForwardsAlignOffsetToInitializePositioner();
     Task UpdatesDataSideFromJsCallback();
     Task UpdatesDataAlignFromJsCallback();
     Task SetsDataAnchorHiddenFromJsCallback();

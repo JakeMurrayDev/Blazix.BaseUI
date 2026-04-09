@@ -13,6 +13,8 @@ public class PopoverDescriptionTests : BunitContext, IPopoverDescriptionContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDescriptionInPopover(
@@ -26,7 +28,7 @@ public class PopoverDescriptionTests : BunitContext, IPopoverDescriptionContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -83,7 +85,7 @@ public class PopoverDescriptionTests : BunitContext, IPopoverDescriptionContract
     {
         RenderFragment<RenderProps<PopoverDescriptionState>> render = props => builder =>
         {
-            builder.OpenElement(0, "span");
+            builder.OpenElement(0, "article");
             builder.AddMultipleAttributes(1, props.Attributes);
             if (props.ElementReferenceCallback is not null)
                 builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
@@ -93,7 +95,7 @@ public class PopoverDescriptionTests : BunitContext, IPopoverDescriptionContract
 
         var cut = Render(CreateDescriptionInPopover(render: render));
 
-        var description = cut.Find("span");
+        var description = cut.Find("article");
         description.TextContent.ShouldBe("Description text");
 
         return Task.CompletedTask;
@@ -156,15 +158,4 @@ public class PopoverDescriptionTests : BunitContext, IPopoverDescriptionContract
         return Task.CompletedTask;
     }
 
-    [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverDescription>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Description"))
-        );
-
-        cut.Find("p").ShouldNotBeNull();
-
-        return Task.CompletedTask;
-    }
 }

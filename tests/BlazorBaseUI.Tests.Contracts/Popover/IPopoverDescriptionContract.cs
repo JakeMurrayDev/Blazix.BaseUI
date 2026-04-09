@@ -8,5 +8,4 @@ public interface IPopoverDescriptionContract
     Task SetsAriaDescribedByOnPopup();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
-    Task RequiresContext();
 }

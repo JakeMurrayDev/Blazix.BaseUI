@@ -4,7 +4,7 @@ using BlazorBaseUI.Tests.Infrastructure;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
-using ModalMode = BlazorBaseUI.Popover.ModalMode;
+using PopoverModalMode = BlazorBaseUI.Popover.PopoverModalMode;
 
 namespace BlazorBaseUI.Tests.Popover;
 
@@ -14,6 +14,8 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreatePopupInPopover(
@@ -25,14 +27,14 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
         RenderFragment? childContent = null,
         bool includeTitle = false,
         bool includeDescription = false,
-        ModalMode modal = ModalMode.False)
+        PopoverModalMode modal = PopoverModalMode.False)
     {
         return builder =>
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
             builder.AddAttribute(3, "Modal", modal);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -157,7 +159,7 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     }
 
     [Fact]
-    public Task HasAriaModal()
+    public Task HasTabIndexMinusOne()
     {
         var cut = Render(CreatePopupInPopover());
 
@@ -194,6 +196,17 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     }
 
     [Fact]
+    public Task DoesNotHaveAriaLabelledByWithoutTitle()
+    {
+        var cut = Render(CreatePopupInPopover(includeTitle: false));
+
+        var popup = cut.Find("[role='dialog']");
+        popup.HasAttribute("aria-labelledby").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasAriaDescribedByWhenDescriptionPresent()
     {
         var cut = Render(CreatePopupInPopover(includeDescription: true));
@@ -203,6 +216,17 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
 
         var description = cut.Find("p");
         popup.GetAttribute("aria-describedby").ShouldBe(description.GetAttribute("id"));
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotHaveAriaDescribedByWithoutDescription()
+    {
+        var cut = Render(CreatePopupInPopover(includeDescription: false));
+
+        var popup = cut.Find("[role='dialog']");
+        popup.HasAttribute("aria-describedby").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -234,9 +258,11 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     }
 
     [Fact]
-    public Task DoesNotHaveAriaModalRegardlessOfModalMode()
+    public Task DoesNotHaveAriaModalWhenModal()
     {
-        var cut = Render(CreatePopupInPopover(modal: ModalMode.True));
+        // React's PopoverPopup does not set aria-modal. FloatingFocusManager
+        // may set it at runtime, but the component itself never renders it.
+        var cut = Render(CreatePopupInPopover(modal: PopoverModalMode.True));
 
         var popup = cut.Find("[role='dialog']");
         popup.HasAttribute("aria-modal").ShouldBeFalse();
@@ -245,79 +271,14 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     }
 
     [Fact]
-    public Task RequiresContext()
+    public Task DoesNotHaveAriaModalWhenNonModal()
     {
-        var cut = Render<PopoverPopup>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
-        );
-
-        cut.Markup.ShouldBeEmpty();
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task PassesDisableInitialFocusToJs()
-    {
-        var cut = Render(CreatePopupInPopoverWithFocusTarget(initialFocus: new FocusTarget.None()));
+        var cut = Render(CreatePopupInPopover(modal: PopoverModalMode.False));
 
         var popup = cut.Find("[role='dialog']");
-        popup.ShouldNotBeNull();
+        popup.HasAttribute("aria-modal").ShouldBeFalse();
 
-        // Verify the popup rendered successfully with FocusTarget.None
-        // JS interop receives "none" mode (verified via loose mock acceptance)
         return Task.CompletedTask;
     }
 
-    [Fact]
-    public Task PassesFocusTargetDefaultToJs()
-    {
-        var cut = Render(CreatePopupInPopoverWithFocusTarget(initialFocus: new FocusTarget.Default()));
-
-        var popup = cut.Find("[role='dialog']");
-        popup.ShouldNotBeNull();
-
-        // Verify the popup rendered successfully with FocusTarget.Default
-        // JS interop receives "default" mode (verified via loose mock acceptance)
-        return Task.CompletedTask;
-    }
-
-    private RenderFragment CreatePopupInPopoverWithFocusTarget(
-        FocusTarget? initialFocus = null,
-        FocusTarget? finalFocus = null)
-    {
-        return builder =>
-        {
-            builder.OpenComponent<PopoverRoot>(0);
-            builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
-            {
-                innerBuilder.OpenComponent<PopoverTrigger>(0);
-                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
-                innerBuilder.CloseComponent();
-
-                innerBuilder.OpenComponent<PopoverPortal>(10);
-                innerBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(portalBuilder =>
-                {
-                    portalBuilder.OpenComponent<PopoverPositioner>(0);
-                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
-                    {
-                        posBuilder.OpenComponent<PopoverPopup>(0);
-                        var attrIndex = 1;
-
-                        if (initialFocus is not null)
-                            posBuilder.AddAttribute(attrIndex++, "InitialFocus", initialFocus);
-                        if (finalFocus is not null)
-                            posBuilder.AddAttribute(attrIndex++, "FinalFocus", finalFocus);
-
-                        posBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
-                        posBuilder.CloseComponent();
-                    }));
-                    portalBuilder.CloseComponent();
-                }));
-                innerBuilder.CloseComponent();
-            }));
-            builder.CloseComponent();
-        };
-    }
 }

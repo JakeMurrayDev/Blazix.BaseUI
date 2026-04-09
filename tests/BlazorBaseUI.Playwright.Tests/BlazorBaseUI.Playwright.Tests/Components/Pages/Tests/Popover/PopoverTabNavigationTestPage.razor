@@ -7,7 +7,7 @@
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
     @if (Layout == "before-trigger")
     {
-        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? ModalMode.True : ModalMode.False)">
+        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)">
             <PopoverPortal>
                 <PopoverPositioner data-testid="popover-positioner">
                     <PopoverPopup data-testid="popover-popup">
@@ -21,7 +21,7 @@
     }
     else if (Layout == "between")
     {
-        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? ModalMode.True : ModalMode.False)">
+        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)">
             <PopoverTrigger data-testid="popover-trigger">Open Popover</PopoverTrigger>
             <button data-testid="between-button">Between Button</button>
             <PopoverPortal>
@@ -37,7 +37,7 @@
     else
     {
         <button data-testid="before-button">Before Button</button>
-        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? ModalMode.True : ModalMode.False)">
+        <PopoverRoot @bind-Open="isOpen" DefaultOpen="@DefaultOpen" Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)">
             <PopoverTrigger data-testid="popover-trigger">Open Popover</PopoverTrigger>
             <PopoverPortal>
                 <PopoverPositioner data-testid="popover-positioner">

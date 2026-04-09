@@ -499,6 +499,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithDisableInitialFocus(bool value)
+    {
+        queryParams["disableInitialFocus"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithLayout(string layout)
     {
         queryParams["layout"] = layout;

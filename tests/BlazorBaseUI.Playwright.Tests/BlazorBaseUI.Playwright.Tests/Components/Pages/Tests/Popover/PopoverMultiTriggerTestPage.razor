@@ -62,7 +62,7 @@
             @bind-Open="isOpen"
             DefaultOpen="@DefaultOpen"
             DefaultTriggerId="@DefaultTriggerId">
-            <ChildContentWithPayload Context="payloadContext">
+            <ChildContent Context="payloadContext">
                 <PopoverTrigger Id="trigger-a" Payload="@((object?)"Payload A")" data-testid="trigger-a">Trigger A</PopoverTrigger>
                 <PopoverTrigger Id="trigger-b" Payload="@((object?)"Payload B")" data-testid="trigger-b">Trigger B</PopoverTrigger>
                 <PopoverPortal>
@@ -82,7 +82,7 @@
                         </PopoverPopup>
                     </PopoverPositioner>
                 </PopoverPortal>
-            </ChildContentWithPayload>
+            </ChildContent>
         </PopoverRoot>
     }
 

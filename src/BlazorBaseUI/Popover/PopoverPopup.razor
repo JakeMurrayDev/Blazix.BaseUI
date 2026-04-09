@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 @using BlazorBaseUI.Toolbar
+@using BlazorBaseUI.FloatingFocusManager
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
@@ -12,13 +13,28 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="ChildContent"
                @attributes="AdditionalAttributes"
-               @ref="renderElementReference" />
+               @ref="renderElementReference">
+    <FloatingFocusManager Modal="@isModal"
+                          Disabled="@(!isMounted || openedByHover)"
+                          InitialFocus="@ComputeInitialFocus()"
+                          ReturnFocus="@ComputeReturnFocus()"
+                          InteractionType="@(RootContext?.InteractionType)"
+                          RestoreFocus="true"
+                          RestoreFocusMode="popup"
+                          PreviousFocusableElement="@(RootContext?.GetTriggerElement())"
+                          NextFocusableElement="@(RootContext?.GetTriggerFocusTarget())">
+        @ChildContent
+    </FloatingFocusManager>
+</RenderElement>
 
 @code {
+    private readonly string popupId = Guid.NewGuid().ToIdString();
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private bool isModal;
+    private bool isMounted;
+    private bool openedByHover;
     private PopoverPopupState state;
     private RenderElement<PopoverPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -97,8 +113,19 @@
         var open = RootContext?.GetOpen() ?? false;
         var side = PositionerContext?.Side ?? Side.Bottom;
         var align = PositionerContext?.Align ?? Align.Center;
-        var instant = RootContext?.InstantType ?? InstantType.None;
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+
+        isModal = RootContext?.Modal is not PopoverModalMode.False && (RootContext?.HasClosePart ?? false);
+        isMounted = RootContext?.GetMounted() ?? false;
+        openedByHover = RootContext?.PopoverOpenChangeReason == PopoverOpenChangeReason.TriggerHover;
+
+        if (RootContext is not null)
+        {
+            RootContext.PopupId = popupId;
+            RootContext.FocusManagerModal = isModal;
+        }
+
         state = new PopoverPopupState(open, side, align, instant, transitionStatus);
         BuildComponentAttributes();
     }
@@ -129,8 +156,10 @@
     {
         var attrs = new Dictionary<string, object>();
 
+        attrs["id"] = popupId;
         attrs["role"] = "dialog";
-        attrs["data-base-ui-focusable"] = true;
+        attrs["tabindex"] = -1;
+        attrs["data-blazor-base-ui-focusable"] = string.Empty;
 
         var titleId = RootContext?.TitleId;
         if (!string.IsNullOrEmpty(titleId))
@@ -153,7 +182,7 @@
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
 
-        var instantType = RootContext?.InstantType ?? InstantType.None;
+        var instantType = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
         var instantAttr = instantType.ToDataAttributeString();
         if (!string.IsNullOrEmpty(instantAttr))
         {
@@ -161,12 +190,11 @@
         }
 
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        attrs["data-starting-style"] = transitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = transitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         if (transitionStatus == TransitionStatus.Starting)
         {
-            attrs["style"] = "transition-property: none";
+            attrs["style"] = "transition: none";
         }
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
@@ -186,8 +214,8 @@
             var module = await ModuleTask.Value;
             var modalString = RootContext.Modal switch
             {
-                ModalMode.True => "true",
-                ModalMode.TrapFocus => "trap-focus",
+                PopoverModalMode.True => "true",
+                PopoverModalMode.TrapFocus => "trap-focus",
                 _ => "false"
             };
             var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
@@ -199,6 +227,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -222,6 +251,18 @@
         return result.HasValue ? ("element", result.Value) : ("none", null);
     }
 
+    private bool ComputeInitialFocus()
+    {
+        if (InitialFocus is FocusTarget.None) return false;
+        return true;
+    }
+
+    private bool ComputeReturnFocus()
+    {
+        if (FinalFocus is FocusTarget.None) return false;
+        return true;
+    }
+
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
@@ -240,6 +281,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 

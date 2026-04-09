@@ -17,6 +17,7 @@
     private RenderElement<PopoverBackdropState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private Func<PopoverBackdropState, string>? computedStyleValue;
+    private ElementReference? previousElement;
 
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
@@ -57,6 +58,17 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetBackdropElement(currentElement);
+        }
+    }
+
+    /// <inheritdoc />
     protected override void OnParametersSet()
     {
         var open = RootContext?.GetOpen() ?? false;
@@ -64,7 +76,7 @@
         state = new PopoverBackdropState(open, transitionStatus);
         computedStyleValue = s =>
         {
-            var baseStyle = RootContext?.OpenChangeReason == OpenChangeReason.TriggerHover
+            var baseStyle = RootContext?.PopoverOpenChangeReason == PopoverOpenChangeReason.TriggerHover
                 ? $"{ForcedStyle} pointer-events: none;"
                 : ForcedStyle;
             var userStyle = StyleValue?.Invoke(s);
@@ -85,12 +97,8 @@
         }
 
         var isOpen = RootContext?.GetOpen() ?? false;
-        attrs["data-open"] = isOpen;
-        attrs["data-closed"] = !isOpen;
-
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        attrs["data-starting-style"] = transitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = transitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, isOpen, transitionStatus);
 
         componentAttributes = attrs;
     }

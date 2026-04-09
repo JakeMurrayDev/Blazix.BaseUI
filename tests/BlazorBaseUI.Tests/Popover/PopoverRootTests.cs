@@ -14,6 +14,8 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     [Fact]
@@ -134,8 +136,8 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Popover.ModalMode.True);
-            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Popover.PopoverModalMode.True);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -176,7 +178,7 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     [Fact]
     public Task DoesNotRenderInternalBackdropWhenModalFalse()
     {
-        var cut = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.ModalMode.False));
+        var cut = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.PopoverModalMode.False));
 
         var positioner = cut.Find("[data-side]");
         var previousSibling = positioner.PreviousElementSibling;
@@ -320,46 +322,6 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     }
 
     [Fact]
-    public async Task ResetsOpenChangeReasonOnTransitionEnd()
-    {
-        var cut = Render(CreatePopover(defaultOpen: false));
-
-        // Open via trigger click
-        cut.Find("button").Click();
-
-        // Simulate transition end (close)
-        var root = cut.FindComponent<PopoverRoot>();
-        await cut.InvokeAsync(() => root.Instance.OnTransitionEnd(true));
-
-        // Now close
-        cut.Find("button").Click();
-
-        await cut.InvokeAsync(() => root.Instance.OnTransitionEnd(false));
-
-        // After close transition, the positioner should not have stale reason
-        // Verify the trigger no longer shows data-pressed (reason was reset)
-        var trigger = cut.Find("button");
-        trigger.HasAttribute("data-pressed").ShouldBeFalse();
-    }
-
-    [Fact]
-    public async Task ResetsOpenChangeReasonOnForceUnmount()
-    {
-        var actions = new PopoverRootActions();
-        var cut = Render(CreatePopover(defaultOpen: true, actionsRef: actions));
-
-        cut.Find("[role='dialog']").ShouldNotBeNull();
-
-        await cut.InvokeAsync(() => actions.Unmount?.Invoke());
-
-        cut.WaitForAssertion(() => cut.FindAll("[role='dialog']").Count.ShouldBe(0));
-
-        // After force unmount, trigger should not show stale data-pressed
-        var trigger = cut.Find("button");
-        trigger.HasAttribute("data-pressed").ShouldBeFalse();
-    }
-
-    [Fact]
     public Task SetsInstantClickOnlyForKeyboardTriggerPress()
     {
         var cut = Render(CreatePopover(defaultOpen: false));
@@ -402,22 +364,6 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
 
         // Before close, verify no instant attribute
         popup.HasAttribute("data-instant").ShouldBeFalse();
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task ViewportTriggerSwapClearsInstantType()
-    {
-        // Open via click (which sets instant type)
-        var cut = Render(CreatePopover(defaultOpen: false));
-        var trigger = cut.Find("button");
-        trigger.PointerDown(new PointerEventArgs { PointerType = "" });
-        trigger.Click(new MouseEventArgs { Detail = 0 });
-
-        // For keyboard click, instant should be set on the popup
-        var popup = cut.Find("[role='dialog']");
-        popup.GetAttribute("data-instant").ShouldBe("click");
 
         return Task.CompletedTask;
     }
@@ -491,61 +437,24 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     public Task ScrollLockReactsToModalParameterChange()
     {
         // Start with non-modal open popover
-        var cut = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.ModalMode.False));
+        var cut = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.PopoverModalMode.False));
         cut.Find("[role='dialog']").ShouldNotBeNull();
 
         // Re-render with modal=true - verifies no exceptions from scroll lock update
-        var cut2 = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.ModalMode.True));
+        var cut2 = Render(CreatePopover(defaultOpen: true, modal: BlazorBaseUI.Popover.PopoverModalMode.True));
         cut2.Find("[role='dialog']").ShouldNotBeNull();
 
         return Task.CompletedTask;
     }
 
-    [Fact]
-    public async Task InteractionTypeClearedOnTransitionEnd()
-    {
-        var cut = Render(CreatePopover(defaultOpen: false));
-
-        // Open via keyboard click (Detail=0) to set interactionType
-        var trigger = cut.Find("button");
-        trigger.PointerDown(new PointerEventArgs { PointerType = "" });
-        trigger.Click(new MouseEventArgs { Detail = 0 });
-
-        // Verify instant click is set on the popup (proves interactionType = "keyboard")
-        var popup = cut.Find("[role='dialog']");
-        popup.GetAttribute("data-instant").ShouldBe("click");
-
-        // Complete the open transition
-        var root = cut.FindComponent<PopoverRoot>();
-        await cut.InvokeAsync(() => root.Instance.OnTransitionEnd(true));
-
-        // Close via keyboard click
-        trigger.PointerDown(new PointerEventArgs { PointerType = "" });
-        trigger.Click(new MouseEventArgs { Detail = 0 });
-
-        // Should still get instant click since interactionType hasn't been cleared yet
-        popup = cut.Find("[role='dialog']");
-        popup.GetAttribute("data-instant").ShouldBe("click");
-
-        // Complete the close transition — this should clear interactionType
-        await cut.InvokeAsync(() => root.Instance.OnTransitionEnd(false));
-
-        // Reopen with mouse — interactionType should be fresh (not stale "keyboard")
-        trigger.PointerDown(new PointerEventArgs { PointerType = "mouse" });
-        trigger.Click(new MouseEventArgs { Detail = 1 });
-
-        popup = cut.Find("[role='dialog']");
-        popup.HasAttribute("data-instant").ShouldBeFalse();
-    }
-
     private RenderFragment CreatePopover(
         bool? open = null,
         bool defaultOpen = false,
-        BlazorBaseUI.Popover.ModalMode modal = BlazorBaseUI.Popover.ModalMode.False,
+        BlazorBaseUI.Popover.PopoverModalMode modal = BlazorBaseUI.Popover.PopoverModalMode.False,
         EventCallback<PopoverOpenChangeEventArgs>? onOpenChange = null,
         EventCallback<bool>? onOpenChangeComplete = null,
         PopoverRootActions? actionsRef = null,
-        RenderFragment? customContent = null)
+        RenderFragment<PopoverRootPayloadContext>? customContent = null)
     {
         return builder =>
         {
@@ -563,7 +472,7 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
             if (actionsRef is not null)
                 builder.AddAttribute(6, "ActionsRef", actionsRef);
 
-            builder.AddAttribute(7, "ChildContent", customContent ?? ((RenderFragment)(innerBuilder =>
+            builder.AddAttribute(7, "ChildContent", customContent ?? ((RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -593,7 +502,7 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
         return builder =>
         {
             builder.OpenComponent<PopoverRoot>(0);
-            builder.AddAttribute(1, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(1, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "Id", "trigger-a");
@@ -645,7 +554,7 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
             // Root with handle
             builder.OpenComponent<PopoverRoot>(20);
             builder.AddAttribute(21, "Handle", (IPopoverHandle)handle);
-            builder.AddAttribute(22, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(22, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverPortal>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>

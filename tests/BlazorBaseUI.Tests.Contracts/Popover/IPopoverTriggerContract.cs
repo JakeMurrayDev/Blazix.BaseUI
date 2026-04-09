@@ -15,10 +15,13 @@ public interface IPopoverTriggerContract
     Task HasFocusHandlersWhenOpenOnHover();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
-    Task RequiresContext();
     Task HasAriaDisabledWhenDisabledCustomElement();
     Task HasDataPressedWhenOpenViaClick();
     Task DoesNotHaveDataPressedWhenClosed();
+    Task DoesNotHaveDataPressedWhenHoverOpened();
     Task HasDataClickTriggerAttribute();
     Task InitializesHoverForHandleTrigger();
+    Task RendersFocusGuardsWhenOpenAndNonModal();
+    Task DoesNotRenderFocusGuardsWhenClosed();
+    Task DoesNotRenderFocusGuardsWhenModal();
 }

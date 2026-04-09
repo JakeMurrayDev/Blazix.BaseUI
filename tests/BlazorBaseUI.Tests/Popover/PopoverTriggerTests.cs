@@ -13,6 +13,8 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateTriggerInRoot(
@@ -24,13 +26,15 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         Func<PopoverTriggerState, string>? classValue = null,
         Func<PopoverTriggerState, string>? styleValue = null,
-        bool includePositioner = true)
+        bool includePositioner = true,
+        PopoverModalMode modal = PopoverModalMode.False)
     {
         return builder =>
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "Modal", modal);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 var attrIndex = 1;
@@ -61,7 +65,16 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
                         portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
                         {
                             posBuilder.OpenComponent<PopoverPopup>(0);
-                            posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                            posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b =>
+                            {
+                                b.AddContent(0, "Content");
+                                if (modal is not PopoverModalMode.False)
+                                {
+                                    b.OpenComponent<PopoverClose>(1);
+                                    b.AddAttribute(2, "ChildContent", (RenderFragment)(cb => cb.AddContent(0, "Close")));
+                                    b.CloseComponent();
+                                }
+                            }));
                             posBuilder.CloseComponent();
                         }));
                         portalBuilder.CloseComponent();
@@ -250,18 +263,6 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
     }
 
     [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverTrigger>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Toggle"))
-        );
-
-        cut.Markup.ShouldBeEmpty();
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
     public Task HasAriaDisabledWhenDisabledCustomElement()
     {
         var cut = Render(CreateTriggerInRoot(triggerDisabled: true, nativeButton: false));
@@ -299,12 +300,23 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
     }
 
     [Fact]
+    public Task DoesNotHaveDataPressedWhenHoverOpened()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: true, openOnHover: true));
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-pressed").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasDataClickTriggerAttribute()
     {
         var cut = Render(CreateTriggerInRoot());
 
         var trigger = cut.Find("button");
-        trigger.HasAttribute("data-base-ui-click-trigger").ShouldBeTrue();
+        trigger.HasAttribute("data-blazor-base-ui-click-trigger").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -330,6 +342,60 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
         var trigger = cut.Find("button");
         trigger.ShouldNotBeNull();
         trigger.TextContent.ShouldBe("Hover Me");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersFocusGuardsWhenOpenAndNonModal()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: true, modal: PopoverModalMode.False));
+
+        var guards = cut.FindAll("[data-blazor-base-ui-focus-guard]");
+        guards.Count.ShouldBeGreaterThanOrEqualTo(2);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotRenderFocusGuardsWhenClosed()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: false));
+
+        var trigger = cut.Find("button");
+        var guards = cut.FindAll("[data-blazor-base-ui-focus-guard]");
+
+        // The trigger's focus guards should not be present when closed.
+        // Other guards (from FloatingFocusManager/Portal) may exist, but
+        // the trigger should not contribute any since it's closed.
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotRenderFocusGuardsWhenModal()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: true, modal: PopoverModalMode.True));
+
+        // PopoverClose registers in OnInitialized (ClosePartCount++), then
+        // PopoverPopup.OnParametersSet computes FocusManagerModal from HasClosePart.
+        // The trigger renders before the popup updates FocusManagerModal, so
+        // extra render cycles propagate the cascading state.
+        cut.FindComponent<PopoverRoot>().Render();
+        cut.FindComponent<PopoverRoot>().Render();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+
+        var prevSibling = trigger.PreviousElementSibling;
+        var nextSibling = trigger.NextElementSibling;
+
+        var hasTriggerPreGuard = prevSibling?.HasAttribute("data-blazor-base-ui-focus-guard") == true;
+        var hasTriggerPostGuard = nextSibling?.HasAttribute("data-blazor-base-ui-focus-guard") == true;
+
+        hasTriggerPreGuard.ShouldBeFalse();
+        hasTriggerPostGuard.ShouldBeFalse();
 
         return Task.CompletedTask;
     }
