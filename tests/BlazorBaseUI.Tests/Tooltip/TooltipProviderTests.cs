@@ -12,6 +12,7 @@ public class TooltipProviderTests : BunitContext, ITooltipProviderContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupTooltipModule(JSInterop);
+        JsInteropSetup.SetupFloatingDelayGroupModule(JSInterop);
     }
 
     private RenderFragment CreateProvider(

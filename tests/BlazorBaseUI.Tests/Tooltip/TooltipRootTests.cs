@@ -219,37 +219,32 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
     }
 
     [Fact]
-    public async Task DisabledPreventsSubsequentOpens()
+    public Task DisabledPreventsSubsequentOpens()
     {
-        // Disabled prevents new opens but doesn't close an already-open tooltip
-        // When DefaultOpen=true and Disabled=true, the tooltip opens initially
-        // but subsequent programmatic opens should be blocked
-        var actions = new TooltipRootActions();
-        var cut = Render(CreateTooltip(defaultOpen: true, disabled: true, actionsRef: actions));
+        // Disabled auto-closes open tooltips and prevents new opens.
+        var cut = Render(CreateTooltip(defaultOpen: true, disabled: true));
 
-        // Initially open because DefaultOpen=true takes effect
-        cut.Find("[role='tooltip'][data-open]").ShouldNotBeNull();
-
-        // Close the tooltip
-        await cut.InvokeAsync(() => actions.Close?.Invoke());
-
-        // Try to reopen by focusing the trigger
-        var trigger = cut.Find("button");
-        await cut.InvokeAsync(() => trigger.Focus());
-
-        // Should still be closed because disabled prevents reopening
+        // Should be closed because disabled auto-closes open tooltips
         cut.FindAll("[role='tooltip'][data-open]").Count.ShouldBe(0);
+
+        // Try to open by focusing the trigger — should stay closed
+        var trigger = cut.Find("button");
+        trigger.Focus();
+
+        cut.FindAll("[role='tooltip'][data-open]").Count.ShouldBe(0);
+
+        return Task.CompletedTask;
     }
 
     [Fact]
     public Task DisabledDoesNotPreventInitialDefaultOpen()
     {
         // When both DefaultOpen=true and Disabled=true are set,
-        // the tooltip opens initially (disabled only blocks subsequent opens)
+        // the disabled auto-close fires in OnParametersSet, closing the tooltip.
         var cut = Render(CreateTooltip(defaultOpen: true, disabled: true));
 
-        // The tooltip should be open because DefaultOpen runs before disabled check
-        cut.Find("[role='tooltip'][data-open]").ShouldNotBeNull();
+        // The tooltip should be closed because disabled auto-closes open tooltips
+        cut.FindAll("[role='tooltip'][data-open]").Count.ShouldBe(0);
 
         return Task.CompletedTask;
     }

@@ -30,6 +30,8 @@
     private int lastEffectiveDelay = -1;
     private int lastEffectiveCloseDelay = -1;
     private bool lastUseJsHover;
+    private bool recentPointerDown;
+    private bool blockFocusOpen;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -62,10 +64,11 @@
 
     /// <summary>
     /// Gets or sets the delay in milliseconds before the tooltip opens on hover.
-    /// Defaults to <c>600</c>.
+    /// When <see langword="null"/>, falls back to the provider delay or <c>600</c>.
+    /// Defaults to <see langword="null"/>.
     /// </summary>
     [Parameter]
-    public int Delay { get; set; } = 600;
+    public int? Delay { get; set; }
 
     /// <summary>
     /// Gets or sets the delay in milliseconds before the tooltip closes after the cursor leaves.
@@ -78,9 +81,10 @@
     /// When true, uses JavaScript-based hover interaction with safePolygon support,
     /// allowing the user to move their cursor from the trigger to the tooltip popup
     /// without it closing. When false, uses C# Task.Delay for hover handling.
+    /// Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
-    public bool UseJsHover { get; set; }
+    public bool UseJsHover { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the ID of the trigger. In addition to being forwarded to the rendered element,
@@ -159,7 +163,20 @@
             Handle!.UpdateTriggerPayload(triggerId, Payload);
         }
 
+        var previousOpen = state.Open;
         var open = IsOpenedByThisTrigger();
+
+        if (previousOpen && !open)
+        {
+            var reason = HasHandle ? (TooltipOpenChangeReason?)null : RootContext?.OpenChangeReason;
+            if (reason is TooltipOpenChangeReason.EscapeKey
+                or TooltipOpenChangeReason.OutsidePress
+                or TooltipOpenChangeReason.TriggerPress)
+            {
+                blockFocusOpen = true;
+            }
+        }
+
         state = new TooltipTriggerState(open, IsDisabled);
         BuildComponentAttributes();
 
@@ -232,10 +249,7 @@
 
         attrs["type"] = "button";
 
-        if (IsDisabled)
-        {
-            attrs["disabled"] = true;
-        }
+        attrs["data-trigger-disabled"] = IsDisabled;
 
         var open = IsOpenedByThisTrigger();
         var popupId = RootContext?.PopupId;
@@ -249,8 +263,10 @@
 
         attrs["data-popup-open"] = open;
 
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
         attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
         attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
 
@@ -272,6 +288,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -284,6 +301,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -349,12 +367,17 @@
             return 0;
         }
 
-        return ProviderContext?.Delay ?? Delay;
+        return Delay ?? ProviderContext?.Delay ?? 600;
     }
 
     private int GetEffectiveCloseDelay()
     {
         return CloseDelay ?? ProviderContext?.CloseDelay ?? 0;
+    }
+
+    private void HandlePointerDown(PointerEventArgs e)
+    {
+        recentPointerDown = true;
     }
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
@@ -367,6 +390,13 @@
         }
 
         if (IsDisabled || (!HasRootContext && !HasHandle))
+        {
+            return;
+        }
+
+        // Don't open if another trigger already owns the tooltip
+        var activeId = HasHandle ? Handle!.ActiveTriggerId : RootContext?.ActiveTriggerId;
+        if (activeId is not null && activeId != triggerId)
         {
             return;
         }
@@ -398,8 +428,9 @@
                 await RequestOpenAsync(true, TooltipOpenChangeReason.TriggerHover);
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
 
         await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
@@ -446,8 +477,9 @@
                 await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerHover);
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
@@ -455,6 +487,19 @@
 
     private async Task HandleFocusAsync(FocusEventArgs e)
     {
+        if (recentPointerDown)
+        {
+            recentPointerDown = false;
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        if (blockFocusOpen)
+        {
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+            return;
+        }
+
         if (IsDisabled || (!HasRootContext && !HasHandle))
         {
             return;
@@ -473,6 +518,8 @@
 
     private async Task HandleBlurAsync(FocusEventArgs e)
     {
+        blockFocusOpen = false;
+
         if (IsDisabled || (!HasRootContext && !HasHandle))
         {
             return;
@@ -487,6 +534,19 @@
 
         await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerFocus);
         await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        recentPointerDown = false;
+
+        if (!IsDisabled && CloseOnClick && IsOpenedByThisTrigger())
+        {
+            blockFocusOpen = true;
+            await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerPress);
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
     private void CancelHoverDelay()
@@ -511,7 +571,7 @@
             var module = await ModuleTask.Value;
             var effectiveDelay = GetEffectiveDelay();
             var effectiveCloseDelay = GetEffectiveCloseDelay();
-            var disableHoverablePopup = RootContext.DisableHoverablePopup;
+            var disableHoverablePopup = RootContext.DisableHoverablePopup || RootContext.TrackCursorAxis == TrackCursorAxis.Both;
             await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
             hoverInitialized = true;
             lastEffectiveDelay = effectiveDelay;
@@ -519,6 +579,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -537,6 +598,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
 
         hoverInitialized = false;

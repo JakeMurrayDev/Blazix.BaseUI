@@ -150,7 +150,7 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
         var cut = Render(CreateTriggerInRoot(triggerDisabled: true));
 
         var trigger = cut.Find("button");
-        trigger.HasAttribute("disabled").ShouldBeTrue();
+        trigger.HasAttribute("data-trigger-disabled").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

@@ -1,10 +1,19 @@
-<CascadingValue Value="context" IsFixed="true">
-    @ChildContent
-</CascadingValue>
+@using BlazorBaseUI.FloatingDelayGroup
+
+@* FloatingDelayGroup uses OpenDelayMs for instant-phase bookkeeping only.
+   Individual trigger delays come from GetEffectiveDelay() which reads
+   ProviderContext.Delay (null when not set), not from the delay group. *@
+<FloatingDelayGroup OpenDelayMs="@(Delay ?? 600)" CloseDelayMs="@(CloseDelay ?? 0)" TimeoutMs="@Timeout">
+    <CascadingValue Value="context" IsFixed="true">
+        @ChildContent
+    </CascadingValue>
+</FloatingDelayGroup>
 
 @code {
-    private DateTime? lastClosedTime;
     private TooltipProviderContext context = null!;
+
+    [CascadingParameter]
+    private FloatingDelayGroupContext? DelayGroupContext { get; set; }
 
     /// <summary>
     /// Gets or sets the delay in milliseconds before the tooltip opens on hover.
@@ -40,10 +49,7 @@
         context = new TooltipProviderContext
         {
             Delay = Delay,
-            CloseDelay = CloseDelay,
-            Timeout = Timeout,
-            GetLastClosedTime = () => lastClosedTime,
-            SetLastClosedTime = SetLastClosedTime
+            CloseDelay = CloseDelay
         };
     }
 
@@ -52,11 +58,10 @@
     {
         context.Delay = Delay;
         context.CloseDelay = CloseDelay;
-        context.Timeout = Timeout;
-    }
 
-    private void SetLastClosedTime()
-    {
-        lastClosedTime = DateTime.UtcNow;
+        if (DelayGroupContext is not null)
+        {
+            context.SetInstantPhaseProvider(() => DelayGroupContext.IsInstantPhase);
+        }
     }
 }

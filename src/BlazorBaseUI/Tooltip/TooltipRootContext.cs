@@ -122,4 +122,29 @@ internal sealed class TooltipRootContext
     /// Gets or sets the delegate that forces the tooltip to unmount immediately.
     /// </summary>
     public Action ForceUnmount { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets whether a viewport component is mounted.
+    /// </summary>
+    public bool HasViewport { get; set; }
+
+    /// <summary>
+    /// Gets or sets the virtual anchor ID used for cursor tracking positioning.
+    /// </summary>
+    public string? VirtualAnchorId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the delegate that retrieves a trigger element by its ID.
+    /// </summary>
+    public Func<string, ElementReference?> GetTriggerElementById { get; set; } = _ => null;
+
+    /// <summary>
+    /// Gets or sets the delegate that returns the popup element reference.
+    /// </summary>
+    public Func<ElementReference?> GetPopupElement { get; set; } = () => null;
+
+    /// <summary>
+    /// Gets or sets the delegate that returns the positioner element reference.
+    /// </summary>
+    public Func<ElementReference?> GetPositionerElement { get; set; } = () => null;
 }

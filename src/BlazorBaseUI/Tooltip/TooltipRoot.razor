@@ -1,3 +1,4 @@
+@using BlazorBaseUI.FloatingDelayGroup
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @implements ITooltipHandleSubscriber
@@ -23,18 +24,21 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
-    private bool isMounted;
+    private readonly TransitionLifecycleManager transition = new();
     private string? activeTriggerId;
     private object? payload;
     private ElementReference? positionerElement;
     private ElementReference? popupElement;
     private TooltipOpenChangeReason openChangeReason = TooltipOpenChangeReason.None;
-    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private TooltipInstantType instantType = TooltipInstantType.None;
+    private TooltipInstantType? previousInstantType;
+    private bool preventUnmountOnClose;
     private TooltipRootState state;
     private TooltipRootContext context = null!;
     private DotNetObjectReference<TooltipRoot>? dotNetRef;
     private ITooltipHandle? subscribedHandle;
+    private DelayGroupMemberCallback? delayGroupCallback;
+    private DotNetObjectReference<DelayGroupMemberCallback>? delayGroupCallbackRef;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -42,6 +46,9 @@
 
     [CascadingParameter]
     private TooltipProviderContext? ProviderContext { get; set; }
+
+    [CascadingParameter]
+    private FloatingDelayGroupContext? DelayGroupContext { get; set; }
 
     /// <summary>
     /// Determines whether the tooltip is currently open.
@@ -146,7 +153,12 @@
     protected override void OnInitialized()
     {
         isOpen = DefaultOpen;
-        isMounted = CurrentOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
         activeTriggerId = DefaultTriggerId;
         state = new TooltipRootState(CurrentOpen);
         context = new TooltipRootContext
@@ -154,17 +166,17 @@
             RootId = rootId,
             PopupId = popupId,
             Open = CurrentOpen,
-            Mounted = isMounted,
+            Mounted = transition.IsMounted,
             Disabled = Disabled,
             OpenChangeReason = openChangeReason,
-            TransitionStatus = transitionStatus,
+            TransitionStatus = transition.TransitionStatus,
             InstantType = instantType,
             TrackCursorAxis = TrackCursorAxis,
             DisableHoverablePopup = DisableHoverablePopup,
             ActiveTriggerId = activeTriggerId,
             Payload = payload,
             GetOpen = () => CurrentOpen,
-            GetMounted = () => isMounted,
+            GetMounted = () => transition.IsMounted,
             GetPayload = () => payload,
             GetTriggerElement = GetTriggerElement,
             RegisterTriggerElement = RegisterTriggerElement,
@@ -173,7 +185,10 @@
             SetPopupElement = SetPopupElement,
             SetOpenAsync = SetOpenAsync,
             SetTriggerPayload = SetTriggerPayload,
-            ForceUnmount = ForceUnmount
+            ForceUnmount = ForceUnmount,
+            GetTriggerElementById = id => triggerElements.TryGetValue(id, out var el) ? el : null,
+            GetPopupElement = () => popupElement,
+            GetPositionerElement = () => positionerElement
         };
 
         if (ActionsRef is not null)
@@ -196,10 +211,10 @@
             state = new TooltipRootState(currentOpen);
             if (currentOpen)
             {
-                isMounted = true;
+                transition.BeginOpen();
             }
             context.Open = currentOpen;
-            context.Mounted = isMounted;
+            context.Mounted = transition.IsMounted;
         }
 
         if (TriggerId is not null)
@@ -208,7 +223,15 @@
             context.ActiveTriggerId = activeTriggerId;
         }
 
+        TrySetImplicitActiveTrigger();
+
         context.Disabled = Disabled;
+
+        if (Disabled && CurrentOpen)
+        {
+            _ = SetOpenAsync(false, TooltipOpenChangeReason.None, null);
+        }
+
         context.DisableHoverablePopup = DisableHoverablePopup;
         context.TrackCursorAxis = TrackCursorAxis;
 
@@ -236,6 +259,7 @@
             hasRendered = true;
             dotNetRef = DotNetObjectReference.Create(this);
             await InitializeJsAsync();
+            await RegisterDelayGroupMemberAsync();
         }
     }
 
@@ -267,15 +291,23 @@
     }
 
     /// <summary>
+    /// Handles an outside press event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOutsidePress()
+    {
+        await SetOpenAsync(false, TooltipOpenChangeReason.OutsidePress, null);
+    }
+
+    /// <summary>
     /// Handles the starting style application event from JavaScript interop.
     /// </summary>
     [JSInvokable]
     public void OnStartingStyleApplied()
     {
-        if (transitionStatus == TransitionStatus.Starting)
+        if (transition.HandleStartingStyleApplied())
         {
-            transitionStatus = TransitionStatus.Undefined;
-            context.TransitionStatus = transitionStatus;
+            context.TransitionStatus = transition.TransitionStatus;
             StateHasChanged();
         }
     }
@@ -287,12 +319,12 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        var unmounted = transition.HandleTransitionEnd(open, preventUnmountOnClose);
+        preventUnmountOnClose = false;
+        context.TransitionStatus = transition.TransitionStatus;
 
-        if (!open)
+        if (unmounted)
         {
-            isMounted = false;
             context.Mounted = false;
             activeTriggerId = null;
             context.ActiveTriggerId = null;
@@ -300,7 +332,15 @@
             context.Payload = null;
         }
 
-        instantType = TooltipInstantType.None;
+        if (previousInstantType.HasValue)
+        {
+            instantType = previousInstantType.Value;
+            previousInstantType = null;
+        }
+        else
+        {
+            instantType = TooltipInstantType.None;
+        }
         context.InstantType = instantType;
 
         _ = InvokeOpenChangeCompleteAsync(open);
@@ -312,11 +352,26 @@
     {
         UnsubscribeFromHandle();
 
+        if (DelayGroupContext is not null)
+        {
+            try
+            {
+                await DelayGroupContext.UnregisterMemberAsync(rootId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        delayGroupCallbackRef?.Dispose();
+
         if (moduleTask?.IsValueCreated == true && hasRendered)
         {
             try
             {
                 var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeCursorTracking", rootId);
                 await module.InvokeVoidAsync("disposeRoot", rootId);
                 await module.DisposeAsync();
             }
@@ -401,6 +456,11 @@
             return;
         }
 
+        if (!nextOpen)
+        {
+            preventUnmountOnClose = args.PreventUnmount;
+        }
+
         openChangeReason = reason;
         context.OpenChangeReason = reason;
 
@@ -427,8 +487,12 @@
             instantType = reason == TooltipOpenChangeReason.TriggerFocus
                 ? TooltipInstantType.Focus
                 : (ProviderContext?.IsInInstantPhase() == true ? TooltipInstantType.Delay : TooltipInstantType.None);
-            transitionStatus = TransitionStatus.Starting;
-            isMounted = true;
+            transition.BeginOpen();
+
+            if (DelayGroupContext is not null)
+            {
+                _ = DelayGroupContext.NotifyMemberOpenedAsync(rootId);
+            }
         }
         else
         {
@@ -437,14 +501,17 @@
                 TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.OutsidePress => TooltipInstantType.Dismiss,
                 _ => TooltipInstantType.None
             };
-            transitionStatus = TransitionStatus.Ending;
+            transition.BeginClose();
 
-            ProviderContext?.SetLastClosedTime();
+            if (DelayGroupContext is not null)
+            {
+                _ = DelayGroupContext.NotifyMemberClosedAsync(rootId);
+            }
         }
 
         context.InstantType = instantType;
-        context.TransitionStatus = transitionStatus;
-        context.Mounted = isMounted;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
 
         if (!IsControlled)
         {
@@ -454,6 +521,16 @@
         state = new TooltipRootState(nextOpen);
         context.Open = nextOpen;
 
+        TrySetImplicitActiveTrigger();
+
+        if (nextOpen && activeTriggerId is null)
+        {
+            payload = null;
+            context.Payload = null;
+        }
+
+        ApplyInstantPhaseOverride();
+
         SyncHandleState(nextOpen, activeTriggerId);
 
         if (hasRendered)
@@ -461,6 +538,26 @@
             try
             {
                 var module = await ModuleTask.Value;
+
+                // Manage cursor tracking lifecycle
+                if (nextOpen && TrackCursorAxis != TrackCursorAxis.None)
+                {
+                    var axis = TrackCursorAxis switch
+                    {
+                        TrackCursorAxis.X => "x",
+                        TrackCursorAxis.Y => "y",
+                        TrackCursorAxis.Both => "both",
+                        _ => "none"
+                    };
+                    var virtualId = await module.InvokeAsync<string?>("initializeCursorTracking", rootId, axis);
+                    context.VirtualAnchorId = virtualId;
+                }
+                else if (!nextOpen)
+                {
+                    await module.InvokeVoidAsync("disposeCursorTracking", rootId);
+                    context.VirtualAnchorId = null;
+                }
+
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -482,6 +579,8 @@
     {
         triggerElements[triggerId] = element;
 
+        TrySetImplicitActiveTrigger();
+
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
         {
             _ = SetTriggerElementJsAsync(element.Value);
@@ -496,6 +595,14 @@
     {
         triggerElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
+
+        if (activeTriggerId == triggerId && CurrentOpen)
+        {
+            activeTriggerId = null;
+            context.ActiveTriggerId = null;
+            payload = null;
+            context.Payload = null;
+        }
     }
 
     /// <summary>
@@ -545,7 +652,7 @@
     /// <summary>
     /// Gets whether the tooltip is currently mounted in the DOM.
     /// </summary>
-    internal bool GetMounted() => isMounted;
+    internal bool GetMounted() => transition.IsMounted;
 
     /// <summary>
     /// Gets the current payload value from the active trigger.
@@ -588,6 +695,31 @@
         }
     }
 
+    private async Task RegisterDelayGroupMemberAsync()
+    {
+        if (DelayGroupContext?.HasProvider != true)
+        {
+            return;
+        }
+
+        delayGroupCallback = new DelayGroupMemberCallback(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                try
+                {
+                    await SetOpenAsync(false, TooltipOpenChangeReason.None, null);
+                }
+                catch (Exception ex)
+                {
+                    await DispatchExceptionAsync(ex);
+                }
+            });
+        });
+        delayGroupCallbackRef = DotNetObjectReference.Create(delayGroupCallback);
+        await DelayGroupContext.RegisterMemberAsync(rootId, delayGroupCallbackRef);
+    }
+
     private async Task SetTriggerElementJsAsync(ElementReference element)
     {
         try
@@ -628,16 +760,48 @@
 
     private void ForceUnmount()
     {
-        isMounted = false;
+        transition.ForceUnmount();
         context.Mounted = false;
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        context.TransitionStatus = transition.TransitionStatus;
         activeTriggerId = null;
         context.ActiveTriggerId = null;
         payload = null;
         context.Payload = null;
         _ = InvokeOpenChangeCompleteAsync(false);
         StateHasChanged();
+    }
+
+    private void TrySetImplicitActiveTrigger()
+    {
+        if (CurrentOpen && activeTriggerId is null && triggerElements.Count == 1)
+        {
+            var entry = triggerElements.First();
+            activeTriggerId = entry.Key;
+            context.ActiveTriggerId = entry.Key;
+        }
+    }
+
+    private void ApplyInstantPhaseOverride()
+    {
+        var isEnding = transition.TransitionStatus == TransitionStatus.Ending;
+        var isClosingBySibling = isEnding && openChangeReason == TooltipOpenChangeReason.None;
+        var isInInstantPhaseAndNotEnding = !isEnding && ProviderContext?.IsInInstantPhase() == true;
+
+        if (isClosingBySibling || isInInstantPhaseAndNotEnding)
+        {
+            if (instantType != TooltipInstantType.Delay)
+            {
+                previousInstantType = instantType;
+            }
+            instantType = TooltipInstantType.Delay;
+            context.InstantType = instantType;
+        }
+        else if (previousInstantType.HasValue)
+        {
+            instantType = previousInstantType.Value;
+            previousInstantType = null;
+            context.InstantType = instantType;
+        }
     }
 
     private async Task InvokeOpenChangeCompleteAsync(bool open)

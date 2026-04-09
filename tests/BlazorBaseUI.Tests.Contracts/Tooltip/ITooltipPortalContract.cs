@@ -7,4 +7,7 @@ public interface ITooltipPortalContract
     Task RendersChildrenWhenKeepMounted();
     Task CascadesPortalContext();
     Task RequiresContext();
+    Task ForwardsAdditionalAttributes();
+    Task RendersWithCustomRender();
+    Task ExposesElementReference();
 }
