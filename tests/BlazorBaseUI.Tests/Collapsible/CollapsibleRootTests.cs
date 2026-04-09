@@ -255,7 +255,7 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
         var cut = Render(CreateCollapsibleRoot(
             onOpenChange: EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(this, args =>
             {
-                args.Canceled = true;
+                args.Cancel();
             })
         ));
 
@@ -319,6 +319,38 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
 
         var trigger = cut.Find("button");
         trigger.HasAttribute("data-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataDisabledOnRootWhenDisabled()
+    {
+        var cut = Render(CreateCollapsibleRoot(disabled: true));
+
+        var root = cut.Find("div[data-disabled]");
+        root.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AllowPropagationOnEventArgs()
+    {
+        var propagationAllowed = false;
+
+        var cut = Render(CreateCollapsibleRoot(
+            onOpenChange: EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(this, args =>
+            {
+                args.AllowPropagation();
+                propagationAllowed = args.IsPropagationAllowed;
+            })
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.Click();
+
+        propagationAllowed.ShouldBeTrue();
 
         return Task.CompletedTask;
     }

@@ -224,12 +224,16 @@ public class CollapsibleTriggerTests : BunitContext, ICollapsibleTriggerContract
     }
 
     [Fact]
-    public Task HasDisabledAttributeWhenDisabled()
+    public Task HasAriaDisabledWhenDisabled()
     {
         var cut = Render(CreateTriggerInRoot(disabled: true));
 
         var trigger = cut.Find("button");
-        trigger.HasAttribute("disabled").ShouldBeTrue();
+        // CollapsibleTrigger always uses focusableWhenDisabled=true,
+        // so it sets aria-disabled instead of the native disabled attribute
+        // to keep the element focusable for screen readers.
+        trigger.HasAttribute("disabled").ShouldBeFalse();
+        trigger.GetAttribute("aria-disabled").ShouldBe("true");
 
         return Task.CompletedTask;
     }

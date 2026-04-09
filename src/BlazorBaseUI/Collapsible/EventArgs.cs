@@ -12,16 +12,6 @@ public sealed class CollapsibleOpenChangeEventArgs : OpenChangeEventArgs<Collaps
     /// <param name="reason">The reason the open state changed.</param>
     public CollapsibleOpenChangeEventArgs(bool open, CollapsibleOpenChangeReason reason = CollapsibleOpenChangeReason.None)
         : base(open, reason) { }
-
-    /// <summary>
-    /// Gets whether the event should propagate to parent components.
-    /// </summary>
-    public bool IsPropagationAllowed { get; private set; }
-
-    /// <summary>
-    /// Allows the open state change event to propagate to parent components.
-    /// </summary>
-    public void AllowPropagation() => IsPropagationAllowed = true;
 }
 
 /// <summary>

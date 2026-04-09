@@ -18,4 +18,6 @@ public interface ICollapsibleRootContract
     Task HasDataOpenWhenOpen();
     Task HasDataClosedWhenClosed();
     Task HasDataDisabledWhenDisabled();
+    Task HasDataDisabledOnRootWhenDisabled();
+    Task AllowPropagationOnEventArgs();
 }

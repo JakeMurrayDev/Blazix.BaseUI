@@ -99,7 +99,7 @@
     private void HandleOpenChange(CollapsibleOpenChangeEventArgs args)
     {
         changeCount++;
-        lastCanceled = args.Canceled;
+        lastCanceled = args.IsCanceled;
         lastReason = args.Reason.ToString();
         lastOpen = args.Open;
     }

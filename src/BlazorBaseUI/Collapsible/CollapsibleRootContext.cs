@@ -18,10 +18,10 @@ internal sealed class CollapsibleRootContext
     public string PanelId { get; set; } = string.Empty;
 
     /// <summary>The callback to invoke when the trigger is activated.</summary>
-    public Action HandleTrigger { get; set; } = null!;
+    public Func<Task> HandleTrigger { get; set; } = null!;
 
     /// <summary>The callback to invoke when a <c>beforematch</c> event occurs.</summary>
-    public Action HandleBeforeMatch { get; set; } = null!;
+    public Func<Task> HandleBeforeMatch { get; set; } = null!;
 
     /// <summary>The callback to register the panel element identifier.</summary>
     public Action<string> SetPanelId { get; set; } = null!;
