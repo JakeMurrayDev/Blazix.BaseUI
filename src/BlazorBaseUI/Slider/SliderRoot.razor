@@ -30,12 +30,16 @@
     private SliderRootContext context = null!;
     private SliderRootState state = null!;
     private bool hasRendered;
+    private bool previousDisabled;
+    private bool needsBlurOnDisable;
+    private double[]? lastChangedValues;
     private double[] currentValues = null!;
     private double[] previousValues = null!;
     private int activeThumbIndex = -1;
     private int lastUsedThumbIndex = -1;
     private bool dragging;
     private string? defaultId;
+    private string? localLabelId;
     private ElementReference? controlElement;
     private ElementReference? indicatorElement;
     private RenderElement<SliderRootState>? renderElementReference;
@@ -270,6 +274,8 @@
 
     private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
+    private string RootLabelId => $"{ResolvedId}-label";
+
     private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
 
     private SliderRootState CurrentState => SliderRootState.FromFieldState(
@@ -307,7 +313,8 @@
             SetIndicatorElement = SetIndicatorElement,
             GetIndicatorElement = GetIndicatorElement,
             RegisterRealtimeSubscriber = RegisterRealtimeSubscriber,
-            UnregisterRealtimeSubscriber = UnregisterRealtimeSubscriber
+            UnregisterRealtimeSubscriber = UnregisterRealtimeSubscriber,
+            SetLabelId = SetLocalLabelId
         };
 
         var initialValue = IsRange ? (object)currentValues : currentValues[0];
@@ -316,7 +323,8 @@
         FieldContext?.RegisterFocusHandlerFunc(FocusFirstThumbAsync);
         FieldContext?.SubscribeFunc(this);
 
-        previousValues = [..currentValues];
+        previousValues = [.. currentValues];
+        previousDisabled = ResolvedDisabled;
 
         state = CurrentState;
         UpdateContext();
@@ -337,9 +345,23 @@
 
         if (hasRendered && !ValuesEqual(currentValues, previousValues))
         {
-            previousValues = [..currentValues];
+            previousValues = [.. currentValues];
             HandleValuesChanged();
         }
+
+        System.Diagnostics.Debug.Assert(Min < Max, "Slider 'Max' must be greater than 'Min'.");
+
+        if (ResolvedDisabled && activeThumbIndex != -1)
+        {
+            activeThumbIndex = -1;
+        }
+
+        if (ResolvedDisabled && !previousDisabled && hasRendered)
+        {
+            needsBlurOnDisable = true;
+        }
+
+        previousDisabled = ResolvedDisabled;
 
         state = CurrentState;
         UpdateContext();
@@ -353,6 +375,23 @@
         {
             hasRendered = true;
             await InitializeJsAsync();
+        }
+
+        if (needsBlurOnDisable)
+        {
+            needsBlurOnDisable = false;
+            try
+            {
+                var module = await ModuleTask.Value;
+                if (renderElementReference?.Element is { } el)
+                {
+                    await module.InvokeVoidAsync("blurActiveElement", el);
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
         }
     }
 
@@ -375,6 +414,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -395,9 +435,10 @@
         attrs["id"] = ResolvedId;
         attrs["role"] = "group";
 
-        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+        var resolvedLabelId = ResolveLabelId();
+        if (!string.IsNullOrEmpty(resolvedLabelId))
         {
-            attrs["aria-labelledby"] = LabelableContext.LabelId;
+            attrs["aria-labelledby"] = resolvedLabelId;
         }
 
         attrs["data-dragging"] = state.Dragging;
@@ -431,7 +472,8 @@
         context.ThumbAlignment = ThumbAlignment;
         context.Values = currentValues;
         context.State = state;
-        context.LabelId = LabelableContext?.LabelId;
+        context.LabelId = ResolveLabelId();
+        context.RootLabelId = RootLabelId;
         context.FormatOptions = Format;
         context.Locale = Locale;
         context.Validation = FieldContext?.Validation;
@@ -473,6 +515,16 @@
             return Values.Select(v => SliderUtilities.Clamp(v, Min, Max)).OrderBy(v => v).ToArray();
         }
         return currentValues;
+    }
+
+    private string? ResolveLabelId() => LabelableContext?.LabelId ?? localLabelId;
+
+    private void SetLocalLabelId(string? id)
+    {
+        localLabelId = id;
+        context.LabelId = ResolveLabelId();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private static bool ValuesEqual(double[] a, double[] b)
@@ -523,7 +575,7 @@
     {
         if (!IsControlled)
         {
-            currentValues = [..newValues];
+            currentValues = [.. newValues];
         }
     }
 
@@ -572,7 +624,7 @@
     {
         if (!IsControlled)
         {
-            currentValues = [..newValues];
+            currentValues = [.. newValues];
         }
 
         if (IsRange && ValuesChanged.HasDelegate)
@@ -584,6 +636,8 @@
             _ = ValueChanged.InvokeAsync(newValues[0]);
         }
 
+        lastChangedValues = [.. newValues];
+
         HandleValuesChanged();
         state = CurrentState;
         UpdateContext();
@@ -593,11 +647,14 @@
 
     private void CommitValue(double[] values, SliderChangeReason reason)
     {
+        var committedValues = lastChangedValues ?? values;
+        lastChangedValues = null;
+
         if (IsRange)
         {
             if (OnValuesCommitted.HasDelegate)
             {
-                var eventArgs = new SliderValueCommittedEventArgs<double[]>(values, reason);
+                var eventArgs = new SliderValueCommittedEventArgs<double[]>(committedValues, reason);
                 _ = OnValuesCommitted.InvokeAsync(eventArgs);
             }
         }
@@ -605,7 +662,7 @@
         {
             if (OnValueCommitted.HasDelegate)
             {
-                var eventArgs = new SliderValueCommittedEventArgs<double>(values[0], reason);
+                var eventArgs = new SliderValueCommittedEventArgs<double>(committedValues[0], reason);
                 _ = OnValueCommitted.InvokeAsync(eventArgs);
             }
         }
@@ -614,7 +671,7 @@
 
         if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
         {
-            var value = IsRange ? (object)values : values[0];
+            var value = IsRange ? (object)committedValues : committedValues[0];
             _ = FieldContext.Validation.CommitAsync(value);
         }
     }
@@ -711,6 +768,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -727,6 +785,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 }

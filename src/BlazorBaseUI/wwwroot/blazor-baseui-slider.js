@@ -1,3 +1,5 @@
+import { activeElement, contains, getTarget, getDocument, isElement } from './blazor-baseui-floating.js';
+
 const STATE_KEY = Symbol.for('BlazorBaseUI.Slider.State');
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = new WeakMap();
@@ -19,9 +21,11 @@ export function initialize(controlElement, dotNetRef, disabled, readOnly, orient
         latestValues: null,
         controlRect: null,
         config: null,
+        controlElement,
         thumbElements: [],
         indicatorElement: null,
-        boundHandlers: null
+        boundHandlers: null,
+        insetResizeObserver: null
     };
 
     state.set(controlElement, elementState);
@@ -31,21 +35,80 @@ export function dispose(controlElement) {
     if (!controlElement) return;
 
     const elementState = state.get(controlElement);
-    if (elementState && elementState.boundHandlers) {
-        document.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
-        document.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
-        document.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+    if (elementState) {
+        if (elementState.boundHandlers) {
+            const doc = getDocument(controlElement);
+            doc.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
+            doc.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
+            doc.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+        }
+        if (elementState.insetResizeObserver) {
+            elementState.insetResizeObserver.disconnect();
+        }
     }
 
     state.delete(controlElement);
 }
 
+export function registerPointerGuard(controlElement) {
+    if (!controlElement) return;
+
+    if (controlElement.__pointerGuardHandler) {
+        controlElement.removeEventListener('pointerdown', controlElement.__pointerGuardHandler);
+    }
+
+    function guardHandler(e) {
+        controlElement.__skipPointerDown = false;
+
+        if (e.defaultPrevented) {
+            controlElement.__skipPointerDown = true;
+            return;
+        }
+
+        const target = getTarget(e);
+        if (!isElement(target)) {
+            controlElement.__skipPointerDown = true;
+            return;
+        }
+
+        if (e.button !== 0) return;
+
+        // Capture pointer and prevent default synchronously to stop
+        // the browser from initiating native drag behavior (stop cursor).
+        // Focus is handled explicitly via focusThumbInput after startDrag.
+        e.preventDefault();
+        try {
+            controlElement.setPointerCapture(e.pointerId);
+        } catch (_) {
+            // Pointer may have been released
+        }
+    }
+
+    controlElement.__pointerGuardHandler = guardHandler;
+    controlElement.addEventListener('pointerdown', guardHandler);
+}
+
+export function unregisterPointerGuard(controlElement) {
+    if (!controlElement) return;
+    if (controlElement.__pointerGuardHandler) {
+        controlElement.removeEventListener('pointerdown', controlElement.__pointerGuardHandler);
+        delete controlElement.__pointerGuardHandler;
+        delete controlElement.__skipPointerDown;
+    }
+}
+
 export function startDrag(controlElement, dotNetRef, config, thumbElements, indicatorElement, clientX, clientY) {
     if (!controlElement) return null;
 
+    // Check if native pointer guard flagged this event to skip
+    if (controlElement.__skipPointerDown) {
+        controlElement.__skipPointerDown = false;
+        return null;
+    }
+
     // Convert thumbElements to a proper array (it comes from C# as array-like)
     const thumbArray = thumbElements ? Array.from(thumbElements).filter(el => el != null) : [];
-    
+
     if (thumbArray.length === 0) {
         return null;
     }
@@ -67,18 +130,23 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
             latestValues: null,
             controlRect: null,
             config: null,
+            controlElement,
             thumbElements: [],
             indicatorElement: null,
-            boundHandlers: null
+            boundHandlers: null,
+            insetResizeObserver: null
         };
         state.set(controlElement, elementState);
     }
 
+    elementState.controlElement = controlElement;
+
     // Clean up any previous drag state
     if (elementState.boundHandlers) {
-        document.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
-        document.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
-        document.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+        const doc = getDocument(controlElement);
+        doc.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
+        doc.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
+        doc.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
     }
 
     elementState.dotNetRef = dotNetRef;
@@ -94,8 +162,29 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
     const wasClickOnThumb = clickedThumbIndex >= 0;
     
     // Find closest thumb based on pointer position (for track clicks)
-    const closestIndex = wasClickOnThumb ? clickedThumbIndex : findClosestThumbByPosition(thumbArray, clientX, clientY, config.orientation);
+    let closestIndex = wasClickOnThumb ? clickedThumbIndex : findClosestThumbByPosition(thumbArray, clientX, clientY, config.orientation);
     elementState.pressedThumbIndex = closestIndex;
+
+    // When selected thumb is at max, walk backward to find leftmost thumb at max
+    if (closestIndex >= 0 && closestIndex < config.values.length && config.values[closestIndex] === config.max) {
+        let candidateIndex = closestIndex;
+        while (candidateIndex > 0 && config.values[candidateIndex - 1] === config.max) {
+            candidateIndex -= 1;
+        }
+        closestIndex = candidateIndex;
+        elementState.pressedThumbIndex = closestIndex;
+    }
+
+    // Detect if clicked thumb already contains the active element
+    let pressedOnFocusedThumb = false;
+    if (wasClickOnThumb) {
+        const doc = getDocument(controlElement);
+        const active = activeElement(doc);
+        const clickedThumb = thumbArray[closestIndex];
+        if (active && clickedThumb && contains(clickedThumb, active)) {
+            pressedOnFocusedThumb = true;
+        }
+    }
 
     // Only calculate thumb center offset when clicking directly on a thumb
     // For track clicks, we want the value calculated from the actual click position
@@ -127,9 +216,10 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
         };
     }
 
-    document.addEventListener('pointermove', elementState.boundHandlers.pointerMove);
-    document.addEventListener('pointerup', elementState.boundHandlers.pointerUp);
-    document.addEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+    const dragDoc = getDocument(controlElement);
+    dragDoc.addEventListener('pointermove', elementState.boundHandlers.pointerMove);
+    dragDoc.addEventListener('pointerup', elementState.boundHandlers.pointerUp);
+    dragDoc.addEventListener('pointercancel', elementState.boundHandlers.pointerUp);
 
     // Ensure values are proper numbers for C# deserialization
     const safeValues = (elementState.latestValues || config.values || [0]).map(v => {
@@ -139,7 +229,9 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
 
     return {
         thumbIndex: elementState.pressedThumbIndex >= 0 ? elementState.pressedThumbIndex : 0,
-        values: safeValues
+        values: safeValues,
+        pressedOnFocusedThumb: pressedOnFocusedThumb,
+        wasTrackPress: !wasClickOnThumb
     };
 }
 
@@ -207,6 +299,12 @@ function handlePointerMove(controlElement, e) {
     const elementState = state.get(controlElement);
     if (!elementState || !elementState.dragging || !elementState.config) return;
 
+    // Phantom move guard — button released outside window without pointerup
+    if (e.buttons === 0) {
+        handlePointerUp(controlElement, e);
+        return;
+    }
+
     const config = elementState.config;
     const newValue = calculateFingerValueInternal(controlElement, e.clientX, e.clientY, config, elementState.thumbCenterOffset);
 
@@ -242,9 +340,10 @@ function handlePointerUp(controlElement, e) {
     if (!elementState) return;
 
     if (elementState.boundHandlers) {
-        document.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
-        document.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
-        document.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+        const doc = getDocument(controlElement);
+        doc.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
+        doc.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
+        doc.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
     }
 
     const wasDragging = elementState.dragging;
@@ -296,6 +395,15 @@ function updateIndicatorPosition(elementState, config) {
     const indicator = elementState.indicatorElement;
     if (!indicator || !elementState.latestValues) return;
 
+    if (config.thumbAlignment === 'edge') {
+        updateIndicatorInsetPosition(elementState, config);
+    } else {
+        updateIndicatorCenteredPosition(elementState, config);
+    }
+}
+
+function updateIndicatorCenteredPosition(elementState, config) {
+    const indicator = elementState.indicatorElement;
     const values = elementState.latestValues;
     const vertical = config.orientation === 'vertical';
     const isRange = values.length > 1;
@@ -330,6 +438,62 @@ function updateIndicatorPosition(elementState, config) {
             indicator.style.width = `${size}%`;
         }
     }
+}
+
+function updateIndicatorInsetPosition(elementState, config) {
+    const indicator = elementState.indicatorElement;
+    const controlElement = elementState.controlElement;
+    const thumbElements = elementState.thumbElements;
+    if (!indicator || !controlElement || !thumbElements || thumbElements.length === 0) return;
+
+    const values = elementState.latestValues;
+    const vertical = config.orientation === 'vertical';
+    const isRange = values.length > 1;
+
+    const startPosition = computeInsetPercent(
+        thumbElements[0], controlElement, values[0], config.min, config.max, vertical);
+
+    let endPosition = startPosition;
+    if (isRange && thumbElements.length > 1) {
+        endPosition = computeInsetPercent(
+            thumbElements[thumbElements.length - 1], controlElement,
+            values[values.length - 1], config.min, config.max, vertical);
+    }
+
+    const startEdge = vertical ? 'bottom' : 'insetInlineStart';
+    const mainSide = vertical ? 'height' : 'width';
+    const crossSide = vertical ? 'width' : 'height';
+
+    indicator.style.position = vertical ? 'absolute' : 'relative';
+    indicator.style[crossSide] = 'inherit';
+    indicator.style.setProperty('--start-position', `${startPosition ?? 0}%`);
+
+    if (!isRange) {
+        indicator.style[startEdge] = '0';
+        indicator.style[mainSide] = 'var(--start-position)';
+    } else {
+        indicator.style.setProperty('--relative-size', `${(endPosition ?? 0) - (startPosition ?? 0)}%`);
+        indicator.style[startEdge] = 'var(--start-position)';
+        indicator.style[mainSide] = 'var(--relative-size)';
+    }
+
+    indicator.style.visibility =
+        (startPosition === undefined || (isRange && endPosition === undefined)) ? 'hidden' : '';
+}
+
+function computeInsetPercent(thumbElement, controlElement, thumbValue, min, max, vertical) {
+    if (!thumbElement || !controlElement) return undefined;
+
+    const thumbRect = thumbElement.getBoundingClientRect();
+    const controlRect = controlElement.getBoundingClientRect();
+    const side = vertical ? 'height' : 'width';
+    const thumbValuePercent = valueToPercent(thumbValue, min, max);
+
+    const controlSize = controlRect[side] - thumbRect[side];
+    const thumbOffsetFromControlEdge = thumbRect[side] / 2 + (controlSize * thumbValuePercent) / 100;
+    const nextPositionPercent = (thumbOffsetFromControlEdge / controlRect[side]) * 100;
+
+    return Number.isFinite(nextPositionPercent) ? nextPositionPercent : undefined;
 }
 
 function valueToPercent(value, min, max) {
@@ -417,7 +581,7 @@ function resolveCollision(config, currentValues, pressedValues, pressedIndex, ne
         case 'swap':
             return resolveSwapCollision(config, currentValues, pressedValues, pressedIndex, nextValue, minValueDifference);
         case 'push':
-            return resolvePushCollision(config, currentValues, pressedIndex, nextValue, minValueDifference);
+            return resolvePushCollision(config, currentValues, pressedValues, pressedIndex, nextValue, minValueDifference);
         case 'none':
         default:
             return resolveNoneCollision(config, currentValues, pressedIndex, nextValue, minValueDifference);
@@ -454,11 +618,16 @@ function resolveSwapCollision(config, currentValues, pressedValues, pressedIndex
         return { values: candidateValues, thumbIndex: pressedIndex, didSwap: false };
     }
 
+    const initialValuesForPush = candidateValues.map((_, idx) => {
+        if (idx === pressedIndex) return candidateValues[pressedIndex];
+        return (pressedValues && pressedValues[idx] !== undefined) ? pressedValues[idx] : currentValues[idx];
+    });
+
     const nextValueForTarget = shouldSwapForward
         ? Math.max(nextValue, candidateValues[targetIndex])
         : Math.min(nextValue, candidateValues[targetIndex]);
 
-    const adjustedValues = getPushedThumbValues(candidateValues, targetIndex, nextValueForTarget, config, minValueDifference);
+    const adjustedValues = getPushedThumbValues(candidateValues, targetIndex, nextValueForTarget, config, minValueDifference, initialValuesForPush);
 
     const neighborIndex = shouldSwapForward ? targetIndex - 1 : targetIndex + 1;
     if (neighborIndex >= 0 && neighborIndex < adjustedValues.length) {
@@ -477,7 +646,7 @@ function resolveSwapCollision(config, currentValues, pressedValues, pressedIndex
     return { values: adjustedValues, thumbIndex: targetIndex, didSwap: true };
 }
 
-function resolvePushCollision(config, currentValues, pressedIndex, nextValue, minValueDifference) {
+function resolvePushCollision(config, currentValues, pressedValues, pressedIndex, nextValue, minValueDifference) {
     const pushedValues = getPushedThumbValues([...currentValues], pressedIndex, nextValue, config, minValueDifference);
     return { values: pushedValues, thumbIndex: pressedIndex, didSwap: false };
 }
@@ -495,26 +664,43 @@ function resolveNoneCollision(config, currentValues, pressedIndex, nextValue, mi
     return { values: candidateValues, thumbIndex: pressedIndex, didSwap: false };
 }
 
-function getPushedThumbValues(values, index, nextValue, config, minDistance) {
+function getPushedThumbValues(values, index, nextValue, config, minDistance, initialValues) {
     if (index < 0 || index >= values.length) {
         return values;
     }
 
     const result = [...values];
-    result[index] = clamp(nextValue, config.min, config.max);
+    const lastIndex = result.length - 1;
+    const baseInitialValues = initialValues || values;
 
-    for (let i = index + 1; i < result.length; i++) {
+    const indexMin = config.min + index * minDistance;
+    const indexMax = config.max - (lastIndex - index) * minDistance;
+    result[index] = clamp(nextValue, indexMin, indexMax);
+
+    for (let i = index + 1; i <= lastIndex; i++) {
         const minAllowed = result[i - 1] + minDistance;
-        if (result[i] < minAllowed) {
-            result[i] = Math.min(minAllowed, config.max - (result.length - 1 - i) * minDistance);
+        const maxAllowed = config.max - (lastIndex - i) * minDistance;
+        const initialValue = baseInitialValues[i] !== undefined ? baseInitialValues[i] : result[i];
+        let candidate = Math.max(result[i], minAllowed);
+
+        if (initialValue < candidate) {
+            candidate = Math.max(initialValue, minAllowed);
         }
+
+        result[i] = clamp(candidate, minAllowed, maxAllowed);
     }
 
     for (let i = index - 1; i >= 0; i--) {
         const maxAllowed = result[i + 1] - minDistance;
-        if (result[i] > maxAllowed) {
-            result[i] = Math.max(maxAllowed, config.min + i * minDistance);
+        const minAllowed = config.min + i * minDistance;
+        const initialValue = baseInitialValues[i] !== undefined ? baseInitialValues[i] : result[i];
+        let candidate = Math.min(result[i], maxAllowed);
+
+        if (initialValue > candidate) {
+            candidate = Math.min(initialValue, maxAllowed);
         }
+
+        result[i] = clamp(candidate, minAllowed, maxAllowed);
     }
 
     for (let i = 0; i < result.length; i++) {
@@ -586,8 +772,168 @@ export function focusThumbInput(thumbElement) {
 
     const input = thumbElement.querySelector('input[type="range"]');
     if (input) {
-        input.focus({ preventScroll: true });
+        input.focus({ preventScroll: true, focusVisible: false });
     }
+}
+
+export function blurActiveElement(containerElement) {
+    if (!containerElement) return;
+
+    const doc = getDocument(containerElement);
+    const activeEl = activeElement(doc);
+    if (activeEl && contains(containerElement, activeEl)) {
+        activeEl.blur();
+    }
+}
+
+export function syncInsetPositions(controlElement, thumbElements, indicatorElement, config) {
+    if (!controlElement) return;
+
+    const thumbArray = thumbElements ? Array.from(thumbElements).filter(el => el != null) : [];
+    if (thumbArray.length === 0) return;
+
+    if (indicatorElement) {
+        const tempState = {
+            indicatorElement,
+            controlElement,
+            thumbElements: thumbArray,
+            latestValues: config.values
+        };
+
+        updateIndicatorInsetPosition(tempState, config);
+    }
+
+    const vertical = config.orientation === 'vertical';
+    for (let i = 0; i < thumbArray.length && i < config.values.length; i++) {
+        const thumb = thumbArray[i];
+        if (!thumb) continue;
+
+        const position = computeInsetPercent(
+            thumb, controlElement, config.values[i], config.min, config.max, vertical);
+
+        if (position === undefined) {
+            thumb.style.visibility = 'hidden';
+        } else {
+            thumb.style.visibility = '';
+            if (vertical) {
+                thumb.style.bottom = `${position}%`;
+            } else {
+                thumb.style.insetInlineStart = `${position}%`;
+            }
+        }
+    }
+}
+
+export function observeInsetResize(controlElement, thumbElements, indicatorElement, config) {
+    const elementState = state.get(controlElement);
+    if (!elementState || typeof ResizeObserver !== 'function') return;
+
+    if (elementState.insetResizeObserver) {
+        elementState.insetResizeObserver.disconnect();
+    }
+
+    const thumbArray = thumbElements ? Array.from(thumbElements).filter(el => el != null) : [];
+
+    const observer = new ResizeObserver(() => {
+        if (elementState.dragging) return;
+        syncInsetPositions(controlElement, thumbArray, indicatorElement, config);
+    });
+
+    observer.observe(controlElement);
+    for (const thumb of thumbArray) {
+        observer.observe(thumb);
+    }
+
+    elementState.insetResizeObserver = observer;
+}
+
+export function unobserveInsetResize(controlElement) {
+    const elementState = state.get(controlElement);
+    if (elementState?.insetResizeObserver) {
+        elementState.insetResizeObserver.disconnect();
+        elementState.insetResizeObserver = null;
+    }
+}
+
+const SLIDER_KEYS = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'Home', 'End', 'PageUp', 'PageDown'
+]);
+
+const ARROW_KEYS = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'
+]);
+
+export function registerThumbInput(inputElement, dotNetRef) {
+    if (!inputElement || !dotNetRef) return;
+
+    if (inputElement.__sliderThumbState) {
+        inputElement.__sliderThumbState.dotNetRef = dotNetRef;
+        return;
+    }
+
+    const thumbState = {
+        dotNetRef,
+        restoringFocusVisible: false
+    };
+
+    function handleKeyDown(e) {
+        if (!SLIDER_KEYS.has(e.key)) return;
+
+        e.preventDefault();
+
+        if (ARROW_KEYS.has(e.key)) {
+            e.stopPropagation();
+        }
+
+        try {
+            if (!inputElement.matches(':focus-visible')) {
+                thumbState.restoringFocusVisible = true;
+                inputElement.blur();
+                inputElement.focus({ preventScroll: true, focusVisible: true });
+            }
+        } catch (_) {
+            // :focus-visible not supported — skip restoration
+        } finally {
+            thumbState.restoringFocusVisible = false;
+        }
+
+        thumbState.dotNetRef.invokeMethodAsync('HandleKeyFromJs', e.key, e.shiftKey);
+    }
+
+    function handleBlur(e) {
+        if (thumbState.restoringFocusVisible) {
+            e.stopPropagation();
+        }
+    }
+
+    function handleFocus(e) {
+        if (thumbState.restoringFocusVisible) {
+            e.stopPropagation();
+        }
+    }
+
+    inputElement.addEventListener('keydown', handleKeyDown);
+    inputElement.addEventListener('blur', handleBlur);
+    inputElement.addEventListener('focus', handleFocus);
+
+    thumbState.handleKeyDown = handleKeyDown;
+    thumbState.handleBlur = handleBlur;
+    thumbState.handleFocus = handleFocus;
+    inputElement.__sliderThumbState = thumbState;
+}
+
+export function unregisterThumbInput(inputElement) {
+    if (!inputElement) return;
+
+    const thumbState = inputElement.__sliderThumbState;
+    if (!thumbState) return;
+
+    inputElement.removeEventListener('keydown', thumbState.handleKeyDown);
+    inputElement.removeEventListener('blur', thumbState.handleBlur);
+    inputElement.removeEventListener('focus', thumbState.handleFocus);
+
+    delete inputElement.__sliderThumbState;
 }
 
 export function stopDrag(controlElement) {
@@ -595,9 +941,10 @@ export function stopDrag(controlElement) {
     if (!elementState) return;
 
     if (elementState.boundHandlers) {
-        document.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
-        document.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
-        document.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
+        const doc = getDocument(controlElement);
+        doc.removeEventListener('pointermove', elementState.boundHandlers.pointerMove);
+        doc.removeEventListener('pointerup', elementState.boundHandlers.pointerUp);
+        doc.removeEventListener('pointercancel', elementState.boundHandlers.pointerUp);
     }
 
     elementState.dragging = false;

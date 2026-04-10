@@ -112,7 +112,14 @@
         if (Context is null)
             return string.Empty;
 
-        var values = Context.Values;
+        return Context.Inset
+            ? GetInsetIndicatorStyle()
+            : GetCenteredIndicatorStyle();
+    }
+
+    private string GetCenteredIndicatorStyle()
+    {
+        var values = Context!.Values;
         var min = Context.Min;
         var max = Context.Max;
 
@@ -140,6 +147,41 @@
 
             var size = endPercent - startPercent;
             return $"position: relative; height: inherit; inset-inline-start: {startPercent.ToString("F4", CultureInfo.InvariantCulture)}%; width: {size.ToString("F4", CultureInfo.InvariantCulture)}%;";
+        }
+    }
+
+    private string GetInsetIndicatorStyle()
+    {
+        var values = Context!.Values;
+        var min = Context.Min;
+        var max = Context.Max;
+
+        var startPercent = SliderUtilities.ValueToPercent(values[0], min, max);
+        var endPercent = IsRange
+            ? SliderUtilities.ValueToPercent(values[^1], min, max)
+            : startPercent;
+
+        var startStr = startPercent.ToString("F4", CultureInfo.InvariantCulture);
+
+        if (IsVertical)
+        {
+            if (!IsRange)
+            {
+                return $"visibility: hidden; position: absolute; width: inherit; --start-position: {startStr}%; bottom: 0; height: var(--start-position);";
+            }
+
+            var relativeSize = (endPercent - startPercent).ToString("F4", CultureInfo.InvariantCulture);
+            return $"visibility: hidden; position: absolute; width: inherit; --start-position: {startStr}%; --relative-size: {relativeSize}%; bottom: var(--start-position); height: var(--relative-size);";
+        }
+        else
+        {
+            if (!IsRange)
+            {
+                return $"visibility: hidden; position: relative; height: inherit; --start-position: {startStr}%; inset-inline-start: 0; width: var(--start-position);";
+            }
+
+            var relativeSize = (endPercent - startPercent).ToString("F4", CultureInfo.InvariantCulture);
+            return $"visibility: hidden; position: relative; height: inherit; --start-position: {startStr}%; --relative-size: {relativeSize}%; inset-inline-start: var(--start-position); width: var(--relative-size);";
         }
     }
 }

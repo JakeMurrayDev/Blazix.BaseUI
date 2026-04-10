@@ -10,4 +10,11 @@ public interface ISliderTrackContract
     Task HasPositionRelativeStyle();
     Task HasDataOrientation();
     Task HasDataDisabledWhenDisabled();
+    Task HasDataDraggingWhenDragging();
+    Task HasDataValidWhenValid();
+    Task HasDataInvalidWhenInvalid();
+    Task DoesNotHaveDataValidOrInvalidWhenValidIsNull();
+    Task HasDataTouchedWhenTouched();
+    Task HasDataDirtyWhenDirty();
+    Task HasDataFocusedWhenFocused();
 }

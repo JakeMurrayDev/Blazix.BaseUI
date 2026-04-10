@@ -1,3 +1,4 @@
+@using System.Globalization
 @implements IDisposable
 
 <RenderElement TState="SliderRootState"
@@ -157,7 +158,7 @@
         }
 
         var displayValue = string.Join(" \u2013 ", formattedValues.Select((f, i) =>
-            !string.IsNullOrEmpty(f) ? f : Context.Values[i].ToString(Context.Locale)));
+            !string.IsNullOrEmpty(f) ? f : Context.Values[i].ToString(CultureInfo.InvariantCulture)));
 
         return builder => builder.AddContent(0, displayValue);
     }

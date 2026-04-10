@@ -55,6 +55,31 @@ public class SliderTrackTests : BunitContext, ISliderTrackContract
         };
     }
 
+    private RenderFragment CreateTrackWithContext(
+        SliderRootState state,
+        IReadOnlyDictionary<string, object>? additionalAttributes = null)
+    {
+        return builder =>
+        {
+            var context = new SliderRootContext { State = state };
+            builder.OpenComponent<CascadingValue<SliderRootContext>>(0);
+            builder.AddAttribute(1, "Value", context);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderTrack>(0);
+                var mergedAttrs = new Dictionary<string, object> { { "data-testid", "slider-track" } };
+                if (additionalAttributes is not null)
+                {
+                    foreach (var kvp in additionalAttributes)
+                        mergedAttrs[kvp.Key] = kvp.Value;
+                }
+                innerBuilder.AddAttribute(1, "AdditionalAttributes", (IReadOnlyDictionary<string, object>)mergedAttrs);
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersAsDivByDefault()
     {
@@ -158,6 +183,93 @@ public class SliderTrackTests : BunitContext, ISliderTrackContract
 
         var track = cut.Find("[data-testid='slider-track']");
         track.HasAttribute("data-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataDraggingWhenDragging()
+    {
+        var state = SliderRootState.Default with { Dragging = true };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-dragging").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataValidWhenValid()
+    {
+        var state = SliderRootState.Default with { Valid = true };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-valid").ShouldBeTrue();
+        track.HasAttribute("data-invalid").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataInvalidWhenInvalid()
+    {
+        var state = SliderRootState.Default with { Valid = false };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-invalid").ShouldBeTrue();
+        track.HasAttribute("data-valid").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotHaveDataValidOrInvalidWhenValidIsNull()
+    {
+        var state = SliderRootState.Default with { Valid = null };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-valid").ShouldBeFalse();
+        track.HasAttribute("data-invalid").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataTouchedWhenTouched()
+    {
+        var state = SliderRootState.Default with { Touched = true };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-touched").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataDirtyWhenDirty()
+    {
+        var state = SliderRootState.Default with { Dirty = true };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-dirty").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataFocusedWhenFocused()
+    {
+        var state = SliderRootState.Default with { Focused = true };
+        var cut = Render(CreateTrackWithContext(state));
+
+        var track = cut.Find("[data-testid='slider-track']");
+        track.HasAttribute("data-focused").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
