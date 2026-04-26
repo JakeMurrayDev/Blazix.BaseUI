@@ -45,6 +45,8 @@
     private int prevItemMapSize;
     private bool itemMapSubscribed;
     private string? scrollLockToken;
+    private bool scrollLockDesired;
+    private Task scrollLockOp = Task.CompletedTask;
     private ElementReference? lastPositionerElement;
 
     [CascadingParameter]
@@ -253,13 +255,15 @@
         var shouldScrollLock =
             (alignItemWithTriggerActive || modal) && open && openMethod != InteractionType.Touch;
 
-        if (shouldScrollLock && scrollLockToken is null)
+        // Use a synchronous desired-state flag and a chained task to prevent
+        // double-acquire races when multiple renders fire before the async
+        // apply completes (e.g., SelectLabel's NotifyStateChanged triggers an
+        // extra render cycle that would otherwise enter the null-token branch
+        // twice and leave lockCount permanently elevated).
+        if (shouldScrollLock != scrollLockDesired)
         {
-            _ = ApplyScrollLockAsync();
-        }
-        else if (!shouldScrollLock && scrollLockToken is not null)
-        {
-            _ = ReleaseScrollLockAsync();
+            scrollLockDesired = shouldScrollLock;
+            scrollLockOp = ScheduleScrollLockAsync(scrollLockOp, shouldScrollLock);
         }
 
         var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
@@ -301,8 +305,15 @@
             {
                 await InitializePositionerAsync();
             }
-            else if (!DisableAnchorTracking)
+            else if (!DisableAnchorTracking && !alignItemWithTriggerActive)
             {
+                // Skip floating-ui re-positioning when alignItemWithTrigger is active.
+                // The popup-level `beginAlignItemWithTriggerPlacement` pass owns placement
+                // in that mode; running `updatePosition` here overwrites those styles
+                // with the standard bottom-of-trigger layout, producing a visible flash
+                // (notably during exit transitions, when no microtask re-applies
+                // align-item styles afterward). Mirrors React's discard of
+                // `positioning.positionerStyles` in favor of FIXED while align-item is on.
                 await UpdatePositionAsync();
             }
         }
@@ -323,7 +334,23 @@
             RootContext.AlignItemWithTriggerActive = false;
         }
 
-        await ReleaseScrollLockAsync();
+        // Drain any pending scroll lock reconciliation so Apply has a chance
+        // to publish its token before we attempt the final release.
+        scrollLockDesired = false;
+        try
+        {
+            await scrollLockOp;
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+        }
+
+        if (scrollLockToken is not null)
+        {
+            await ReleaseScrollLockAsync();
+        }
+
         await positionerInterop.DisposeAsync();
         positionerDotNetRef?.Dispose();
 
@@ -662,6 +689,30 @@
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex;
+        }
+    }
+
+    private async Task ScheduleScrollLockAsync(Task previous, bool desired)
+    {
+        try
+        {
+            await previous;
+        }
+        catch (Exception ex)
+        {
+            // Prior operation may have faulted, but any JS/circuit errors
+            // are already swallowed inside Apply/Release. Continue so the
+            // next reconcile step can still run.
+            _ = ex;
+        }
+
+        if (desired && scrollLockToken is null)
+        {
+            await ApplyScrollLockAsync();
+        }
+        else if (!desired && scrollLockToken is not null)
+        {
+            await ReleaseScrollLockAsync();
         }
     }
 

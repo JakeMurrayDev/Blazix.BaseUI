@@ -168,10 +168,16 @@
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
         }
 
-        // Clear positioner styles when the popup closes or align-item mode turns off.
-        var wasActiveAndOpen = previousOpen && previousAlignActive;
         var isActiveAndOpen = open && alignActive;
-        if (wasActiveAndOpen && !isActiveAndOpen)
+
+        // Clear positioner styles only when BOTH open and align-item mode are false,
+        // matching React's `if (open || alignItemWithTriggerActive) return;` guard in
+        // useIsoLayoutEffect. Clearing while still mounted during the close transition
+        // restores the saved `top: '0', left: '0'` fallbacks, which causes the popup
+        // to visibly jump to the top-left of the viewport during the exit animation.
+        var bothInactiveNow = !open && !alignActive;
+        var bothInactivePrev = !previousOpen && !previousAlignActive;
+        if (bothInactiveNow && !bothInactivePrev)
         {
             try
             {

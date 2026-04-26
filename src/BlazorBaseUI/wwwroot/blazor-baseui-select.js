@@ -436,6 +436,7 @@ function setActiveItem(rootState, items, index) {
 function saveOriginalPositionerStyles(popupState, positionerElement) {
     if (popupState.savedPositionerStyles) return;
     popupState.originalPositionerStyles = {
+        position: positionerElement.style.position,
         top: positionerElement.style.top || '0',
         left: positionerElement.style.left || '0',
         right: positionerElement.style.right,
@@ -618,9 +619,8 @@ export function setRootOpen(rootId, isOpen, reason) {
     rootState.isOpen = isOpen;
 
     if (isOpen) {
-        if (rootState.modal) {
-            rootState.scrollLockCleanup = acquireScrollLock();
-        }
+        // Scroll lock is owned exclusively by SelectPositioner (C#-side) to cover
+        // both modal and alignItemWithTrigger cases, and to avoid double-locking.
 
         function waitForPopupAndFocus() {
             let attempts = 0;
@@ -664,11 +664,24 @@ export function setRootOpen(rootId, isOpen, reason) {
 
         function setupOpenTransition() {
             const popupEl = rootState.listElement || rootState.popupElement;
-            if (popupEl && checkForTransitionOrAnimation(popupEl)) {
-                setupTransitionEndListener(rootState, true);
-            } else if (rootState.dotNetRef && rootState.isOpen) {
-                rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', true).catch(() => { });
-            }
+            const hasTransition = popupEl ? checkForTransitionOrAnimation(popupEl) : false;
+
+            // Double-RAF ensures the browser paints the starting styles first,
+            // then observes the attribute change that triggers the opening CSS transition.
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (!rootState.isOpen) return;
+
+                    if (hasTransition) {
+                        setupTransitionEndListener(rootState, true);
+                    } else if (rootState.dotNetRef) {
+                        rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', true).catch(() => { });
+                    }
+                    if (rootState.dotNetRef) {
+                        rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
+                    }
+                });
+            });
         }
 
         requestAnimationFrame(() => {
@@ -677,6 +690,8 @@ export function setRootOpen(rootId, isOpen, reason) {
             }
         });
     } else {
+        // Safety net: release any legacy scroll lock that may have been set prior to
+        // the positioner taking exclusive ownership. New code paths never set this.
         if (rootState.scrollLockCleanup) {
             rootState.scrollLockCleanup();
             rootState.scrollLockCleanup = null;
@@ -1366,18 +1381,15 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             const maxRight = viewportWidth - paddingRight;
             const rightOverflow = Math.max(0, left + positionerRect.width - maxRight);
 
-            positionerElement.style.left = `${left - rightOverflow}px`;
-            positionerElement.style.height = `${height}px`;
-            positionerElement.style.maxHeight = 'auto';
-            positionerElement.style.marginTop = `${marginTop}px`;
-            positionerElement.style.marginBottom = `${marginBottom}px`;
-            popupElement.style.height = '100%';
-
-            const maxScrollTop = getMaxScrollTop(scroller);
-            const isTopPositioned = scrollTop >= maxScrollTop - SCROLL_EDGE_TOLERANCE_PX;
+            // === Measurement phase: project post-commit layout without mutating the DOM ===
+            // Once the mutations below are applied, the scroll container's clientHeight
+            // will equal `height` (popup fills positioner at 100%), so maxScrollTop is
+            // deterministic: scrollHeight - height.
+            const projectedMaxScrollTop = Math.max(0, scrollHeight - height);
+            const isTopPositioned = scrollTop >= projectedMaxScrollTop - SCROLL_EDGE_TOLERANCE_PX;
 
             if (isTopPositioned) {
-                height = Math.min(viewportHeight, positionerRect.height) - (scrollTop - maxScrollTop);
+                height = Math.min(viewportHeight, positionerRect.height) - (scrollTop - projectedMaxScrollTop);
             }
 
             const fallbackToAlignPopupToTrigger =
@@ -1389,6 +1401,8 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             const isPinchZoomed = visualScale !== 1 && isWebKit();
 
             if (fallbackToAlignPopupToTrigger || isPinchZoomed) {
+                // Fallback BEFORE committing any style mutations so the popup has
+                // clean inline styles for the standard floating-positioner path.
                 popupState.initialPlaced = true;
                 clearPopupStylesInternal(rootState);
                 popupState.alignItemWithTriggerActive = false;
@@ -1397,6 +1411,23 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
                 }
                 return;
             }
+
+            // === Commit phase: apply all layout mutations together ===
+            // Force `position: fixed` so the placement coordinates are resolved
+            // against the viewport instead of the nearest positioned ancestor.
+            // The body scroll-lock applies `position: relative` to <body>, which
+            // would otherwise cause the absolutely-positioned popup to resolve
+            // against the (internally-scrolled) body — pushing it off-screen /
+            // "to the top of the page" for sections reached by scrolling.
+            // Mirrors React's `FIXED = { position: 'fixed' }` branch for
+            // `alignItemWithTriggerActive` in SelectPositioner.tsx.
+            positionerElement.style.position = 'fixed';
+            positionerElement.style.left = `${left - rightOverflow}px`;
+            positionerElement.style.height = `${height}px`;
+            positionerElement.style.maxHeight = 'auto';
+            positionerElement.style.marginTop = `${marginTop}px`;
+            positionerElement.style.marginBottom = `${marginBottom}px`;
+            popupElement.style.height = '100%';
 
             const initialHeight = Math.max(minHeight, height);
 
@@ -1455,6 +1486,26 @@ function clearPopupStylesInternal(rootState) {
             }
         }
     }
+    // Reset popup-level styles applied during alignItemWithTrigger placement.
+    // Without this, `height: 100%` and `--transform-origin` leak across open cycles
+    // and cause the popup to render at 0 height (invisible) after the fallback path
+    // runs when the trigger is near a viewport edge.
+    const popupElement = popupState.popupElement;
+    if (popupElement) {
+        popupElement.style.height = '';
+        popupElement.style.removeProperty('--transform-origin');
+    }
+    // Reset the saved-styles flag so the next `saveOriginalPositionerStyles` call
+    // re-captures the current layout. Critical for the fallback-then-close flow:
+    // when `beginAlignItemWithTriggerPlacement` detects a fallback, it calls this
+    // function — if we left the flag set, the close-time clearPopupStyles call
+    // would restore pre-alignItem floating-ui coordinates on top of the
+    // post-fallback floating-ui layout, causing the popup to briefly jump from
+    // its fallback placement (above the trigger) back to its initial placement
+    // (below the trigger) during the exit transition — the "appears on top of
+    // the input for a moment" flash reported for near-bottom-of-viewport selects.
+    popupState.savedPositionerStyles = false;
+    popupState.originalPositionerStyles = {};
     popupState.initialPlaced = false;
     popupState.reachedMaxHeight = false;
 }

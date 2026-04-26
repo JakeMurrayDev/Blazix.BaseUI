@@ -333,6 +333,25 @@
         // that returns the C# registration order which may be stale.
         var idx = itemIndex;
         var newSelected = RootContext?.IsValueSelected(Value) ?? false;
+
+        // When this item matches the currently-selected value, promote its index
+        // to the root's <see cref="ISelectRootContext.SelectedIndex"/> so
+        // <see cref="SelectItemText"/> can claim the selected-text-element slot
+        // via its <c>SelectedByFocus</c> branch. Mirrors React's
+        // <c>useIsoLayoutEffect</c> in SelectItem.tsx that writes
+        // <c>store.set('selectedIndex', index)</c> when the item value matches.
+        // Required when <see cref="SelectRoot{TValue}.Items"/> is not supplied
+        // (the only path that previously wrote SelectedIndex); without this,
+        // sections bound with <c>@bind-Value</c> after the user picks a non-first
+        // item would leave <c>SelectedIndex = -1</c> after close/reopen, and the
+        // align-item-with-trigger layout would fall back to aligning item 0 with
+        // the trigger.
+        if (newSelected && idx >= 0 && TypedRootContext is not null &&
+            TypedRootContext.SelectedIndex != idx)
+        {
+            TypedRootContext.SelectedIndex = idx;
+        }
+
         var newHighlighted = idx >= 0 && (RootContext?.ActiveIndex ?? -1) == idx;
         var newHasRegistered = idx >= 0;
         var newSelectedByFocus = idx >= 0 && (RootContext?.IsSelectedByFocus(idx) ?? false);
