@@ -1,3 +1,4 @@
+using System.Reflection;
 using BlazorBaseUI.Select;
 using Microsoft.AspNetCore.Components.Rendering;
 
@@ -400,6 +401,48 @@ public class SelectPositionerTests : BunitContext, ISelectPositionerContract
     }
 
     [Fact]
+    public async Task PrunesSingleSelectValueWhenSameCountReplacementHasHashCollision()
+    {
+        var oldSelected = new HashCollisionValue(1);
+        var oldOther = new HashCollisionValue(2);
+        var newValue = new HashCollisionValue(3);
+        var newOther = new HashCollisionValue(0);
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SelectRoot<HashCollisionValue>>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "DefaultValue", oldSelected);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SelectPositioner>(0);
+                innerBuilder.AddAttribute(1, "AlignItemWithTrigger", false);
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var rootComp = cut.FindComponent<SelectRoot<HashCollisionValue>>();
+        var typedContext = rootComp.Instance.typedContext;
+        var positioner = cut.FindComponent<SelectPositioner>().Instance;
+
+        // Every value in this fixture has hash 0, so the old set and new set
+        // collide under XOR aggregation even though no old value remains.
+        // This reproduces the same-count replacement case without relying on
+        // Blazor's incremental unregister/register ordering, which would prune
+        // on the intermediate shrink before the collision is observable.
+        SeedPreviousItemMap(positioner, [oldSelected, oldOther]);
+        var registeredValues = (List<object?>)typedContext.RegisteredValues;
+        registeredValues.Clear();
+        registeredValues.Add(newValue);
+        registeredValues.Add(newOther);
+
+        await InvokeHandleItemMapChangedAsync(positioner);
+
+        typedContext.GetValue().ShouldBeNull();
+    }
+
+    [Fact]
     public Task ExposesScrollArrowSettersOnPositionerContext()
     {
         var cut = Render(Wrap(defaultOpen: true, alignItemWithTrigger: false));
@@ -412,5 +455,55 @@ public class SelectPositionerTests : BunitContext, ISelectPositionerContract
         ctx.GetScrollDownArrow.ShouldNotBeNull();
         ctx.SetControlledAlignItemWithTrigger.ShouldNotBeNull();
         return Task.CompletedTask;
+    }
+
+    private static void SeedPreviousItemMap(SelectPositioner positioner, IReadOnlyList<object?> values)
+    {
+        SetPrivateField(positioner, "prevItemMapSize", values.Count);
+
+        var hashField = typeof(SelectPositioner).GetField(
+            "prevItemMapHash",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        hashField?.SetValue(positioner, values.Aggregate(0, (hash, value) => hash ^ (value?.GetHashCode() ?? 0)));
+
+        var snapshotField = typeof(SelectPositioner).GetField(
+            "prevItemMapValues",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        snapshotField?.SetValue(positioner, values.ToList());
+    }
+
+    private static void SetPrivateField<T>(object target, string name, T value)
+    {
+        var field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        if (field is null)
+        {
+            throw new InvalidOperationException($"Could not find field '{name}'.");
+        }
+
+        field.SetValue(target, value);
+    }
+
+    private static async Task InvokeHandleItemMapChangedAsync(SelectPositioner positioner)
+    {
+        var method = typeof(SelectPositioner).GetMethod(
+            "HandleItemMapChangedAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (method is null)
+        {
+            throw new InvalidOperationException("Could not find HandleItemMapChangedAsync.");
+        }
+
+        var task = (Task?)method.Invoke(positioner, null);
+        if (task is null)
+        {
+            throw new InvalidOperationException("HandleItemMapChangedAsync did not return a Task.");
+        }
+
+        await task;
+    }
+
+    private sealed record HashCollisionValue(int Id)
+    {
+        public override int GetHashCode() => 0;
     }
 }

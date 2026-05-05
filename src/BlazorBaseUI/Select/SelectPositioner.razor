@@ -43,6 +43,7 @@
     private bool alignItemWithTriggerActive;
     private bool lastMounted;
     private int prevItemMapSize;
+    private List<object?> prevItemMapValues = new();
     private bool itemMapSubscribed;
     private string? scrollLockToken;
     private bool scrollLockDesired;
@@ -608,13 +609,27 @@
         if (size == 0)
         {
             prevItemMapSize = 0;
+            prevItemMapValues.Clear();
             return;
         }
 
         var prev = prevItemMapSize;
+        var previousValues = prevItemMapValues;
+        var currentValues = values.ToList();
         prevItemMapSize = size;
+        prevItemMapValues = currentValues;
 
-        if (size == prev)
+        // Prune is needed when the registered set changed in a way that could
+        // strand the current selection. That happens on a SHRINK (an item
+        // unregistered) or on a same-count REPLACEMENT (1:1 swap with a
+        // different value set). Pure growth never strands existing selection
+        // because `RegisterItemValue` only adds.
+        var sizeShrank = prev != 0 && size < prev;
+        var sameSizeButDifferent = prev != 0 &&
+            size == prev &&
+            !HaveSameMembership(previousValues, currentValues, RootContext.AreValuesEqual);
+
+        if (!sizeShrank && !sameSizeButDifferent)
         {
             return;
         }
@@ -622,17 +637,15 @@
         var equal = RootContext.AreValuesEqual;
         var multi = RootContext.Multiple;
 
-        // Only prune on a SHRINK of the registered set. Pruning on growth is
-        // mathematically incorrect: `RegisterItemValue` only adds — a value
-        // that was previously registered cannot disappear as a result. But
-        // because `RegisterItemValue` raises `ItemMapChanged` per call (no
-        // batching, unlike React's `CompositeList` which fires once with the
-        // completed map), a popup reopen can fire this handler mid-mount with
-        // a partial set ([apple] before banana/cherry have re-mounted), making
-        // the current selection (e.g. cherry) appear "missing" and triggering
-        // an incorrect `SetValueBoxedAsync(null)`. The `size < prev` guard
-        // ensures prune only runs after an actual unregister.
-        if (prev != 0 && !multi && size < prev)
+        // Only prune when the registered set actually changed. The shrink branch
+        // exists because Blazor's `RegisterItemValue` raises `ItemMapChanged`
+        // per call (no batching, unlike React's `CompositeList`); a popup reopen
+        // can fire this handler mid-mount with a partial set ([apple] before
+        // banana/cherry have re-mounted), making the current selection
+        // (e.g. cherry) appear "missing" and triggering an incorrect
+        // `SetValueBoxedAsync(null)`. The same-size-but-different branch handles
+        // 1:1 item replacement where the count is preserved.
+        if (!multi && (sizeShrank || sameSizeButDifferent))
         {
             var currentBoxed = RootContext.CurrentValueBoxed;
             if (currentBoxed is not null)
@@ -675,9 +688,9 @@
         }
 
         // Same reasoning as the single-select branch above: only prune on
-        // shrink so partial-mount registration during reopen can't briefly
-        // erase still-valid selected values.
-        if (prev != 0 && multi && size < prev)
+        // shrink or same-size replacement so partial-mount registration during
+        // reopen can't briefly erase still-valid selected values.
+        if (multi && (sizeShrank || sameSizeButDifferent))
         {
             var multiValues = RootContext.MultiValueBoxed;
             if (multiValues.Count > 0)
@@ -714,6 +727,39 @@
             RootContext.ScrollDownArrowVisible = false;
             await ClearHeightStylesAsync();
         }
+    }
+
+    private static bool HaveSameMembership(
+        IReadOnlyList<object?> previous,
+        IReadOnlyList<object?> current,
+        Func<object?, object?, bool> equal)
+    {
+        if (previous.Count != current.Count)
+        {
+            return false;
+        }
+
+        var matched = new bool[current.Count];
+        for (var i = 0; i < previous.Count; i++)
+        {
+            var found = false;
+            for (var j = 0; j < current.Count; j++)
+            {
+                if (!matched[j] && equal(previous[i], current[j]))
+                {
+                    matched[j] = true;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private Lazy<Task<IJSObjectReference>> FloatingModule =>

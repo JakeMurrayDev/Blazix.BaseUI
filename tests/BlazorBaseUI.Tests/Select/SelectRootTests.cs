@@ -1183,6 +1183,55 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task Id_UnnamedHiddenInputUsesGeneratedRootId()
+    {
+        var cut = Render(CreateSelect());
+
+        var triggerId = cut.Find("button").GetAttribute("id");
+        var hiddenInput = cut.Find("input[aria-hidden='true']");
+
+        hiddenInput.GetAttribute("id").ShouldBe($"{triggerId}-hidden-input");
+        hiddenInput.HasAttribute("name").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ClosedTypeahead_WithItemGroupsStartsAfterCurrentValue()
+    {
+        var groups = new[]
+        {
+            new SelectOptionGroup<string>(
+                Label: "A",
+                Items:
+                [
+                    new SelectOption<string>("apple", "Apple"),
+                    new SelectOption<string>("apricot", "Apricot")
+                ])
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", "apple");
+            builder.AddAttribute(2, "ItemGroups", groups);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SelectTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        await cut.InvokeAsync(async () => await root.typedContext.HandleClosedTypeaheadAsync("a"));
+
+        root.typedContext.GetValue().ShouldBe("apricot");
+    }
+
     // --- IsItemEqualToValue ---
 
     [Fact]

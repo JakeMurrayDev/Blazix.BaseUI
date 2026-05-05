@@ -17,7 +17,7 @@ public interface ISelectItemIndicatorContract
     // Visibility
     Task DoesNotRenderWhenNotSelected();
     Task RendersWhenSelected();
-    Task NonKeepMountedIndicatorUnmountsImmediatelyWhenSelectionChanges();
+    Task NonKeepMountedIndicatorRemainsMountedDuringExitTransitionWhenSelectionChanges();
 
     // KeepMounted
     Task KeepsIndicatorMountedWhenNotSelected();

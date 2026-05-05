@@ -312,7 +312,7 @@ public class SelectItemIndicatorTests : BunitContext, ISelectItemIndicatorContra
     }
 
     [Fact]
-    public async Task NonKeepMountedIndicatorUnmountsImmediatelyWhenSelectionChanges()
+    public async Task NonKeepMountedIndicatorRemainsMountedDuringExitTransitionWhenSelectionChanges()
     {
         var cut = Render(CreateSelectWithTwoIndicators(defaultValue: "apple"));
 
@@ -323,7 +323,11 @@ public class SelectItemIndicatorTests : BunitContext, ISelectItemIndicatorContra
         await bananaItem.TriggerEventAsync("onmousemove", new MouseEventArgs());
         bananaItem.Click();
 
-        cut.FindAll("[data-testid='apple-indicator']").Count.ShouldBe(0);
+        // Mirror React's `useTransitionStatus(selected)`: the deselected
+        // indicator stays mounted while the exit transition is in flight so
+        // consumers can attach `[data-ending]` exit styles. Only after the
+        // unmount delay completes does it leave the DOM.
+        cut.FindAll("[data-testid='apple-indicator']").Count.ShouldBe(1);
         cut.FindAll("[data-testid='banana-indicator']").Count.ShouldBe(1);
     }
 

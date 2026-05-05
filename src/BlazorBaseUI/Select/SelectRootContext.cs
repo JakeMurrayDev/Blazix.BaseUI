@@ -495,7 +495,16 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext
                 return GetValues().Count == 0;
             }
 
-            return GetValue() is null;
+            // Mirror React's `stringifyAsValue(value, itemToStringValue) !== ''`:
+            // both null and a serialized empty string mean "no real selection".
+            var value = GetValue();
+            if (value is null)
+            {
+                return true;
+            }
+
+            var serialized = GetFormValue(value);
+            return string.IsNullOrEmpty(serialized);
         }
     }
 
@@ -504,10 +513,12 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext
     {
         get
         {
+            // Mirror React's state shape: in Multiple mode, expose the whole value
+            // array (boxed) so custom Render/state-keyed CSS receive the array as
+            // React does. Single mode stays scalar.
             if (Multiple)
             {
-                var values = GetValues();
-                return values.Count == 0 ? null : values[0];
+                return MultiValueBoxed;
             }
 
             return GetValue();
@@ -517,7 +528,25 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext
     /// <inheritdoc />
     public bool IsValueSelected(object? value)
     {
-        if (value is not TValue typedValue)
+        // React allows null item values (default `value` prop on SelectItem). The
+        // `is TValue` pattern fails on null, so handle null explicitly: when TValue
+        // is a reference type or Nullable<T> (`default(TValue)` is null), null is a
+        // legal candidate; otherwise it cannot match.
+        TValue? typedValue;
+        if (value is null)
+        {
+            if (default(TValue) is not null)
+            {
+                return false;
+            }
+
+            typedValue = default;
+        }
+        else if (value is TValue tv)
+        {
+            typedValue = tv;
+        }
+        else
         {
             return false;
         }
@@ -783,58 +812,98 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext
         var found = false;
         var currentValue = GetValue();
 
-        if (Items is not null && Items.Count > 0)
+        bool TryFindMatch<TCandidate>(
+            IReadOnlyList<TCandidate> candidates,
+            Func<TCandidate, TValue> getValue,
+            Func<TCandidate, string?> getLabel,
+            out TValue? value)
         {
-            var startIndex = 0;
-            for (var i = 0; i < Items.Count; i++)
+            value = default;
+            if (candidates.Count == 0)
             {
-                if (AreEqual(Items[i].Value, currentValue))
+                return false;
+            }
+
+            var startIndex = 0;
+            for (var i = 0; i < candidates.Count; i++)
+            {
+                if (AreEqual(getValue(candidates[i]), currentValue))
                 {
                     startIndex = i + 1;
                     break;
                 }
             }
 
-            for (var offset = 0; offset < Items.Count; offset++)
+            for (var offset = 0; offset < candidates.Count; offset++)
             {
-                var index = (startIndex + offset) % Items.Count;
-                var item = Items[index];
-                if (!string.IsNullOrEmpty(item.Label) &&
-                    item.Label.StartsWith(_typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
+                var index = (startIndex + offset) % candidates.Count;
+                var candidate = candidates[index];
+                var label = getLabel(candidate);
+                if (!string.IsNullOrEmpty(label) &&
+                    label.StartsWith(_typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
                 {
-                    matchValue = item.Value;
-                    found = true;
-                    break;
-                }
-            }
-        }
-        else
-        {
-            foreach (var kvp in _itemLabels)
-            {
-                if (kvp.Value.StartsWith(_typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
-                {
-                    matchValue = kvp.Key;
-                    found = true;
-                    break;
+                    value = getValue(candidate);
+                    return true;
                 }
             }
 
-            if (!found && _itemLabelResolvers.Count > 0)
+            return false;
+        }
+
+        if (Items is not null && Items.Count > 0)
+        {
+            found = TryFindMatch(
+                Items,
+                item => item.Value,
+                item => item.Label,
+                out matchValue);
+        }
+
+        if (!found && ItemGroups is not null)
+        {
+            var groupedItems = new List<SelectOption<TValue>>();
+            foreach (var group in ItemGroups)
             {
-                foreach (var kvp in _itemLabelResolvers)
+                foreach (var item in group.Items)
                 {
-                    var label = await kvp.Value();
-                    if (!string.IsNullOrEmpty(label) &&
-                        label.StartsWith(_typeaheadBuffer, StringComparison.OrdinalIgnoreCase) &&
-                        kvp.Key is TValue typedKey)
-                    {
-                        matchValue = typedKey;
-                        found = true;
-                        break;
-                    }
+                    groupedItems.Add(item);
                 }
             }
+
+            found = TryFindMatch(
+                groupedItems,
+                item => item.Value,
+                item => item.Label,
+                out matchValue);
+        }
+
+        if (!found)
+        {
+            var labels = _itemLabels.ToList();
+            found = TryFindMatch(
+                labels,
+                kvp => kvp.Key,
+                kvp => kvp.Value,
+                out matchValue);
+        }
+
+        if (!found && _itemLabelResolvers.Count > 0)
+        {
+            var resolvedLabels = new List<KeyValuePair<TValue, string?>>();
+            foreach (var kvp in _itemLabelResolvers)
+            {
+                var label = await kvp.Value();
+                if (kvp.Key is TValue typedKey)
+                {
+                    resolvedLabels.Add(new KeyValuePair<TValue, string?>(typedKey, label));
+                }
+            }
+
+            found = TryFindMatch(
+                resolvedLabels,
+                kvp => kvp.Key,
+                kvp => kvp.Value,
+                out matchValue);
         }
 
         if (found)

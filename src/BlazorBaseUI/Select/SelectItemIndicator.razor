@@ -26,7 +26,13 @@
 
     private bool Rendered => ItemContext?.Selected ?? false;
 
-    private bool IsPresent => KeepMounted || Rendered;
+    // Mirror React's `useTransitionStatus(selected)` mounting rule: keep the
+    // element rendered while the exit transition is still in flight (Ending),
+    // so consumers can apply `[data-ending]` exit styles without the node
+    // disappearing first. `isMounted` flips false only after `ScheduleUnmount`
+    // completes, which is exactly the lifetime we want here.
+    private bool IsPresent =>
+        KeepMounted || Rendered || isMounted || transitionStatus == TransitionStatus.Ending;
 
     private RenderFragment effectiveChildContent => ChildContent ?? _defaultChildContent;
 
@@ -129,6 +135,13 @@
         {
             transitionStatus = TransitionStatus.Ending;
             ScheduleUnmount();
+        }
+        else if (isRendered && wasRendered && transitionStatus == TransitionStatus.Ending)
+        {
+            // Re-selected mid-exit: cancel pending unmount, restart entry.
+            transitionCts?.Cancel();
+            transitionStatus = TransitionStatus.Starting;
+            ScheduleTransitionEnd();
         }
     }
 

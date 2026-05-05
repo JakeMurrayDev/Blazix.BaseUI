@@ -21,6 +21,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool visible;
+    private Side lastSide = Side.Bottom;
     private bool isMounted;
     private bool jsInitialized;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
@@ -206,16 +207,26 @@
     {
         var stateVisible = RootContext?.ScrollUpArrowVisible ?? false;
         var newVisible = stateVisible && RootContext?.OpenInteractionType != InteractionType.Touch;
+        var newSide = PositionerContext?.Side ?? Side.Bottom;
 
-        if (newVisible != visible)
+        var visibilityChanged = newVisible != visible;
+        var sideChanged = newSide != lastSide;
+
+        if (!visibilityChanged && !sideChanged)
+        {
+            return;
+        }
+
+        if (visibilityChanged)
         {
             visible = newVisible;
             UpdateTransitionStatus();
-            var side = PositionerContext?.Side ?? Side.Bottom;
-            state = new SelectScrollUpArrowState(visible, side, transitionStatus);
-            BuildComponentAttributes();
-            InvokeAsync(StateHasChanged);
         }
+
+        lastSide = newSide;
+        state = new SelectScrollUpArrowState(visible, newSide, transitionStatus);
+        BuildComponentAttributes();
+        InvokeAsync(StateHasChanged);
     }
 
     private void UpdateTransitionStatus()
