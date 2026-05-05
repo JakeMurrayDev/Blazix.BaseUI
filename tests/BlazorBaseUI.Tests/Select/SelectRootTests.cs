@@ -1,3 +1,4 @@
+using BlazorBaseUI.DirectionProvider;
 using BlazorBaseUI.Field;
 using BlazorBaseUI.Form;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,10 +9,13 @@ namespace BlazorBaseUI.Tests.Select;
 
 public class SelectRootTests : BunitContext, ISelectRootContract
 {
+    private const string SelectModule = "./_content/BlazorBaseUI/blazor-baseui-select.js";
+
     public SelectRootTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
         JsInteropSetup.SetupFieldModule(JSInterop);
         JsInteropSetup.SetupLabelModule(JSInterop);
         Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
@@ -24,12 +28,15 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         bool defaultOpen = false,
         bool? open = null,
         string? name = null,
-        BlazorBaseUI.Select.ModalMode modal = BlazorBaseUI.Select.ModalMode.False,
+        string? form = null,
+        BlazorBaseUI.Select.SelectModalMode modal = BlazorBaseUI.Select.SelectModalMode.False,
         Func<string?, string?>? itemToStringLabel = null,
         Func<string?, string?>? itemToStringValue = null,
         EventCallback<SelectOpenChangeEventArgs>? onOpenChange = null,
         EventCallback<SelectValueChangeEventArgs<string>>? onValueChange = null,
         EventCallback<string?>? valueChanged = null,
+        SelectRootActions? actionsRef = null,
+        Action<ElementReference?>? inputRef = null,
         RenderFragment? childContent = null)
     {
         return builder =>
@@ -41,12 +48,15 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
             if (open.HasValue) builder.AddAttribute(i++, "Open", open.Value);
             if (name is not null) builder.AddAttribute(i++, "Name", name);
+            if (form is not null) builder.AddAttribute(i++, "Form", form);
             builder.AddAttribute(i++, "Modal", modal);
             if (itemToStringLabel is not null) builder.AddAttribute(i++, "ItemToStringLabel", itemToStringLabel);
             if (itemToStringValue is not null) builder.AddAttribute(i++, "ItemToStringValue", itemToStringValue);
             if (onOpenChange.HasValue) builder.AddAttribute(i++, "OnOpenChange", onOpenChange.Value);
             if (onValueChange.HasValue) builder.AddAttribute(i++, "OnValueChange", onValueChange.Value);
             if (valueChanged.HasValue) builder.AddAttribute(i++, "ValueChanged", valueChanged.Value);
+            if (actionsRef is not null) builder.AddAttribute(i++, "ActionsRef", actionsRef);
+            if (inputRef is not null) builder.AddAttribute(i++, "InputRef", inputRef);
             builder.AddAttribute(i++, "ChildContent", childContent ?? CreateDefaultChildren());
             builder.CloseComponent();
         };
@@ -153,6 +163,26 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
+    public Task Value_ShouldBeControlledWhenValueParameterIsProvidedWithoutValueChanged()
+    {
+        var cut = Render(CreateSelect(
+            value: "cherry",
+            defaultOpen: true));
+
+        var items = cut.FindAll("[role='option']");
+        items.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
+
+        items.First(i => i.TextContent.Contains("Banana")).Click();
+        cut.FindComponent<SelectRoot<string>>().Render();
+
+        var updatedItems = cut.FindAll("[role='option']");
+        updatedItems.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
+        updatedItems.First(i => i.TextContent.Contains("Banana")).HasAttribute("data-selected").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task Value_ShouldUpdateWhenValuePropChanges()
     {
         var cut = Render(CreateSelect(
@@ -216,6 +246,36 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
+    public Task HiddenInput_ForwardsFormAttribute()
+    {
+        var cut = Render(CreateSelect(
+            name: "fruit",
+            form: "checkout",
+            defaultValue: "apple"));
+
+        var hiddenInput = cut.Find("input[type='hidden']");
+        hiddenInput.GetAttribute("form").ShouldBe("checkout");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InputRef_ReceivesHiddenInputElement()
+    {
+        ElementReference? received = null;
+
+        Render(CreateSelect(
+            name: "fruit",
+            defaultValue: "apple",
+            inputRef: element => received = element));
+
+        received.ShouldNotBeNull();
+        received.Value.Id.ShouldNotBeNullOrEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task ItemToStringLabel_UsesForTriggerText()
     {
         var cut = Render(CreateSelect(
@@ -250,6 +310,59 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         receivedValue.ShouldBe("banana");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnStartingStyleApplied_ClearsStartingTransitionStatus()
+    {
+        var cut = Render(CreateSelect(defaultOpen: true));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        root.typedContext.TransitionStatus.ShouldBe(TransitionStatus.Starting);
+
+        root.OnStartingStyleApplied();
+
+        root.typedContext.TransitionStatus.ShouldBe(TransitionStatus.Undefined);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitializeRoot_UsesNonLoopingNavigationAndDirectionProvider()
+    {
+        var module = JSInterop.SetupModule(SelectModule);
+
+        Render(builder =>
+        {
+            builder.OpenComponent<global::BlazorBaseUI.DirectionProvider.DirectionProvider>(0);
+            builder.AddAttribute(1, "Direction", Direction.Rtl);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(childBuilder =>
+            {
+                childBuilder.AddContent(0, CreateSelect(defaultOpen: true));
+            }));
+            builder.CloseComponent();
+        });
+
+        var invocation = module.Invocations.Last(i => i.Identifier == "initializeRoot");
+        invocation.Arguments[2].ShouldBe(false);
+        invocation.Arguments[4].ShouldBe("rtl");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ActionsRefUnmount_ForcesPopupUnmount()
+    {
+        var actions = new SelectRootActions();
+        var cut = Render(CreateSelect(defaultOpen: true, actionsRef: actions));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        root.typedContext.Mounted.ShouldBeTrue();
+
+        await cut.InvokeAsync(() => actions.Unmount?.Invoke());
+
+        root.typedContext.Mounted.ShouldBeFalse();
+        root.typedContext.TransitionStatus.ShouldBe(TransitionStatus.Undefined);
     }
 
     [Fact]
@@ -294,7 +407,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var trigger = cut.Find("button");
-        trigger.Click();
+        trigger.TriggerEvent("onmousedown", new MouseEventArgs());
 
         invoked.ShouldBeTrue();
         receivedOpen.ShouldBeTrue();
@@ -313,7 +426,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var trigger = cut.Find("button");
-        trigger.Click();
+        trigger.TriggerEvent("onmousedown", new MouseEventArgs());
 
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
 
@@ -324,7 +437,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     public Task Modal_ShouldRenderBackdropWhenTrue()
     {
         var cut = Render(CreateSelect(
-            modal: BlazorBaseUI.Select.ModalMode.True,
+            modal: BlazorBaseUI.Select.SelectModalMode.True,
             defaultOpen: true,
             childContent: CreateChildrenWithBackdrop()));
 
@@ -338,7 +451,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     public Task Modal_ShouldNotRenderBackdropWhenFalse()
     {
         var cut = Render(CreateSelect(
-            modal: BlazorBaseUI.Select.ModalMode.False,
+            modal: BlazorBaseUI.Select.SelectModalMode.False,
             defaultOpen: true));
 
         // Default children do not include SelectBackdrop, so no backdrop should exist.
@@ -358,6 +471,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         IReadOnlyList<string>? values = null,
         bool defaultOpen = false,
         string? name = null,
+        string? form = null,
         bool required = false,
         Func<string?, string?>? itemToStringValue = null,
         EventCallback<SelectValueChangeEventArgs<string>>? onValueChange = null,
@@ -372,6 +486,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             if (values is not null) builder.AddAttribute(i++, "Values", values);
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
             if (name is not null) builder.AddAttribute(i++, "Name", name);
+            if (form is not null) builder.AddAttribute(i++, "Form", form);
             builder.AddAttribute(i++, "Required", required);
             if (itemToStringValue is not null) builder.AddAttribute(i++, "ItemToStringValue", itemToStringValue);
             if (onValueChange.HasValue) builder.AddAttribute(i++, "OnValueChange", onValueChange.Value);
@@ -518,6 +633,65 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task MultipleHiddenInputs_ForwardFormAttribute()
+    {
+        var cut = Render(CreateMultipleSelect(
+            name: "fruits",
+            defaultValues: new[] { "apple", "banana" },
+            form: "checkout"));
+
+        var hiddenInputs = cut.FindAll("input[type='hidden']");
+        hiddenInputs.Count.ShouldBe(2);
+        hiddenInputs[0].GetAttribute("form").ShouldBe("checkout");
+        hiddenInputs[1].GetAttribute("form").ShouldBe("checkout");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Values_ShouldBeControlledWhenValuesParameterIsProvidedWithoutValuesChanged()
+    {
+        var cut = Render(CreateMultipleSelect(
+            name: "fruits",
+            values: new[] { "apple" },
+            defaultOpen: true));
+
+        cut.FindAll("input[type='hidden']").Single().GetAttribute("value").ShouldBe("apple");
+
+        var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
+        banana.Click();
+        cut.FindComponent<SelectRoot<string>>().Render();
+
+        var hiddenInputs = cut.FindAll("input[type='hidden']");
+        hiddenInputs.Count.ShouldBe(1);
+        hiddenInputs[0].GetAttribute("value").ShouldBe("apple");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnValueChange_MultipleReceivesNextValues()
+    {
+        IReadOnlyList<string>? receivedValues = null;
+
+        var cut = Render(CreateMultipleSelect(
+            defaultValues: new[] { "apple" },
+            defaultOpen: true,
+            onValueChange: EventCallback.Factory.Create<SelectValueChangeEventArgs<string>>(this, args =>
+            {
+                receivedValues = args.Values;
+            })));
+
+        var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
+        banana.Click();
+
+        receivedValues.ShouldNotBeNull();
+        receivedValues.ShouldBe(["apple", "banana"]);
+
+        return Task.CompletedTask;
+    }
+
     // --- ItemToStringLabel ---
 
     [Fact]
@@ -613,7 +787,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         // but SetOpenAsync should check ReadOnly in the trigger's click handler
         // Actually, ReadOnly in base-ui prevents item selection, not opening.
         // Let's verify the select can open but items cannot be selected
-        await trigger.TriggerEventAsync("onclick", new MouseEventArgs());
+        await trigger.TriggerEventAsync("onmousedown", new MouseEventArgs());
         cut.FindComponent<SelectTrigger>().Render();
 
         // Open the popup, then try to select an item

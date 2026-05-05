@@ -255,7 +255,7 @@ function handleGlobalKeyDown(e) {
     // Match React's `enabled: !readOnly && !disabled` on useListNavigation,
     // useTypeahead, and useClick: a readonly select that is somehow open
     // accepts only Escape and Tab.
-    if (topmostRoot.readOnly) {
+    if (topmostRoot.readOnly || topmostRoot.disabled) {
         if (e.key === 'Tab') {
             topmostRoot.dotNetRef.invokeMethodAsync('OnTabKey').catch(() => { });
         }
@@ -274,25 +274,25 @@ function handleGlobalKeyDown(e) {
 
     if (e.key === 'ArrowDown') {
         e.preventDefault();
-        const nextIndex = findNextEnabledIndex(items, currentIndex, 1, topmostRoot.loopFocus);
+        const nextIndex = findNextIndex(items, currentIndex, 1, topmostRoot.loopFocus);
         if (nextIndex !== -1) {
             setActiveItem(topmostRoot, items, nextIndex);
         }
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        const nextIndex = findNextEnabledIndex(items, currentIndex, -1, topmostRoot.loopFocus);
+        const nextIndex = findNextIndex(items, currentIndex, -1, topmostRoot.loopFocus);
         if (nextIndex !== -1) {
             setActiveItem(topmostRoot, items, nextIndex);
         }
     } else if (e.key === 'Home') {
         e.preventDefault();
-        const nextIndex = findNextEnabledIndex(items, -1, 1, false);
+        const nextIndex = findNextIndex(items, -1, 1, false);
         if (nextIndex !== -1) {
             setActiveItem(topmostRoot, items, nextIndex);
         }
     } else if (e.key === 'End') {
         e.preventDefault();
-        const nextIndex = findNextEnabledIndex(items, items.length, -1, false);
+        const nextIndex = findNextIndex(items, items.length, -1, false);
         if (nextIndex !== -1) {
             setActiveItem(topmostRoot, items, nextIndex);
         }
@@ -349,7 +349,7 @@ function getNavigableItems(container) {
     return Array.from(container.querySelectorAll('[role="option"]'));
 }
 
-function findNextEnabledIndex(items, currentIndex, direction, loop) {
+function findNextIndex(items, currentIndex, direction, loop) {
     const length = items.length;
     if (length === 0) return -1;
 
@@ -364,12 +364,7 @@ function findNextEnabledIndex(items, currentIndex, direction, loop) {
             if (!loop) return -1;
         }
 
-        const item = items[index];
-        if (!item.hasAttribute('aria-disabled') || item.getAttribute('aria-disabled') !== 'true') {
-            return index;
-        }
-
-        index += direction;
+        return index;
     }
 
     return -1;
@@ -388,10 +383,6 @@ function handleTypeahead(rootState, items, char) {
     for (let offset = 1; offset <= items.length; offset++) {
         const index = (startIndex + offset) % items.length;
         const item = items[index];
-
-        if (item.hasAttribute('aria-disabled') && item.getAttribute('aria-disabled') === 'true') {
-            continue;
-        }
 
         // Prefer an explicit author-provided label via data-blazor-base-ui-label;
         // fall back to SelectItemText's rendered textContent. Mirrors React
@@ -566,16 +557,17 @@ function handlePopupScrollInternal(rootState, scroller) {
 
 // ─── Public API ───────────────────────────────────────────────────────
 
-export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, readOnly) {
+export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, readOnly, disabled) {
     initGlobalListeners();
 
     state.roots.set(rootId, {
         dotNetRef,
         isOpen: false,
-        loopFocus: loopFocus ?? true,
+        loopFocus: loopFocus ?? false,
         modal: modal ?? false,
         direction: direction ?? 'ltr',
         readOnly: !!readOnly,
+        disabled: !!disabled,
         activeIndex: -1,
         keyboardActive: false,
         triggerElement: null,
@@ -652,7 +644,7 @@ export function setRootOpen(rootId, isOpen, reason) {
                             }
                         }
                         if (targetIndex === -1) {
-                            targetIndex = findNextEnabledIndex(items, -1, 1, false);
+                            targetIndex = findNextIndex(items, -1, 1, false);
                         }
                         if (targetIndex >= 0) {
                             setActiveItem(rootState, items, targetIndex);
@@ -800,6 +792,12 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
         triggerDotNetRef.invokeMethodAsync('NotifyPointerMove').catch(() => { });
     };
 
+    const onPointerDown = (event) => {
+        if (event.pointerType === 'touch') {
+            triggerDotNetRef.invokeMethodAsync('NotifyTouchOpen').catch(() => { });
+        }
+    };
+
     const onMouseDown = () => {
         if (rootState.isOpen) return;
 
@@ -836,11 +834,13 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
     };
 
     triggerElement.addEventListener('pointermove', onPointerMove);
+    triggerElement.addEventListener('pointerdown', onPointerDown);
     triggerElement.addEventListener('mousedown', onMouseDown);
     triggerElement.addEventListener('focusout', onFocusOut);
 
     rootState.triggerCleanup = () => {
         triggerElement.removeEventListener('pointermove', onPointerMove);
+        triggerElement.removeEventListener('pointerdown', onPointerDown);
         triggerElement.removeEventListener('mousedown', onMouseDown);
         triggerElement.removeEventListener('focusout', onFocusOut);
     };
@@ -867,6 +867,20 @@ export function setReadOnly(rootId, readOnly) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.readOnly = !!readOnly;
+    }
+}
+
+export function setDisabled(rootId, disabled) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.disabled = !!disabled;
+    }
+}
+
+export function setDirection(rootId, direction) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.direction = direction || 'ltr';
     }
 }
 
@@ -921,7 +935,7 @@ function attachScrollListener(rootState) {
     const containerEl = rootState.listElement || rootState.popupElement;
     if (!containerEl) return;
 
-    const handler = () => notifyScrollArrowVisibility(rootState);
+    const handler = () => handlePopupScrollInternal(rootState, containerEl);
     containerEl.addEventListener('scroll', handler, { passive: true });
     rootState.scrollListener = { element: containerEl, handler };
 }

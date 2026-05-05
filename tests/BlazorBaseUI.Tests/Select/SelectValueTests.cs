@@ -6,6 +6,7 @@ public class SelectValueTests : BunitContext, ISelectValueContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateSelectWithValue(
@@ -105,6 +106,17 @@ public class SelectValueTests : BunitContext, ISelectValueContract
     }
 
     [Fact]
+    public Task Placeholder_EmitsDataPlaceholderAttribute()
+    {
+        var cut = Render(CreateSelectWithValue(placeholder: "Pick one..."));
+
+        var span = cut.Find("button span");
+        span.HasAttribute("data-placeholder").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task Placeholder_DoesNotDisplayWhenValueSelected()
     {
         var cut = Render(CreateSelectWithValue(defaultValue: "apple", placeholder: "Pick one..."));
@@ -112,6 +124,7 @@ public class SelectValueTests : BunitContext, ISelectValueContract
         var span = cut.Find("button span");
         span.TextContent.ShouldBe("apple");
         span.TextContent.ShouldNotContain("Pick one...");
+        span.HasAttribute("data-placeholder").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -337,5 +350,251 @@ public class SelectValueTests : BunitContext, ISelectValueContract
         receivedValues!.Count.ShouldBe(0);
 
         return Task.CompletedTask;
+    }
+
+    // --- Parity with React source ---
+
+    [Fact]
+    public Task Placeholder_ChildContentBeatsPlaceholderWhenMultiSelectEmpty()
+    {
+        RenderFragment childContent = b => b.AddContent(0, "Custom empty");
+
+        var cut = Render(CreateSelectWithValue(
+            multiple: true,
+            placeholder: "Pick some...",
+            childContent: childContent));
+
+        var span = cut.Find("button span");
+        span.TextContent.ShouldBe("Custom empty");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task PlaceholderContent_RendersWhenProvidedAndNoValue()
+    {
+        RenderFragment placeholderContent = b =>
+        {
+            b.OpenElement(0, "em");
+            b.AddContent(1, "Choose one");
+            b.CloseElement();
+        };
+
+        var cut = Render(CreateValueWithPlaceholderContent(placeholderContent: placeholderContent));
+
+        var em = cut.Find("button span em");
+        em.TextContent.ShouldBe("Choose one");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task PlaceholderContent_TakesPrecedenceOverTextPlaceholder()
+    {
+        RenderFragment placeholderContent = b => b.AddContent(0, "Rich!");
+
+        var cut = Render(CreateValueWithPlaceholderContent(
+            placeholder: "Plain text",
+            placeholderContent: placeholderContent));
+
+        var span = cut.Find("button span");
+        span.TextContent.ShouldBe("Rich!");
+        span.TextContent.ShouldNotContain("Plain text");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NullItemLabel_SuppressesPlaceholderWhenNoValueSelected()
+    {
+        IReadOnlyList<SelectOption<string?>> items = new[]
+        {
+            new SelectOption<string?>(null, "None"),
+            new SelectOption<string?>("apple", "Apple")
+        };
+
+        var cut = Render(CreateNullableValueWithItems(
+            placeholder: "Pick one...",
+            items: items));
+
+        var span = cut.Find("button span");
+        span.TextContent.ShouldBe("None");
+        span.TextContent.ShouldNotContain("Pick one...");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task GetLabel_ResolvesFromItemGroups()
+    {
+        IReadOnlyList<SelectOptionGroup<string>> groups = new[]
+        {
+            new SelectOptionGroup<string>(
+                "Fruit",
+                new[] { new SelectOption<string>("apple", "Apple"), new SelectOption<string>("banana", "Banana") }),
+            new SelectOptionGroup<string>(
+                "Veggies",
+                new[] { new SelectOption<string>("carrot", "Carrot") })
+        };
+
+        var cut = Render(CreateStringValueWithGroups(defaultValue: "carrot", groups: groups));
+
+        var span = cut.Find("button span");
+        span.TextContent.ShouldBe("Carrot");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task GetLabel_ResolvesFromISelectItemLabelOnValue()
+    {
+        var value = new LabeledItem("apple", "Apple!");
+        var cut = Render(CreateLabeledItemValue(defaultValue: value));
+
+        var span = cut.Find("button span");
+        span.TextContent.ShouldBe("Apple!");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Value_RegistersSpanElementWithRootContext()
+    {
+        ISelectRootContext? captured = null;
+
+        var fragment = (RenderFragment)(builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<SelectTrigger>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(triggerBuilder =>
+                {
+                    triggerBuilder.OpenComponent<SelectValue<string>>(0);
+                    triggerBuilder.AddAttribute(1, "Placeholder", "-");
+                    triggerBuilder.CloseComponent();
+
+                    triggerBuilder.OpenComponent<RootContextSpy>(10);
+                    triggerBuilder.AddComponentReferenceCapture(11, inst => captured = ((RootContextSpy)inst).Context);
+                    triggerBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        Render(fragment);
+
+        captured.ShouldNotBeNull();
+        captured!.GetValueElement().ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    // --- Helpers for parity tests ---
+
+    private static RenderFragment CreateValueWithPlaceholderContent(
+        string? placeholder = null,
+        RenderFragment? placeholderContent = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<SelectTrigger>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(triggerBuilder =>
+                {
+                    triggerBuilder.OpenComponent<SelectValue<string>>(0);
+                    var vi = 1;
+                    if (placeholder is not null) triggerBuilder.AddAttribute(vi++, "Placeholder", placeholder);
+                    if (placeholderContent is not null) triggerBuilder.AddAttribute(vi++, "PlaceholderContent", placeholderContent);
+                    triggerBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreateNullableValueWithItems(
+        string? placeholder = null,
+        IReadOnlyList<SelectOption<string?>>? items = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string?>>(0);
+            var i = 1;
+            if (items is not null) builder.AddAttribute(i++, "Items", items);
+            builder.AddAttribute(i++, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<SelectTrigger>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(triggerBuilder =>
+                {
+                    triggerBuilder.OpenComponent<SelectValue<string?>>(0);
+                    if (placeholder is not null) triggerBuilder.AddAttribute(1, "Placeholder", placeholder);
+                    triggerBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreateStringValueWithGroups(
+        string? defaultValue = null,
+        IReadOnlyList<SelectOptionGroup<string>>? groups = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            var i = 1;
+            if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
+            if (groups is not null) builder.AddAttribute(i++, "ItemGroups", groups);
+            builder.AddAttribute(i++, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<SelectTrigger>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(triggerBuilder =>
+                {
+                    triggerBuilder.OpenComponent<SelectValue<string>>(0);
+                    triggerBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreateLabeledItemValue(LabeledItem? defaultValue = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<LabeledItem>>(0);
+            var i = 1;
+            if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
+            builder.AddAttribute(i++, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<SelectTrigger>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(triggerBuilder =>
+                {
+                    triggerBuilder.OpenComponent<SelectValue<LabeledItem>>(0);
+                    triggerBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private sealed record LabeledItem(string Value, string Label) : ISelectItemLabel;
+
+    internal sealed class RootContextSpy : ComponentBase
+    {
+        [CascadingParameter]
+        public ISelectRootContext? Context { get; set; }
+
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+        }
     }
 }

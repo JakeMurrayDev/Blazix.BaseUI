@@ -7,6 +7,8 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <IsTestProject>true</IsTestProject>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <!-- slopwatch-ignore: SW005 CS7022: Web SDK test project with GenerateProgramFile=false has duplicate entry point. xUnit1051: test helper methods on public test classes are not test methods. -->
+    <NoWarn>CS7022;xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

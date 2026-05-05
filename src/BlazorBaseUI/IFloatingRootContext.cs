@@ -37,4 +37,12 @@ public interface IFloatingRootContext
     /// Sets the open state asynchronously.
     /// </summary>
     Task SetOpenAsync(bool open);
+
+    /// <summary>
+    /// Gets the interaction type that caused the most recent close
+    /// (mouse click, keyboard, touch, pen). Used by <see cref="FloatingFocusManager.FloatingFocusManager"/>
+    /// to resolve the <c>finalFocus</c> callback at close time.
+    /// Defaults to <see cref="InteractionType.None"/> when unknown.
+    /// </summary>
+    InteractionType CloseInteractionType => InteractionType.None;
 }

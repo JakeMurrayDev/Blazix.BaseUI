@@ -1,4 +1,5 @@
 @using Microsoft.JSInterop
+@using BlazorBaseUI.Csp
 
 @implements IAsyncDisposable
 
@@ -35,6 +36,9 @@
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private CspProviderContext? CspContext { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -100,9 +104,9 @@
             try
             {
                 var module = await moduleTask.Value;
-                if (!injectedScrollbarStyle)
+                if (!injectedScrollbarStyle && CspContext?.DisableStyleElements != true)
                 {
-                    await module.InvokeVoidAsync("injectScrollbarDisableStyle", (object?)null);
+                    await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
                     injectedScrollbarStyle = true;
                 }
             }

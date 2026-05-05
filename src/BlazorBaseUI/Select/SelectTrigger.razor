@@ -336,7 +336,10 @@
             return;
         }
 
-        RootContext.OpenInteractionType = InteractionType.Click;
+        if (RootContext.OpenInteractionType != InteractionType.Touch)
+        {
+            RootContext.OpenInteractionType = InteractionType.Click;
+        }
         var nextOpen = !RootContext.GetOpen();
         if (nextOpen)
         {
@@ -420,6 +423,16 @@
         if (RootContext is not null)
         {
             RootContext.KeyboardActive = false;
+        }
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task NotifyTouchOpen()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.OpenInteractionType = InteractionType.Touch;
         }
         return Task.CompletedTask;
     }

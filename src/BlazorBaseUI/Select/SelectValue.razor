@@ -7,6 +7,7 @@
                Render="Render"
                ClassValue="ClassValue"
                StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
                ChildContent="resolvedContent"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
@@ -14,6 +15,7 @@
 @code {
     private SelectValueState state;
     private RenderElement<SelectValueState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
     private RenderFragment? resolvedContent;
     private bool _valueElementRegistered;
 
@@ -104,6 +106,7 @@
     protected override void OnParametersSet()
     {
         state = BuildState();
+        BuildComponentAttributes();
         ResolveContent();
     }
 
@@ -133,8 +136,21 @@
     private void OnRootStateChanged()
     {
         state = BuildState();
+        BuildComponentAttributes();
         ResolveContent();
         InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (state.Placeholder)
+        {
+            attrs["data-placeholder"] = true;
+        }
+
+        componentAttributes = attrs;
     }
 
     private SelectValueState BuildState()

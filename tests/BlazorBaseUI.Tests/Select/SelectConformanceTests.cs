@@ -13,6 +13,7 @@ public class SelectConformanceTests : BunitContext, ISelectConformanceContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateSelectRoot(bool defaultOpen, RenderFragment childContent)
@@ -64,10 +65,29 @@ public class SelectConformanceTests : BunitContext, ISelectConformanceContract
     [Fact]
     public Task SelectArrow_RendersAsDiv()
     {
-        var cut = Render(CreateSelectWithPositioner(defaultOpen: true, (RenderFragment)(posBuilder =>
+        // Arrow is intentionally suppressed when AlignItemWithTriggerActive is
+        // true (matches React's `if (alignItemWithTriggerActive) return null`),
+        // so this test opts out of align-item mode.
+        var cut = Render(CreateSelectRoot(defaultOpen: true, (RenderFragment)(innerBuilder =>
         {
-            posBuilder.OpenComponent<SelectArrow>(0);
-            posBuilder.CloseComponent();
+            innerBuilder.OpenComponent<SelectTrigger>(0);
+            innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Select")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenComponent<SelectPortal>(10);
+            innerBuilder.AddAttribute(11, "KeepMounted", true);
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<SelectPositioner>(0);
+                portalBuilder.AddAttribute(1, "AlignItemWithTrigger", false);
+                portalBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<SelectArrow>(0);
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
         })));
 
         var arrow = cut.Find("div[aria-hidden='true']");

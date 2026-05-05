@@ -21,13 +21,29 @@ if (!window[STATE_KEY]) {
 
 const state = window[STATE_KEY];
 
+const POSITIONER_OWNED_STYLE_PROPERTIES = [
+    'position',
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'visibility',
+    '--available-width',
+    '--available-height',
+    '--anchor-width',
+    '--anchor-height',
+    '--positioner-width',
+    '--positioner-height',
+    '--transform-origin'
+];
+
 // Inject CSS to hide positioners until JS has computed their position.
 // Prevents flash-of-unpositioned-content when elements are portaled.
 if (!document.querySelector('[data-baseui-positioner-css]')) {
     const style = document.createElement('style');
     style.setAttribute('data-baseui-positioner-css', '');
     style.textContent = [
-        '[role="presentation"][data-side]:not([data-positioned]) { visibility: hidden !important; position: fixed !important; }',
+        '[data-blazor-base-ui-positioner][role="presentation"][data-side]:not([data-positioned]) { visibility: hidden !important; position: fixed !important; }',
         '[role="presentation"][data-side]:not([data-open]) { pointer-events: none; }'
     ].join('\n');
     document.head.appendChild(style);
@@ -477,16 +493,17 @@ export async function initializePositioner(options) {
         hasSideOffsetFn: options.hasSideOffsetFn || false,
         hasAlignOffsetFn: options.hasAlignOffsetFn || false,
         cleanup: null,
+        styleObserver: null,
+        ownedPositionerStyles: null,
+        restoringPositionerStyles: false,
         computedSide: side,
         computedAlign: align
     };
 
     state.positioners.set(positionerId, positionerState);
+    setupPositionStylePreserver(positionerState);
     await updatePositionInternal(positionerState);
-
-    if (!disableAnchorTracking) {
-        await setupAutoUpdate(positionerState);
-    }
+    await setupAutoUpdate(positionerState);
 
     return positionerId;
 }
@@ -505,6 +522,7 @@ export function disposePositioner(positionerId) {
     const positionerState = state.positioners.get(positionerId);
     if (positionerState) {
         cleanupAutoUpdate(positionerState);
+        cleanupPositionStylePreserver(positionerState);
         positionerState.positionerElement?.removeAttribute('data-positioned');
         state.positioners.delete(positionerId);
     }
@@ -518,6 +536,7 @@ async function setupAutoUpdate(positionerState) {
 
     try {
         const FloatingUI = await ensureFloatingUI();
+        const trackAnchor = !positionerState.disableAnchorTracking;
 
         const cleanup = FloatingUI.autoUpdate(
             triggerElement,
@@ -526,8 +545,8 @@ async function setupAutoUpdate(positionerState) {
             {
                 ancestorScroll: true,
                 ancestorResize: true,
-                elementResize: true,
-                layoutShift: true
+                elementResize: trackAnchor && typeof ResizeObserver !== 'undefined',
+                layoutShift: trackAnchor && typeof IntersectionObserver !== 'undefined'
             }
         );
 
@@ -555,6 +574,82 @@ function cleanupAutoUpdate(positionerState) {
     if (positionerState.cleanup) {
         positionerState.cleanup();
         positionerState.cleanup = null;
+    }
+}
+
+function setupPositionStylePreserver(positionerState) {
+    const { positionerElement } = positionerState;
+    if (!positionerElement || typeof MutationObserver === 'undefined') {
+        return;
+    }
+
+    cleanupPositionStylePreserver(positionerState);
+
+    positionerState.styleObserver = new MutationObserver(() => {
+        restoreOwnedPositionStylesIfNeeded(positionerState);
+    });
+
+    positionerState.styleObserver.observe(positionerElement, {
+        attributes: true,
+        attributeFilter: ['style']
+    });
+}
+
+function cleanupPositionStylePreserver(positionerState) {
+    if (positionerState.styleObserver) {
+        positionerState.styleObserver.disconnect();
+        positionerState.styleObserver = null;
+    }
+}
+
+function rememberOwnedPositionStyles(positionerState) {
+    const { positionerElement } = positionerState;
+    if (!positionerElement) {
+        return;
+    }
+
+    const snapshot = {};
+    for (const property of POSITIONER_OWNED_STYLE_PROPERTIES) {
+        snapshot[property] = positionerElement.style.getPropertyValue(property);
+    }
+    positionerState.ownedPositionerStyles = snapshot;
+}
+
+function restoreOwnedPositionStylesIfNeeded(positionerState) {
+    const { positionerElement, ownedPositionerStyles } = positionerState;
+    if (
+        !positionerElement ||
+        !ownedPositionerStyles ||
+        positionerState.restoringPositionerStyles ||
+        positionerState.alignItemWithTriggerActive ||
+        !positionerElement.hasAttribute('data-positioned')
+    ) {
+        return;
+    }
+
+    let needsRestore = false;
+    for (const [property, value] of Object.entries(ownedPositionerStyles)) {
+        if (positionerElement.style.getPropertyValue(property) !== value) {
+            needsRestore = true;
+            break;
+        }
+    }
+
+    if (!needsRestore) {
+        return;
+    }
+
+    positionerState.restoringPositionerStyles = true;
+    try {
+        for (const [property, value] of Object.entries(ownedPositionerStyles)) {
+            if (value) {
+                positionerElement.style.setProperty(property, value);
+            } else {
+                positionerElement.style.removeProperty(property);
+            }
+        }
+    } finally {
+        positionerState.restoringPositionerStyles = false;
     }
 }
 
@@ -893,6 +988,10 @@ async function updatePositionInternal(positionerState) {
 
         positionerElement.style.setProperty('--transform-origin', transformOrigin);
 
+        if (!positionerState.alignItemWithTriggerActive) {
+            rememberOwnedPositionStyles(positionerState);
+        }
+
         // Store computed placement for safePolygon
         positionerState.computedSide = effectiveSide;
         positionerState.computedAlign = effectiveAlign;
@@ -990,6 +1089,8 @@ function updatePositionFallback(positionerState) {
 
     positionerElement.setAttribute('data-side', side);
     positionerElement.setAttribute('data-align', align);
+
+    rememberOwnedPositionStyles(positionerState);
 
     positionerState.computedSide = side;
     positionerState.computedAlign = align;

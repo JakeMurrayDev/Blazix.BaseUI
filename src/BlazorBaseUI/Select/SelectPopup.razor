@@ -1,5 +1,6 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
+@using BlazorBaseUI.Csp
 @using BlazorBaseUI.FloatingFocusManager
 
 @implements IAsyncDisposable
@@ -50,6 +51,9 @@
 
     [CascadingParameter]
     private SelectPositionerContext? PositionerContext { get; set; }
+
+    [CascadingParameter]
+    private CspProviderContext? CspContext { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -141,7 +145,10 @@
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("injectScrollbarDisableStyle", (object?)null);
+                if (CspContext?.DisableStyleElements != true)
+                {
+                    await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
+                }
                 await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, RootContext.HighlightItemOnHover);
                 previousHighlightItemOnHover = RootContext.HighlightItemOnHover;
                 await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!);
@@ -187,16 +194,12 @@
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
         }
 
-        // Run alignItemWithTrigger placement on every render while active & open,
-        // but only after Floating UI has completed its first positioning pass.
-        // Mirrors React's `(alignItemWithTriggerActive && !isPositioned)` suppression
-        // in SelectPopup.tsx:269. Without this gate the popup runs the align-item
-        // pass while the FOUC CSS in blazor-baseui-floating.js is still hiding the
-        // positioner (no `data-positioned` yet), then Floating UI's first absolute
-        // pass briefly reveals the unaligned placement before the next align-item
-        // pass corrects it.
-        var positioned = PositionerContext?.IsPositioned ?? false;
-        if (isActiveAndOpen && positioned)
+        // Run alignItemWithTrigger placement on every render while active & open.
+        // The JS routine is idempotent and owns releasing the FOUC hide by setting
+        // data-positioned after it writes the fixed placement. Waiting for the C#
+        // IsPositioned round-trip can leave Server-rendered popups invisible when
+        // Floating UI's first callback is delayed or skipped.
+        if (isActiveAndOpen)
         {
             try
             {

@@ -1,4 +1,5 @@
 @typeparam TValue
+@using BlazorBaseUI.DirectionProvider
 @using BlazorBaseUI.Field
 @using BlazorBaseUI.Form
 @using BlazorBaseUI.Utilities
@@ -34,6 +35,7 @@
            aria-hidden="true"
            id="@hiddenInputId"
            name="@hiddenInputName"
+           form="@Form"
            autocomplete="@AutoComplete"
            value="@serializedValue"
            disabled="@ResolvedDisabled"
@@ -41,6 +43,7 @@
            readonly="@ReadOnly"
            aria-invalid="@(FieldState.Valid == false ? "true" : null)"
            aria-describedby="@(string.IsNullOrEmpty(describedBy) ? null : describedBy)"
+           @ref="hiddenInputElement"
            @onfocus="HandleHiddenInputFocus"
            @onchange="HandleHiddenInputChange" />
 
@@ -49,7 +52,7 @@
         var values = GetCurrentValues();
         @foreach (var v in values)
         {
-            <input type="hidden" name="@ResolvedName" value="@(typedContext?.GetFormValue(v) ?? v?.ToString())" />
+            <input type="hidden" name="@ResolvedName" form="@Form" value="@(typedContext?.GetFormValue(v) ?? v?.ToString())" />
         }
     }
 }
@@ -61,10 +64,14 @@
     private bool hasRendered;
     private bool isOpen;
     private bool previousReadOnly;
+    private bool previousDisabled;
+    private Direction previousDirection;
     private readonly TransitionLifecycleManager transition = new();
     private int activeIndex = -1;
     private TValue? internalValue;
     private List<TValue> internalValues = new();
+    private ElementReference hiddenInputElement;
+    private ElementReference? previousHiddenInputElement;
     private ElementReference? triggerElement;
     private ElementReference? popupElement;
     private ElementReference? positionerElement;
@@ -76,6 +83,10 @@
     internal SelectRootContext<TValue> typedContext = null!;
     private ISelectRootContext context = null!;
     private DotNetObjectReference<SelectRoot<TValue>>? dotNetRef;
+    private bool hasValueParameter;
+    private bool hasValuesParameter;
+    private bool previousHiddenInputRendered;
+    private SelectRootActions? previousActionsRef;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -85,15 +96,19 @@
 
     private bool CurrentOpen => IsControlled ? Open!.Value : isOpen;
 
-    private TValue? CurrentValue => ValueChanged.HasDelegate ? Value : internalValue;
+    private TValue? CurrentValue => IsValueControlled ? Value : internalValue;
 
-    private bool IsValueControlled => ValueChanged.HasDelegate;
+    private bool IsValueControlled => hasValueParameter;
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
     private string? ResolvedName => Name ?? FieldContext?.Name;
 
     private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
+
+    private Direction EffectiveDirection => Direction != Direction.Undefined
+        ? Direction
+        : DirectionContext?.Direction ?? Direction.Ltr;
 
     /// <summary>
     /// Gets or sets whether the select popup is currently open.
@@ -171,7 +186,7 @@
     /// Gets or sets the text direction of the select.
     /// </summary>
     [Parameter]
-    public Direction Direction { get; set; } = Direction.Ltr;
+    public Direction Direction { get; set; } = Direction.Undefined;
 
     /// <summary>
     /// Gets or sets the identifier of the select root.
@@ -191,6 +206,12 @@
     /// </summary>
     [Parameter]
     public string? AutoComplete { get; set; }
+
+    /// <summary>
+    /// Gets or sets the id of the native form associated with the hidden input.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
 
     /// <summary>
     /// Gets or sets a function to convert a value to its string label for display.
@@ -272,6 +293,18 @@
     public EventCallback<SelectValueChangeEventArgs<TValue>> OnValueChange { get; set; }
 
     /// <summary>
+    /// Gets or sets the imperative actions object for the select root.
+    /// </summary>
+    [Parameter]
+    public SelectRootActions? ActionsRef { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback that receives the hidden input element reference.
+    /// </summary>
+    [Parameter]
+    public Action<ElementReference?>? InputRef { get; set; }
+
+    /// <summary>
     /// Defines the child components of this instance.
     /// </summary>
     [Parameter]
@@ -285,6 +318,18 @@
 
     [CascadingParameter]
     private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        hasValueParameter = parameters.TryGetValue<TValue?>(nameof(Value), out _);
+        hasValuesParameter = parameters.TryGetValue<IReadOnlyList<TValue>?>(nameof(Values), out _);
+
+        return base.SetParametersAsync(parameters);
+    }
 
     /// <inheritdoc />
     protected override void OnInitialized()
@@ -371,20 +416,40 @@
 
         typedContext.FloatingRootContext = new SelectFloatingRootContextAdapter(typedContext);
         context = typedContext;
+        previousDisabled = ResolvedDisabled;
+        previousDirection = EffectiveDirection;
+        SyncActionsRef();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
         var currentOpen = CurrentOpen;
+        var effectiveDirection = EffectiveDirection;
         if (state.Open != currentOpen)
         {
             if (currentOpen)
             {
                 transition.BeginOpen();
+                activeIndex = 0;
             }
+            else
+            {
+                transition.BeginClose();
+                context.OpenInteractionType = InteractionType.None;
+                SyncSelectedIndex();
+            }
+
+            context.TransitionStatus = transition.TransitionStatus;
             context.Open = currentOpen;
             context.Mounted = transition.IsMounted;
+            context.ActiveIndex = activeIndex;
+            context.OpenChangeReason = SelectOpenChangeReason.None;
+
+            if (hasRendered)
+            {
+                _ = SyncRootOpenAsync(currentOpen, SelectOpenChangeReason.None);
+            }
         }
 
         context.Disabled = ResolvedDisabled;
@@ -411,6 +476,20 @@
             previousReadOnly = ReadOnly;
             _ = SyncReadOnlyAsync(ReadOnly);
         }
+
+        if (hasRendered && previousDisabled != ResolvedDisabled)
+        {
+            previousDisabled = ResolvedDisabled;
+            _ = SyncDisabledAsync(ResolvedDisabled);
+        }
+
+        if (hasRendered && previousDirection != effectiveDirection)
+        {
+            previousDirection = effectiveDirection;
+            _ = SyncDirectionAsync(effectiveDirection);
+        }
+
+        SyncActionsRef();
     }
 
     private async Task SyncReadOnlyAsync(bool readOnly)
@@ -426,6 +505,32 @@
         }
     }
 
+    private async Task SyncDisabledAsync(bool disabled)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setDisabled", rootId, disabled);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncDirectionAsync(Direction direction)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setDirection", rootId, direction.ToAttributeString() ?? "ltr");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
     /// <inheritdoc />
     protected override void OnAfterRender(bool firstRender)
     {
@@ -433,9 +538,13 @@
         {
             hasRendered = true;
             previousReadOnly = ReadOnly;
+            previousDisabled = ResolvedDisabled;
+            previousDirection = EffectiveDirection;
             dotNetRef = DotNetObjectReference.Create(this);
             _ = InitializeJsAsync();
         }
+
+        NotifyInputRefIfNeeded();
     }
 
     /// <inheritdoc />
@@ -457,6 +566,12 @@
             }
         }
 
+        if (previousActionsRef is not null)
+        {
+            previousActionsRef.Unmount = null;
+        }
+
+        InputRef?.Invoke(null);
         dotNetRef?.Dispose();
     }
 
@@ -500,6 +615,22 @@
     public void OnKeyboardActiveChange(bool active)
     {
         context.KeyboardActive = active;
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript after the opening starting styles have been applied.
+    /// </summary>
+    [JSInvokable]
+    public void OnStartingStyleApplied()
+    {
+        if (!transition.HandleStartingStyleApplied())
+        {
+            return;
+        }
+
+        context.TransitionStatus = transition.TransitionStatus;
+        typedContext.NotifyStateChanged();
+        StateHasChanged();
     }
 
     /// <summary>
@@ -622,22 +753,7 @@
 
         if (hasRendered)
         {
-            try
-            {
-                var module = await ModuleTask.Value;
-                var reasonString = reason switch
-                {
-                    SelectOpenChangeReason.EscapeKey => "escape-key",
-                    SelectOpenChangeReason.ItemPress => "item-press",
-                    SelectOpenChangeReason.OutsidePress => "outside-press",
-                    _ => null
-                };
-                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString);
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
+            await SyncRootOpenAsync(nextOpen, reason);
         }
 
         await OpenChanged.InvokeAsync(nextOpen);
@@ -646,17 +762,30 @@
         StateHasChanged();
     }
 
+    private async Task SyncRootOpenAsync(bool open, SelectOpenChangeReason reason)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            var reasonString = reason switch
+            {
+                SelectOpenChangeReason.EscapeKey => "escape-key",
+                SelectOpenChangeReason.ItemPress => "item-press",
+                SelectOpenChangeReason.OutsidePress => "outside-press",
+                _ => null
+            };
+
+            await module.InvokeVoidAsync("setRootOpen", rootId, open, reasonString);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
     private async Task SelectValueInternalAsync(TValue? value)
     {
         if (ReadOnly)
-        {
-            return;
-        }
-
-        var eventArgs = new SelectValueChangeEventArgs<TValue>(value);
-        await OnValueChange.InvokeAsync(eventArgs);
-
-        if (eventArgs.IsCanceled)
         {
             return;
         }
@@ -672,6 +801,14 @@
             else if (value is not null)
             {
                 values.Add(value);
+            }
+
+            var eventArgs = new SelectValueChangeEventArgs<TValue>(value, values);
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                return;
             }
 
             if (!IsValuesControlled)
@@ -696,6 +833,14 @@
         }
         else
         {
+            var eventArgs = new SelectValueChangeEventArgs<TValue>(value);
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                return;
+            }
+
             if (!IsValueControlled)
             {
                 internalValue = value;
@@ -733,6 +878,16 @@
                 }
             }
 
+            var eventArgs = new SelectValueChangeEventArgs<TValue>(
+                replacement.Count > 0 ? replacement[0] : default,
+                replacement);
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                return;
+            }
+
             if (!IsValuesControlled)
             {
                 internalValues = replacement;
@@ -750,6 +905,14 @@
         else
         {
             TValue? value = boxedValue is TValue tv ? tv : default;
+
+            var eventArgs = new SelectValueChangeEventArgs<TValue>(value);
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                return;
+            }
 
             if (!IsValueControlled)
             {
@@ -900,7 +1063,7 @@
         return CurrentValue is null;
     }
 
-    private bool IsValuesControlled => ValuesChanged.HasDelegate;
+    private bool IsValuesControlled => hasValuesParameter;
 
     private IReadOnlyList<TValue> GetCurrentValues()
     {
@@ -918,8 +1081,8 @@
         {
             var module = await ModuleTask.Value;
             var modal = Modal == SelectModalMode.True;
-            var directionStr = Direction.ToAttributeString() ?? "ltr";
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, true, modal, directionStr, ReadOnly);
+            var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, false, modal, directionStr, ReadOnly, ResolvedDisabled);
 
             if (triggerElement.HasValue)
             {
@@ -955,6 +1118,67 @@
         {
             _ = SetTriggerElementAsync(element.Value);
         }
+    }
+
+    private void SyncActionsRef()
+    {
+        if (previousActionsRef is not null && previousActionsRef != ActionsRef)
+        {
+            previousActionsRef.Unmount = null;
+        }
+
+        if (ActionsRef is not null)
+        {
+            ActionsRef.Unmount = ForceUnmount;
+        }
+
+        previousActionsRef = ActionsRef;
+    }
+
+    private void ForceUnmount()
+    {
+        transition.ForceUnmount();
+        context.Mounted = false;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.ForceMount = false;
+        activeIndex = -1;
+        context.ActiveIndex = activeIndex;
+        typedContext.NotifyStateChanged();
+        StateHasChanged();
+    }
+
+    private void NotifyInputRefIfNeeded()
+    {
+        if (InputRef is null)
+        {
+            return;
+        }
+
+        var rendered = ShouldRenderHiddenInput();
+        var currentElement = rendered ? hiddenInputElement : (ElementReference?)null;
+
+        if (rendered == previousHiddenInputRendered &&
+            SameElement(currentElement, previousHiddenInputElement))
+        {
+            return;
+        }
+
+        InputRef(currentElement);
+        previousHiddenInputRendered = rendered;
+        previousHiddenInputElement = currentElement;
+    }
+
+    private bool ShouldRenderHiddenInput() =>
+        !string.IsNullOrEmpty(ResolvedName) || FieldContext is not null;
+
+    private static bool SameElement(ElementReference? a, ElementReference? b)
+    {
+        if (a is { } left && b is { } right)
+        {
+            return left.Id == right.Id;
+        }
+
+        return !a.HasValue && !b.HasValue;
     }
 
     private async Task SetTriggerElementAsync(ElementReference element)
