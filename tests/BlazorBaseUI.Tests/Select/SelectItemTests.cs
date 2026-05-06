@@ -6,12 +6,15 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateSelectWithItems(
         string? defaultValue = null,
         bool defaultOpen = false,
-        bool disabledItem = false)
+        bool disabledItem = false,
+        bool useNativeButton = false,
+        string? firstItemLabel = null)
     {
         return builder =>
         {
@@ -34,7 +37,15 @@ public class SelectItemTests : BunitContext, ISelectItemContract
                     {
                         popupBuilder.OpenComponent<SelectItem<string>>(0);
                         popupBuilder.AddAttribute(1, "Value", "apple");
-                        popupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
+                        if (firstItemLabel is not null)
+                        {
+                            popupBuilder.AddAttribute(2, "Label", firstItemLabel);
+                        }
+                        if (useNativeButton)
+                        {
+                            popupBuilder.AddAttribute(3, "NativeButton", true);
+                        }
+                        popupBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
                         popupBuilder.CloseComponent();
 
                         popupBuilder.OpenComponent<SelectItem<string>>(10);
@@ -52,17 +63,19 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     }
 
     [Fact]
-    public Task ShouldSelectItemAndClosePopupWhenClicked()
+    public async Task ShouldSelectItemAndClosePopupWhenClicked()
     {
         var cut = Render(CreateSelectWithItems(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
+        // React parity: a mouse click on an item requires the item to be highlighted first
+        // (normally achieved by onmouseenter in a real browser).
+        await items[0].TriggerEventAsync("onmouseenter", new MouseEventArgs());
+        items = cut.FindAll("[role='option']");
         items[0].Click();
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
-
-        return Task.CompletedTask;
     }
 
     [Fact]
@@ -148,8 +161,6 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     }
 
     // --- Focus + Disabled: disabled items do not highlight on mouseenter ---
-    // In our implementation, the mouseenter handler checks !Disabled, so disabled
-    // items do NOT highlight. This test verifies that behavior.
 
     [Fact]
     public async Task DisabledItem_ShouldNotHighlightOnMouseEnter()
@@ -157,16 +168,11 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         var cut = Render(CreateSelectWithItems(defaultOpen: true, disabledItem: true));
 
         var items = cut.FindAll("[role='option']");
-        // Banana (index 1) is disabled; mouseenter won't highlight it in our impl
         await items[1].TriggerEventAsync("onmouseenter", new MouseEventArgs());
 
         items = cut.FindAll("[role='option']");
-        // Our implementation does NOT highlight disabled items on mouseenter
-        // This matches the guard in HandleMouseEnterAsync: if (!Disabled)
         items[1].HasAttribute("data-highlighted").ShouldBeFalse();
     }
-
-    // --- Focus on open: selected item should have data-selected upon opening ---
 
     [Fact]
     public Task ShouldFocusSelectedItemUponOpeningPopup()
@@ -181,25 +187,111 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         return Task.CompletedTask;
     }
 
-    // --- Disabled item click guard: clicking a disabled item should not select it or close the popup ---
-
     [Fact]
     public Task DisabledItem_ShouldNotSelectOnClickAndKeepOpen()
     {
         var cut = Render(CreateSelectWithItems(defaultOpen: true, disabledItem: true));
 
-        // Try to click the disabled item (banana)
         var items = cut.FindAll("[role='option']");
         items[1].Click();
 
-        // Since banana is disabled, it should not be selected
         items = cut.FindAll("[role='option']");
         items[1].HasAttribute("data-selected").ShouldBeFalse();
 
-        // Select should remain open (disabled item click doesn't close)
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
         return Task.CompletedTask;
+    }
+
+    // --- React parity additions ---
+
+    [Fact]
+    public Task ShouldNotEmitDataLabel()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, firstItemLabel: "Apple"));
+
+        var items = cut.FindAll("[role='option']");
+        // React's SelectItem does not emit `data-label`; we use `data-blazor-base-ui-label` instead.
+        items[0].HasAttribute("data-label").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ShouldEmitDataBlazorBaseUiLabelWhenLabelSet()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, firstItemLabel: "Apple"));
+
+        var items = cut.FindAll("[role='option']");
+        items[0].GetAttribute("data-blazor-base-ui-label").ShouldBe("Apple");
+        // Second item has no Label parameter → attribute absent
+        items[1].HasAttribute("data-blazor-base-ui-label").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ShouldRejectMouseClickOnUnhighlightedItem()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true));
+
+        var items = cut.FindAll("[role='option']");
+        // Click without prior mouseenter — React parity: unhighlighted mouse click is ignored.
+        items[0].Click();
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-selected").ShouldBeFalse();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NativeButton_ShouldRenderAsButtonElementWithTypeButton()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, useNativeButton: true));
+
+        var items = cut.FindAll("[role='option']");
+        items[0].TagName.ShouldBe("BUTTON");
+        items[0].GetAttribute("type").ShouldBe("button");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NonNativeButton_ShouldRenderAsDivWithRoleOption()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true));
+
+        var items = cut.FindAll("[role='option']");
+        items[0].TagName.ShouldBe("DIV");
+        items[0].GetAttribute("role").ShouldBe("option");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DisabledItem_ShouldRemainFocusableWhenHighlighted()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, disabledItem: true));
+
+        var items = cut.FindAll("[role='option']");
+        // Disabled item starts with tabindex=-1
+        items[1].GetAttribute("tabindex").ShouldBe("-1");
+
+        // Simulate focus (e.g., roving tabindex from JS sets activeIndex to this item):
+        // we use the onfocus handler path which sets the hover active index.
+        await items[1].TriggerEventAsync("onfocus", new FocusEventArgs());
+
+        items = cut.FindAll("[role='option']");
+        // focusableWhenDisabled: true path keeps the disabled item focusable.
+        items[1].GetAttribute("tabindex").ShouldBe("0");
+        // aria-disabled remains true so AT announces the disabled state.
+        items[1].GetAttribute("aria-disabled").ShouldBe("true");
+        // Native `disabled` attribute must NOT be set — that would strip focusability.
+        items[1].HasAttribute("disabled").ShouldBeFalse();
     }
 }

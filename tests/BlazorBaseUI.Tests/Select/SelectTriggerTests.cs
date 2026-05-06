@@ -12,6 +12,7 @@ public class SelectTriggerTests : BunitContext, ISelectTriggerContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
         JsInteropSetup.SetupFieldModule(JSInterop);
         JsInteropSetup.SetupLabelModule(JSInterop);
         Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
@@ -103,7 +104,7 @@ public class SelectTriggerTests : BunitContext, ISelectTriggerContract
         var cut = Render(CreateSelectWithTrigger());
 
         var button = cut.Find("button");
-        await button.TriggerEventAsync("onclick", new MouseEventArgs());
+        await button.TriggerEventAsync("onmousedown", new MouseEventArgs());
         cut.FindComponent<SelectTrigger>().Render();
 
         button = cut.Find("button");
@@ -185,7 +186,7 @@ public class SelectTriggerTests : BunitContext, ISelectTriggerContract
         var cut = Render(CreateSelectWithTrigger(disabled: true));
 
         var button = cut.Find("button");
-        await button.TriggerEventAsync("onclick", new MouseEventArgs());
+        await button.TriggerEventAsync("onmousedown", new MouseEventArgs());
         cut.FindComponent<SelectTrigger>().Render();
 
         button = cut.Find("button");
@@ -506,6 +507,270 @@ public class SelectTriggerTests : BunitContext, ISelectTriggerContract
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-invalid").ShouldBe("true");
 
+        return Task.CompletedTask;
+    }
+
+    // ─── New behaviors ────────────────────────────────────────────────
+
+    private sealed class SelectContextCapture : ComponentBase
+    {
+        [CascadingParameter] public ISelectRootContext? RootContext { get; set; }
+        public ISelectRootContext? Captured => RootContext;
+    }
+
+    private RenderFragment CreateSelectWithCapture(bool defaultOpen = false, string? defaultValue = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            var i = 1;
+            builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
+            if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
+            builder.AddAttribute(i++, "ChildContent", (RenderFragment)(inner =>
+            {
+                inner.OpenComponent<SelectTrigger>(0);
+                inner.CloseComponent();
+
+                inner.OpenComponent<SelectPositioner>(10);
+                inner.AddAttribute(11, "ChildContent", (RenderFragment)(p =>
+                {
+                    p.OpenComponent<SelectPopup>(0);
+                    p.AddAttribute(1, "ChildContent", (RenderFragment)(pp =>
+                    {
+                        pp.OpenComponent<SelectItem<string>>(0);
+                        pp.AddAttribute(1, "Value", "apple");
+                        pp.CloseComponent();
+                    }));
+                    p.CloseComponent();
+                }));
+                inner.CloseComponent();
+
+                inner.OpenComponent<SelectContextCapture>(20);
+                inner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    [Fact]
+    public async Task KeyDown_SetsKeyboardActive()
+    {
+        var cut = Render(CreateSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.KeyboardActive.ShouldBeFalse();
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onkeydown", new KeyboardEventArgs { Key = "a" });
+
+        ctx.KeyboardActive.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task PointerMove_ClearsKeyboardActive()
+    {
+        var cut = Render(CreateSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.KeyboardActive = true;
+
+        await cut.FindComponent<SelectTrigger>().Instance.NotifyPointerMove();
+
+        ctx.KeyboardActive.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Focus_SetsForceMount()
+    {
+        var cut = Render(CreateSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.ForceMount.ShouldBeFalse();
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onfocus", new FocusEventArgs());
+        // Focus schedules ForceMount via InvokeAsync; yield so the continuation runs.
+        await Task.Yield();
+        cut.FindComponent<SelectTrigger>().Render();
+
+        ctx.ForceMount.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Focus_ClosesPopupWhenAlignItemWithTriggerActive()
+    {
+        var cut = Render(CreateSelectWithCapture(defaultOpen: true));
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        // SelectPositioner defaults to AlignItemWithTrigger=true.
+        ctx.AlignItemWithTriggerActive.ShouldBeTrue();
+        ctx.GetOpen().ShouldBeTrue();
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onfocus", new FocusEventArgs());
+
+        ctx.GetOpen().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Focus_DoesNotCloseWhenItIsTheSideEffectOfTheClickThatJustOpenedThePopup()
+    {
+        // Regression: on the very first click, browsers fire `mousedown` then
+        // `focus` for the same user gesture. The `mousedown` handler opens the
+        // popup, then the positioner re-renders with AlignItemWithTriggerActive
+        // = true, then `focus` fires. Without the suppression flag, the focus
+        // close-on-focus guard saw both Open=true and AlignItemWithTriggerActive
+        // = true and immediately closed the popup again, so first-click open
+        // appeared to never happen.
+        var cut = Render(CreateSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.GetOpen().ShouldBeFalse();
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onmousedown", new MouseEventArgs());
+        cut.FindComponent<SelectTrigger>().Render();
+
+        ctx.GetOpen().ShouldBeTrue();
+        ctx.AlignItemWithTriggerActive.ShouldBeTrue();
+
+        await button.TriggerEventAsync("onfocus", new FocusEventArgs());
+
+        ctx.GetOpen().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task NotifyCancelOpen_ClosesOpenPopupWithCancelOpenReason()
+    {
+        var cut = Render(CreateSelectWithCapture(defaultOpen: true));
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.GetOpen().ShouldBeTrue();
+
+        await cut.InvokeAsync(() =>
+            cut.FindComponent<SelectTrigger>().Instance.NotifyCancelOpen());
+
+        ctx.GetOpen().ShouldBeFalse();
+        ctx.OpenChangeReason.ShouldBe(SelectOpenChangeReason.CancelOpen);
+    }
+
+    private RenderFragment CreateFieldSelectWithCapture()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "Name", "fruit");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SelectRoot<string>>(0);
+                fieldBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(selectBuilder =>
+                {
+                    selectBuilder.OpenComponent<SelectTrigger>(0);
+                    selectBuilder.CloseComponent();
+                    selectBuilder.OpenComponent<SelectContextCapture>(1);
+                    selectBuilder.CloseComponent();
+                }));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    [Fact]
+    public async Task NotifyRealBlur_InvokesTriggerBlur()
+    {
+        var cut = Render(CreateFieldSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+        ctx.FieldState.Touched.ShouldBeFalse();
+
+        await cut.FindComponent<SelectTrigger>().Instance.NotifyRealBlur();
+
+        // OnTriggerBlur runs the root's HandleTriggerBlur which sets touched.
+        ctx.FieldState.Touched.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task SelectionGating_PlaceholderOnly_OpensBothFlagsAfterSelectedDelay()
+    {
+        var cut = Render(CreateSelectWithCapture());
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onmousedown", new MouseEventArgs());
+        cut.FindComponent<SelectTrigger>().Render();
+
+        ctx.AllowSelectedMouseUp.ShouldBeFalse();
+        ctx.AllowUnselectedMouseUp.ShouldBeFalse();
+
+        cut.WaitForAssertion(
+            () =>
+            {
+                ctx.AllowSelectedMouseUp.ShouldBeTrue();
+                ctx.AllowUnselectedMouseUp.ShouldBeTrue();
+            },
+            TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task SelectionGating_WithSelectedItem_OpensUnselectedThenSelected()
+    {
+        var cut = Render(CreateSelectWithCapture(defaultValue: "apple"));
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+
+        var button = cut.Find("button");
+        await button.TriggerEventAsync("onmousedown", new MouseEventArgs());
+        cut.FindComponent<SelectTrigger>().Render();
+
+        cut.WaitForAssertion(
+            () => ctx.AllowUnselectedMouseUp.ShouldBeTrue(),
+            TimeSpan.FromSeconds(1));
+
+        cut.WaitForAssertion(
+            () => ctx.AllowSelectedMouseUp.ShouldBeTrue(),
+            TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task SelectionGating_ClosedResetsFlags()
+    {
+        var cut = Render(CreateSelectWithCapture(defaultOpen: true));
+        var ctx = cut.FindComponent<SelectContextCapture>().Instance.Captured!;
+
+        // Allow gating to flip on while open.
+        cut.WaitForAssertion(
+            () => ctx.AllowUnselectedMouseUp.ShouldBeTrue(),
+            TimeSpan.FromSeconds(2));
+
+        await cut.InvokeAsync(() => ctx.SetOpenAsync(false, SelectOpenChangeReason.None));
+        cut.FindComponent<SelectTrigger>().Render();
+
+        ctx.AllowSelectedMouseUp.ShouldBeFalse();
+        ctx.AllowUnselectedMouseUp.ShouldBeFalse();
+    }
+
+    [Fact]
+    public Task State_ExposesCurrentValue()
+    {
+        SelectTriggerState? captured = null;
+
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", "apple");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
+            {
+                inner.OpenComponent<SelectTrigger>(0);
+                inner.AddAttribute(1, "Render",
+                    (RenderFragment<RenderProps<SelectTriggerState>>)(props => b =>
+                    {
+                        captured = props.State;
+                        b.OpenElement(0, "button");
+                        b.AddMultipleAttributes(1, props.Attributes);
+                        b.CloseElement();
+                    }));
+                inner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        Render(fragment);
+
+        captured.HasValue.ShouldBeTrue();
+        captured!.Value.Value.ShouldBe("apple");
         return Task.CompletedTask;
     }
 }

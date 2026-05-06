@@ -434,5 +434,28 @@ public static class JsInteropSetup
         module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
         module.SetupVoid("updatePosition", _ => true).SetVoidResult();
         module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+        module.SetupVoid("registerPositioner", _ => true).SetVoidResult();
+        module.SetupVoid("unregisterPositioner", _ => true).SetVoidResult();
+        module.SetupVoid("initializeTrigger", _ => true).SetVoidResult();
+        module.SetupVoid("disposeTrigger", _ => true).SetVoidResult();
+        module.Setup<string>("applyScrollLock", _ => true).SetResult("scroll-lock-token");
+        module.SetupVoid("releaseScrollLock", _ => true).SetVoidResult();
+        module.SetupVoid("initializePopup", _ => true).SetVoidResult();
+        module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+        module.SetupVoid("beginAlignItemWithTriggerPlacement", _ => true).SetVoidResult();
+        module.SetupVoid("handlePopupScroll", _ => true).SetVoidResult();
+        module.SetupVoid("clearPopupStyles", _ => true).SetVoidResult();
+        module.SetupVoid("attachWindowResizeListener", _ => true).SetVoidResult();
+        module.SetupVoid("detachWindowResizeListener", _ => true).SetVoidResult();
+        module.SetupVoid("injectScrollbarDisableStyle", _ => true).SetVoidResult();
+        module.SetupVoid("setSelectedItemTextElement", _ => true).SetVoidResult();
+        module.SetupVoid("setValueElement", _ => true).SetVoidResult();
+        module.SetupVoid("setHighlightItemOnHover", _ => true).SetVoidResult();
+        module.SetupVoid("setDisabled", _ => true).SetVoidResult();
+        module.SetupVoid("setDirection", _ => true).SetVoidResult();
+        module.Setup<string?>("getElementText", _ => true).SetResult(null);
+
+        var floating = jsInterop.SetupModule(FloatingModule);
+        floating.SetupVoid("clearStyles", _ => true).SetVoidResult();
     }
 }

@@ -6,6 +6,7 @@ public class SelectGroupTests : BunitContext, ISelectGroupContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateSelectWithGroup(bool defaultOpen = true)

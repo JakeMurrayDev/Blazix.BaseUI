@@ -20,15 +20,21 @@ public sealed class SelectValueChangeEventArgs<TValue> : EventArgs
     /// <summary>
     /// Initializes a new instance of the <see cref="SelectValueChangeEventArgs{TValue}"/> class.
     /// </summary>
-    public SelectValueChangeEventArgs(TValue? value)
+    public SelectValueChangeEventArgs(TValue? value, IReadOnlyList<TValue>? values = null)
     {
         Value = value;
+        Values = values;
     }
 
     /// <summary>
     /// Gets the newly selected value.
     /// </summary>
     public TValue? Value { get; }
+
+    /// <summary>
+    /// Gets the next selected values when the select allows multiple selection.
+    /// </summary>
+    public IReadOnlyList<TValue>? Values { get; }
 
     /// <summary>
     /// Gets whether the value change has been canceled.

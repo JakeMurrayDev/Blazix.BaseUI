@@ -29,4 +29,25 @@ public interface ISelectTriggerContract
     Task FieldRoot_HasAriaLabelledBy();
     Task FieldRoot_HasAriaDescribedBy();
     Task FieldRoot_HasAriaInvalidWhenFieldInvalid();
+
+    // Keyboard vs pointer tracking
+    Task KeyDown_SetsKeyboardActive();
+    Task PointerMove_ClearsKeyboardActive();
+
+    // Focus coordination
+    Task Focus_SetsForceMount();
+    Task Focus_ClosesPopupWhenAlignItemWithTriggerActive();
+    Task Focus_DoesNotCloseWhenItIsTheSideEffectOfTheClickThatJustOpenedThePopup();
+
+    // JS-driven callbacks
+    Task NotifyCancelOpen_ClosesOpenPopupWithCancelOpenReason();
+    Task NotifyRealBlur_InvokesTriggerBlur();
+
+    // Selection mouseup gating
+    Task SelectionGating_PlaceholderOnly_OpensBothFlagsAfterSelectedDelay();
+    Task SelectionGating_WithSelectedItem_OpensUnselectedThenSelected();
+    Task SelectionGating_ClosedResetsFlags();
+
+    // State record
+    Task State_ExposesCurrentValue();
 }

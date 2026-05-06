@@ -2,7 +2,9 @@
 @using BlazorBaseUI.Utilities
 @using BlazorBaseUI.Utilities.LabelableProvider
 @using Microsoft.AspNetCore.Components.Web
-@implements IDisposable
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 
 <RenderElement TState="SelectTriggerState"
                Tag="button"
@@ -17,10 +19,23 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string SelectModule = "./_content/BlazorBaseUI/blazor-baseui-select.js";
+    private const int SelectedDelayMs = 400;
+    private const int UnselectedDelayMs = 200;
+
     private string triggerId = null!;
     private SelectTriggerState state;
     private RenderElement<SelectTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private Lazy<Task<IJSObjectReference>> moduleTask = null!;
+    private DotNetObjectReference<SelectTrigger>? selfReference;
+    private bool jsInitialized;
+
+    private CancellationTokenSource? selectedDelayCts;
+    private CancellationTokenSource? unselectedDelayCts;
+    private (bool Open, bool Placeholder, bool HasNullItemLabel)? lastGatingKey;
+    private bool suppressFocusCloseOnce;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -87,14 +102,21 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(
+            () => JS.InvokeAsync<IJSObjectReference>("import", SelectModule).AsTask());
+
         triggerId = Id ?? RootContext?.RootId ?? Guid.NewGuid().ToIdString();
         LabelableContext?.SetControlId(triggerId);
-        BuildComponentAttributes();
 
         if (RootContext is not null)
         {
+            RootContext.TriggerId = triggerId;
             RootContext.StateChanged += OnRootStateChanged;
         }
+
+        RebuildState();
+        BuildComponentAttributes();
+        SyncSelectionGating();
     }
 
     /// <inheritdoc />
@@ -104,47 +126,94 @@
         {
             triggerId = Id;
             LabelableContext?.SetControlId(triggerId);
+            if (RootContext is not null)
+            {
+                RootContext.TriggerId = triggerId;
+            }
         }
 
-        var open = RootContext?.GetOpen() ?? false;
-        var disabled = Disabled || (RootContext?.Disabled ?? false);
-        var placeholder = RootContext?.IsPlaceholder ?? true;
-        var readOnly = RootContext?.ReadOnly ?? false;
-        var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
-        state = SelectTriggerState.FromFieldState(fieldState, open, disabled, placeholder, readOnly);
+        RebuildState();
         BuildComponentAttributes();
+        SyncSelectionGating();
     }
 
     /// <inheritdoc />
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             RootContext?.SetTriggerElement(Element);
+
+            if (RootContext is not null && Element.HasValue)
+            {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    selfReference = DotNetObjectReference.Create(this);
+                    await module.InvokeVoidAsync("initializeTrigger", RootContext.RootId, Element.Value, selfReference);
+                    jsInitialized = true;
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
         }
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         LabelableContext?.SetControlId(null);
 
         if (RootContext is not null)
         {
+            if (RootContext.TriggerId == triggerId)
+            {
+                RootContext.TriggerId = null;
+            }
+
             RootContext.StateChanged -= OnRootStateChanged;
         }
+
+        selectedDelayCts?.Cancel();
+        selectedDelayCts?.Dispose();
+        unselectedDelayCts?.Cancel();
+        unselectedDelayCts?.Dispose();
+
+        if (jsInitialized && moduleTask.IsValueCreated && RootContext is not null)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeTrigger", RootContext.RootId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        selfReference?.Dispose();
     }
 
     private void OnRootStateChanged()
+    {
+        RebuildState();
+        BuildComponentAttributes();
+        SyncSelectionGating();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RebuildState()
     {
         var open = RootContext?.GetOpen() ?? false;
         var disabled = Disabled || (RootContext?.Disabled ?? false);
         var placeholder = RootContext?.IsPlaceholder ?? true;
         var readOnly = RootContext?.ReadOnly ?? false;
         var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
-        state = SelectTriggerState.FromFieldState(fieldState, open, disabled, placeholder, readOnly);
-        BuildComponentAttributes();
-        InvokeAsync(StateHasChanged);
+        var value = RootContext?.CurrentValueBoxed;
+        state = SelectTriggerState.FromFieldState(fieldState, open, disabled, placeholder, readOnly, value);
     }
 
     private void BuildComponentAttributes()
@@ -156,21 +225,25 @@
         var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
 
         attrs["role"] = "combobox";
+
         if (NativeButton)
         {
-            attrs["type"] = "button";
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
         }
         else
         {
-            attrs["tabindex"] = disabled ? -1 : 0;
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
         }
+
+        // Ensure the combobox role wins over any role injected by ApplyButtonAttributes.
+        attrs["role"] = "combobox";
+
         attrs["aria-haspopup"] = "listbox";
         attrs["aria-expanded"] = open ? "true" : "false";
         attrs["id"] = triggerId;
 
         if (disabled)
         {
-            attrs["disabled"] = true;
             attrs["data-disabled"] = true;
         }
 
@@ -185,9 +258,12 @@
             attrs["aria-required"] = "true";
         }
 
-        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+        var labelledById = AccessibilityUtilities.ResolveAriaLabelledBy(
+            LabelableContext?.LabelId,
+            RootContext?.LabelId);
+        if (!string.IsNullOrEmpty(labelledById))
         {
-            attrs["aria-labelledby"] = LabelableContext.LabelId;
+            attrs["aria-labelledby"] = labelledById;
         }
 
         var describedBy = LabelableContext?.GetAriaDescribedBy();
@@ -230,25 +306,54 @@
         attrs["data-filled"] = fieldState.Filled;
         attrs["data-focused"] = fieldState.Focused;
 
-        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["onmousedown"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseDownAsync);
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
-        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
-        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+
+        // onblur and onpointermove are owned by the JS module (see initializeTrigger)
+        // so it can do relatedTarget containment and pointermove tracking without
+        // interop round-trips for every mouse move.
 
         componentAttributes = attrs;
     }
 
-    private async Task HandleClickAsync(MouseEventArgs e)
+    private async Task HandleMouseDownAsync(MouseEventArgs e)
     {
         if (state.Disabled || RootContext is null)
         {
             return;
         }
 
-        var nextOpen = !RootContext.GetOpen();
-        await RootContext.SetOpenAsync(nextOpen, SelectOpenChangeReason.TriggerPress);
+        // Match React's `useClick({ enabled: !readOnly && !disabled })`.
+        if (RootContext.ReadOnly)
+        {
+            return;
+        }
 
-        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+        // Match React's `useClick({ event: 'mousedown' })`: only primary button toggles.
+        if (e.Button != 0)
+        {
+            return;
+        }
+
+        if (RootContext.OpenInteractionType != InteractionType.Touch)
+        {
+            RootContext.OpenInteractionType = InteractionType.Click;
+        }
+        var nextOpen = !RootContext.GetOpen();
+        if (nextOpen)
+        {
+            // Suppress the close-on-focus guard for the focus event that fires as
+            // a side effect of this click. React's onFocus reads `open` from a
+            // render-time captured store value, so on the first click the closure
+            // still observes `open === false` and skips the guard. Blazor reads
+            // live state via RootContext.GetOpen(), which is already true by the
+            // time focus runs (and AlignItemWithTriggerActive is also true once
+            // the positioner has re-rendered), so without this flag the guard
+            // would close the popup we just opened.
+            suppressFocusCloseOnce = true;
+        }
+        await RootContext.SetOpenAsync(nextOpen, SelectOpenChangeReason.TriggerPress);
     }
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
@@ -258,24 +363,198 @@
             return;
         }
 
-        if (e.Key == "ArrowDown" || e.Key == "ArrowUp" || e.Key == "Enter" || e.Key == " ")
+        RootContext.KeyboardActive = true;
+
+        // Match React's `useListNavigation`/`useTypeahead`/`useClick` shared
+        // `enabled: !readOnly && !disabled` guard. User-supplied onkeydown
+        // still fires below.
+        if (!RootContext.ReadOnly)
         {
-            if (!RootContext.GetOpen())
+            if (e.Key == "ArrowDown" || e.Key == "ArrowUp" || e.Key == "Enter" || e.Key == " ")
             {
-                await RootContext.SetOpenAsync(true, SelectOpenChangeReason.TriggerPress);
+                if (!RootContext.GetOpen())
+                {
+                    RootContext.OpenInteractionType = InteractionType.Keyboard;
+                    await RootContext.SetOpenAsync(true, SelectOpenChangeReason.TriggerPress);
+                }
+            }
+            else if (!RootContext.GetOpen() && e.Key.Length == 1 && !e.CtrlKey && !e.AltKey && !e.MetaKey)
+            {
+                await RootContext.HandleClosedTypeaheadAsync(e.Key);
             }
         }
 
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 
-    private void HandleFocus(FocusEventArgs e)
+    private async Task HandleFocusAsync(FocusEventArgs e)
     {
-        RootContext?.OnTriggerFocus();
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        RootContext.OnTriggerFocus();
+
+        var skipFocusClose = suppressFocusCloseOnce;
+        suppressFocusCloseOnce = false;
+
+        if (!skipFocusClose && RootContext.GetOpen() && RootContext.AlignItemWithTriggerActive)
+        {
+            await RootContext.SetOpenAsync(false, SelectOpenChangeReason.None);
+        }
+
+        // Queue a tick before flipping ForceMount, matching React's
+        // `timeoutFocus.start(0, …)` so the first render after focus sees
+        // the flag while items mount asynchronously.
+        _ = InvokeAsync(() =>
+        {
+            if (RootContext is not null)
+            {
+                RootContext.ForceMount = true;
+                RootContext.NotifyStateChanged();
+            }
+        });
     }
 
-    private void HandleBlur(FocusEventArgs e)
+    [JSInvokable]
+    public Task NotifyPointerMove()
     {
+        if (RootContext is not null)
+        {
+            RootContext.KeyboardActive = false;
+        }
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task NotifyTouchOpen()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.OpenInteractionType = InteractionType.Touch;
+        }
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task NotifyCancelOpen()
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        if (RootContext.GetOpen())
+        {
+            await RootContext.SetOpenAsync(false, SelectOpenChangeReason.CancelOpen);
+        }
+    }
+
+    [JSInvokable]
+    public Task NotifyRealBlur()
+    {
+        // Clear the suppression flag on real blur so a later focus event that
+        // arrives via Tab navigation (rather than as a side effect of a click
+        // that just opened the popup) runs the close-on-focus guard normally.
+        suppressFocusCloseOnce = false;
         RootContext?.OnTriggerBlur();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Mirrors the React <c>useEffect</c> that opens/closes the mouse-up gating
+    /// windows: a single 400 ms window when no selected item exists, or a 200 ms
+    /// (unselected) → 400 ms (selected) pair when one does.
+    /// </summary>
+    private void SyncSelectionGating()
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        var open = RootContext.GetOpen();
+        var placeholder = RootContext.IsPlaceholder;
+        var hasNullItemLabel = RootContext.HasNullItemLabel;
+        var key = (open, placeholder, hasNullItemLabel);
+
+        if (lastGatingKey == key)
+        {
+            return;
+        }
+
+        lastGatingKey = key;
+
+        selectedDelayCts?.Cancel();
+        selectedDelayCts?.Dispose();
+        selectedDelayCts = null;
+
+        unselectedDelayCts?.Cancel();
+        unselectedDelayCts?.Dispose();
+        unselectedDelayCts = null;
+
+        if (!open)
+        {
+            RootContext.AllowSelectedMouseUp = false;
+            RootContext.AllowUnselectedMouseUp = false;
+            return;
+        }
+
+        var hasSelectedItemInList = !placeholder || hasNullItemLabel;
+
+        if (!hasSelectedItemInList)
+        {
+            selectedDelayCts = new CancellationTokenSource();
+            var token = selectedDelayCts.Token;
+            _ = DelayThenAsync(SelectedDelayMs, token, () =>
+            {
+                if (RootContext is null || token.IsCancellationRequested) return;
+                RootContext.AllowSelectedMouseUp = true;
+                RootContext.AllowUnselectedMouseUp = true;
+                RootContext.NotifyStateChanged();
+            });
+        }
+        else
+        {
+            unselectedDelayCts = new CancellationTokenSource();
+            var unselectedToken = unselectedDelayCts.Token;
+            _ = DelayThenAsync(UnselectedDelayMs, unselectedToken, () =>
+            {
+                if (RootContext is null || unselectedToken.IsCancellationRequested) return;
+                RootContext.AllowUnselectedMouseUp = true;
+                RootContext.NotifyStateChanged();
+
+                selectedDelayCts = new CancellationTokenSource();
+                var selectedToken = selectedDelayCts.Token;
+                _ = DelayThenAsync(UnselectedDelayMs, selectedToken, () =>
+                {
+                    if (RootContext is null || selectedToken.IsCancellationRequested) return;
+                    RootContext.AllowSelectedMouseUp = true;
+                    RootContext.NotifyStateChanged();
+                });
+            });
+        }
+    }
+
+    private async Task DelayThenAsync(int delayMs, CancellationToken token, Action action)
+    {
+        try
+        {
+            await Task.Delay(delayMs, token);
+            if (!token.IsCancellationRequested)
+            {
+                action();
+            }
+        }
+        catch (OperationCanceledException ex)
+        {
+            // Expected: the gating key changed and we restarted the wait; nothing to do.
+            _ = ex;
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
     }
 }

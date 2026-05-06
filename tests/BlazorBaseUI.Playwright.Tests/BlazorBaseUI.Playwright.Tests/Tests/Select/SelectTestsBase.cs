@@ -374,4 +374,45 @@ public abstract class SelectTestsBase : TestBase
     }
 
     #endregion
+
+    #region Popup Pipeline Tests
+
+    /// <summary>
+    /// Verifies that a window-resize event closes a select that was opened in
+    /// align-item-with-trigger mode.
+    /// </summary>
+    [Fact]
+    public virtual async Task WindowResizeClosesOpenSelectWhenAligned()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        await OpenSelectAsync();
+
+        // Trigger a resize event — the JS resize listener inside SelectPopup
+        // calls back to OnWindowResize, which calls SetOpenAsync(false, WindowResize).
+        await Page.EvaluateAsync("() => window.dispatchEvent(new Event('resize'))");
+
+        await WaitForSelectClosedAsync();
+    }
+
+    /// <summary>
+    /// Verifies the SelectPopup emits <c>data-side</c> and <c>data-align</c>
+    /// attributes derived from the positioner.
+    /// </summary>
+    [Fact]
+    public virtual async Task PopupExposesDataSideAndDataAlign()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+        await OpenSelectAsync();
+
+        var popup = GetByTestId("select-popup");
+        await Assertions.Expect(popup).ToHaveAttributeAsync(
+            "data-side",
+            new System.Text.RegularExpressions.Regex("^(top|bottom|left|right|inline-start|inline-end|none)$"));
+        await Assertions.Expect(popup).ToHaveAttributeAsync(
+            "data-align",
+            new System.Text.RegularExpressions.Regex("^(start|center|end)$"));
+    }
+
+    #endregion
 }

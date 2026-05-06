@@ -18,4 +18,12 @@ public interface ISelectItemContract
 
     // Disabled item click guard
     Task DisabledItem_ShouldNotSelectOnClickAndKeepOpen();
+
+    // React parity additions
+    Task ShouldNotEmitDataLabel();
+    Task ShouldEmitDataBlazorBaseUiLabelWhenLabelSet();
+    Task ShouldRejectMouseClickOnUnhighlightedItem();
+    Task NativeButton_ShouldRenderAsButtonElementWithTypeButton();
+    Task NonNativeButton_ShouldRenderAsDivWithRoleOption();
+    Task DisabledItem_ShouldRemainFocusableWhenHighlighted();
 }

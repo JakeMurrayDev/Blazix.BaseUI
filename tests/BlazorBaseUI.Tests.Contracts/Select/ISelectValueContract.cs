@@ -23,4 +23,13 @@ public interface ISelectValueContract
     Task Multiple_ValuesContentReceivesArrayOfValues();
     Task Multiple_ChildContentTakesPrecedenceOverItems();
     Task Multiple_DefaultsToEmptyArrayWhenNoValueProvided();
+
+    // Parity with React source
+    Task Placeholder_ChildContentBeatsPlaceholderWhenMultiSelectEmpty();
+    Task PlaceholderContent_RendersWhenProvidedAndNoValue();
+    Task PlaceholderContent_TakesPrecedenceOverTextPlaceholder();
+    Task NullItemLabel_SuppressesPlaceholderWhenNoValueSelected();
+    Task GetLabel_ResolvesFromItemGroups();
+    Task GetLabel_ResolvesFromISelectItemLabelOnValue();
+    Task Value_RegistersSpanElementWithRootContext();
 }

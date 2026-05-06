@@ -1,3 +1,5 @@
+@implements IDisposable
+
 <RenderElement TState="SelectItemTextState"
                Tag="div"
                State="CachedState"
@@ -12,6 +14,14 @@
     private static readonly SelectItemTextState CachedState = new();
 
     private RenderElement<SelectItemTextState>? renderElementReference;
+    private ElementReference? lastTextElementPushedToParent;
+    private ElementReference? lastOwnedElement;
+
+    [CascadingParameter]
+    private ISelectRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private SelectItemContext? ItemContext { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -48,4 +58,89 @@
     /// Gets or sets the associated <see cref="ElementReference"/>.
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (ItemContext is null || RootContext is null)
+        {
+            return;
+        }
+
+        // Push the captured element up to the parent SelectItem whenever it changes.
+        // Mirrors React merging `textRef` into the ref array — the parent uses this
+        // element's textContent as a lazy typeahead label fallback.
+        var currentElement = Element;
+        if (!ElementReferenceEquals(currentElement, lastTextElementPushedToParent))
+        {
+            ItemContext.SetTextElement?.Invoke(currentElement);
+            lastTextElementPushedToParent = currentElement;
+        }
+
+        if (!ItemContext.HasRegistered || !currentElement.HasValue)
+        {
+            return;
+        }
+
+        var rootCurrent = RootContext.GetSelectedItemTextElement();
+        var rootHoldsUs = ElementReferenceEquals(rootCurrent, currentElement);
+        var hasNoSelectedItemText = rootCurrent is null;
+        var selectedByFocus = ItemContext.SelectedByFocus;
+
+        // Parity with React's localRef callback:
+        //   if (selectedByFocus || (hasNoSelectedItemText && indexRef.current === 0)) {
+        //     selectedItemTextRef.current = node;
+        //   }
+        var shouldClaim = selectedByFocus || (hasNoSelectedItemText && ItemContext.Index == 0);
+
+        // Re-claim when we were the previous owner but our element ref has drifted
+        // (e.g., Tag switched, @key changed). Covers the stale-element half of React's
+        // `!selectedItemTextRef.current.isConnected` guard, where React re-fires the
+        // ref callback because the DOM node reference changed.
+        var weWereTheOwner = lastOwnedElement.HasValue
+            && ElementReferenceEquals(rootCurrent, lastOwnedElement);
+
+        if (weWereTheOwner && !rootHoldsUs)
+        {
+            shouldClaim = true;
+        }
+
+        if (shouldClaim && !rootHoldsUs)
+        {
+            RootContext.SetSelectedItemTextElement(currentElement);
+            lastOwnedElement = currentElement;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (lastTextElementPushedToParent.HasValue)
+        {
+            ItemContext?.SetTextElement?.Invoke(null);
+            lastTextElementPushedToParent = null;
+        }
+
+        // Release the root's selected-item-text-element claim ONLY if we are still
+        // the current owner. If a sibling (e.g., via SelectedByFocus transition) has
+        // since claimed it, we must not clear — that would leave the root pointing
+        // at nothing while a live sibling element exists. Parity with React's
+        // single-ref-slot semantics where only the real owner can write null.
+        if (RootContext is not null && lastOwnedElement.HasValue)
+        {
+            var rootCurrent = RootContext.GetSelectedItemTextElement();
+            if (ElementReferenceEquals(rootCurrent, lastOwnedElement))
+            {
+                RootContext.SetSelectedItemTextElement(null);
+            }
+            lastOwnedElement = null;
+        }
+    }
+
+    private static bool ElementReferenceEquals(ElementReference? a, ElementReference? b)
+    {
+        if (!a.HasValue && !b.HasValue) return true;
+        if (!a.HasValue || !b.HasValue) return false;
+        return string.Equals(a.Value.Id, b.Value.Id, StringComparison.Ordinal);
+    }
 }

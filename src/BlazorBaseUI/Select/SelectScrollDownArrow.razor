@@ -5,25 +5,27 @@
 
 @inject IJSRuntime JSRuntime
 
-@if (KeepMounted || visible)
-{
-    <RenderElement TState="SelectScrollDownArrowState"
-                   Tag="div"
-                   State="state"
-                   Render="Render"
-                   ClassValue="ClassValue"
-                   StyleValue="StyleValue"
-                   ComponentAttributes="componentAttributes"
-                   ChildContent="childContent"
-                   @attributes="AdditionalAttributes"
-                   @ref="renderElementReference" />
-}
+<RenderElement TState="SelectScrollDownArrowState"
+               Tag="div"
+               State="state"
+               Enabled="IsPresent"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="WrappedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="childContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
 
 @code {
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool visible;
-    private bool isScrolling;
+    private Side lastSide = Side.Bottom;
+    private bool isMounted;
+    private bool jsInitialized;
+    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
+    private CancellationTokenSource? transitionCts;
     private SelectScrollDownArrowState state;
     private RenderElement<SelectScrollDownArrowState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -32,6 +34,31 @@
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/BlazorBaseUI/blazor-baseui-select.js").AsTask());
+
+    private bool IsPresent => KeepMounted || isMounted || visible;
+
+    private Func<SelectScrollDownArrowState, string?>? cachedWrappedStyleValue;
+    private Func<SelectScrollDownArrowState, string?>? previousStyleValue;
+
+    private Func<SelectScrollDownArrowState, string?> WrappedStyleValue
+    {
+        get
+        {
+            if (cachedWrappedStyleValue is null || StyleValue != previousStyleValue)
+            {
+                previousStyleValue = StyleValue;
+                var sv = StyleValue;
+                cachedWrappedStyleValue = s =>
+                {
+                    var userStyle = sv?.Invoke(s);
+                    return string.IsNullOrEmpty(userStyle)
+                        ? "position:absolute"
+                        : $"position:absolute;{userStyle}";
+                };
+            }
+            return cachedWrappedStyleValue;
+        }
+    }
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -87,6 +114,7 @@
     {
         if (RootContext is not null)
         {
+            RootContext.ScrollArrowsMountedCount++;
             RootContext.StateChanged += OnRootStateChanged;
         }
     }
@@ -94,59 +122,183 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        visible = RootContext?.ScrollDownArrowVisible ?? false;
+        var stateVisible = RootContext?.ScrollDownArrowVisible ?? false;
+        visible = stateVisible && RootContext?.OpenInteractionType != InteractionType.Touch;
+
+        UpdateTransitionStatus();
+
         var side = PositionerContext?.Side ?? Side.Bottom;
-        state = new SelectScrollDownArrowState(visible, side);
+        state = new SelectScrollDownArrowState(visible, side, transitionStatus);
         childContent = ChildContent ?? DefaultChildContent;
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             hasRendered = true;
+            PositionerContext?.SetScrollDownArrow?.Invoke(Element);
+        }
+
+        if (hasRendered && IsPresent && Element.HasValue && !jsInitialized)
+        {
+            jsInitialized = true;
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("initScrollArrow", RootContext!.RootId, Element.Value, "down");
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        if (jsInitialized && !IsPresent)
+        {
+            jsInitialized = false;
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeScrollArrow", RootContext!.RootId, "down");
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
         }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        transitionCts?.Cancel();
+        transitionCts?.Dispose();
+
         if (RootContext is not null)
         {
+            RootContext.ScrollArrowsMountedCount--;
             RootContext.StateChanged -= OnRootStateChanged;
         }
 
-        if (isScrolling)
-        {
-            await StopScrollAsync();
-        }
+        PositionerContext?.SetScrollDownArrow?.Invoke(null);
 
         if (moduleTask?.IsValueCreated == true && hasRendered)
         {
             try
             {
                 var module = await ModuleTask.Value;
+                if (jsInitialized)
+                {
+                    await module.InvokeVoidAsync("disposeScrollArrow", RootContext!.RootId, "down");
+                }
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex;
             }
         }
     }
 
     private void OnRootStateChanged()
     {
-        var newVisible = RootContext?.ScrollDownArrowVisible ?? false;
-        if (newVisible != visible)
+        var stateVisible = RootContext?.ScrollDownArrowVisible ?? false;
+        var newVisible = stateVisible && RootContext?.OpenInteractionType != InteractionType.Touch;
+        var newSide = PositionerContext?.Side ?? Side.Bottom;
+
+        var visibilityChanged = newVisible != visible;
+        var sideChanged = newSide != lastSide;
+
+        if (!visibilityChanged && !sideChanged)
+        {
+            return;
+        }
+
+        if (visibilityChanged)
         {
             visible = newVisible;
-            var side = PositionerContext?.Side ?? Side.Bottom;
-            state = new SelectScrollDownArrowState(visible, side);
-            BuildComponentAttributes();
-            InvokeAsync(StateHasChanged);
+            UpdateTransitionStatus();
         }
+
+        lastSide = newSide;
+        state = new SelectScrollDownArrowState(visible, newSide, transitionStatus);
+        BuildComponentAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateTransitionStatus()
+    {
+        var wasRendered = isMounted;
+        var isRendered = visible;
+
+        if (isRendered && !wasRendered)
+        {
+            isMounted = true;
+            transitionStatus = TransitionStatus.Starting;
+            ScheduleTransitionEnd();
+        }
+        else if (!isRendered && wasRendered)
+        {
+            transitionStatus = TransitionStatus.Ending;
+            ScheduleUnmount();
+        }
+        else if (isRendered && wasRendered && transitionStatus == TransitionStatus.Ending)
+        {
+            transitionStatus = TransitionStatus.Starting;
+            ScheduleTransitionEnd();
+        }
+    }
+
+    private void ScheduleTransitionEnd()
+    {
+        transitionCts?.Cancel();
+        transitionCts = new CancellationTokenSource();
+        var token = transitionCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1, token);
+                if (!token.IsCancellationRequested)
+                {
+                    transitionStatus = TransitionStatus.Undefined;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }, token);
+    }
+
+    private void ScheduleUnmount()
+    {
+        transitionCts?.Cancel();
+        transitionCts = new CancellationTokenSource();
+        var token = transitionCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(150, token);
+                if (!token.IsCancellationRequested)
+                {
+                    isMounted = false;
+                    transitionStatus = TransitionStatus.Undefined;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }, token);
     }
 
     private void BuildComponentAttributes()
@@ -164,58 +316,9 @@
         var side = PositionerContext?.Side ?? Side.Bottom;
         attrs["data-side"] = side.ToDataAttributeString()!;
 
-        if (!visible)
-        {
-            attrs["hidden"] = true;
-        }
-
-        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         componentAttributes = attrs;
-    }
-
-    private async Task HandleMouseEnterAsync(MouseEventArgs e)
-    {
-        if (!visible || RootContext is null || isScrolling)
-        {
-            return;
-        }
-
-        isScrolling = true;
-
-        try
-        {
-            var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("startContinuousScroll", RootContext.RootId, "down");
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
-    }
-
-    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
-    {
-        await StopScrollAsync();
-    }
-
-    private async Task StopScrollAsync()
-    {
-        if (!isScrolling)
-        {
-            return;
-        }
-
-        isScrolling = false;
-
-        try
-        {
-            var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("stopContinuousScroll", RootContext!.RootId);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
     }
 
     private static void DefaultChildContent(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)

@@ -7,8 +7,10 @@ namespace BlazorBaseUI.Select;
 /// <param name="Side">Which side the popup is positioned relative to the trigger.</param>
 /// <param name="Align">How the popup is aligned relative to the specified side.</param>
 /// <param name="TransitionStatus">The current transition animation status.</param>
+/// <param name="AlignItemWithTriggerActive">Whether the popup is currently in align-item-with-trigger mode.</param>
 public readonly record struct SelectPopupState(
     bool Open,
     Side Side,
     Align Align,
-    TransitionStatus TransitionStatus);
+    TransitionStatus TransitionStatus,
+    bool AlignItemWithTriggerActive);
