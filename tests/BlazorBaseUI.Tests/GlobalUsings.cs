@@ -53,6 +53,8 @@ global using BlazorBaseUI.PreviewCard;
 global using BlazorBaseUI.Tests.Contracts.PreviewCard;
 global using BlazorBaseUI.Select;
 global using BlazorBaseUI.Tests.Contracts.Select;
+global using BlazorBaseUI.Separator;
+global using BlazorBaseUI.Tests.Contracts.Separator;
 global using BlazorBaseUI.FocusGuard;
 global using BlazorBaseUI.Tests.Contracts.FocusGuard;
 global using BlazorBaseUI.AlertDialog;

@@ -14,6 +14,8 @@ namespace BlazorBaseUI.Select;
 /// <param name="Dirty">Whether the trigger's value has changed from its initial value.</param>
 /// <param name="Filled">Whether the trigger has a value (is filled).</param>
 /// <param name="Focused">Whether the trigger is focused.</param>
+/// <param name="Value">The currently selected value (boxed). Never emitted as a DOM attribute; exposed so
+/// <see cref="SelectTrigger.Render"/> consumers can branch on the value.</param>
 public readonly record struct SelectTriggerState(
     bool Open,
     bool Disabled,
@@ -23,14 +25,16 @@ public readonly record struct SelectTriggerState(
     bool Touched,
     bool Dirty,
     bool Filled,
-    bool Focused)
+    bool Focused,
+    object? Value)
 {
     internal static SelectTriggerState FromFieldState(
         FieldRootState fieldState,
         bool isOpen,
         bool isDisabled,
         bool isPlaceholder,
-        bool isReadOnly) => new(
+        bool isReadOnly,
+        object? value) => new(
             Open: isOpen,
             Disabled: isDisabled,
             Placeholder: isPlaceholder,
@@ -39,5 +43,6 @@ public readonly record struct SelectTriggerState(
             Touched: fieldState.Touched,
             Dirty: fieldState.Dirty,
             Filled: fieldState.Filled,
-            Focused: fieldState.Focused);
+            Focused: fieldState.Focused,
+            Value: value);
 }

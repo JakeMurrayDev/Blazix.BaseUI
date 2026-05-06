@@ -19,26 +19,4 @@ internal static class Extensions
         _ => null
     };
 
-    /// <summary>
-    /// Parses a side string from FloatingUI into the corresponding <see cref="Side"/> enum value.
-    /// </summary>
-    public static Side ParseSide(string value) => value switch
-    {
-        "top" => Side.Top,
-        "right" => Side.Right,
-        "bottom" => Side.Bottom,
-        "left" => Side.Left,
-        _ => Side.Bottom
-    };
-
-    /// <summary>
-    /// Parses an align string from FloatingUI into the corresponding <see cref="Align"/> enum value.
-    /// </summary>
-    public static Align ParseAlign(string value) => value switch
-    {
-        "start" => Align.Start,
-        "center" => Align.Center,
-        "end" => Align.End,
-        _ => Align.Center
-    };
 }

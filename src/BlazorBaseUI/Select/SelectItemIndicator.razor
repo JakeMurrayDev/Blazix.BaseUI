@@ -1,21 +1,40 @@
-@if (KeepMounted || (ItemContext?.Selected ?? false))
-{
-    <RenderElement TState="SelectItemIndicatorState"
-                   Tag="span"
-                   State="state"
-                   Render="Render"
-                   ClassValue="ClassValue"
-                   StyleValue="StyleValue"
-                   ComponentAttributes="componentAttributes"
-                   ChildContent="ChildContent"
-                   @attributes="AdditionalAttributes"
-                   @ref="renderElementReference" />
-}
+@implements IDisposable
+
+<RenderElement TState="SelectItemIndicatorState"
+               Tag="span"
+               State="state"
+               Enabled="IsPresent"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="effectiveChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
 
 @code {
+    private static readonly RenderFragment defaultChildContent = builder => builder.AddContent(0, "✔️");
+
+    private bool isMounted;
+    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
+    private CancellationTokenSource? transitionCts;
     private SelectItemIndicatorState state;
     private RenderElement<SelectItemIndicatorState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private bool previousSelected;
+    private TransitionStatus previousTransitionStatus = TransitionStatus.Undefined;
+
+    private bool Rendered => ItemContext?.Selected ?? false;
+
+    // Mirror React's `useTransitionStatus(selected)` mounting rule: keep the
+    // element rendered while the exit transition is still in flight (Ending),
+    // so consumers can apply `[data-ending]` exit styles without the node
+    // disappearing first. `isMounted` flips false only after `ScheduleUnmount`
+    // completes, which is exactly the lifetime we want here.
+    private bool IsPresent =>
+        KeepMounted || Rendered || isMounted || transitionStatus == TransitionStatus.Ending;
+
+    private RenderFragment effectiveChildContent => ChildContent ?? defaultChildContent;
 
     [CascadingParameter]
     private SelectItemContext? ItemContext { get; set; }
@@ -66,9 +85,29 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        UpdateTransitionStatus();
+
         var selected = ItemContext?.Selected ?? false;
-        state = new SelectItemIndicatorState(selected);
+
+        var stateChanged = previousSelected != selected ||
+                           previousTransitionStatus != transitionStatus;
+
+        if (stateChanged)
+        {
+            state = new SelectItemIndicatorState(selected, transitionStatus);
+        }
+
         BuildComponentAttributes();
+
+        previousSelected = selected;
+        previousTransitionStatus = transitionStatus;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        transitionCts?.Cancel();
+        transitionCts?.Dispose();
     }
 
     private void BuildComponentAttributes()
@@ -76,8 +115,82 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["aria-hidden"] = "true";
-        attrs["data-selected"] = state.Selected;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
+    }
+
+    private void UpdateTransitionStatus()
+    {
+        var wasRendered = isMounted;
+        var isRendered = Rendered;
+
+        if (isRendered && !wasRendered)
+        {
+            isMounted = true;
+            transitionStatus = TransitionStatus.Starting;
+            ScheduleTransitionEnd();
+        }
+        else if (!isRendered && wasRendered)
+        {
+            transitionStatus = TransitionStatus.Ending;
+            ScheduleUnmount();
+        }
+        else if (isRendered && wasRendered && transitionStatus == TransitionStatus.Ending)
+        {
+            // Re-selected mid-exit: cancel pending unmount, restart entry.
+            transitionCts?.Cancel();
+            transitionStatus = TransitionStatus.Starting;
+            ScheduleTransitionEnd();
+        }
+    }
+
+    private void ScheduleTransitionEnd()
+    {
+        transitionCts?.Cancel();
+        transitionCts = new CancellationTokenSource();
+        var token = transitionCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1, token);
+                if (!token.IsCancellationRequested)
+                {
+                    transitionStatus = TransitionStatus.Undefined;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }, token);
+    }
+
+    private void ScheduleUnmount()
+    {
+        transitionCts?.Cancel();
+        transitionCts = new CancellationTokenSource();
+        var token = transitionCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(150, token);
+                if (!token.IsCancellationRequested)
+                {
+                    isMounted = false;
+                    transitionStatus = TransitionStatus.Undefined;
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }, token);
     }
 }

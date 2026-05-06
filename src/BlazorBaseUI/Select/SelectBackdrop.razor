@@ -1,5 +1,3 @@
-@using Microsoft.AspNetCore.Components.Web
-
 <RenderElement TState="SelectBackdropState"
                Tag="div"
                State="state"
@@ -79,11 +77,7 @@
             attrs["hidden"] = true;
         }
 
-        attrs["data-open"] = state.Open;
-        attrs["data-closed"] = !state.Open;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
-        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, state.Open, state.TransitionStatus);
 
         componentAttributes = attrs;
     }
@@ -98,14 +92,4 @@
         };
     }
 
-    private async Task HandleClickAsync(MouseEventArgs e)
-    {
-        if (RootContext is null)
-        {
-            return;
-        }
-
-        await RootContext.SetOpenAsync(false, SelectOpenChangeReason.OutsidePress);
-        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
-    }
 }

@@ -269,9 +269,9 @@
     [JSInvokable]
     public void OnPositionUpdated(string side, string align, bool anchorHidden)
     {
-        var physicalSide = Extensions.ParseSide(side);
+        var physicalSide = BlazorBaseUI.Extensions.ParseSide(side);
         var newSide = GetLogicalSide(physicalSide);
-        var newAlign = Extensions.ParseAlign(align);
+        var newAlign = BlazorBaseUI.Extensions.ParseAlign(align);
 
         if (newSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden)
         {

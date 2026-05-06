@@ -3,7 +3,7 @@ namespace BlazorBaseUI.Select;
 /// <summary>
 /// Specifies the modal behavior of the select when open.
 /// </summary>
-public enum ModalMode
+public enum SelectModalMode
 {
     /// <summary>The select is not modal; user interaction with the rest of the document is allowed.</summary>
     False,
@@ -29,9 +29,19 @@ public enum SelectOpenChangeReason
     /// <summary>An item was pressed.</summary>
     ItemPress,
 
-    /// <summary>An imperative action triggered the change.</summary>
-    ImperativeAction,
+    /// <summary>Focus moved outside the select.</summary>
+    FocusOut,
+
+    /// <summary>Keyboard list navigation triggered the change.</summary>
+    ListNavigation,
+
+    /// <summary>An open action was canceled mid-flight.</summary>
+    CancelOpen,
+
+    /// <summary>A window resize triggered the change.</summary>
+    WindowResize,
 
     /// <summary>No specific reason.</summary>
     None
 }
+

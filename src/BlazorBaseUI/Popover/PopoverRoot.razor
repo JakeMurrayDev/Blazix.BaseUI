@@ -1,18 +1,18 @@
 @using Microsoft.JSInterop
+@using BlazorBaseUI.FloatingTree
 @implements IAsyncDisposable
 @implements IPopoverHandleSubscriber
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context" IsFixed="true">
-    @if (ChildContentWithPayload is not null)
-    {
-        @ChildContentWithPayload(new PopoverRootPayloadContext(payload))
-    }
-    else
-    {
-        @ChildContent
-    }
-</CascadingValue>
+<FloatingTree>
+    <FloatingNode>
+        <CascadingValue TValue="IFloatingRootContext" Value="context.FloatingRootContext!" IsFixed="true">
+            <CascadingValue Value="context" IsFixed="true">
+                @ChildContent!(new PopoverRootPayloadContext(payload))
+            </CascadingValue>
+        </CascadingValue>
+    </FloatingNode>
+</FloatingTree>
 
 @code {
     private readonly string rootId = Guid.NewGuid().ToIdString();
@@ -28,14 +28,14 @@
     private ElementReference? triggerElement;
     private ElementReference? positionerElement;
     private ElementReference? popupElement;
-    private OpenChangeReason openChangeReason = OpenChangeReason.None;
+    private PopoverOpenChangeReason openChangeReason = PopoverOpenChangeReason.None;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
-    private InstantType instantType = InstantType.None;
+    private PopoverInstantType instantType = PopoverInstantType.None;
     private string? interactionType;
     private object? payload;
     private bool hasViewport;
     private bool preventUnmountingOnClose;
-    private ModalMode previousModal;
+    private PopoverModalMode previousModal;
     private PopoverRootState state;
     private PopoverRootContext context = null!;
     private DotNetObjectReference<PopoverRoot>? dotNetRef;
@@ -61,10 +61,10 @@
 
     /// <summary>
     /// Gets or sets the modal behavior of the popover when open.
-    /// Defaults to <see cref="ModalMode.False"/>.
+    /// Defaults to <see cref="PopoverModalMode.False"/>.
     /// </summary>
     [Parameter]
-    public ModalMode Modal { get; set; } = ModalMode.False;
+    public PopoverModalMode Modal { get; set; } = PopoverModalMode.False;
 
     /// <summary>
     /// Gets or sets the ID of the trigger that the popover is associated with.
@@ -114,16 +114,10 @@
     public EventCallback<bool> OnOpenChangeComplete { get; set; }
 
     /// <summary>
-    /// Defines the child components of this instance.
-    /// </summary>
-    [Parameter]
-    public RenderFragment? ChildContent { get; set; }
-
-    /// <summary>
     /// Defines the child components of this instance with access to the active trigger's payload.
     /// </summary>
     [Parameter]
-    public RenderFragment<PopoverRootPayloadContext>? ChildContentWithPayload { get; set; }
+    public RenderFragment<PopoverRootPayloadContext>? ChildContent { get; set; }
 
     private bool IsControlled => Open.HasValue;
 
@@ -145,9 +139,9 @@
             Open = CurrentOpen,
             Mounted = isMounted,
             Modal = Modal,
-            OpenChangeReason = openChangeReason,
+            PopoverOpenChangeReason = openChangeReason,
             TransitionStatus = transitionStatus,
-            InstantType = instantType,
+            PopoverInstantType = instantType,
             TitleId = titleId,
             DescriptionId = descriptionId,
             ActiveTriggerId = activeTriggerId,
@@ -167,13 +161,15 @@
             Close = Close,
             ForceUnmount = ForceUnmount,
             SetHasViewport = SetHasViewport,
-            SetInstantType = SetInstantTypeValue
+            SetPopoverInstantType = SetPopoverInstantTypeValue
         };
+
+        context.FloatingRootContext = new PopoverFloatingRootContextAdapter(context);
 
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ImperativeAction, null);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, null);
         }
 
         SubscribeToHandle();
@@ -214,7 +210,7 @@
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ImperativeAction, null);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, null);
         }
 
         // Handle change of handle parameter
@@ -243,14 +239,15 @@
             var module = await ModuleTask.Value;
             var modalString = Modal switch
             {
-                ModalMode.True => "true",
-                ModalMode.TrapFocus => "trap-focus",
+                PopoverModalMode.True => "true",
+                PopoverModalMode.TrapFocus => "trap-focus",
                 _ => "false"
             };
             await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, modalString);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -261,14 +258,15 @@
             var module = await ModuleTask.Value;
             var modalString = Modal switch
             {
-                ModalMode.True => "true",
-                ModalMode.TrapFocus => "trap-focus",
+                PopoverModalMode.True => "true",
+                PopoverModalMode.TrapFocus => "trap-focus",
                 _ => "false"
             };
             await module.InvokeVoidAsync("updateScrollLock", rootId, modalString);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -290,10 +288,10 @@
         context.HasViewport = value;
     }
 
-    private void SetInstantTypeValue(InstantType type)
+    private void SetPopoverInstantTypeValue(PopoverInstantType type)
     {
         instantType = type;
-        context.InstantType = type;
+        context.PopoverInstantType = type;
         StateHasChanged();
     }
 
@@ -322,6 +320,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -349,17 +348,18 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
-    private Task SetOpenAsyncFromContext(bool nextOpen, OpenChangeReason reason, object? payloadFromTrigger, string? triggerId)
+    private Task SetOpenAsyncFromContext(bool nextOpen, PopoverOpenChangeReason reason, object? payloadFromTrigger, string? triggerId)
     {
         return SetOpenAsync(nextOpen, reason, triggerId, payloadFromTrigger);
     }
 
     private void Close()
     {
-        _ = SetOpenWithExceptionHandlingAsync(false, OpenChangeReason.ClosePress, null);
+        _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ClosePress, null);
     }
 
     private void ForceUnmount()
@@ -372,8 +372,8 @@
         context.ActiveTriggerId = null;
         payload = null;
         context.Payload = null;
-        openChangeReason = OpenChangeReason.None;
-        context.OpenChangeReason = OpenChangeReason.None;
+        openChangeReason = PopoverOpenChangeReason.None;
+        context.PopoverOpenChangeReason = PopoverOpenChangeReason.None;
         interactionType = null;
         context.InteractionType = null;
         _ = InvokeOpenChangeCompleteAsync(false);
@@ -386,7 +386,7 @@
     [JSInvokable]
     public async Task OnOutsidePress()
     {
-        await SetOpenAsync(false, OpenChangeReason.OutsidePress, null);
+        await SetOpenAsync(false, PopoverOpenChangeReason.OutsidePress, null);
     }
 
     /// <summary>
@@ -395,7 +395,7 @@
     [JSInvokable]
     public async Task OnEscapeKey()
     {
-        await SetOpenAsync(false, OpenChangeReason.EscapeKey, null);
+        await SetOpenAsync(false, PopoverOpenChangeReason.EscapeKey, null);
     }
 
     /// <summary>
@@ -418,7 +418,7 @@
     [JSInvokable]
     public async Task OnHoverOpen()
     {
-        await SetOpenAsync(true, OpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(true, PopoverOpenChangeReason.TriggerHover, null);
     }
 
     /// <summary>
@@ -427,7 +427,7 @@
     [JSInvokable]
     public async Task OnHoverClose()
     {
-        await SetOpenAsync(false, OpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(false, PopoverOpenChangeReason.TriggerHover, null);
     }
 
     /// <summary>
@@ -437,7 +437,7 @@
     [JSInvokable]
     public async Task OnFocusOut()
     {
-        await SetOpenAsync(false, OpenChangeReason.FocusOut, null);
+        await SetOpenAsync(false, PopoverOpenChangeReason.FocusOut, null);
     }
 
     /// <summary>
@@ -466,13 +466,13 @@
                 context.Payload = null;
             }
 
-            openChangeReason = OpenChangeReason.None;
-            context.OpenChangeReason = OpenChangeReason.None;
+            openChangeReason = PopoverOpenChangeReason.None;
+            context.PopoverOpenChangeReason = PopoverOpenChangeReason.None;
             SetInteractionType(null);
         }
 
-        instantType = InstantType.None;
-        context.InstantType = instantType;
+        instantType = PopoverInstantType.None;
+        context.PopoverInstantType = instantType;
 
         _ = InvokeOpenChangeCompleteAsync(open);
         StateHasChanged();
@@ -501,8 +501,8 @@
         SyncHandleState(true, activeTriggerId);
 
         // Clear instant type to allow animation during viewport swap
-        instantType = InstantType.None;
-        context.InstantType = instantType;
+        instantType = PopoverInstantType.None;
+        context.PopoverInstantType = instantType;
 
         if (hasRendered)
         {
@@ -518,6 +518,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -559,6 +560,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -571,7 +573,7 @@
     /// <param name="nextOpen">The desired open state.</param>
     /// <param name="reason">The reason for the state change.</param>
     /// <param name="triggerId">The ID of the trigger initiating the change, or <see langword="null"/>.</param>
-    internal async Task SetOpenAsync(bool nextOpen, OpenChangeReason reason, string? triggerId, object? payloadFromContext = null)
+    internal async Task SetOpenAsync(bool nextOpen, PopoverOpenChangeReason reason, string? triggerId, object? payloadFromContext = null)
     {
         if (CurrentOpen == nextOpen)
         {
@@ -587,20 +589,20 @@
         var args = new PopoverOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
 
-        if (!nextOpen && args.UnmountPrevented)
+        if (!nextOpen && args.PreventUnmount)
         {
             preventUnmountingOnClose = true;
         }
 
         openChangeReason = reason;
-        context.OpenChangeReason = reason;
+        context.PopoverOpenChangeReason = reason;
 
-        bool isKeyboardClick = reason == OpenChangeReason.TriggerPress && interactionType == "keyboard";
+        bool isKeyboardClick = reason == PopoverOpenChangeReason.TriggerPress && interactionType == "keyboard";
 
         if (nextOpen)
         {
@@ -621,20 +623,20 @@
                 context.Payload = payload;
             }
 
-            instantType = isKeyboardClick ? InstantType.Click : InstantType.None;
+            instantType = isKeyboardClick ? PopoverInstantType.Click : PopoverInstantType.None;
             transitionStatus = TransitionStatus.Starting;
             isMounted = true;
         }
         else
         {
-            instantType = isKeyboardClick ? InstantType.Click
-                : reason == OpenChangeReason.EscapeKey ? InstantType.Dismiss
-                : reason == OpenChangeReason.FocusOut ? InstantType.Focus
-                : InstantType.None;
+            instantType = isKeyboardClick ? PopoverInstantType.Click
+                : reason == PopoverOpenChangeReason.EscapeKey ? PopoverInstantType.Dismiss
+                : reason == PopoverOpenChangeReason.FocusOut ? PopoverInstantType.Focus
+                : PopoverInstantType.None;
             transitionStatus = TransitionStatus.Ending;
         }
 
-        context.InstantType = instantType;
+        context.PopoverInstantType = instantType;
         context.TransitionStatus = transitionStatus;
         context.Mounted = isMounted;
 
@@ -653,11 +655,12 @@
             try
             {
                 var module = await ModuleTask.Value;
-                var reasonString = reason == OpenChangeReason.TriggerHover ? "trigger-hover" : null;
+                var reasonString = reason == PopoverOpenChangeReason.TriggerHover ? "trigger-hover" : null;
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, interactionType);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -665,7 +668,7 @@
         StateHasChanged();
     }
 
-    void IPopoverHandleSubscriber.OnTriggerRegistered(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -675,12 +678,12 @@
         }
     }
 
-    void IPopoverHandleSubscriber.OnTriggerUnregistered(string triggerId)
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
         triggerElements.Remove(triggerId);
     }
 
-    void IPopoverHandleSubscriber.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
 
@@ -690,7 +693,7 @@
         }
     }
 
-    void IPopoverHandleSubscriber.OnOpenChangeRequested(bool open, OpenChangeReason reason, string? triggerId, string? handleInteractionType)
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnOpenChangeRequested(bool open, PopoverOpenChangeReason reason, string? triggerId, string? handleInteractionType)
     {
         _ = InvokeAsync(async () =>
         {
@@ -710,12 +713,12 @@
         });
     }
 
-    void IPopoverHandleSubscriber.OnStateChanged()
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnStateChanged()
     {
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, OpenChangeReason reason, string? triggerId)
+    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, PopoverOpenChangeReason reason, string? triggerId)
     {
         try
         {

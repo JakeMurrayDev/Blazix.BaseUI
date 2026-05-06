@@ -14,10 +14,14 @@
 @code {
     private static readonly SelectGroupLabelState CachedState = new();
 
-    private string id = default!;
+    private string? defaultId;
+    private string? lastRegisteredId;
     private bool hasRegisteredId;
     private RenderElement<SelectGroupLabelState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
     [CascadingParameter]
     private ISelectGroupContext? GroupContext { get; set; }
@@ -61,18 +65,22 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => $"select-group-label-{Guid.NewGuid():N}");
+        if (GroupContext is null)
+        {
+            throw new InvalidOperationException("SelectGroupLabel must be placed within a SelectGroup.");
+        }
+
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var newId = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => id);
-        if (newId != id)
+        var currentId = ResolvedId;
+        if (hasRegisteredId && currentId != lastRegisteredId)
         {
-            id = newId;
-            GroupContext?.SetLabelId(id);
+            lastRegisteredId = currentId;
+            GroupContext?.SetLabelId(currentId);
         }
 
         BuildComponentAttributes();
@@ -83,7 +91,8 @@
     {
         if (firstRender && !hasRegisteredId)
         {
-            GroupContext?.SetLabelId(id);
+            lastRegisteredId = ResolvedId;
+            GroupContext?.SetLabelId(lastRegisteredId);
             hasRegisteredId = true;
         }
     }
@@ -101,8 +110,7 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["id"] = id;
-        attrs["role"] = "presentation";
+        attrs["id"] = ResolvedId;
 
         componentAttributes = attrs;
     }

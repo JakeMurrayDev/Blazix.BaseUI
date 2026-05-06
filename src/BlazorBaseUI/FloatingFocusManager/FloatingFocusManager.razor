@@ -95,6 +95,17 @@
     public ElementReference? ReturnFocusElement { get; set; }
 
     /// <summary>
+    /// Unified focus-on-close control. Accepts <see cref="FinalFocusTarget.Default"/>
+    /// (use trigger or previously-focused), <see cref="FinalFocusTarget.None"/> (do nothing),
+    /// a specific <see cref="ElementReference"/>, or a callback that receives the close
+    /// <see cref="BlazorBaseUI.InteractionType"/> and returns a <see cref="FinalFocusResult"/>.
+    /// When set, overrides <see cref="ReturnFocus"/>, <see cref="ReturnFocusElement"/>, and <see cref="ReturnFocusCallback"/>.
+    /// Mirrors React Base UI's <c>finalFocus</c> prop.
+    /// </summary>
+    [Parameter]
+    public FinalFocusTarget? FinalFocus { get; set; }
+
+    /// <summary>
     /// Whether to restore focus when the currently focused element is removed from the DOM.
     /// </summary>
     [Parameter]
@@ -200,25 +211,46 @@
         }
         else if (!isOpen && wasOpen)
         {
-            string? closeInteractionType = null;
-            if (ReturnFocusCallback is not null && managerId is not null)
+            if (FinalFocus is { } finalFocus)
             {
-                try
+                var closeType = RootContext.CloseInteractionType;
+                var resolved = finalFocus.Resolve(closeType);
+
+                if (resolved.Suppress)
                 {
-                    var module = await moduleTask.Value;
-                    closeInteractionType = await module.InvokeAsync<string>(
-                        "getLastInteractionType", managerId);
+                    await DisposeManagerAsync(shouldReturnFocus: false);
                 }
-                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                else if (resolved.Target is { } targetElement)
                 {
-                    _ = ex;
+                    await DisposeManagerAsync(shouldReturnFocus: true, overrideReturnFocusElement: targetElement);
+                }
+                else
+                {
+                    await DisposeManagerAsync(shouldReturnFocus: true);
                 }
             }
+            else
+            {
+                string? closeInteractionType = null;
+                if (ReturnFocusCallback is not null && managerId is not null)
+                {
+                    try
+                    {
+                        var module = await moduleTask.Value;
+                        closeInteractionType = await module.InvokeAsync<string>(
+                            "getLastInteractionType", managerId);
+                    }
+                    catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                    {
+                        _ = ex;
+                    }
+                }
 
-            var resolvedReturnFocus = ReturnFocusCallback is not null
-                ? ReturnFocusCallback(closeInteractionType)
-                : ReturnFocus;
-            await DisposeManagerAsync(shouldReturnFocus: resolvedReturnFocus);
+                var resolvedReturnFocus = ReturnFocusCallback is not null
+                    ? ReturnFocusCallback(closeInteractionType)
+                    : ReturnFocus;
+                await DisposeManagerAsync(shouldReturnFocus: resolvedReturnFocus);
+            }
         }
 
         wasOpen = isOpen;
@@ -296,7 +328,7 @@
     {
         if (RootContext is not null)
         {
-            await RootContext.SetOpenAsync(false, "focus-out");
+            await RootContext.SetOpenAsync(false);
         }
     }
 
@@ -421,14 +453,25 @@
         }
     }
 
-    private async Task DisposeManagerAsync(bool shouldReturnFocus)
+    private async Task DisposeManagerAsync(bool shouldReturnFocus, ElementReference? overrideReturnFocusElement = null)
     {
         if (managerId is null) return;
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("disposeFloatingFocusManager", managerId, shouldReturnFocus);
+            if (overrideReturnFocusElement is not null)
+            {
+                await module.InvokeVoidAsync(
+                    "disposeFloatingFocusManager",
+                    managerId,
+                    shouldReturnFocus,
+                    overrideReturnFocusElement);
+            }
+            else
+            {
+                await module.InvokeVoidAsync("disposeFloatingFocusManager", managerId, shouldReturnFocus);
+            }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -449,7 +492,7 @@
             CloseOnFocusOut = CloseOnFocusOut,
             Open = open,
             OnOpenChangeAsync = RootContext is not null
-                ? (o, reason) => RootContext.SetOpenAsync(o, reason)
+                ? (o, _) => RootContext.SetOpenAsync(o)
                 : null,
             DomReference = RootContext?.GetTriggerElement()
         };

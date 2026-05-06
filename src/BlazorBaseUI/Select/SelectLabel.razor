@@ -1,0 +1,244 @@
+@using BlazorBaseUI.Field
+@using BlazorBaseUI.Utilities.LabelableProvider
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IFieldStateSubscriber
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="FieldRootState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="filteredAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-label.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private string labelId = null!;
+    private FieldRootState state;
+    private RenderElement<FieldRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private IReadOnlyDictionary<string, object>? filteredAttributes;
+
+    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private ISelectRootContext? SelectRootContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<FieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// Any <c>id</c> entry is intentionally stripped to keep the label id derived from the Select root,
+    /// matching the React Base UI behavior.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public SelectLabel()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (SelectRootContext is null)
+        {
+            throw new InvalidOperationException(
+                "SelectLabel must be used inside a SelectRoot component.");
+        }
+
+        labelId = $"{SelectRootContext.RootId}-label";
+        LabelableContext?.SetLabelId(labelId);
+        SelectRootContext.LabelId = labelId;
+        SelectRootContext.NotifyStateChanged();
+        FieldContext?.Subscribe(this);
+
+        state = State;
+        filteredAttributes = FilterAttributes(AdditionalAttributes);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (SelectRootContext is not null)
+        {
+            var newId = $"{SelectRootContext.RootId}-label";
+            if (newId != labelId)
+            {
+                labelId = newId;
+                LabelableContext?.SetLabelId(labelId);
+                SelectRootContext.LabelId = labelId;
+                SelectRootContext.NotifyStateChanged();
+            }
+        }
+
+        state = State;
+        filteredAttributes = FilterAttributes(AdditionalAttributes);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+
+                if (renderElementReference?.Element is { } element)
+                {
+                    await module.InvokeVoidAsync("addLabelMouseDownListener", element, true);
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        LabelableContext?.SetLabelId(null);
+
+        if (SelectRootContext is not null && SelectRootContext.LabelId == labelId)
+        {
+            SelectRootContext.LabelId = null;
+            SelectRootContext.NotifyStateChanged();
+        }
+
+        FieldContext?.Unsubscribe(this);
+
+        if (moduleTask.IsValueCreated && renderElementReference?.Element is { } element)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("removeLabelMouseDownListener", element);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    void IFieldStateSubscriber.NotifyStateChanged()
+    {
+        state = State;
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static IReadOnlyDictionary<string, object>? FilterAttributes(
+        IReadOnlyDictionary<string, object>? source)
+    {
+        if (source is null || !source.ContainsKey("id"))
+        {
+            return source;
+        }
+
+        var filtered = new Dictionary<string, object>(source.Count);
+        foreach (var kvp in source)
+        {
+            if (kvp.Key == "id")
+            {
+                continue;
+            }
+            filtered[kvp.Key] = kvp.Value;
+        }
+        return filtered;
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = labelId,
+            ["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync),
+            ["data-disabled"] = state.Disabled,
+            ["data-valid"] = state.Valid == true,
+            ["data-invalid"] = state.Valid == false,
+            ["data-touched"] = state.Touched,
+            ["data-dirty"] = state.Dirty,
+            ["data-filled"] = state.Filled,
+            ["data-focused"] = state.Focused,
+        };
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        var controlId = LabelableContext?.ControlId
+            ?? SelectRootContext?.TriggerId
+            ?? SelectRootContext?.RootId;
+
+        if (!string.IsNullOrEmpty(controlId))
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("focusControlById", controlId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+}

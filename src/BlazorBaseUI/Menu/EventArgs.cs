@@ -3,27 +3,15 @@ namespace BlazorBaseUI.Menu;
 /// <summary>
 /// Provides data for the <see cref="MenuRoot.OnOpenChange"/> event.
 /// </summary>
-public sealed class MenuOpenChangeEventArgs : EventArgs
+public sealed class MenuOpenChangeEventArgs : OpenChangeEventArgs<MenuOpenChangeReason>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="MenuOpenChangeEventArgs"/> class.
     /// </summary>
-    public MenuOpenChangeEventArgs(bool open, MenuOpenChangeReason reason, object? payload = null)
+    public MenuOpenChangeEventArgs(bool open, MenuOpenChangeReason reason, object? payload = null) : base(open, reason)
     {
-        Open = open;
-        Reason = reason;
         Payload = payload;
     }
-
-    /// <summary>
-    /// Gets whether the menu is being opened or closed.
-    /// </summary>
-    public bool Open { get; }
-
-    /// <summary>
-    /// Gets the reason the menu's open state changed.
-    /// </summary>
-    public MenuOpenChangeReason Reason { get; }
 
     /// <summary>
     /// Gets the optional payload associated with the state change.
@@ -31,34 +19,14 @@ public sealed class MenuOpenChangeEventArgs : EventArgs
     public object? Payload { get; }
 
     /// <summary>
-    /// Gets whether the open change has been canceled.
-    /// </summary>
-    public bool IsCanceled { get; private set; }
-
-    /// <summary>
-    /// Gets whether unmounting on close should be prevented.
-    /// </summary>
-    public bool PreventUnmount { get; private set; }
-
-    /// <summary>
     /// Gets whether the event should propagate to parent menus.
     /// </summary>
     public bool IsPropagationAllowed { get; private set; }
 
     /// <summary>
-    /// Cancels the open state change, preventing the menu from opening or closing.
-    /// </summary>
-    public void Cancel() => IsCanceled = true;
-
-    /// <summary>
     /// Allows the open state change event to propagate to parent menus in nested menu scenarios.
     /// </summary>
     public void AllowPropagation() => IsPropagationAllowed = true;
-
-    /// <summary>
-    /// Prevents the menu from unmounting when closing, keeping it mounted in the DOM.
-    /// </summary>
-    public void PreventUnmountOnClose() => PreventUnmount = true;
 }
 
 /// <summary>

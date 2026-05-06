@@ -1,0 +1,28 @@
+@page "/tests/select-label/wasm"
+@using BlazorBaseUI.Select
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Select Label Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <SelectRoot TValue="string" Id="fruit-select">
+        <SelectLabel data-testid="select-label">Fruit</SelectLabel>
+        <SelectTrigger data-testid="select-trigger">
+            <SelectValue TValue="string" Placeholder="Select a fruit..." />
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner>
+                <SelectPopup data-testid="select-popup">
+                    <SelectItem TValue="string" Value="@("apple")" Label="Apple" data-testid="select-item-apple">
+                        <SelectItemText>Apple</SelectItemText>
+                    </SelectItem>
+                    <SelectItem TValue="string" Value="@("banana")" Label="Banana" data-testid="select-item-banana">
+                        <SelectItemText>Banana</SelectItemText>
+                    </SelectItem>
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>

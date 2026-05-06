@@ -90,16 +90,39 @@ internal static class Extensions
             };
     }
 
-    extension(CollisionAvoidance collisionAvoidance)
+    extension(CollisionAvoidanceSideMode mode)
     {
-        public string ToDataAttributeString() =>
-            collisionAvoidance switch
+        public string ToJsString() =>
+            mode switch
             {
-                CollisionAvoidance.None => "none",
-                CollisionAvoidance.Shift => "shift",
-                CollisionAvoidance.Flip => "flip",
-                CollisionAvoidance.FlipShift => "flip-shift",
-                _ => throw new InvalidEnumArgumentException(nameof(collisionAvoidance), (int)collisionAvoidance, typeof(CollisionAvoidance))
+                CollisionAvoidanceSideMode.None => "none",
+                CollisionAvoidanceSideMode.Flip => "flip",
+                CollisionAvoidanceSideMode.Shift => "shift",
+                _ => "flip"
+            };
+    }
+
+    extension(CollisionAvoidanceAlignMode mode)
+    {
+        public string ToJsString() =>
+            mode switch
+            {
+                CollisionAvoidanceAlignMode.None => "none",
+                CollisionAvoidanceAlignMode.Flip => "flip",
+                CollisionAvoidanceAlignMode.Shift => "shift",
+                _ => "shift"
+            };
+    }
+
+    extension(CollisionAvoidanceFallbackAxisSide mode)
+    {
+        public string ToJsString() =>
+            mode switch
+            {
+                CollisionAvoidanceFallbackAxisSide.None => "none",
+                CollisionAvoidanceFallbackAxisSide.Start => "start",
+                CollisionAvoidanceFallbackAxisSide.End => "end",
+                _ => "none"
             };
     }
 
@@ -116,4 +139,27 @@ internal static class Extensions
                 _ => throw new InvalidEnumArgumentException(nameof(direction), (int)direction, typeof(ActivationDirection))
             };
     }
+
+    /// <summary>
+    /// Parses a side string from FloatingUI into the corresponding <see cref="Side"/> enum value.
+    /// </summary>
+    public static Side ParseSide(string value) => value switch
+    {
+        "top" => Side.Top,
+        "right" => Side.Right,
+        "bottom" => Side.Bottom,
+        "left" => Side.Left,
+        _ => Side.Bottom
+    };
+
+    /// <summary>
+    /// Parses an align string from FloatingUI into the corresponding <see cref="Align"/> enum value.
+    /// </summary>
+    public static Align ParseAlign(string value) => value switch
+    {
+        "start" => Align.Start,
+        "center" => Align.Center,
+        "end" => Align.End,
+        _ => Align.Center
+    };
 }

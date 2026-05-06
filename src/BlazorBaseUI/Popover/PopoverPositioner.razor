@@ -155,7 +155,7 @@
     /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
     /// </summary>
     [Parameter]
-    public PopoverCollisionAvoidance? CollisionAvoidance { get; set; }
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
 
     /// <summary>
     /// Gets or sets a custom anchor element to position the popover against instead of the trigger.
@@ -218,7 +218,7 @@
         computedAlign = Align;
 
         var open = RootContext?.GetOpen() ?? false;
-        var instant = RootContext?.InstantType ?? InstantType.None;
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
         state = new PopoverPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
 
         positionerContext.Side = computedSide;
@@ -258,6 +258,7 @@
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
         }
@@ -288,23 +289,12 @@
         }
 
         var isOpen = RootContext?.GetOpen() ?? false;
-        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
 
-        var styleParts = new List<string>();
-        if (!isOpen)
-        {
-            styleParts.Add("pointer-events: none");
-        }
-
-        if (transitionStatus == TransitionStatus.Starting)
-        {
-            styleParts.Add("transition-property: none");
-        }
-
-        if (styleParts.Count > 0)
-        {
-            attrs["style"] = string.Join("; ", styleParts);
-        }
+        // NOTE: Do NOT set inline "style" here. JS (initializePositioner/updatePosition)
+        // manages position, left, top, z-index, and visibility on this element's style.
+        // If C# sets the style attribute, Blazor's diff will clobber JS-set values on
+        // re-render, causing a flash-of-unpositioned-content. Initial hiding and
+        // pointer-events are handled by global CSS rules in blazor-baseui-floating.js.
 
         attrs["data-side"] = computedSide.ToDataAttributeString()!;
         attrs["data-align"] = computedAlign.ToDataAttributeString()!;
@@ -331,8 +321,8 @@
     [JSInvokable]
     public void OnPositionUpdated(string side, string align, bool anchorHidden)
     {
-        var newSide = Extensions.ParseSide(side);
-        var newAlign = Extensions.ParseAlign(align);
+        var newSide = BlazorBaseUI.Extensions.ParseSide(side);
+        var newAlign = BlazorBaseUI.Extensions.ParseAlign(align);
 
         if (newSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden)
         {
@@ -348,7 +338,7 @@
         positionerContext.AnchorHidden = computedAnchorHidden;
 
         var open = RootContext?.GetOpen() ?? false;
-        var instant = RootContext?.InstantType ?? InstantType.None;
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
         state = new PopoverPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
         BuildComponentAttributes();
         StateHasChanged();
@@ -357,8 +347,8 @@
     private bool ShouldRenderInternalBackdrop()
     {
         if (RootContext is null) return false;
-        return RootContext.Modal == ModalMode.True
-            && RootContext.OpenChangeReason != OpenChangeReason.TriggerHover
+        return RootContext.Modal == PopoverModalMode.True
+            && RootContext.PopoverOpenChangeReason != PopoverOpenChangeReason.TriggerHover
             && RootContext.GetMounted();
     }
 
@@ -424,9 +414,11 @@
                 positionerDotNetRef,
                 SideOffsetFunction is not null,
                 AlignOffsetFunction is not null);
+
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -472,6 +464,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -488,6 +481,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 

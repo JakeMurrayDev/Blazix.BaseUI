@@ -131,6 +131,14 @@ No reordering is allowed.
 
 See [JS Interop Rules](.claude/rules/js-interop-rules.md) for imports, script states, exception handling, and responsibility split.
 
+### 4a. JS Interop File Architecture
+
+- Every component requiring JS interop **must** have its own component-specific JS file (e.g., `blazor-baseui-dialog.js`)
+- Component JS files import shared behavior from functional JS modules (e.g., `blazor-baseui-floating.js`, `blazor-baseui-composite.js`)
+- Shared/functional JS modules must **never** contain component-specific logic
+- **Exception:** When the interaction is trivial (a single function call with no component-specific wiring), the C# component may import the shared JS module directly
+- When adding new behavior to a component, modify the component's JS file — not the shared module
+
 ### 5. Logging
 
 - Use `ILogger`

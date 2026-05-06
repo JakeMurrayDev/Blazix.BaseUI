@@ -6,11 +6,13 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="ChildContent"
+               ChildContent="ChildContent ?? DefaultGlyph"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
+    private static readonly RenderFragment DefaultGlyph = builder => builder.AddContent(0, "▼");
+
     private SelectIconState state;
     private RenderElement<SelectIconState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();

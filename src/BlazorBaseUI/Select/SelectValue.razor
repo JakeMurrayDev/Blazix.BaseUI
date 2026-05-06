@@ -17,8 +17,7 @@
     private RenderElement<SelectValueState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private RenderFragment? resolvedContent;
-    private string? _cachedLabel;
-    private bool _cachedIsPlaceholder;
+    private bool valueElementRegistered;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -27,10 +26,21 @@
     private SelectRootContext<TValue>? TypedRootContext { get; set; }
 
     /// <summary>
-    /// Gets or sets the placeholder text displayed when no value is selected.
+    /// Gets or sets the plain-text placeholder displayed when no value is selected.
+    /// Overridden by <see cref="PlaceholderContent"/> when both are provided, and
+    /// suppressed when a null-valued item with a label is present in the root's
+    /// <c>Items</c>/<c>ItemGroups</c>.
     /// </summary>
     [Parameter]
     public string? Placeholder { get; set; }
+
+    /// <summary>
+    /// Gets or sets rich placeholder content displayed when no value is selected.
+    /// Takes priority over <see cref="Placeholder"/>. Suppressed when a null-valued
+    /// item with a label is present in the root's <c>Items</c>/<c>ItemGroups</c>.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? PlaceholderContent { get; set; }
 
     /// <summary>
     /// Gets or sets a child content function that receives the current value.
@@ -65,6 +75,9 @@
 
     /// <summary>
     /// Defines the child components of this instance.
+    /// Takes precedence over every computed fallback (placeholder, null-item label,
+    /// resolved single- or multi-value label). Mirrors React Base UI's static
+    /// <c>children</c> branch in <c>SelectValue</c>.
     /// </summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -92,12 +105,19 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var isPlaceholder = RootContext?.IsPlaceholder ?? true;
-        state = new SelectValueState(isPlaceholder);
+        state = BuildState();
         BuildComponentAttributes();
         ResolveContent();
-        _cachedIsPlaceholder = isPlaceholder;
-        _cachedLabel = ResolveTextLabel(isPlaceholder);
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !valueElementRegistered && RootContext is not null && Element.HasValue)
+        {
+            RootContext.SetValueElement(Element);
+            valueElementRegistered = true;
+        }
     }
 
     /// <inheritdoc />
@@ -106,25 +126,16 @@
         if (RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
+            if (valueElementRegistered)
+            {
+                RootContext.SetValueElement(null);
+            }
         }
     }
 
     private void OnRootStateChanged()
     {
-        var isPlaceholder = RootContext?.IsPlaceholder ?? true;
-
-        if (ValueContent is null && ValuesContent is null && ChildContent is null)
-        {
-            var newLabel = ResolveTextLabel(isPlaceholder);
-            if (isPlaceholder == _cachedIsPlaceholder && newLabel == _cachedLabel)
-            {
-                return;
-            }
-            _cachedIsPlaceholder = isPlaceholder;
-            _cachedLabel = newLabel;
-        }
-
-        state = new SelectValueState(isPlaceholder);
+        state = BuildState();
         BuildComponentAttributes();
         ResolveContent();
         InvokeAsync(StateHasChanged);
@@ -132,11 +143,49 @@
 
     private void BuildComponentAttributes()
     {
-        componentAttributes = new Dictionary<string, object>();
+        var attrs = new Dictionary<string, object>();
+
+        if (state.Placeholder)
+        {
+            attrs["data-placeholder"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private SelectValueState BuildState()
+    {
+        var placeholder = RootContext?.IsPlaceholder ?? true;
+        var isMultiple = RootContext?.Multiple ?? false;
+
+        if (TypedRootContext is null)
+        {
+            return new SelectValueState(placeholder, null, null);
+        }
+
+        if (isMultiple)
+        {
+            var values = TypedRootContext.GetValues();
+            var boxed = new List<object>(values.Count);
+            foreach (var v in values)
+            {
+                if (v is not null) boxed.Add(v);
+            }
+            return new SelectValueState(placeholder, null, boxed);
+        }
+
+        return new SelectValueState(placeholder, (object?)TypedRootContext.GetValue(), null);
     }
 
     private void ResolveContent()
     {
+        // ChildContent wins unconditionally — mirrors React's static `childrenProp != null` branch.
+        if (ChildContent is not null && ValueContent is null && ValuesContent is null)
+        {
+            resolvedContent = ChildContent;
+            return;
+        }
+
         if (TypedRootContext is null)
         {
             resolvedContent = ChildContent;
@@ -155,88 +204,70 @@
                 return;
             }
 
-            if (values.Count == 0)
-            {
-                resolvedContent = CreateTextFragment(Placeholder);
-                return;
-            }
-
             if (ChildContent is not null)
             {
                 resolvedContent = ChildContent;
                 return;
             }
 
+            if (values.Count == 0)
+            {
+                resolvedContent = ResolvePlaceholderFragment();
+                return;
+            }
+
             var labels = new List<string>();
             foreach (var v in values)
             {
-                var label = TypedRootContext.GetLabel(v);
-                labels.Add(label ?? v?.ToString() ?? "");
+                labels.Add(TypedRootContext.GetLabel(v) ?? v?.ToString() ?? "");
             }
             resolvedContent = CreateTextFragment(string.Join(", ", labels));
+            return;
         }
-        else
+
+        var value = TypedRootContext.GetValue();
+
+        if (ValueContent is not null)
         {
-            var value = TypedRootContext.GetValue();
-
-            if (ValueContent is not null)
-            {
-                resolvedContent = ValueContent(value);
-                return;
-            }
-
-            if (ChildContent is not null)
-            {
-                resolvedContent = ChildContent;
-                return;
-            }
-
-            if (value is null)
-            {
-                resolvedContent = CreateTextFragment(Placeholder);
-                return;
-            }
-
-            var label = TypedRootContext.GetLabel(value);
-            resolvedContent = CreateTextFragment(label ?? value?.ToString());
+            resolvedContent = ValueContent(value);
+            return;
         }
+
+        if (ChildContent is not null)
+        {
+            resolvedContent = ChildContent;
+            return;
+        }
+
+        if (value is null)
+        {
+            // When a null-valued item carries a label (e.g. "None"), React's
+            // resolveSelectedLabel wins over the placeholder. Consult it first.
+            if (RootContext?.HasNullItemLabel == true)
+            {
+                var nullLabel = TypedRootContext.GetLabel(default);
+                if (!string.IsNullOrEmpty(nullLabel))
+                {
+                    resolvedContent = CreateTextFragment(nullLabel);
+                    return;
+                }
+            }
+
+            resolvedContent = ResolvePlaceholderFragment();
+            return;
+        }
+
+        var label = TypedRootContext.GetLabel(value);
+        resolvedContent = CreateTextFragment(label ?? value?.ToString());
     }
 
-    private string? ResolveTextLabel(bool isPlaceholder)
+    private RenderFragment? ResolvePlaceholderFragment()
     {
-        if (TypedRootContext is null)
+        if (PlaceholderContent is not null)
         {
-            return null;
+            return PlaceholderContent;
         }
-
-        var isMultiple = RootContext?.Multiple ?? false;
-
-        if (isMultiple)
-        {
-            var values = TypedRootContext.GetValues();
-            if (values.Count == 0)
-            {
-                return Placeholder;
-            }
-
-            var labels = new List<string>();
-            foreach (var v in values)
-            {
-                var label = TypedRootContext.GetLabel(v);
-                labels.Add(label ?? v?.ToString() ?? "");
-            }
-            return string.Join(", ", labels);
-        }
-        else
-        {
-            var value = TypedRootContext.GetValue();
-            if (value is null)
-            {
-                return Placeholder;
-            }
-
-            return TypedRootContext.GetLabel(value) ?? value?.ToString();
-        }
+        return CreateTextFragment(Placeholder);
     }
 
     private static RenderFragment? CreateTextFragment(string? text)

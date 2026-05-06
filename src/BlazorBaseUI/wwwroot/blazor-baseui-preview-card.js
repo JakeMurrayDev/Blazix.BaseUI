@@ -4,15 +4,18 @@
  * PreviewCard-specific functionality that builds on the shared floating infrastructure.
  */
 
-// Reference to shared floating module (loaded separately)
-let floatingModule = null;
-
-async function ensureFloatingModule() {
-    if (!floatingModule) {
-        floatingModule = await import('./blazor-baseui-floating.js');
-    }
-    return floatingModule;
-}
+import {
+    createHoverInteraction,
+    createEscapeKeyHandler,
+    waitForPopupAndStartTransition as floatingWaitForPopup,
+    startSimpleTransition,
+    disposeHoverInteractionOnRoot,
+    updateHoverInteractionFloatingOnRoot,
+    setHoverInteractionOpenOnRoot,
+    initializePositioner as floatingInitializePositioner,
+    updatePositioner as floatingUpdatePositioner,
+    disposePositioner as floatingDisposePositioner
+} from './blazor-baseui-floating.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.PreviewCard.State');
 
@@ -26,22 +29,13 @@ if (!window[STATE_KEY]) {
 }
 const state = window[STATE_KEY];
 
+const handleGlobalKeyDown = createEscapeKeyHandler(state.roots, 'OnEscapeKey');
+
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
     document.addEventListener('keydown', handleGlobalKeyDown);
     state.globalListenersInitialized = true;
-}
-
-function handleGlobalKeyDown(e) {
-    if (e.key !== 'Escape') return;
-
-    for (const [id, rootState] of state.roots) {
-        if (rootState.isOpen && rootState.dotNetRef) {
-            rootState.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => { });
-            break;
-        }
-    }
 }
 
 // ============================================================================
@@ -65,14 +59,12 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
 
     if (!rootState.triggerElement) return;
 
-    const floating = await ensureFloatingModule();
-
     // Clean up existing hover interaction
     if (rootState.hoverInteraction) {
         rootState.hoverInteraction.cleanup();
     }
 
-    rootState.hoverInteraction = floating.createHoverInteraction({
+    rootState.hoverInteraction = createHoverInteraction({
         interactionId: `preview-card-hover-${rootId}`,
         triggerElement: rootState.triggerElement,
         floatingElement: rootState.popupElement,
@@ -96,25 +88,15 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
 }
 
 export function disposeHoverInteraction(rootId) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction) {
-        rootState.hoverInteraction.cleanup();
-        rootState.hoverInteraction = null;
-    }
+    disposeHoverInteractionOnRoot(state.roots, rootId);
 }
 
 export function updateHoverInteractionFloatingElement(rootId) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction && rootState.popupElement) {
-        rootState.hoverInteraction.setFloatingElement(rootState.popupElement);
-    }
+    updateHoverInteractionFloatingOnRoot(state.roots, rootId);
 }
 
 export function setHoverInteractionOpen(rootId, isOpen) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction) {
-        rootState.hoverInteraction.setOpen(isOpen);
-    }
+    setHoverInteractionOpenOnRoot(state.roots, rootId, isOpen);
 }
 
 // ============================================================================
@@ -158,136 +140,10 @@ export function setRootOpen(rootId, isOpen) {
     }
 
     if (isOpen) {
-        waitForPopupAndStartTransition(rootState, isOpen);
+        floatingWaitForPopup(rootState, isOpen, startSimpleTransition);
     } else {
-        startTransition(rootState, isOpen);
+        startSimpleTransition(rootState, isOpen);
     }
-}
-
-// ============================================================================
-// Transition Handling
-// ============================================================================
-
-function waitForPopupAndStartTransition(rootState, isOpen) {
-    const popupElement = rootState.popupElement;
-
-    if (popupElement) {
-        startTransition(rootState, isOpen);
-        return;
-    }
-
-    let attempts = 0;
-    const maxAttempts = 10;
-
-    function checkForPopup() {
-        attempts++;
-        const element = rootState.popupElement;
-
-        if (element) {
-            // Update hover interaction with the new popup element
-            if (rootState.hoverInteraction) {
-                rootState.hoverInteraction.setFloatingElement(element);
-            }
-            if (rootState.pendingOpen === isOpen) {
-                startTransition(rootState, isOpen);
-            }
-        } else if (attempts < maxAttempts && rootState.pendingOpen === isOpen) {
-            requestAnimationFrame(checkForPopup);
-        } else if (rootState.dotNetRef && rootState.pendingOpen === isOpen) {
-            rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
-        }
-    }
-
-    requestAnimationFrame(checkForPopup);
-}
-
-async function startTransition(rootState, isOpen) {
-    const popupElement = rootState.popupElement;
-
-    if (!popupElement) {
-        if (rootState.dotNetRef) {
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-        return;
-    }
-
-    const floating = await ensureFloatingModule();
-    const hasTransition = floating.checkForTransitionOrAnimation(popupElement);
-
-    if (isOpen) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (rootState.pendingOpen !== isOpen) {
-                    return;
-                }
-                if (hasTransition) {
-                    setupTransitionEndListener(rootState, isOpen);
-                }
-                if (rootState.dotNetRef) {
-                    rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
-                }
-            });
-        });
-    } else {
-        if (hasTransition) {
-            setupTransitionEndListener(rootState, isOpen);
-        } else {
-            if (rootState.dotNetRef) {
-                rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-            }
-        }
-    }
-}
-
-async function setupTransitionEndListener(rootState, isOpen) {
-    const popupElement = rootState.popupElement;
-    if (!popupElement) return;
-
-    const floating = await ensureFloatingModule();
-
-    if (rootState.transitionCleanup) {
-        rootState.transitionCleanup();
-        rootState.transitionCleanup = null;
-    }
-    if (rootState.fallbackTimeoutId) {
-        clearTimeout(rootState.fallbackTimeoutId);
-        rootState.fallbackTimeoutId = null;
-    }
-
-    let called = false;
-    const handleEnd = (event) => {
-        if (event.target !== popupElement) return;
-        if (called) return;
-        called = true;
-        cleanup();
-        if (rootState.dotNetRef) {
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    };
-
-    const cleanup = () => {
-        popupElement.removeEventListener('transitionend', handleEnd);
-        popupElement.removeEventListener('animationend', handleEnd);
-        if (rootState.fallbackTimeoutId) {
-            clearTimeout(rootState.fallbackTimeoutId);
-            rootState.fallbackTimeoutId = null;
-        }
-        rootState.transitionCleanup = null;
-    };
-
-    popupElement.addEventListener('transitionend', handleEnd);
-    popupElement.addEventListener('animationend', handleEnd);
-
-    rootState.transitionCleanup = cleanup;
-
-    const fallbackTimeout = floating.getMaxTransitionDuration(popupElement);
-    rootState.fallbackTimeoutId = setTimeout(() => {
-        if (!called && rootState.dotNetRef) {
-            called = true;
-            cleanup();
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    }, fallbackTimeout);
 }
 
 // ============================================================================
@@ -325,9 +181,7 @@ function buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign
 }
 
 export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback) {
-    const floating = await ensureFloatingModule();
-
-    const positionerId = await floating.initializePositioner({
+    const positionerId = await floatingInitializePositioner({
         positionerElement,
         triggerElement,
         side,
@@ -352,9 +206,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
 }
 
 export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback) {
-    const floating = await ensureFloatingModule();
-
-    await floating.updatePositioner(positionerId, {
+    await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
         align,
@@ -370,9 +222,8 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
     });
 }
 
-export async function disposePositioner(positionerId) {
-    const floating = await ensureFloatingModule();
-    floating.disposePositioner(positionerId);
+export function disposePositioner(positionerId) {
+    floatingDisposePositioner(positionerId);
     state.positioners.delete(positionerId);
 }
 

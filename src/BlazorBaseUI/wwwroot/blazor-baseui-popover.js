@@ -5,6 +5,7 @@
  */
 
 import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
 
 const PATIENT_CLICK_THRESHOLD = 500;
 
@@ -12,18 +13,18 @@ import {
     TABBABLE_SELECTOR,
     getTabbableElements,
     createFloatingFocusManager,
-    disposeFloatingFocusManager
+    disposeFloatingFocusManager,
+    createHoverInteraction,
+    checkForTransitionOrAnimation,
+    setupTransitionEndListener,
+    cleanupTransitionState,
+    disposeHoverInteractionOnRoot,
+    updateHoverInteractionFloatingOnRoot,
+    setHoverInteractionOpenOnRoot,
+    initializePositioner as floatingInitializePositioner,
+    updatePositioner as floatingUpdatePositioner,
+    disposePositioner as floatingDisposePositioner
 } from './blazor-baseui-floating.js';
-
-// Reference to shared floating module (loaded separately)
-let floatingModule = null;
-
-async function ensureFloatingModule() {
-    if (!floatingModule) {
-        floatingModule = await import('./blazor-baseui-floating.js');
-    }
-    return floatingModule;
-}
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Popover.State');
 
@@ -73,8 +74,6 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
 
     if (!rootState.triggerElement) return;
 
-    const floating = await ensureFloatingModule();
-
     // Clean up existing hover interaction
     if (rootState.hoverInteraction) {
         rootState.hoverInteraction.cleanup();
@@ -83,7 +82,7 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
     // Use callback dotnet ref if provided, otherwise fall back to root dotnet ref
     const dotNetRef = callbackDotNetRef || rootState.dotNetRef;
 
-    rootState.hoverInteraction = floating.createHoverInteraction({
+    rootState.hoverInteraction = createHoverInteraction({
         interactionId: `popover-hover-${rootId}`,
         triggerElement: rootState.triggerElement,
         floatingElement: rootState.popupElement,
@@ -106,25 +105,15 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
 }
 
 export function disposeHoverInteraction(rootId) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction) {
-        rootState.hoverInteraction.cleanup();
-        rootState.hoverInteraction = null;
-    }
+    disposeHoverInteractionOnRoot(state.roots, rootId);
 }
 
 export function updateHoverInteractionFloatingElement(rootId) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction && rootState.popupElement) {
-        rootState.hoverInteraction.setFloatingElement(rootState.popupElement);
-    }
+    updateHoverInteractionFloatingOnRoot(state.roots, rootId);
 }
 
 export function setHoverInteractionOpen(rootId, isOpen) {
-    const rootState = state.roots.get(rootId);
-    if (rootState?.hoverInteraction) {
-        rootState.hoverInteraction.setOpen(isOpen);
-    }
+    setHoverInteractionOpenOnRoot(state.roots, rootId, isOpen);
 }
 
 function handleGlobalKeyDown(e) {
@@ -245,7 +234,7 @@ export function disposeRoot(rootId) {
         cleanupBackdropCutout(rootState);
 
         // Clean up transition listener
-        cleanupTransition(rootState);
+        cleanupTransitionState(rootState);
 
         // Clean up viewport
         rootState.viewportDotNetRef = null;
@@ -538,38 +527,35 @@ async function startTransition(rootState, isOpen) {
         return;
     }
 
-    const floating = await ensureFloatingModule();
-    const hasTransition = floating.checkForTransitionOrAnimation(popupElement);
+    const hasTransition = checkForTransitionOrAnimation(popupElement);
 
     if (isOpen) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (rootState.pendingOpen !== isOpen) {
-                    return;
-                }
+        await requestDoubleAnimationFrame();
 
-                // Skip focus management for hover-opened popovers
-                const isHoverOpen = rootState.openReason === 'trigger-hover';
+        if (rootState.pendingOpen !== isOpen) {
+            return;
+        }
 
-                if (!isHoverOpen) {
-                    // Delegate to shared FloatingFocusManager (Gap 7)
-                    setupFocusManagement(rootState, popupElement);
-                }
+        // Skip focus management for hover-opened popovers
+        const isHoverOpen = rootState.openReason === 'trigger-hover';
 
-                if (hasTransition) {
-                    setupTransitionEndListener(rootState, isOpen, floating);
-                }
-                if (rootState.dotNetRef) {
-                    rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
-                }
-                if (!hasTransition && rootState.dotNetRef) {
-                    rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', true).catch(() => { });
-                }
-            });
-        });
+        if (!isHoverOpen) {
+            // Delegate to shared FloatingFocusManager (Gap 7)
+            setupFocusManagement(rootState, popupElement);
+        }
+
+        if (hasTransition) {
+            setupTransitionEndListener(rootState, isOpen);
+        }
+        if (rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnStartingStyleApplied').catch(() => { });
+        }
+        if (!hasTransition && rootState.dotNetRef) {
+            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', true).catch(() => { });
+        }
     } else {
         if (hasTransition) {
-            setupTransitionEndListener(rootState, isOpen, floating);
+            setupTransitionEndListener(rootState, isOpen);
         } else {
             if (rootState.dotNetRef) {
                 rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
@@ -578,58 +564,6 @@ async function startTransition(rootState, isOpen) {
     }
 }
 
-function cleanupTransition(rootState) {
-    if (rootState.transitionCleanup) {
-        rootState.transitionCleanup();
-        rootState.transitionCleanup = null;
-    }
-    if (rootState.fallbackTimeoutId) {
-        clearTimeout(rootState.fallbackTimeoutId);
-        rootState.fallbackTimeoutId = null;
-    }
-}
-
-function setupTransitionEndListener(rootState, isOpen, floating) {
-    const popupElement = rootState.popupElement;
-    if (!popupElement) return;
-
-    cleanupTransition(rootState);
-
-    let called = false;
-    const handleEnd = (event) => {
-        if (event.target !== popupElement) return;
-        if (called) return;
-        called = true;
-        cleanup();
-        if (rootState.dotNetRef) {
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    };
-
-    const cleanup = () => {
-        popupElement.removeEventListener('transitionend', handleEnd);
-        popupElement.removeEventListener('animationend', handleEnd);
-        if (rootState.fallbackTimeoutId) {
-            clearTimeout(rootState.fallbackTimeoutId);
-            rootState.fallbackTimeoutId = null;
-        }
-        rootState.transitionCleanup = null;
-    };
-
-    popupElement.addEventListener('transitionend', handleEnd);
-    popupElement.addEventListener('animationend', handleEnd);
-
-    rootState.transitionCleanup = cleanup;
-
-    const fallbackTimeout = floating.getMaxTransitionDuration(popupElement);
-    rootState.fallbackTimeoutId = setTimeout(() => {
-        if (!called && rootState.dotNetRef) {
-            called = true;
-            cleanup();
-            rootState.dotNetRef.invokeMethodAsync('OnTransitionEnd', isOpen).catch(() => { });
-        }
-    }, fallbackTimeout);
-}
 
 // ============================================================================
 // Element References
@@ -666,8 +600,6 @@ function buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign
 }
 
 export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasSideOffsetFn, hasAlignOffsetFn) {
-    const floating = await ensureFloatingModule();
-
     // Build optional position update callback when dotNetRef is provided
     let onPositionUpdated = null;
     if (dotNetRef) {
@@ -676,7 +608,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
         };
     }
 
-    const positionerId = await floating.initializePositioner({
+    const positionerId = await floatingInitializePositioner({
         positionerElement,
         triggerElement,
         side,
@@ -705,9 +637,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
 }
 
 export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, hasSideOffsetFn, hasAlignOffsetFn) {
-    const floating = await ensureFloatingModule();
-
-    await floating.updatePositioner(positionerId, {
+    await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
         align,
@@ -725,9 +655,8 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
     });
 }
 
-export async function disposePositioner(positionerId) {
-    const floating = await ensureFloatingModule();
-    floating.disposePositioner(positionerId);
+export function disposePositioner(positionerId) {
+    floatingDisposePositioner(positionerId);
     state.positioners.delete(positionerId);
 }
 
@@ -1017,7 +946,7 @@ export function disposeViewport(rootId) {
     }
 }
 
-export function onViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement) {
+export async function onViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement) {
     const rootState = state.roots.get(rootId);
     if (!rootState?.viewportElement || !rootState.viewportDotNetRef) return;
 
@@ -1065,29 +994,27 @@ export function onViewportTriggerChange(rootId, previousTriggerElement, newTrigg
     rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionStart', direction).catch(() => { });
 
     // Wait two rAF frames then listen for transition/animation end
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            // Remove data-starting-style from the current container after 2 rAF frames
-            currentContainer.removeAttribute('data-starting-style');
-            let ended = false;
-            const onEnd = (event) => {
-                if (event && event.target !== clone) return;
-                if (ended) return;
-                ended = true;
-                clone.removeEventListener('transitionend', onEnd);
-                clone.removeEventListener('animationend', onEnd);
-                clearTimeout(fallbackId);
-                clone.remove();
-                if (rootState.viewportDotNetRef) {
-                    rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionEnd').catch(() => { });
-                }
-            };
+    await requestDoubleAnimationFrame();
 
-            clone.addEventListener('transitionend', onEnd);
-            clone.addEventListener('animationend', onEnd);
+    // Remove data-starting-style from the current container after 2 rAF frames
+    currentContainer.removeAttribute('data-starting-style');
+    let ended = false;
+    const onEnd = (event) => {
+        if (event && event.target !== clone) return;
+        if (ended) return;
+        ended = true;
+        clone.removeEventListener('transitionend', onEnd);
+        clone.removeEventListener('animationend', onEnd);
+        clearTimeout(fallbackId);
+        clone.remove();
+        if (rootState.viewportDotNetRef) {
+            rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionEnd').catch(() => { });
+        }
+    };
 
-            // Fallback timeout in case no transition/animation fires
-            const fallbackId = setTimeout(onEnd, 500);
-        });
-    });
+    clone.addEventListener('transitionend', onEnd);
+    clone.addEventListener('animationend', onEnd);
+
+    // Fallback timeout in case no transition/animation fires
+    const fallbackId = setTimeout(onEnd, 500);
 }
