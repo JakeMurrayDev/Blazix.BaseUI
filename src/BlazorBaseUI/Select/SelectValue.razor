@@ -17,7 +17,7 @@
     private RenderElement<SelectValueState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private RenderFragment? resolvedContent;
-    private bool _valueElementRegistered;
+    private bool valueElementRegistered;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -113,10 +113,10 @@
     /// <inheritdoc />
     protected override void OnAfterRender(bool firstRender)
     {
-        if (firstRender && !_valueElementRegistered && RootContext is not null && Element.HasValue)
+        if (firstRender && !valueElementRegistered && RootContext is not null && Element.HasValue)
         {
             RootContext.SetValueElement(Element);
-            _valueElementRegistered = true;
+            valueElementRegistered = true;
         }
     }
 
@@ -126,7 +126,7 @@
         if (RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
-            if (_valueElementRegistered)
+            if (valueElementRegistered)
             {
                 RootContext.SetValueElement(null);
             }

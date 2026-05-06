@@ -11,18 +11,18 @@ namespace BlazorBaseUI.Select;
 internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposable
 {
     #pragma warning disable CS8714 // TValue may be nullable but Dictionary requires notnull key
-    private readonly Dictionary<TValue, string> _itemLabels = new();
+    private readonly Dictionary<TValue, string> itemLabels = new();
     #pragma warning restore CS8714
 
-    private readonly List<object?> _registeredValues = new();
-    private readonly List<object> _registeredItems = new();
-    private readonly List<KeyValuePair<object?, Func<Task<string?>>>> _itemLabelResolvers = new();
+    private readonly List<object?> registeredValues = new();
+    private readonly List<object> registeredItems = new();
+    private readonly List<KeyValuePair<object?, Func<Task<string?>>>> itemLabelResolvers = new();
     private bool hasNullItemLabel;
     private string? nullItemLabel;
-    private Func<object?, object?, bool>? _areValuesEqual;
+    private Func<object?, object?, bool>? areValuesEqual;
 
-    private string _typeaheadBuffer = string.Empty;
-    private CancellationTokenSource? _typeaheadCts;
+    private string typeaheadBuffer = string.Empty;
+    private CancellationTokenSource? typeaheadCts;
 
     /// <inheritdoc />
     public string RootId { get; init; } = string.Empty;
@@ -226,7 +226,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public Func<int, Task>? SyncActiveIndexSilentFunc { get; init; }
 
     /// <inheritdoc />
-    public IReadOnlyList<object?> RegisteredValues => _registeredValues;
+    public IReadOnlyList<object?> RegisteredValues => registeredValues;
 
     /// <inheritdoc />
     public IReadOnlyList<object?> MultiValueBoxed
@@ -255,7 +255,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
 
     /// <inheritdoc />
     public Func<object?, object?, bool> AreValuesEqual =>
-        _areValuesEqual ??= (a, b) =>
+        areValuesEqual ??= (a, b) =>
         {
             if (ReferenceEquals(a, b))
             {
@@ -278,9 +278,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     /// <inheritdoc />
     public void Dispose()
     {
-        _typeaheadCts?.Cancel();
-        _typeaheadCts?.Dispose();
-        _typeaheadCts = null;
+        typeaheadCts?.Cancel();
+        typeaheadCts?.Dispose();
+        typeaheadCts = null;
     }
 
     /// <inheritdoc />
@@ -290,7 +290,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     /// <inheritdoc />
     public void RegisterItemValue(object? value)
     {
-        _registeredValues.Add(value);
+        registeredValues.Add(value);
         ItemMapChanged?.Invoke();
     }
 
@@ -298,11 +298,11 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public void UnregisterItemValue(object? value)
     {
         var comparer = AreValuesEqual;
-        for (var i = 0; i < _registeredValues.Count; i++)
+        for (var i = 0; i < registeredValues.Count; i++)
         {
-            if (comparer(_registeredValues[i], value))
+            if (comparer(registeredValues[i], value))
             {
-                _registeredValues.RemoveAt(i);
+                registeredValues.RemoveAt(i);
                 ItemMapChanged?.Invoke();
                 return;
             }
@@ -312,47 +312,47 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     /// <inheritdoc />
     public int RegisterItem(object item)
     {
-        _registeredItems.Add(item);
-        return _registeredItems.Count - 1;
+        registeredItems.Add(item);
+        return registeredItems.Count - 1;
     }
 
     /// <inheritdoc />
     public void UnregisterItem(object item)
     {
-        _registeredItems.Remove(item);
+        registeredItems.Remove(item);
     }
 
     /// <inheritdoc />
     public int GetItemIndex(object item)
     {
-        return _registeredItems.IndexOf(item);
+        return registeredItems.IndexOf(item);
     }
 
     /// <inheritdoc />
     public void RegisterItemLabelResolver(object? boxedValue, Func<Task<string?>> resolver)
     {
         var comparer = AreValuesEqual;
-        for (var i = 0; i < _itemLabelResolvers.Count; i++)
+        for (var i = 0; i < itemLabelResolvers.Count; i++)
         {
-            if (comparer(_itemLabelResolvers[i].Key, boxedValue))
+            if (comparer(itemLabelResolvers[i].Key, boxedValue))
             {
-                _itemLabelResolvers[i] = new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver);
+                itemLabelResolvers[i] = new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver);
                 return;
             }
         }
 
-        _itemLabelResolvers.Add(new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver));
+        itemLabelResolvers.Add(new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver));
     }
 
     /// <inheritdoc />
     public void UnregisterItemLabelResolver(object? boxedValue)
     {
         var comparer = AreValuesEqual;
-        for (var i = 0; i < _itemLabelResolvers.Count; i++)
+        for (var i = 0; i < itemLabelResolvers.Count; i++)
         {
-            if (comparer(_itemLabelResolvers[i].Key, boxedValue))
+            if (comparer(itemLabelResolvers[i].Key, boxedValue))
             {
-                _itemLabelResolvers.RemoveAt(i);
+                itemLabelResolvers.RemoveAt(i);
                 return;
             }
         }
@@ -362,9 +362,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public int IndexOfValue(object? boxedValue)
     {
         var comparer = AreValuesEqual;
-        for (var i = 0; i < _registeredValues.Count; i++)
+        for (var i = 0; i < registeredValues.Count; i++)
         {
-            if (comparer(_registeredValues[i], boxedValue))
+            if (comparer(registeredValues[i], boxedValue))
             {
                 return i;
             }
@@ -407,7 +407,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     }
 
     /// <inheritdoc />
-    public bool IsTyping => _typeaheadBuffer.Length > 0;
+    public bool IsTyping => typeaheadBuffer.Length > 0;
 
     /// <inheritdoc />
     public void ClearSelectedItemText()
@@ -602,12 +602,12 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
         }
         else
         {
-            if (_itemLabels.TryGetValue(value, out var existing) && existing == label)
+            if (itemLabels.TryGetValue(value, out var existing) && existing == label)
             {
                 return;
             }
 
-            _itemLabels[value] = label;
+            itemLabels[value] = label;
         }
 
         if (ItemToStringLabel is not null)
@@ -676,7 +676,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             return nullItemLabel;
         }
 
-        if (value is not null && _itemLabels.TryGetValue(value, out var label))
+        if (value is not null && itemLabels.TryGetValue(value, out var label))
         {
             return label;
         }
@@ -741,7 +741,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             }
         }
 
-        foreach (var kvp in _itemLabels)
+        foreach (var kvp in itemLabels)
         {
             var candidate = GetFormValue(kvp.Key);
             if (candidate is not null &&
@@ -788,7 +788,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             return (true, default);
         }
 
-        foreach (var kvp in _itemLabels)
+        foreach (var kvp in itemLabels)
         {
             var candidate = GetLabel(kvp.Key);
             if (candidate is not null &&
@@ -852,15 +852,15 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             return;
         }
 
-        var previousCts = _typeaheadCts;
+        var previousCts = typeaheadCts;
         previousCts?.Cancel();
         previousCts?.Dispose();
 
         var cts = new CancellationTokenSource();
-        _typeaheadCts = cts;
+        typeaheadCts = cts;
         var token = cts.Token;
 
-        _typeaheadBuffer += character.ToLowerInvariant();
+        typeaheadBuffer += character.ToLowerInvariant();
 
         TValue? matchValue = default;
         var found = false;
@@ -894,7 +894,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 var candidate = candidates[index];
                 var label = getLabel(candidate);
                 if (!string.IsNullOrEmpty(label) &&
-                    label.StartsWith(_typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
+                    label.StartsWith(typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
                 {
                     value = getValue(candidate);
                     return true;
@@ -939,7 +939,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 labels.Add((default, nullItemLabel));
             }
 
-            foreach (var kvp in _itemLabels)
+            foreach (var kvp in itemLabels)
             {
                 labels.Add((kvp.Key, kvp.Value));
             }
@@ -951,10 +951,10 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 out matchValue);
         }
 
-        if (!found && _itemLabelResolvers.Count > 0)
+        if (!found && itemLabelResolvers.Count > 0)
         {
             var resolvedLabels = new List<(TValue? Value, string? Label)>();
-            foreach (var kvp in _itemLabelResolvers)
+            foreach (var kvp in itemLabelResolvers)
             {
                 var label = await kvp.Value();
                 if (TryGetTypedValue(kvp.Key, out var typedKey))
@@ -980,12 +980,12 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             {
                 if (task.Status == TaskStatus.RanToCompletion)
                 {
-                    _typeaheadBuffer = string.Empty;
+                    typeaheadBuffer = string.Empty;
                 }
 
-                if (ReferenceEquals(_typeaheadCts, cts))
+                if (ReferenceEquals(typeaheadCts, cts))
                 {
-                    _typeaheadCts = null;
+                    typeaheadCts = null;
                 }
 
                 cts.Dispose();

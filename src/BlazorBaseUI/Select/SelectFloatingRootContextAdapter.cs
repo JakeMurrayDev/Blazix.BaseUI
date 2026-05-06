@@ -8,30 +8,30 @@ namespace BlazorBaseUI.Select;
 /// </summary>
 internal sealed class SelectFloatingRootContextAdapter : IFloatingRootContext
 {
-    private readonly ISelectRootContext _context;
+    private readonly ISelectRootContext rootContext;
 
-    public SelectFloatingRootContextAdapter(ISelectRootContext context) => _context = context;
-
-    /// <inheritdoc />
-    public string FloatingId => _context.RootId;
+    public SelectFloatingRootContextAdapter(ISelectRootContext context) => rootContext = context;
 
     /// <inheritdoc />
-    public bool GetOpen() => _context.GetOpen();
+    public string FloatingId => rootContext.RootId;
 
     /// <inheritdoc />
-    public ElementReference? GetTriggerElement() => _context.GetTriggerElement();
+    public bool GetOpen() => rootContext.GetOpen();
 
     /// <inheritdoc />
-    public ElementReference? GetPopupElement() => _context.GetPopupElement();
+    public ElementReference? GetTriggerElement() => rootContext.GetTriggerElement();
 
     /// <inheritdoc />
-    public void SetPopupElement(ElementReference element) => _context.SetPopupElement(element);
+    public ElementReference? GetPopupElement() => rootContext.GetPopupElement();
 
     /// <inheritdoc />
-    public Task SetOpenAsync(bool open) => _context.SetOpenAsync(open, SelectOpenChangeReason.FocusOut);
+    public void SetPopupElement(ElementReference element) => rootContext.SetPopupElement(element);
 
     /// <inheritdoc />
-    public InteractionType CloseInteractionType => _context.OpenChangeReason switch
+    public Task SetOpenAsync(bool open) => rootContext.SetOpenAsync(open, SelectOpenChangeReason.FocusOut);
+
+    /// <inheritdoc />
+    public InteractionType CloseInteractionType => rootContext.OpenChangeReason switch
     {
         SelectOpenChangeReason.TriggerPress => InteractionType.Click,
         SelectOpenChangeReason.OutsidePress => InteractionType.Click,
