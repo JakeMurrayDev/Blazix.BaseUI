@@ -139,23 +139,11 @@
 
         if (NativeButton)
         {
-            attrs["type"] = "button";
-            if (disabled && FocusableWhenDisabled)
-            {
-                attrs["aria-disabled"] = "true";
-            }
-            else if (disabled)
-            {
-                attrs["disabled"] = true;
-            }
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, FocusableWhenDisabled);
         }
         else
         {
-            attrs["role"] = "button";
-            if (disabled)
-            {
-                attrs["aria-disabled"] = "true";
-            }
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, FocusableWhenDisabled);
         }
 
         attrs["data-orientation"] = orientationString!;

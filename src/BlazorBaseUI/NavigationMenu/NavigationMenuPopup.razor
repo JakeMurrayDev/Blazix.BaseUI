@@ -89,8 +89,19 @@
         attrs["tabindex"] = "-1";
 
         // Side-dependent positioning for origin-side alignment (top or left)
-        var isOriginSide = state.Side == Side.Top || state.Side == Side.InlineStart;
-        var isPhysicalLeft = state.Side == Side.Left || state.Side == Side.InlineStart;
+        var isRtl = string.Equals(RootContext?.Direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var isOriginSide = state.Side == Side.Top;
+        var isPhysicalLeft = state.Side == Side.Left;
+        if (isRtl)
+        {
+            isOriginSide = isOriginSide || state.Side == Side.InlineEnd;
+            isPhysicalLeft = isPhysicalLeft || state.Side == Side.InlineEnd;
+        }
+        else
+        {
+            isOriginSide = isOriginSide || state.Side == Side.InlineStart;
+            isPhysicalLeft = isPhysicalLeft || state.Side == Side.InlineStart;
+        }
 
         if (isOriginSide)
         {

@@ -13,11 +13,12 @@ public class DialogPopupTests : BunitContext, IDialogPopupContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithPopup(
         bool open = true,
-        BlazorBaseUI.Dialog.ModalMode modal = BlazorBaseUI.Dialog.ModalMode.False,
+        BlazorBaseUI.Dialog.DialogModalMode modal = BlazorBaseUI.Dialog.DialogModalMode.False,
         RenderFragment<RenderProps<DialogPopupState>>? render = null,
         Dictionary<string, object>? popupAttributes = null,
         Func<DialogPopupState, string>? classValue = null,
@@ -70,7 +71,7 @@ public class DialogPopupTests : BunitContext, IDialogPopupContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "Open", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<DialogPortal>(0);
@@ -83,7 +84,7 @@ public class DialogPopupTests : BunitContext, IDialogPopupContract
                         // Nested dialog
                         popupBuilder.OpenComponent<DialogRoot>(0);
                         popupBuilder.AddAttribute(1, "Open", true);
-                        popupBuilder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+                        popupBuilder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
                         popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => nestedInnerBuilder =>
                         {
                             nestedInnerBuilder.OpenComponent<DialogPortal>(0);
@@ -216,7 +217,7 @@ public class DialogPopupTests : BunitContext, IDialogPopupContract
     [Fact]
     public Task HasAriaModalTrueWhenModal()
     {
-        var cut = Render(CreateDialogWithPopup(modal: BlazorBaseUI.Dialog.ModalMode.True));
+        var cut = Render(CreateDialogWithPopup(modal: BlazorBaseUI.Dialog.DialogModalMode.True));
 
         var popup = cut.Find("[data-testid='dialog-popup']");
         popup.GetAttribute("aria-modal").ShouldBe("true");

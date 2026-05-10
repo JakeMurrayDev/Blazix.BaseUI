@@ -31,6 +31,12 @@ function getVarNames(prefix) {
  * @property {string} prefix
  * @property {Function | null} beforeMatchHandler
  * @property {'opening' | 'closing' | 'idle'} animationDirection
+ * @property {boolean} isBeforeMatch
+ * @property {boolean} cancelInitialTransition
+ * @property {boolean} cancelInitialAnimation
+ * @property {boolean} keepMounted
+ * @property {'height' | 'width' | null} transitionDimension
+ * @property {string | null} latestAnimationName
  */
 
 function getOrCreateState(panel, dotNetRef, prefix) {
@@ -42,7 +48,13 @@ function getOrCreateState(panel, dotNetRef, prefix) {
             dotNetRef,
             prefix: prefix || 'collapsible-panel',
             beforeMatchHandler: null,
-            animationDirection: 'idle'
+            animationDirection: 'idle',
+            isBeforeMatch: false,
+            cancelInitialTransition: false,
+            cancelInitialAnimation: false,
+            keepMounted: false,
+            transitionDimension: null,
+            latestAnimationName: null
         };
         panelStates.set(panel, state);
     } else {
@@ -74,27 +86,77 @@ function abortAndFinalize(state, panel, vars) {
     if (state.animationDirection === 'opening') {
         // Opening was interrupted - set to current measured dimensions
         const dims = measureDimensions(panel);
-        setCssVariables(panel, {
-            [vars.height]: dims.height > 0 ? `${dims.height}px` : 'auto',
-            [vars.width]: dims.width > 0 ? `${dims.width}px` : 'auto'
-        });
+        setCssVariables(panel, makeDimVars(vars, state.transitionDimension,
+            dims.height > 0 ? `${dims.height}px` : 'auto',
+            dims.width > 0 ? `${dims.width}px` : 'auto'
+        ));
     } else if (state.animationDirection === 'closing') {
         // Closing was interrupted - measure current dimensions
         const dims = measureDimensions(panel);
-        setCssVariables(panel, {
-            [vars.height]: `${dims.height}px`,
-            [vars.width]: `${dims.width}px`
-        });
+        setCssVariables(panel, makeDimVars(vars, state.transitionDimension,
+            `${dims.height}px`,
+            `${dims.width}px`
+        ));
     }
 
     state.animationDirection = 'idle';
 }
 
-export function initialize(panel, dotNetRef, initialOpen, prefix) {
+/**
+ * Builds a CSS variable object respecting the detected transition dimension.
+ * When transitionDimension is known, only that dimension gets the specified value;
+ * the other dimension is set to fallbackOther (default 'auto') to avoid breaking layout.
+ * @param {Object} vars - The var names { height, width }
+ * @param {'height' | 'width' | null} dimension - The detected transition dimension
+ * @param {string} heightVal - The height value
+ * @param {string} widthVal - The width value
+ * @param {string} [fallbackOther] - Value for the non-transitioning dimension (default: keep as given)
+ * @returns {Object} CSS variable map
+ */
+function makeDimVars(vars, dimension, heightVal, widthVal, fallbackOther) {
+    if (!dimension) {
+        // Unknown dimension: set both (original behavior)
+        return { [vars.height]: heightVal, [vars.width]: widthVal };
+    }
+    if (dimension === 'height') {
+        return {
+            [vars.height]: heightVal,
+            [vars.width]: fallbackOther !== undefined ? fallbackOther : widthVal
+        };
+    }
+    // dimension === 'width'
+    return {
+        [vars.height]: fallbackOther !== undefined ? fallbackOther : heightVal,
+        [vars.width]: widthVal
+    };
+}
+
+export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFound, keepMounted) {
     if (!panel) return;
 
     const state = getOrCreateState(panel, dotNetRef, prefix);
     const vars = getVarNames(state.prefix);
+
+    state.keepMounted = !!keepMounted;
+    // Track whether initial open transition/animation should be suppressed
+    // (panels that start open don't need an opening transition or animation)
+    state.cancelInitialTransition = !!initialOpen;
+    state.cancelInitialAnimation = !!initialOpen;
+
+    // Detect which dimension is being transitioned (height vs width).
+    // Setting both to 0px will break layout, so we need to know which one to collapse.
+    // Matches React's transitionDimensionRef logic.
+    if (state.transitionDimension === null) {
+        const panelStyles = getComputedStyle(panel);
+        if (
+            panel.getAttribute('data-orientation') === 'horizontal' ||
+            panelStyles.transitionProperty.indexOf('width') > -1
+        ) {
+            state.transitionDimension = 'width';
+        } else {
+            state.transitionDimension = 'height';
+        }
+    }
 
     if (initialOpen) {
         // Use auto so the panel can resize naturally when nested content changes
@@ -103,15 +165,32 @@ export function initialize(panel, dotNetRef, initialOpen, prefix) {
             [vars.width]: 'auto'
         });
     } else {
-        setCssVariables(panel, {
-            [vars.height]: '0px',
-            [vars.width]: '0px'
+        // Only collapse the active dimension; leave the other at auto
+        setCssVariables(panel, makeDimVars(vars, state.transitionDimension, '0px', '0px', 'auto'));
+
+        // When hiddenUntilFound is used and the panel is closed, persist
+        // data-starting-style to prevent CSS transitions from firing when the
+        // hidden attribute changes to "until-found" (different display properties).
+        // Matches React's useCollapsiblePanel behavior.
+        if (hiddenUntilFound) {
+            const animationType = detectAnimationType(panel);
+            if (animationType === 'css-transition') {
+                setDataAttribute(panel, 'starting-style', true);
+            }
+        }
+    }
+
+    // Clear cancelInitialAnimation after one frame (matches React's useOnMount behavior)
+    if (state.cancelInitialAnimation) {
+        requestAnimationFrame(() => {
+            state.cancelInitialAnimation = false;
         });
     }
 
     // Add beforematch event listener for hidden="until-found" support
     if (!state.beforeMatchHandler) {
         state.beforeMatchHandler = () => {
+            state.isBeforeMatch = true;
             invokeBeforeMatch(state.dotNetRef);
         };
         panel.addEventListener('beforematch', state.beforeMatchHandler);
@@ -123,32 +202,121 @@ export async function open(panel, skipAnimation) {
     if (!state) return;
 
     const vars = getVarNames(state.prefix);
+    const dim = state.transitionDimension;
 
     // Abort any ongoing animation and finalize its CSS state immediately
     abortAndFinalize(state, panel, vars);
+
+    // Handle beforematch-triggered open: suppress animation so content appears instantly
+    // when revealed by browser find-in-page (matches React's isBeforeMatchRef behavior)
+    if (state.isBeforeMatch) {
+        panel.style.transitionDuration = '0s';
+        const dims = measureDimensions(panel);
+        setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
+        requestAnimationFrame(() => {
+            state.isBeforeMatch = false;
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    panel.style.removeProperty('transition-duration');
+                });
+            });
+        });
+        setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
+        state.animationDirection = 'idle';
+        invokeAnimationEnded(state.dotNetRef, 'open', true);
+        return;
+    }
 
     // Clear any transition attributes from previous animations
     setDataAttribute(panel, 'ending-style', false);
     setDataAttribute(panel, 'starting-style', false);
 
+    // Override layout properties that can distort scrollHeight/scrollWidth measurements
+    // (matches React's useCollapsiblePanel open measurement behavior)
+    const layoutProps = ['justify-content', 'align-items', 'align-content', 'justify-items'];
+    const savedLayout = {};
+    for (const prop of layoutProps) {
+        savedLayout[prop] = panel.style.getPropertyValue(prop);
+        panel.style.setProperty(prop, 'initial', 'important');
+    }
+
     // SYNCHRONOUSLY measure and set dimensions FIRST (Base UI approach)
     // This ensures CSS is always in a valid state
     const dims = measureDimensions(panel);
-    setCssVariables(panel, {
-        [vars.height]: `${dims.height}px`,
-        [vars.width]: `${dims.width}px`
+    setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
+
+    // Restore layout properties on the next frame (after measurement is consumed)
+    requestAnimationFrame(() => {
+        for (const [prop, value] of Object.entries(savedLayout)) {
+            if (value === '') {
+                panel.style.removeProperty(prop);
+            } else {
+                panel.style.setProperty(prop, value);
+            }
+        }
     });
 
     const animationType = detectAnimationType(panel);
 
     if (skipAnimation || animationType === 'none') {
-        setCssVariables(panel, {
-            [vars.height]: 'auto',
-            [vars.width]: 'auto'
-        });
+        setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
         state.animationDirection = 'idle';
+        state.cancelInitialTransition = false;
+        state.cancelInitialAnimation = false;
         invokeAnimationEnded(state.dotNetRef, 'open', true);
         return;
+    }
+
+    // --- CSS Animation path ---
+    // Matches React's useIsoLayoutEffect for css-animation type (useCollapsiblePanel.ts:275-320)
+    if (animationType === 'css-animation') {
+        // Save and pause animation-name so we can measure without the animation running
+        state.latestAnimationName = panel.style.animationName || state.latestAnimationName;
+        panel.style.setProperty('animation-name', 'none');
+
+        // Re-measure with animation paused (matches React's setDimensions call)
+        const animDims = measureDimensions(panel);
+        setCssVariables(panel, makeDimVars(vars, dim, `${animDims.height}px`, `${animDims.width}px`));
+
+        // Restore animation-name unless this is the initial open (suppressed)
+        // or a beforematch open. Matches React's shouldCancelInitialOpenAnimationRef guard.
+        if (!state.cancelInitialAnimation && !state.isBeforeMatch) {
+            panel.style.removeProperty('animation-name');
+        }
+
+        state.cancelInitialAnimation = false;
+
+        // Set up abort controller for animation waiting
+        const abortController = new AbortController();
+        state.abortController = abortController;
+        state.animationDirection = 'opening';
+
+        invokeTransitionStatusChanged(state.dotNetRef, 'starting');
+
+        // Wait for CSS animations to complete
+        const completed = await waitForAnimationsToFinish(panel, abortController.signal);
+        if (!completed) {
+            return;
+        }
+
+        if (state.abortController === abortController) {
+            state.abortController = null;
+        }
+        state.animationDirection = 'idle';
+
+        setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
+        invokeAnimationEnded(state.dotNetRef, 'open', true);
+        return;
+    }
+
+    // --- CSS Transition path ---
+
+    // When keepMounted=false and the panel is opened for the first time,
+    // set data-starting-style early to ensure CSS transition starting properties
+    // are applied before the transition triggers.
+    // Matches React's shouldCancelInitialOpenTransitionRef behavior.
+    if (!state.cancelInitialTransition && !state.keepMounted) {
+        setDataAttribute(panel, 'starting-style', true);
     }
 
     // Set up abort controller for animation waiting only
@@ -160,6 +328,7 @@ export async function open(panel, skipAnimation) {
     // Set starting-style for CSS transition starting point
     setDataAttribute(panel, 'starting-style', true);
     invokeTransitionStatusChanged(state.dotNetRef, 'starting');
+    state.cancelInitialTransition = false;
 
     // Wait one frame for starting-style to be applied
     const frameOk = await requestAnimationFrameAsync(signal);
@@ -185,10 +354,7 @@ export async function open(panel, skipAnimation) {
     state.animationDirection = 'idle';
 
     // Set to auto for responsive sizing
-    setCssVariables(panel, {
-        [vars.height]: 'auto',
-        [vars.width]: 'auto'
-    });
+    setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
 
     invokeAnimationEnded(state.dotNetRef, 'open', true);
 }
@@ -198,6 +364,7 @@ export async function close(panel) {
     if (!state) return;
 
     const vars = getVarNames(state.prefix);
+    const dim = state.transitionDimension;
 
     // Abort any ongoing animation and finalize its CSS state immediately
     abortAndFinalize(state, panel, vars);
@@ -215,32 +382,62 @@ export async function close(panel) {
         return;
     }
 
-    setCssVariables(panel, {
-        [vars.height]: `${dims.height}px`,
-        [vars.width]: `${dims.width}px`
-    });
+    setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
 
     const animationType = detectAnimationType(panel);
 
     if (animationType === 'none') {
-        setCssVariables(panel, {
-            [vars.height]: '0px',
-            [vars.width]: '0px'
-        });
+        setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
         state.animationDirection = 'idle';
         invokeAnimationEnded(state.dotNetRef, 'close', true);
         return;
     }
+
+    // --- CSS Animation path for close ---
+    // Matches React's useIsoLayoutEffect css-animation close (useCollapsiblePanel.ts:295-309)
+    if (animationType === 'css-animation') {
+        // Save and pause animation-name so we can measure without the animation running
+        state.latestAnimationName = panel.style.animationName || state.latestAnimationName;
+        panel.style.setProperty('animation-name', 'none');
+
+        // Re-measure with animation paused
+        const animDims = measureDimensions(panel);
+        setCssVariables(panel, makeDimVars(vars, dim, `${animDims.height}px`, `${animDims.width}px`));
+
+        // Restore animation-name to trigger the close animation
+        panel.style.removeProperty('animation-name');
+
+        // Set up abort controller for animation waiting
+        const abortController = new AbortController();
+        state.abortController = abortController;
+        state.animationDirection = 'closing';
+
+        invokeTransitionStatusChanged(state.dotNetRef, 'ending');
+
+        // Wait for CSS animations to complete
+        const completed = await waitForAnimationsToFinish(panel, abortController.signal);
+        if (!completed) {
+            return;
+        }
+
+        if (state.abortController === abortController) {
+            state.abortController = null;
+        }
+        state.animationDirection = 'idle';
+
+        panel.style.removeProperty('content-visibility');
+        setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
+        invokeAnimationEnded(state.dotNetRef, 'close', true);
+        return;
+    }
+
+    // --- CSS Transition path for close ---
 
     // Set up abort controller for animation waiting only
     const abortController = new AbortController();
     state.abortController = abortController;
     state.animationDirection = 'closing';
     const signal = abortController.signal;
-
-    if (animationType === 'css-animation') {
-        panel.style.removeProperty('animation-name');
-    }
 
     // Wait one frame for dimensions to be applied
     const frameOk = await requestAnimationFrameAsync(signal);
@@ -270,11 +467,12 @@ export async function close(panel) {
     }
     state.animationDirection = 'idle';
 
+    // Remove content-visibility to ensure the panel is visually collapsed
+    // (matches React's useCollapsiblePanel close completion behavior)
+    panel.style.removeProperty('content-visibility');
+
     // Set final closed state
-    setCssVariables(panel, {
-        [vars.height]: '0px',
-        [vars.width]: '0px'
-    });
+    setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
 
     invokeAnimationEnded(state.dotNetRef, 'close', true);
 }

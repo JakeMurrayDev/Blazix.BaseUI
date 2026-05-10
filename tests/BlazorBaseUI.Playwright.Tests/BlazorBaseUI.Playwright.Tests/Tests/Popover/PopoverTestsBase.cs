@@ -776,7 +776,7 @@ public abstract class PopoverTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/popover-multi-trigger")
             .WithShowPayload(true));
 
-        // Note: contained triggers use ChildContentWithPayload which displays payload in popup-content
+        // Note: contained triggers use ChildContent's payload context which displays payload in popup-content
         var triggerA = GetByTestId("trigger-a");
         await triggerA.ClickAsync();
         await WaitForDelayAsync(200);
@@ -1800,6 +1800,104 @@ public abstract class PopoverTestsBase : TestBase
 
         var lastReason = GetByTestId("last-reason");
         await Assertions.Expect(lastReason).ToHaveTextAsync("OutsidePress");
+    }
+
+    #endregion
+
+    #region Missing Coverage Tests
+
+    /// <summary>
+    /// Tests that moving the mouse away before the hover delay fires does not open the popover.
+    /// React source: PopoverRoot.test.tsx — hover delay cancellation.
+    /// </summary>
+    [Fact]
+    public virtual async Task HoverOpen_MouseLeaveBeforeDelay_DoesNotOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(500));
+
+        // Allow JS hover interaction to initialize
+        await WaitForDelayAsync(500);
+
+        var trigger = GetByTestId("popover-trigger");
+        await trigger.HoverAsync();
+
+        // Move away quickly, before the 500ms delay fires
+        await WaitForDelayAsync(100);
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.HoverAsync();
+
+        // Wait past the original delay to confirm it was cancelled
+        await WaitForDelayAsync(600);
+
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+    }
+
+    /// <summary>
+    /// Tests that a non-modal popover closes when focus moves outside of it.
+    /// React source: PopoverRoot.test.tsx — focusOut close reason.
+    /// </summary>
+    [Fact]
+    public virtual async Task FocusOut_ClosesNonModalPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithShowFocusableContent(true));
+
+        await OpenPopoverAsync();
+        await WaitForDelayAsync(200);
+
+        // Tab through the popup content until focus leaves
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.FocusAsync();
+        await WaitForDelayAsync(300);
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    /// <summary>
+    /// Tests that when InitialFocus is disabled, focus does not move to the popup on open.
+    /// React source: PopoverPopup.test.tsx — initialFocus={false}.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_InitialFocusNone_DoesNotMoveFocus()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover-focus")
+            .WithDisableInitialFocus(true));
+
+        var trigger = GetByTestId("popover-trigger");
+        await trigger.ClickAsync();
+
+        var popup = GetByTestId("popover-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await WaitForDelayAsync(200);
+
+        // Focus should remain on trigger, not move to popup content
+        await Assertions.Expect(trigger).ToBeFocusedAsync();
+    }
+
+    /// <summary>
+    /// Tests that outside elements are marked inert when a modal popover is open.
+    /// React source: PopoverClose.test.tsx — modal inertness semantics.
+    /// </summary>
+    [Fact]
+    public virtual async Task Modal_OutsideElements_AreInert()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithModal(true)
+            .WithShowClose(true));
+
+        await OpenPopoverAsync();
+        await WaitForDelayAsync(200);
+
+        var outsideButton = GetByTestId("outside-button");
+        var isInert = await outsideButton.GetAttributeAsync("inert");
+        var ariaHidden = await outsideButton.GetAttributeAsync("aria-hidden");
+
+        // Outside elements should be either inert or aria-hidden when modal is open
+        Assert.True(isInert is not null || ariaHidden == "true",
+            "Outside element should be inert or aria-hidden when modal popover is open");
     }
 
     #endregion

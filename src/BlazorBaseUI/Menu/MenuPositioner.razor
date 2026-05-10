@@ -19,10 +19,8 @@
 </CascadingValue>
 
 @code {
-    private Lazy<Task<IJSObjectReference>>? moduleTask;
-    private bool hasRendered;
+    private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
-    private string? positionerId;
     private Side computedSide;
     private Align computedAlign;
     private int effectiveSideOffset;
@@ -31,15 +29,12 @@
     private PositionMethod effectivePositionMethod;
     private bool shiftCrossAxis;
     private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
     private DotNetObjectReference<MenuPositioner>? positionerDotNetRef;
     private MenuPositionerState state;
     private MenuPositionerContext positionerContext = null!;
     private RenderElement<MenuPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-
-    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-menu.js").AsTask());
 
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
@@ -163,10 +158,15 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        positionerInterop = new PositionerInterop(
+            JSRuntime,
+            "./_content/BlazorBaseUI/blazor-baseui-menu.js");
+
         positionerContext = new MenuPositionerContext
         {
             Side = Side ?? BlazorBaseUI.Side.Bottom,
             Align = Align ?? BlazorBaseUI.Align.Center,
+            ArrowUncentered = false,
             GetArrowElement = () => arrowElement,
             SetArrowElement = SetArrowElement
         };
@@ -228,14 +228,14 @@
     {
         if (firstRender)
         {
-            hasRendered = true;
+            positionerInterop.MarkRendered();
             positionerDotNetRef = DotNetObjectReference.Create(this);
             RootContext?.SetPositionerElement(Element);
         }
 
-        if (hasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
         {
-            if (string.IsNullOrEmpty(positionerId))
+            if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
             }
@@ -249,31 +249,18 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && hasRendered && !string.IsNullOrEmpty(positionerId))
-        {
-            try
-            {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposePositioner", positionerId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
-        }
-
+        await positionerInterop.DisposeAsync();
         positionerDotNetRef?.Dispose();
     }
 
     [JSInvokable]
-    public void OnPositionUpdated(string side, string align, bool anchorHidden)
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
     {
         var physicalSide = BlazorBaseUI.Extensions.ParseSide(side);
         var newSide = GetLogicalSide(physicalSide);
         var newAlign = BlazorBaseUI.Extensions.ParseAlign(align);
 
-        if (newSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden)
+        if (newSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
         {
             return;
         }
@@ -281,10 +268,12 @@
         computedSide = newSide;
         computedAlign = newAlign;
         computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
 
         positionerContext.Side = computedSide;
         positionerContext.Align = computedAlign;
         positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
 
         var open = RootContext?.GetOpen() ?? false;
         var nested = RootContext?.ParentType == MenuParentType.Menu;
@@ -304,6 +293,7 @@
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
 
         attrs["role"] = "presentation";
+        attrs["data-blazor-base-ui-positioner"] = true;
 
         if (!mounted)
         {
@@ -364,7 +354,7 @@
 
         arrowElement = element;
 
-        if (hasRendered && !string.IsNullOrEmpty(positionerId))
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
         {
             _ = UpdatePositionAsync();
         }
@@ -387,10 +377,10 @@
 
         try
         {
-            var module = await ModuleTask.Value;
+            var module = await positionerInterop.GetModuleAsync();
             var (caSide, caAlign, caFallback) = GetCollisionAvoidanceStrings(nested);
             var hasViewport = RootContext.HasViewport;
-            positionerId = await module.InvokeAsync<string>(
+            positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
                 "initializePositioner",
                 Element.Value,
                 anchorElement.Value,
@@ -408,7 +398,7 @@
                 caSide, caAlign, caFallback,
                 positionerDotNetRef,
                 hasViewport,
-                shiftCrossAxis);
+                shiftCrossAxis));
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -418,7 +408,7 @@
 
     private async Task UpdatePositionAsync()
     {
-        if (string.IsNullOrEmpty(positionerId) || RootContext is null)
+        if (!positionerInterop.IsInitialized || RootContext is null)
         {
             return;
         }
@@ -434,10 +424,10 @@
 
         try
         {
-            var module = await ModuleTask.Value;
+            var module = await positionerInterop.GetModuleAsync();
             await module.InvokeVoidAsync(
                 "updatePosition",
-                positionerId,
+                positionerInterop.PositionerId,
                 anchorElement.Value,
                 computedSide.ToDataAttributeString(),
                 computedAlign.ToDataAttributeString(),

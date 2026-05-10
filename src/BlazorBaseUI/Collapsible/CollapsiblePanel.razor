@@ -23,10 +23,9 @@
     private bool hasRendered;
     private bool isMounted;
     private bool jsInitialized;
-    private bool pendingJsInit;
     private DotNetObjectReference<CollapsiblePanel>? dotNetRef;
     private CollapsiblePanelState state = new(false, false, TransitionStatus.Undefined);
-    private bool? animationTarget;
+    private AnimationAction pendingAnimation = AnimationAction.None;
     private RenderElement<CollapsiblePanelState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private Func<CollapsiblePanelState, string?>? computedStyleValue;
@@ -48,7 +47,7 @@
 
     private bool IsPresent => KeepMounted || HiddenUntilFound || isMounted;
 
-    private bool IsHidden => !KeepMounted && !HiddenUntilFound && !CurrentOpen && animationTarget != false;
+    private bool IsHidden => !KeepMounted && !HiddenUntilFound && !CurrentOpen && pendingAnimation != AnimationAction.Close;
 
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = null!;
@@ -125,7 +124,7 @@
         computedStyleValue = s =>
         {
             var userStyle = StyleValue?.Invoke(s);
-            if (!jsInitialized && (pendingJsInit || ((KeepMounted || HiddenUntilFound) && !CurrentOpen)))
+            if (!jsInitialized && IsPresent && !CurrentOpen)
             {
                 var cssVars = "--collapsible-panel-height: 0px; --collapsible-panel-width: 0px";
                 return string.IsNullOrEmpty(userStyle) ? cssVars : $"{cssVars}; {userStyle}";
@@ -147,20 +146,18 @@
             if (currentOpen)
             {
                 isMounted = true;
-                animationTarget = true;
-                pendingJsInit = !jsInitialized;
+                pendingAnimation = AnimationAction.Open;
             }
             else
             {
-                animationTarget = false;
+                pendingAnimation = AnimationAction.Close;
             }
         }
         else if (currentOpen && !isMounted)
         {
             // Race condition recovery: close animation completed after state was already set to open
             isMounted = true;
-            animationTarget = true;
-            pendingJsInit = !jsInitialized;
+            pendingAnimation = AnimationAction.Open;
         }
 
         if (state.Open != currentOpen || state.Disabled != currentDisabled)
@@ -188,25 +185,26 @@
                 try
                 {
                     var module = await moduleTask.Value;
-                    await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, CurrentOpen);
+                    await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, CurrentOpen, null, HiddenUntilFound, KeepMounted);
                     jsInitialized = true;
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
 
             return;
         }
 
-        if (animationTarget == true)
+        if (pendingAnimation == AnimationAction.Open)
         {
-            animationTarget = null;
+            pendingAnimation = AnimationAction.None;
             _ = OpenAsync();
         }
-        else if (animationTarget == false)
+        else if (pendingAnimation == AnimationAction.Close)
         {
-            animationTarget = null;
+            pendingAnimation = AnimationAction.None;
             _ = CloseAsync();
         }
     }
@@ -224,6 +222,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -275,10 +274,13 @@
     /// Called from JavaScript when the browser's "find in page" reveals <c>hidden="until-found"</c> content.
     /// </summary>
     [JSInvokable]
-    public void OnBeforeMatch()
+    public async Task OnBeforeMatch()
     {
         // Called when browser's "find in page" reveals hidden="until-found" content
-        Context?.HandleBeforeMatch();
+        if (Context is not null)
+        {
+            await Context.HandleBeforeMatch();
+        }
     }
 
     private void BuildComponentAttributes()
@@ -292,8 +294,8 @@
 
         attrs["data-open"] = state.Open;
         attrs["data-closed"] = !state.Open;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        attrs["data-disabled"] = state.Disabled;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }
@@ -312,16 +314,15 @@
 
             if (!jsInitialized)
             {
-                await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, false);
+                await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, false, null, HiddenUntilFound, KeepMounted);
                 jsInitialized = true;
             }
-
-            pendingJsInit = false;
 
             await module.InvokeVoidAsync("open", Element.Value, false);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -339,6 +340,9 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
+
+    private enum AnimationAction { None, Open, Close }
 }

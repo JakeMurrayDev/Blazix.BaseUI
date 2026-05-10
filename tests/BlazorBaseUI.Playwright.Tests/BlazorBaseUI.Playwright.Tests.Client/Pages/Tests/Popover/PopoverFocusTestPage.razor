@@ -19,7 +19,7 @@
         <PopoverPortal>
             <PopoverPositioner data-testid="popover-positioner">
                 <PopoverPopup
-                    InitialFocus="@(UseInitialFocus ? specificButtonRef : null)"
+                    InitialFocus="@(DisableInitialFocus ? new FocusTarget.None() : UseInitialFocus ? specificButtonRef : null)"
                     FinalFocus="@(UseFinalFocus ? finalFocusButtonRef : null)"
                     data-testid="popover-popup">
                     <button data-testid="first-button">First Button</button>
@@ -48,6 +48,9 @@
 
     [SupplyParameterFromQuery(Name = "useFinalFocus")]
     public bool UseFinalFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disableInitialFocus")]
+    public bool DisableInitialFocus { get; set; }
 
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }

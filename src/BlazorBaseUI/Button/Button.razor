@@ -193,6 +193,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -203,33 +204,11 @@
 
         if (NativeButton)
         {
-            attrs["type"] = "button";
-            if (Disabled && FocusableWhenDisabled)
-            {
-                attrs["aria-disabled"] = "true";
-                attrs["tabindex"] = TabIndex;
-            }
-            else if (Disabled)
-            {
-                attrs["disabled"] = true;
-            }
-            else
-            {
-                attrs["tabindex"] = TabIndex;
-            }
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled, FocusableWhenDisabled, TabIndex);
         }
         else
         {
-            attrs["role"] = "button";
-            if (Disabled)
-            {
-                attrs["aria-disabled"] = "true";
-                attrs["tabindex"] = FocusableWhenDisabled ? TabIndex : -1;
-            }
-            else
-            {
-                attrs["tabindex"] = TabIndex;
-            }
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled, FocusableWhenDisabled, TabIndex);
         }
 
         attrs["data-disabled"] = Disabled;
@@ -251,6 +230,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 }

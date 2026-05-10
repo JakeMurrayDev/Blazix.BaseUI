@@ -5,7 +5,8 @@ public interface INavigationMenuContentContract
     Task RendersDivByDefault();
     Task ForwardsAdditionalAttributes();
     Task HasDataOpenWhenActive();
-    Task HasDataClosedWhenInactive();
+    Task HasDataClosedWhenInactiveWithKeepMounted();
+    Task DoesNotRenderWhenInactiveWithoutKeepMounted();
     Task AppliesClassValue();
     Task RequiresContext();
 }

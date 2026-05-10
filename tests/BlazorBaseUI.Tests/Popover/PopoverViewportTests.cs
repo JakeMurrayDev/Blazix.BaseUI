@@ -13,6 +13,8 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateViewportInPopover(
@@ -26,7 +28,7 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -143,18 +145,6 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
     }
 
     [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverViewport>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
-        );
-
-        cut.Markup.ShouldBeEmpty();
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
     public async Task SetsInstantTypeTriggerChangeOnTransitionEnd()
     {
         var cut = Render(CreateViewportInPopover());
@@ -168,5 +158,54 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         // After transition end, the popup should have data-instant="trigger-change"
         var popup = cut.Find("[role='dialog']");
         popup.GetAttribute("data-instant").ShouldBe("trigger-change");
+    }
+
+    [Fact]
+    public Task HasDataInstantWhenSet()
+    {
+        var cut = Render(CreateViewportInPopover());
+
+        var popup = cut.Find("[role='dialog']");
+        var viewport = popup.FirstElementChild;
+
+        // By default, PopoverInstantType is None so data-instant should not be rendered
+        viewport!.HasAttribute("data-instant").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task HasActivationDirectionAfterTransitionStart()
+    {
+        var cut = Render(CreateViewportInPopover());
+
+        var viewport = cut.FindComponent<PopoverViewport>();
+
+        await cut.InvokeAsync(() => viewport.Instance.OnViewportTransitionStart("right down"));
+
+        var popup = cut.Find("[role='dialog']");
+        var viewportEl = popup.FirstElementChild;
+        viewportEl!.GetAttribute("data-activation-direction").ShouldBe("right down");
+        viewportEl!.HasAttribute("data-transitioning").ShouldBeTrue();
+    }
+
+    [Fact]
+    public Task HasDataCurrentOnInnerWrapper()
+    {
+        var cut = Render(CreateViewportInPopover());
+
+        var popup = cut.Find("[role='dialog']");
+        var viewport = popup.FirstElementChild;
+
+        // data-current should NOT be on the viewport element itself
+        viewport!.HasAttribute("data-current").ShouldBeFalse();
+
+        // data-current should be on an inner wrapper div
+        var innerWrapper = viewport.QuerySelector("[data-current]");
+        innerWrapper.ShouldNotBeNull();
+        innerWrapper!.TagName.ShouldBe("DIV");
+        innerWrapper.TextContent.ShouldContain("Viewport Content");
+
+        return Task.CompletedTask;
     }
 }

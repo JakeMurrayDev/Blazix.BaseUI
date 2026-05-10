@@ -13,11 +13,12 @@ public class DialogBackdropTests : BunitContext, IDialogBackdropContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithBackdrop(
         bool open = true,
-        BlazorBaseUI.Dialog.ModalMode modal = BlazorBaseUI.Dialog.ModalMode.True,
+        BlazorBaseUI.Dialog.DialogModalMode modal = BlazorBaseUI.Dialog.DialogModalMode.True,
         RenderFragment<RenderProps<DialogBackdropState>>? render = null,
         bool forceRender = false,
         Dictionary<string, object>? backdropAttributes = null,
@@ -75,7 +76,7 @@ public class DialogBackdropTests : BunitContext, IDialogBackdropContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "Open", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.True);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.True);
             builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<DialogPortal>(0);
@@ -92,7 +93,7 @@ public class DialogBackdropTests : BunitContext, IDialogBackdropContract
                         // Nested dialog
                         popupBuilder.OpenComponent<DialogRoot>(0);
                         popupBuilder.AddAttribute(1, "Open", true);
-                        popupBuilder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.True);
+                        popupBuilder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.True);
                         popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => nestedInnerBuilder =>
                         {
                             nestedInnerBuilder.OpenComponent<DialogPortal>(0);
@@ -206,7 +207,7 @@ public class DialogBackdropTests : BunitContext, IDialogBackdropContract
     public Task RendersWhenModalFalse()
     {
         // Fix 02: Source has no modal guard on backdrop — backdrop renders for non-modal dialogs if included in markup
-        var cut = Render(CreateDialogWithBackdrop(modal: BlazorBaseUI.Dialog.ModalMode.False));
+        var cut = Render(CreateDialogWithBackdrop(modal: BlazorBaseUI.Dialog.DialogModalMode.False));
 
         cut.FindAll("[data-testid='backdrop']").Count.ShouldBe(1);
 

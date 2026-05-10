@@ -467,15 +467,17 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     [Fact]
     public Task Modal_UpdatesRootContextWhenParameterChanges()
     {
-        var cut = RenderComponent<SelectRoot<string>>(parameters => parameters
+        var cut = Render<SelectRoot<string>>(parameters => parameters
             .Add(p => p.DefaultOpen, true)
             .Add(p => p.Modal, BlazorBaseUI.Select.SelectModalMode.False)
             .Add(p => p.ChildContent, CreateDefaultChildren()));
 
         cut.Instance.typedContext.Modal.ShouldBeFalse();
 
-        cut.SetParametersAndRender(parameters => parameters
-            .Add(p => p.Modal, BlazorBaseUI.Select.SelectModalMode.True));
+        cut = Render<SelectRoot<string>>(parameters => parameters
+            .Add(p => p.DefaultOpen, true)
+            .Add(p => p.Modal, BlazorBaseUI.Select.SelectModalMode.True)
+            .Add(p => p.ChildContent, CreateDefaultChildren()));
 
         cut.Instance.typedContext.Modal.ShouldBeTrue();
 
@@ -1271,7 +1273,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
                         popupBuilder.OpenComponent<SelectItem<string?>>(0);
-                        popupBuilder.AddAttribute(1, "Value", null);
+                        popupBuilder.AddAttribute(1, "Value", (string?)null);
                         popupBuilder.AddAttribute(2, "Label", "None");
                         popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "None")));
                         popupBuilder.CloseComponent();

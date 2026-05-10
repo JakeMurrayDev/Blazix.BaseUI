@@ -16,7 +16,9 @@ public class TooltipPortalTests : BunitContext, ITooltipPortalContract
 
     private RenderFragment CreatePortalInRoot(
         bool defaultOpen = false,
-        bool keepMounted = false)
+        bool keepMounted = false,
+        RenderFragment<RenderProps<object>>? render = null,
+        IReadOnlyDictionary<string, object>? additionalAttributes = null)
     {
         return builder =>
         {
@@ -30,7 +32,18 @@ public class TooltipPortalTests : BunitContext, ITooltipPortalContract
 
                 innerBuilder.OpenComponent<TooltipPortal>(10);
                 innerBuilder.AddAttribute(11, "KeepMounted", keepMounted);
-                innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+                if (render is not null)
+                {
+                    innerBuilder.AddAttribute(12, "Render", render);
+                }
+                if (additionalAttributes is not null)
+                {
+                    foreach (var kvp in additionalAttributes)
+                    {
+                        innerBuilder.AddAttribute(13, kvp.Key, kvp.Value);
+                    }
+                }
+                innerBuilder.AddAttribute(14, "ChildContent", (RenderFragment)(portalBuilder =>
                 {
                     portalBuilder.OpenComponent<TooltipPositioner>(0);
                     portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
@@ -94,11 +107,68 @@ public class TooltipPortalTests : BunitContext, ITooltipPortalContract
     [Fact]
     public Task RequiresContext()
     {
-        var cut = Render<TooltipPortal>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
+        Should.Throw<InvalidOperationException>(() =>
+            Render<TooltipPortal>(parameters => parameters
+                .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
+            )
         );
 
-        cut.Markup.ShouldBeEmpty();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ForwardsAdditionalAttributes()
+    {
+        var cut = Render(CreatePortalInRoot(
+            defaultOpen: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "data-testid", "portal" },
+                { "aria-label", "Portal" }
+            }
+        ));
+
+        var portal = cut.Find("[data-testid='portal']");
+        portal.GetAttribute("aria-label").ShouldBe("Portal");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersWithCustomRender()
+    {
+        RenderFragment<RenderProps<object>> customRender = context => builder =>
+        {
+            builder.OpenElement(0, "section");
+            foreach (var attr in context.Attributes)
+            {
+                builder.AddAttribute(1, attr.Key, attr.Value);
+            }
+            if (context.ChildContent is not null)
+            {
+                builder.AddContent(2, context.ChildContent);
+            }
+            builder.CloseElement();
+        };
+
+        var cut = Render(CreatePortalInRoot(
+            defaultOpen: true,
+            render: customRender
+        ));
+
+        var section = cut.Find("section[data-blazor-base-ui-portal]");
+        section.TagName.ShouldBe("SECTION");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExposesElementReference()
+    {
+        var cut = Render(CreatePortalInRoot(defaultOpen: true));
+
+        var portal = cut.FindComponent<TooltipPortal>();
+        portal.Instance.Element.ShouldNotBeNull();
 
         return Task.CompletedTask;
     }

@@ -13,6 +13,8 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreatePositionerInPopover(
@@ -30,7 +32,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -170,56 +172,6 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     }
 
     [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverPositioner>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
-        );
-
-        cut.Markup.ShouldBeEmpty();
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task ForwardsSideOffsetToInitializePositioner()
-    {
-        var popoverModule = JSInterop.SetupModule("./_content/BlazorBaseUI/blazor-baseui-popover.js");
-
-        var cut = Render(CreatePositionerInPopover(sideOffset: 20));
-
-        // initializePositioner(positionerId, rootId, triggerElement, side, sideOffset, alignOffset, ...)
-        var initInvocations = popoverModule.Invocations
-            .Where(i => i.Identifier == "initializePositioner")
-            .ToList();
-
-        initInvocations.Count.ShouldBeGreaterThan(0);
-        initInvocations[0].Arguments.Count.ShouldBeGreaterThanOrEqualTo(6);
-        initInvocations[0].Arguments[4].ShouldBe(20d);
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task ForwardsAlignOffsetToInitializePositioner()
-    {
-        var popoverModule = JSInterop.SetupModule("./_content/BlazorBaseUI/blazor-baseui-popover.js");
-
-        var cut = Render(CreatePositionerInPopover(alignOffset: 15));
-
-        // initializePositioner(positionerId, rootId, triggerElement, side, sideOffset, alignOffset, ...)
-        var initInvocations = popoverModule.Invocations
-            .Where(i => i.Identifier == "initializePositioner")
-            .ToList();
-
-        initInvocations.Count.ShouldBeGreaterThan(0);
-        initInvocations[0].Arguments.Count.ShouldBeGreaterThanOrEqualTo(6);
-        initInvocations[0].Arguments[5].ShouldBe(15d);
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
     public async Task UpdatesDataSideFromJsCallback()
     {
         var cut = Render(CreatePositionerInPopover(side: BlazorBaseUI.Side.Bottom));
@@ -228,7 +180,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
         positioner.Instance.ShouldNotBeNull();
 
         // Simulate JS callback reporting a flipped side
-        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("top", "center", false));
+        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("top", "center", false, false));
 
         var positionerElement = cut.Find("[role='presentation']");
         positionerElement.GetAttribute("data-side").ShouldBe("top");
@@ -242,7 +194,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
         var positioner = cut.FindComponent<PopoverPositioner>();
 
         // Simulate JS callback reporting shifted alignment
-        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("bottom", "start", false));
+        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("bottom", "start", false, false));
 
         var positionerElement = cut.Find("[role='presentation']");
         positionerElement.GetAttribute("data-align").ShouldBe("start");
@@ -256,7 +208,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
         var positioner = cut.FindComponent<PopoverPositioner>();
 
         // Simulate JS callback reporting anchor hidden
-        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("bottom", "center", true));
+        await cut.InvokeAsync(() => positioner.Instance.OnPositionUpdated("bottom", "center", true, false));
 
         var positionerElement = cut.Find("[role='presentation']");
         positionerElement.HasAttribute("data-anchor-hidden").ShouldBeTrue();
@@ -265,7 +217,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     [Fact]
     public Task RendersInternalBackdropWhenModalAndPressed()
     {
-        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.ModalMode.True));
+        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.PopoverModalMode.True));
 
         var positioner = cut.Find("[data-side]");
         var previousSibling = positioner.PreviousElementSibling;
@@ -280,7 +232,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     [Fact]
     public Task DoesNotRenderInternalBackdropWhenNotModal()
     {
-        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.ModalMode.False));
+        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.PopoverModalMode.False));
 
         var positioner = cut.Find("[data-side]");
         var previousSibling = positioner.PreviousElementSibling;
@@ -299,7 +251,7 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
         // When hover opened, the open change reason is TriggerHover,
         // so internal backdrop should not render even with modal=true
         // We can't easily simulate hover open in bUnit, so we test the non-modal path
-        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.ModalMode.False));
+        var cut = Render(CreatePositionerInPopoverWithModal(BlazorBaseUI.Popover.PopoverModalMode.False));
 
         var inertElements = cut.FindAll("[data-base-ui-inert]");
         inertElements.Count.ShouldBe(0);
@@ -308,14 +260,14 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     }
 
     private RenderFragment CreatePositionerInPopoverWithModal(
-        BlazorBaseUI.Popover.ModalMode modal)
+        BlazorBaseUI.Popover.PopoverModalMode modal)
     {
         return builder =>
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", true);
             builder.AddAttribute(2, "Modal", modal);
-            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));

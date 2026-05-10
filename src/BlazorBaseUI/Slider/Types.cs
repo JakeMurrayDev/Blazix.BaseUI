@@ -8,7 +8,7 @@ internal sealed record ThumbRect(double Left, double Right, double Top, double B
 /// <summary>
 /// Contains the result of initiating a drag operation on a slider thumb.
 /// </summary>
-internal sealed record StartDragResult(int ThumbIndex, double[] Values);
+internal sealed record StartDragResult(int ThumbIndex, double[] Values, bool PressedOnFocusedThumb, bool WasTrackPress);
 
 /// <summary>
 /// Configuration passed to JavaScript for managing slider drag interactions.

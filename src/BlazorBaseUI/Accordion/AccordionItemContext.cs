@@ -50,12 +50,12 @@ internal interface IAccordionItemContext
     /// Sets the ID of the associated trigger element.
     /// </summary>
     /// <param name="id">The trigger element ID.</param>
-    void SetTriggerId(string id);
+    void SetTriggerId(string? id);
 
     /// <summary>
     /// Invokes the trigger action to toggle the accordion item.
     /// </summary>
-    void HandleTrigger();
+    Task HandleTrigger();
 }
 
 /// <summary>
@@ -77,7 +77,7 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     public bool Disabled { get; set; }
 
     /// <summary>The action invoked when the trigger is activated.</summary>
-    public Action TriggerHandler { get; set; } = null!;
+    public Func<Task> TriggerHandler { get; set; } = null!;
 
     /// <summary>The action invoked to set the panel ID.</summary>
     public Action<string> PanelIdSetter { get; set; } = null!;
@@ -105,11 +105,11 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     }
 
     /// <inheritdoc />
-    public void SetTriggerId(string id)
+    public void SetTriggerId(string? id)
     {
         TriggerId = id;
     }
 
     /// <inheritdoc />
-    public void HandleTrigger() => TriggerHandler();
+    public Task HandleTrigger() => TriggerHandler();
 }

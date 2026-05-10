@@ -9,26 +9,64 @@ internal static class AccessibilityUtilities
     /// <summary>
     /// Applies button semantics to a non-native button element's attribute dictionary.
     /// Adds role="button", tabindex, and aria-disabled when needed.
+    /// Mirrors the attribute portion of React's useButton + useFocusableWhenDisabled for non-native elements.
     /// </summary>
+    /// <param name="attributes">The attribute dictionary to modify.</param>
+    /// <param name="disabled">Whether the element is disabled.</param>
+    /// <param name="focusableWhenDisabled">Whether the element should remain focusable when disabled.</param>
+    /// <param name="tabIndex">The tabindex to use when focusable. Defaults to 0.</param>
     public static void ApplyButtonAttributes(
         IDictionary<string, object> attributes,
         bool disabled = false,
-        bool focusableWhenDisabled = false)
+        bool focusableWhenDisabled = false,
+        int tabIndex = 0)
     {
         attributes["role"] = "button";
 
         if (disabled && !focusableWhenDisabled)
         {
             attributes["aria-disabled"] = "true";
+            attributes["tabindex"] = -1;
         }
         else if (disabled && focusableWhenDisabled)
         {
             attributes["aria-disabled"] = "true";
-            attributes["tabindex"] = 0;
+            attributes["tabindex"] = tabIndex;
         }
         else
         {
-            attributes["tabindex"] = 0;
+            attributes["tabindex"] = tabIndex;
+        }
+    }
+
+    /// <summary>
+    /// Applies native button semantics (type="button") along with disabled/focusable-when-disabled handling.
+    /// Mirrors the attribute portion of React's useButton + useFocusableWhenDisabled for native button elements.
+    /// </summary>
+    /// <param name="attributes">The attribute dictionary to modify.</param>
+    /// <param name="disabled">Whether the element is disabled.</param>
+    /// <param name="focusableWhenDisabled">Whether the element should remain focusable when disabled.</param>
+    /// <param name="tabIndex">The tabindex to use when focusable. Defaults to 0.</param>
+    public static void ApplyNativeButtonAttributes(
+        IDictionary<string, object> attributes,
+        bool disabled = false,
+        bool focusableWhenDisabled = false,
+        int tabIndex = 0)
+    {
+        attributes["type"] = "button";
+
+        if (disabled && focusableWhenDisabled)
+        {
+            attributes["aria-disabled"] = "true";
+            attributes["tabindex"] = tabIndex;
+        }
+        else if (disabled)
+        {
+            attributes["disabled"] = true;
+        }
+        else
+        {
+            attributes["tabindex"] = tabIndex;
         }
     }
 

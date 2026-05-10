@@ -246,6 +246,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -258,6 +259,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -357,8 +359,9 @@
                 await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerHover);
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
 
         await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
@@ -405,8 +408,9 @@
                 await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover);
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
@@ -475,6 +479,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -493,6 +498,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
 
         hoverInitialized = false;

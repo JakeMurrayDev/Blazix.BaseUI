@@ -1,4 +1,5 @@
 @using Microsoft.JSInterop
+@using BlazorBaseUI.FloatingFocusManager
 
 @implements IAsyncDisposable
 
@@ -12,9 +13,18 @@
                ClassValue="ClassValue"
                StyleValue="computedStyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="ChildContent"
                @attributes="AdditionalAttributes"
-               @ref="renderElementReference" />
+               @ref="renderElementReference">
+    <FloatingFocusManager Modal="@(Context is not null && Context.Modal != DialogModalMode.False)"
+                          Disabled="@(Context is null || !Context.GetMounted())"
+                          InitialFocus="@ComputeInitialFocus()"
+                          ReturnFocus="@ComputeReturnFocus()"
+                          CloseOnFocusOut="@(Context is not null && !Context.DisablePointerDismissal)"
+                          RestoreFocusMode="popup"
+                          InteractionType="@(Context?.InteractionType)">
+        @ChildContent
+    </FloatingFocusManager>
+</RenderElement>
 
 @code {
     private Lazy<Task<IJSObjectReference>>? moduleTask;
@@ -177,6 +187,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
 
             previousInitialFocus = InitialFocus;
@@ -197,6 +208,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -211,6 +223,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -223,6 +236,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -271,11 +285,11 @@
         attrs["id"] = popupId;
         attrs["role"] = Context.Role.ToRoleString();
         attrs["tabindex"] = "-1";
-        attrs["data-base-ui-focusable"] = string.Empty;
+        attrs["data-blazor-base-ui-focusable"] = string.Empty;
 
         // Set aria-modal for accessibility. Also set by FloatingFocusManager
         // at runtime, but kept here for SSR/bUnit where JS doesn't execute.
-        if (Context.Modal != ModalMode.False)
+        if (Context.Modal != DialogModalMode.False)
         {
             attrs["aria-modal"] = "true";
         }
@@ -292,8 +306,7 @@
 
         attrs["data-open"] = Context.Open;
         attrs["data-closed"] = !Context.Open;
-        attrs["data-starting-style"] = Context.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = Context.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, Context.TransitionStatus);
         attrs["data-nested"] = Context.Nested;
         attrs["data-nested-dialog-open"] = Context.NestedDialogCount > 0;
 
@@ -327,5 +340,17 @@
         var interactionType = Context?.InteractionType ?? string.Empty;
         var result = cb.Fn(interactionType);
         return result.HasValue ? ("element", result.Value) : ("default", null);
+    }
+
+    private bool ComputeInitialFocus()
+    {
+        if (InitialFocus is FocusTarget.None) return false;
+        return true;
+    }
+
+    private bool ComputeReturnFocus()
+    {
+        if (FinalFocus is FocusTarget.None) return false;
+        return true;
     }
 }

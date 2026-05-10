@@ -89,7 +89,7 @@ public class AlertDialogRootTests : BunitContext, IAlertDialogRootContract
         // AlertDialogRoot wraps DialogRoot with hardcoded Modal=True.
         // Verify the inner DialogRoot component received the correct Modal parameter.
         var dialogRoot = cut.FindComponent<DialogRoot>();
-        dialogRoot.Instance.Modal.ShouldBe(BlazorBaseUI.Dialog.ModalMode.True);
+        dialogRoot.Instance.Modal.ShouldBe(BlazorBaseUI.Dialog.DialogModalMode.True);
 
         return Task.CompletedTask;
     }

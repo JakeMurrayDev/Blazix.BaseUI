@@ -13,6 +13,7 @@ public class DialogTitleTests : BunitContext, IDialogTitleContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithTitle(
@@ -25,7 +26,7 @@ public class DialogTitleTests : BunitContext, IDialogTitleContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "Open", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<DialogPortal>(0);

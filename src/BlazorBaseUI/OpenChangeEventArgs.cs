@@ -40,9 +40,19 @@ public abstract class OpenChangeEventArgs<TReason> : EventArgs
     public virtual bool PreventUnmount { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether event propagation is allowed.
+    /// </summary>
+    public bool IsPropagationAllowed { get; private set; }
+
+    /// <summary>
     /// Cancels the open state change, preventing the component from opening or closing.
     /// </summary>
     public void Cancel() => IsCanceled = true;
+
+    /// <summary>
+    /// Allows the event to propagate instead of being stopped internally.
+    /// </summary>
+    public void AllowPropagation() => IsPropagationAllowed = true;
 
     /// <summary>
     /// Prevents the component from unmounting when it closes.

@@ -1,4 +1,3 @@
-@using BlazorBaseUI.Popover
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
@@ -20,19 +19,13 @@
 }
 
 @code {
-    private Lazy<Task<IJSObjectReference>>? moduleTask;
-    private bool hasRendered;
+    private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
-    private string? positionerId;
     private PreviewCardPositionerState state;
     private PreviewCardPositionerContext positionerContext = null!;
     private RenderElement<PreviewCardPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
-
-    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-preview-card.js").AsTask());
 
     [CascadingParameter]
     private PreviewCardRootContext? RootContext { get; set; }
@@ -118,7 +111,7 @@
     /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
     /// </summary>
     [Parameter]
-    public PopoverCollisionAvoidance? CollisionAvoidance { get; set; }
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
 
     /// <summary>
     /// Gets or sets a custom anchor element to position the preview card against instead of the trigger.
@@ -158,6 +151,10 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        positionerInterop = new PositionerInterop(
+            JSRuntime,
+            "./_content/BlazorBaseUI/blazor-baseui-preview-card.js");
+
         positionerContext = new PreviewCardPositionerContext
         {
             Side = Side,
@@ -187,7 +184,7 @@
     {
         if (firstRender)
         {
-            hasRendered = true;
+            positionerInterop.MarkRendered();
         }
 
         var currentElement = Element;
@@ -197,9 +194,9 @@
             RootContext?.SetPositionerElement(currentElement);
         }
 
-        if (hasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
         {
-            if (string.IsNullOrEmpty(positionerId))
+            if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
             }
@@ -215,6 +212,7 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["role"] = "presentation";
+        attrs["data-blazor-base-ui-positioner"] = true;
 
         if (!(RootContext?.GetMounted() ?? false))
         {
@@ -248,17 +246,11 @@
 
         arrowElement = element;
 
-        if (hasRendered && !string.IsNullOrEmpty(positionerId))
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
         {
             _ = UpdatePositionAsync();
         }
     }
-
-    private (string Side, string Align, string Fallback) GetCollisionAvoidanceStrings() => (
-        (CollisionAvoidance?.Side ?? CollisionAvoidanceSideMode.Flip).ToJsString(),
-        (CollisionAvoidance?.Align ?? CollisionAvoidanceAlignMode.Flip).ToJsString(),
-        (CollisionAvoidance?.FallbackAxisSide ?? CollisionAvoidanceFallbackAxisSide.End).ToJsString()
-    );
 
     private async Task InitializePositionerAsync()
     {
@@ -273,92 +265,58 @@
             return;
         }
 
-        try
+        var config = new PositionerConfig
         {
-            var module = await ModuleTask.Value;
-            var ca = GetCollisionAvoidanceStrings();
+            Side = Side,
+            Align = Align,
+            SideOffset = SideOffset,
+            AlignOffset = AlignOffset,
+            CollisionPadding = CollisionPadding,
+            CollisionBoundary = CollisionBoundary,
+            ArrowPadding = ArrowPadding,
+            Sticky = Sticky,
+            PositionMethod = PositionMethod,
+            DisableAnchorTracking = DisableAnchorTracking,
+            CollisionAvoidance = CollisionAvoidance
+        };
 
-            positionerId = await module.InvokeAsync<string>(
-                "initializePositioner",
-                Element.Value,
-                anchorElement.Value,
-                Side.ToDataAttributeString(),
-                Align.ToDataAttributeString(),
-                SideOffset,
-                AlignOffset,
-                CollisionPadding,
-                CollisionBoundary.ToDataAttributeString(),
-                ArrowPadding,
-                arrowElement,
-                Sticky,
-                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
-                DisableAnchorTracking,
-                ca.Side,
-                ca.Align,
-                ca.Fallback);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
+        await positionerInterop.InitializeAsync(
+            Element.Value, anchorElement.Value, config, arrowElement);
     }
 
     private async Task UpdatePositionAsync()
     {
-        if (string.IsNullOrEmpty(positionerId) || RootContext is null)
+        if (!positionerInterop.IsInitialized || RootContext is null)
         {
             return;
         }
 
-        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
+        var anchorElement = Anchor ?? RootContext!.GetTriggerElement();
         if (!anchorElement.HasValue)
         {
             return;
         }
 
-        try
+        var config = new PositionerConfig
         {
-            var module = await ModuleTask.Value;
-            var ca = GetCollisionAvoidanceStrings();
+            Side = Side,
+            Align = Align,
+            SideOffset = SideOffset,
+            AlignOffset = AlignOffset,
+            CollisionPadding = CollisionPadding,
+            CollisionBoundary = CollisionBoundary,
+            ArrowPadding = ArrowPadding,
+            Sticky = Sticky,
+            PositionMethod = PositionMethod,
+            CollisionAvoidance = CollisionAvoidance
+        };
 
-            await module.InvokeVoidAsync(
-                "updatePosition",
-                positionerId,
-                anchorElement.Value,
-                Side.ToDataAttributeString(),
-                Align.ToDataAttributeString(),
-                SideOffset,
-                AlignOffset,
-                CollisionPadding,
-                CollisionBoundary.ToDataAttributeString(),
-                ArrowPadding,
-                arrowElement,
-                Sticky,
-                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
-                ca.Side,
-                ca.Align,
-                ca.Fallback);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
+        await positionerInterop.UpdateAsync(anchorElement.Value, config, arrowElement);
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && hasRendered && !string.IsNullOrEmpty(positionerId))
-        {
-            try
-            {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposePositioner", positionerId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-            }
-        }
-
-        positionerId = null;
+        await positionerInterop.DisposeAsync();
     }
 }

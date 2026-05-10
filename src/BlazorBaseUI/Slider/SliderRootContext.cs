@@ -23,9 +23,12 @@ internal sealed class SliderRootContext
     public double Step { get; set; } = 1;
     public ThumbCollisionBehavior ThumbCollisionBehavior { get; set; } = ThumbCollisionBehavior.Push;
     public ThumbAlignment ThumbAlignment { get; set; } = ThumbAlignment.Center;
+    public bool Inset => ThumbAlignment != ThumbAlignment.Center;
     public double[] Values { get; set; } = [0];
     public SliderRootState State { get; set; } = SliderRootState.Default;
     public string? LabelId { get; set; }
+    public string? RootLabelId { get; set; }
+    public Action<string?> SetLabelId { get; set; } = null!;
     public NumberFormatOptions? FormatOptions { get; set; }
     public string? Locale { get; set; }
     public FieldValidation? Validation { get; set; }

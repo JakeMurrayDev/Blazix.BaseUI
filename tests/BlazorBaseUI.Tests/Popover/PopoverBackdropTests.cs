@@ -13,6 +13,8 @@ public class PopoverBackdropTests : BunitContext, IPopoverBackdropContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateBackdropInPopover(
@@ -26,7 +28,7 @@ public class PopoverBackdropTests : BunitContext, IPopoverBackdropContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -162,15 +164,4 @@ public class PopoverBackdropTests : BunitContext, IPopoverBackdropContract
         backdrop.GetAttribute("style")!.ShouldContain("pointer-events: none");
     }
 
-    [Fact]
-    public Task RequiresContext()
-    {
-        var cut = Render<PopoverBackdrop>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
-        );
-
-        cut.Markup.ShouldBeEmpty();
-
-        return Task.CompletedTask;
-    }
 }

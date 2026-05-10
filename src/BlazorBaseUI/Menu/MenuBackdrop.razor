@@ -99,10 +99,7 @@
             attrs["hidden"] = true;
         }
 
-        attrs["data-open"] = state.Open;
-        attrs["data-closed"] = !state.Open;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, state.Open, state.TransitionStatus);
         componentAttributes = attrs;
     }
 

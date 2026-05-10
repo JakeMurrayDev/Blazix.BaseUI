@@ -8,4 +8,4 @@ namespace BlazorBaseUI.Popover;
 /// <param name="Align">The alignment of the popover relative to the specified side.</param>
 /// <param name="AnchorHidden">Indicates whether the anchor element is hidden from view.</param>
 /// <param name="Instant">Indicates whether CSS transitions should be instant, and the reason why.</param>
-public readonly record struct PopoverPositionerState(bool Open, Side Side, Align Align, bool AnchorHidden, InstantType Instant);
+public readonly record struct PopoverPositionerState(bool Open, Side Side, Align Align, bool AnchorHidden, PopoverInstantType Instant);

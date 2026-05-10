@@ -13,6 +13,7 @@ public class DialogCloseTests : BunitContext, IDialogCloseContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithClose(
@@ -28,7 +29,7 @@ public class DialogCloseTests : BunitContext, IDialogCloseContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
 
             if (onOpenChange.HasValue)
                 builder.AddAttribute(3, "OnOpenChange", onOpenChange.Value);
@@ -238,7 +239,7 @@ public class DialogCloseTests : BunitContext, IDialogCloseContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(3, "OnOpenChange", EventCallback.Factory.Create<DialogOpenChangeEventArgs>(this, args =>
             {
                 if (!args.Open)

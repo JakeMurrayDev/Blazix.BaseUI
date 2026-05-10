@@ -9,5 +9,4 @@ public interface IPopoverCloseContract
     Task ClosesPopoverOnClick();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
-    Task RequiresContext();
 }

@@ -17,16 +17,6 @@ public sealed class MenuOpenChangeEventArgs : OpenChangeEventArgs<MenuOpenChange
     /// Gets the optional payload associated with the state change.
     /// </summary>
     public object? Payload { get; }
-
-    /// <summary>
-    /// Gets whether the event should propagate to parent menus.
-    /// </summary>
-    public bool IsPropagationAllowed { get; private set; }
-
-    /// <summary>
-    /// Allows the open state change event to propagate to parent menus in nested menu scenarios.
-    /// </summary>
-    public void AllowPropagation() => IsPropagationAllowed = true;
 }
 
 /// <summary>

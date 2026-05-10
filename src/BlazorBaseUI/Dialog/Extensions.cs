@@ -5,11 +5,11 @@ namespace BlazorBaseUI.Dialog;
 /// </summary>
 internal static class Extensions
 {
-    public static string? ToDataAttributeString(this ModalMode mode) => mode switch
+    public static string? ToDataAttributeString(this DialogModalMode mode) => mode switch
     {
-        ModalMode.False => "false",
-        ModalMode.True => "true",
-        ModalMode.TrapFocus => "trap-focus",
+        DialogModalMode.False => "false",
+        DialogModalMode.True => "true",
+        DialogModalMode.TrapFocus => "trap-focus",
         _ => null
     };
 

@@ -8,7 +8,7 @@
     <PopoverRoot
         @bind-Open="isOpen"
         DefaultOpen="@DefaultOpen"
-        Modal="@(Modal ? ModalMode.True : ModalMode.False)"
+        Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)"
         OnOpenChange="HandleOpenChange"
         OnOpenChangeComplete="HandleOpenChangeComplete">
         <PopoverTrigger

@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
 @typeparam TPayload
-@implements IDisposable
+
+@implements IAsyncDisposable
 
 <RenderElement TState="DialogTriggerState"
                Tag="button"
@@ -15,6 +17,13 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-button.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton;
     private string triggerId = null!;
     private string lastPointerType = string.Empty;
     private DialogTriggerState state;
@@ -26,6 +35,11 @@
     private bool HasHandle => Handle is not null;
 
     private bool HasRootContext => RootContext is not null;
+
+    private bool NeedsJsInterop => !NativeButton || Disabled;
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
 
     [CascadingParameter]
     private DialogRootContext? RootContext { get; set; }
@@ -99,9 +113,21 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    public DialogTypedTrigger()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        if (RootContext is null && Handle is null)
+        {
+            throw new InvalidOperationException(
+                "DialogTrigger must be used within a DialogRoot or with a Handle.");
+        }
+
         triggerId = Id ?? Guid.NewGuid().ToIdString();
     }
 
@@ -136,13 +162,42 @@
         {
             RootContext?.SetTriggerPayload(triggerId, Payload);
         }
+
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        var stateChanged = Disabled != previousDisabled || NativeButton != previousNativeButton;
+
+        if (stateChanged)
+        {
+            var previousNeedsJs = !previousNativeButton || previousDisabled;
+            var currentNeedsJs = NeedsJsInterop;
+
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+
+            if (currentNeedsJs)
+            {
+                _ = SyncJsAsync(dispose: false);
+            }
+            else if (previousNeedsJs)
+            {
+                _ = SyncJsAsync(dispose: true);
+            }
+        }
     }
 
     /// <inheritdoc />
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            hasRendered = true;
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+
             if (HasHandle)
             {
                 Handle!.RegisterTrigger(triggerId, Element, Payload);
@@ -151,6 +206,11 @@
             else
             {
                 RootContext?.RegisterTriggerElement(triggerId, Element);
+            }
+
+            if (NeedsJsInterop)
+            {
+                await SyncJsAsync(dispose: false);
             }
         }
 
@@ -163,9 +223,23 @@
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         UnregisterFromCurrentStore(triggerId);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
     }
 
     private void BuildComponentAttributes()
@@ -174,20 +248,11 @@
 
         if (NativeButton)
         {
-            attrs["type"] = "button";
-            if (Disabled)
-            {
-                attrs["disabled"] = true;
-            }
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
         }
         else
         {
-            attrs["role"] = "button";
-            attrs["tabindex"] = Disabled ? "-1" : "0";
-            if (Disabled)
-            {
-                attrs["aria-disabled"] = "true";
-            }
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
         }
 
         attrs["aria-haspopup"] = "dialog";
@@ -204,15 +269,10 @@
         attrs["data-popup-open"] = open;
         attrs["data-disabled"] = Disabled;
 
-        attrs["data-base-ui-click-trigger"] = true;
+        attrs["data-blazor-base-ui-click-trigger"] = true;
 
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
-
-        if (!NativeButton)
-        {
-            attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
-        }
 
         componentAttributes = attrs;
     }
@@ -273,6 +333,11 @@
 
     private Task HandlePointerDownAsync(PointerEventArgs e)
     {
+        if (Disabled)
+        {
+            return Task.CompletedTask;
+        }
+
         lastPointerType = e.PointerType ?? string.Empty;
         return Task.CompletedTask;
     }
@@ -294,29 +359,11 @@
             lastPointerType = string.Empty;
         }
 
-        await RequestOpenAsync(nextOpen, OpenChangeReason.TriggerPress, interactionType);
+        await RequestOpenAsync(nextOpen, DialogOpenChangeReason.TriggerPress, interactionType);
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
-    {
-        if (Disabled || (!HasRootContext && !HasHandle))
-        {
-            return;
-        }
-
-        // Handle Enter and Space keys for non-native buttons
-        if (e.Key == "Enter" || e.Key == " ")
-        {
-            var nextOpen = !IsOpenedByThisTrigger();
-            string? interactionType = nextOpen ? "keyboard" : null;
-            await RequestOpenAsync(nextOpen, OpenChangeReason.TriggerPress, interactionType);
-        }
-
-        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
-    }
-
-    private Task RequestOpenAsync(bool open, OpenChangeReason reason, string? interactionType = null)
+    private Task RequestOpenAsync(bool open, DialogOpenChangeReason reason, string? interactionType = null)
     {
         if (HasHandle)
         {
@@ -349,5 +396,23 @@
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task SyncJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("sync", Element.Value, Disabled, false, NativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 }

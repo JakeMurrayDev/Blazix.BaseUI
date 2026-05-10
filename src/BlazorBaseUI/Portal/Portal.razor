@@ -56,12 +56,6 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
-    protected override void OnInitialized()
-    {
-        BuildComponentAttributes();
-    }
-
-    /// <inheritdoc />
     protected override void OnParametersSet()
     {
         BuildComponentAttributes();

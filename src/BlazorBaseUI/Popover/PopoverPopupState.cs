@@ -8,4 +8,4 @@ namespace BlazorBaseUI.Popover;
 /// <param name="Align">The alignment of the popover relative to the specified side.</param>
 /// <param name="Instant">The type of instant transition currently in effect.</param>
 /// <param name="TransitionStatus">The current transition status of the popup.</param>
-public readonly record struct PopoverPopupState(bool Open, Side Side, Align Align, InstantType Instant, TransitionStatus TransitionStatus);
+public readonly record struct PopoverPopupState(bool Open, Side Side, Align Align, PopoverInstantType Instant, TransitionStatus TransitionStatus);

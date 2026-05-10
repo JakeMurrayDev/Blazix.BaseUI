@@ -25,12 +25,12 @@ internal sealed class PopoverRootContext
     /// <summary>
     /// Gets or sets the modal behavior of the popover.
     /// </summary>
-    public ModalMode Modal { get; set; }
+    public PopoverModalMode Modal { get; set; }
 
     /// <summary>
     /// Gets or sets the reason for the most recent open state change.
     /// </summary>
-    public OpenChangeReason OpenChangeReason { get; set; }
+    public PopoverOpenChangeReason PopoverOpenChangeReason { get; set; }
 
     /// <summary>
     /// Gets or sets the interaction type that opened the popover (e.g. "mouse", "touch", "pen", "keyboard").
@@ -45,7 +45,12 @@ internal sealed class PopoverRootContext
     /// <summary>
     /// Gets or sets the type of instant transition currently in effect.
     /// </summary>
-    public InstantType InstantType { get; set; }
+    public PopoverInstantType PopoverInstantType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the unique element ID of the popup, used for <c>aria-controls</c> on the trigger.
+    /// </summary>
+    public string? PopupId { get; set; }
 
     /// <summary>
     /// Gets or sets the element ID of the popover title, used for <c>aria-labelledby</c>.
@@ -83,6 +88,12 @@ internal sealed class PopoverRootContext
     public Func<ElementReference?> GetTriggerElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets a delegate that returns the trigger's post-focus-guard element,
+    /// used as the <c>NextFocusableElement</c> for tab cycling out of the popup.
+    /// </summary>
+    public Func<ElementReference?> GetTriggerFocusTarget { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets a delegate that returns the positioner element reference.
     /// </summary>
     public Func<ElementReference?> GetPositionerElement { get; set; } = null!;
@@ -108,6 +119,11 @@ internal sealed class PopoverRootContext
     public Action<ElementReference?> SetTriggerElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets a delegate that sets the trigger's post-focus-guard element reference.
+    /// </summary>
+    public Action<ElementReference?> SetTriggerFocusTarget { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets a delegate that sets the positioner element reference.
     /// </summary>
     public Action<ElementReference?> SetPositionerElement { get; set; } = null!;
@@ -118,9 +134,19 @@ internal sealed class PopoverRootContext
     public Action<ElementReference?> SetPopupElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets a delegate that returns the backdrop element reference.
+    /// </summary>
+    public Func<ElementReference?> GetBackdropElement { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that sets the backdrop element reference.
+    /// </summary>
+    public Action<ElementReference?> SetBackdropElement { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets a delegate that asynchronously sets the open state with a reason, optional payload, and optional trigger ID.
     /// </summary>
-    public Func<bool, OpenChangeReason, object?, string?, Task> SetOpenAsync { get; set; } = null!;
+    public Func<bool, PopoverOpenChangeReason, object?, string?, Task> SetOpenAsync { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets a delegate that closes the popover.
@@ -150,7 +176,7 @@ internal sealed class PopoverRootContext
     /// <summary>
     /// Gets or sets a delegate that sets the instant type for transitions.
     /// </summary>
-    public Action<InstantType> SetInstantType { get; set; } = null!;
+    public Action<PopoverInstantType> SetPopoverInstantType { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the ID of the previously active trigger, used for viewport transitions.
@@ -158,7 +184,34 @@ internal sealed class PopoverRootContext
     public string? PreviousActiveTriggerId { get; set; }
 
     /// <summary>
+    /// Gets or sets the current count of registered close parts.
+    /// </summary>
+    public int ClosePartCount { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether at least one close part is present.
+    /// </summary>
+    public bool HasClosePart => ClosePartCount > 0;
+
+    /// <summary>
+    /// Gets or sets a delegate that registers a close part and returns an unregister action.
+    /// </summary>
+    public Func<Action> RegisterClosePart { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the focus manager is in modal mode,
+    /// computed from <see cref="Modal"/> and <see cref="HasClosePart"/>.
+    /// </summary>
+    public bool FocusManagerModal { get; set; }
+
+    /// <summary>
     /// Gets or sets the text direction for RTL support (<c>"ltr"</c> or <c>"rtl"</c>).
     /// </summary>
     public string Direction { get; set; } = "ltr";
+
+    /// <summary>
+    /// Gets or sets the floating root context adapter for use with
+    /// <see cref="FloatingFocusManager.FloatingFocusManager"/> and <see cref="FloatingTree.FloatingTree"/>.
+    /// </summary>
+    public IFloatingRootContext? FloatingRootContext { get; set; }
 }

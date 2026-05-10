@@ -6,5 +6,4 @@ public interface IPopoverPortalContract
     Task RendersChildrenWhenMounted();
     Task DoesNotRenderChildrenWhenNotMounted();
     Task RendersWithKeepMounted();
-    Task RequiresContext();
 }

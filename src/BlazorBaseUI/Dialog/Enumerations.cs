@@ -3,7 +3,7 @@ namespace BlazorBaseUI.Dialog;
 /// <summary>
 /// Specifies the reason the dialog's open state changed.
 /// </summary>
-public enum OpenChangeReason
+public enum DialogOpenChangeReason
 {
     /// <summary>No specific reason.</summary>
     None,
@@ -30,7 +30,7 @@ public enum OpenChangeReason
 /// <summary>
 /// Specifies the modal behavior of the dialog.
 /// </summary>
-public enum ModalMode
+public enum DialogModalMode
 {
     /// <summary>Non-modal: user interaction with the rest of the document is allowed.</summary>
     False,

@@ -1,4 +1,3 @@
-@using BlazorBaseUI.Popover
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
@@ -20,22 +19,25 @@
 }
 
 @code {
-    private Lazy<Task<IJSObjectReference>>? moduleTask;
-    private bool hasRendered;
+    private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
-    private string? positionerId;
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
+    private DotNetObjectReference<TooltipPositioner>? positionerDotNetRef;
     private TooltipPositionerState state;
     private TooltipPositionerContext positionerContext = null!;
     private RenderElement<TooltipPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
-
-    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-tooltip.js").AsTask());
+    private bool previousMounted;
 
     [CascadingParameter]
     private TooltipRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private TooltipPortalContext? PortalContext { get; set; }
 
     /// <summary>
     /// Gets or sets a custom render template for the positioner element.
@@ -65,6 +67,13 @@
     public int SideOffset { get; set; }
 
     /// <summary>
+    /// Gets or sets a function that computes the side offset dynamically based on anchor/popup dimensions.
+    /// When set, takes precedence over <see cref="SideOffset"/>.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? SideOffsetFunction { get; set; }
+
+    /// <summary>
     /// Gets or sets the offset in pixels from the alignment edge of the anchor element.
     /// Defaults to <c>0</c>.
     /// </summary>
@@ -72,11 +81,25 @@
     public int AlignOffset { get; set; }
 
     /// <summary>
+    /// Gets or sets a function that computes the align offset dynamically based on anchor/popup dimensions.
+    /// When set, takes precedence over <see cref="AlignOffset"/>.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? AlignOffsetFunction { get; set; }
+
+    /// <summary>
     /// Gets or sets the padding in pixels between the tooltip and the collision boundary edge.
     /// Defaults to <c>5</c>.
     /// </summary>
     [Parameter]
     public int CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets per-side collision padding between the tooltip and the collision boundary edge.
+    /// When set, takes precedence over <see cref="CollisionPadding"/>.
+    /// </summary>
+    [Parameter]
+    public SidePadding? CollisionPaddingPerSide { get; set; }
 
     /// <summary>
     /// Gets or sets the boundary used to detect collisions for repositioning.
@@ -118,7 +141,7 @@
     /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
     /// </summary>
     [Parameter]
-    public PopoverCollisionAvoidance? CollisionAvoidance { get; set; }
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
 
     /// <summary>
     /// Gets or sets a custom anchor element to position the tooltip against instead of the trigger.
@@ -158,11 +181,18 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        positionerInterop = new PositionerInterop(
+            JSRuntime, "./_content/BlazorBaseUI/blazor-baseui-tooltip.js");
+
+        computedSide = Side;
+        computedAlign = Align;
+        computedAnchorHidden = false;
+
         positionerContext = new TooltipPositionerContext
         {
-            Side = Side,
-            Align = Align,
-            AnchorHidden = false,
+            Side = computedSide,
+            Align = computedAlign,
+            AnchorHidden = computedAnchorHidden,
             ArrowUncentered = false,
             GetArrowElement = () => arrowElement,
             SetArrowElement = SetArrowElement
@@ -172,15 +202,20 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        // Reset computed values when parameters change
+        computedSide = Side;
+        computedAlign = Align;
+
         var open = RootContext?.GetOpen() ?? false;
         var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
         var instant = trackCursorAxis != TrackCursorAxis.None
             ? TooltipInstantType.TrackingCursor
             : RootContext?.InstantType ?? TooltipInstantType.None;
-        state = new TooltipPositionerState(open, Side, Align, false, instant);
+        state = new TooltipPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
 
-        positionerContext.Side = Side;
-        positionerContext.Align = Align;
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
 
         BuildComponentAttributes();
     }
@@ -190,7 +225,8 @@
     {
         if (firstRender)
         {
-            hasRendered = true;
+            positionerInterop.MarkRendered();
+            positionerDotNetRef = DotNetObjectReference.Create(this);
         }
 
         var currentElement = Element;
@@ -200,15 +236,30 @@
             RootContext?.SetPositionerElement(currentElement);
         }
 
-        if (hasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
         {
-            if (string.IsNullOrEmpty(positionerId))
+            previousMounted = true;
+            if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
             }
             else
             {
                 await UpdatePositionAsync();
+            }
+        }
+        else if (previousMounted && positionerInterop.IsInitialized && RootContext?.GetMounted() == false)
+        {
+            previousMounted = false;
+            try
+            {
+                var module = await positionerInterop.GetModuleAsync();
+                await module.InvokeVoidAsync("disposePositioner", positionerInterop.PositionerId);
+                positionerInterop.SetPositionerId(null);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -219,24 +270,42 @@
         {
             var disableHoverablePopup = RootContext?.DisableHoverablePopup ?? false;
             var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
-            var needsPointerEventsNone = disableHoverablePopup || trackCursorAxis == TrackCursorAxis.Both;
+            var open = RootContext?.GetOpen() ?? false;
+            var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+            var needsPointerEventsNone = !open || disableHoverablePopup || trackCursorAxis == TrackCursorAxis.Both;
+            var needsTransitionNone = transitionStatus == TransitionStatus.Starting;
 
-            if (!needsPointerEventsNone && StyleValue is null)
+            if (!needsPointerEventsNone && !needsTransitionNone && StyleValue is null)
             {
                 return null;
             }
 
-            if (!needsPointerEventsNone)
+            if (!needsPointerEventsNone && !needsTransitionNone)
             {
                 return StyleValue;
             }
 
             return s =>
             {
+                var parts = new List<string>(3);
+
                 var userStyle = StyleValue?.Invoke(s);
-                return string.IsNullOrEmpty(userStyle)
-                    ? "pointer-events: none;"
-                    : $"{userStyle}; pointer-events: none;";
+                if (!string.IsNullOrEmpty(userStyle))
+                {
+                    parts.Add(userStyle);
+                }
+
+                if (needsPointerEventsNone)
+                {
+                    parts.Add("pointer-events: none");
+                }
+
+                if (needsTransitionNone)
+                {
+                    parts.Add("transition: none");
+                }
+
+                return string.Join("; ", parts);
             };
         }
     }
@@ -246,19 +315,23 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["role"] = "presentation";
+        attrs["data-blazor-base-ui-positioner"] = true;
 
         if (!(RootContext?.GetMounted() ?? false))
         {
             attrs["hidden"] = true;
         }
 
-        attrs["data-side"] = Side.ToDataAttributeString()!;
-        attrs["data-align"] = Align.ToDataAttributeString()!;
+        attrs["data-side"] = computedSide.ToDataAttributeString()!;
+        attrs["data-align"] = computedAlign.ToDataAttributeString()!;
 
         var isOpen = RootContext?.GetOpen() ?? false;
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
-        attrs["data-anchor-hidden"] = state.AnchorHidden;
+        attrs["data-anchor-hidden"] = computedAnchorHidden;
+
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
         var instantType = trackCursorAxis != TrackCursorAxis.None
@@ -282,17 +355,53 @@
 
         arrowElement = element;
 
-        if (hasRendered && !string.IsNullOrEmpty(positionerId))
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
         {
             _ = UpdatePositionAsync();
         }
     }
 
-    private (string Side, string Align, string Fallback) GetCollisionAvoidanceStrings() => (
-        (CollisionAvoidance?.Side ?? CollisionAvoidanceSideMode.Flip).ToJsString(),
-        (CollisionAvoidance?.Align ?? CollisionAvoidanceAlignMode.Flip).ToJsString(),
-        (CollisionAvoidance?.FallbackAxisSide ?? CollisionAvoidanceFallbackAxisSide.End).ToJsString()
-    );
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var physicalSide = BlazorBaseUI.Extensions.ParseSide(side);
+        var newAlign = BlazorBaseUI.Extensions.ParseAlign(align);
+
+        if (physicalSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            return;
+        }
+
+        computedSide = physicalSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+
+        var open = RootContext?.GetOpen() ?? false;
+        var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
+        var instant = trackCursorAxis != TrackCursorAxis.None
+            ? TooltipInstantType.TrackingCursor
+            : RootContext?.InstantType ?? TooltipInstantType.None;
+        state = new TooltipPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public double ComputeSideOffset(OffsetData data) => SideOffsetFunction?.Invoke(data) ?? SideOffset;
+
+    [JSInvokable]
+    public double ComputeAlignOffset(OffsetData data) => AlignOffsetFunction?.Invoke(data) ?? AlignOffset;
+
+    private object GetCollisionPaddingArg() =>
+        CollisionPaddingPerSide is not null
+            ? new { top = CollisionPaddingPerSide.Top, right = CollisionPaddingPerSide.Right, bottom = CollisionPaddingPerSide.Bottom, left = CollisionPaddingPerSide.Left }
+            : (object)CollisionPadding;
 
     private async Task InitializePositionerAsync()
     {
@@ -309,10 +418,11 @@
 
         try
         {
-            var module = await ModuleTask.Value;
-            var ca = GetCollisionAvoidanceStrings();
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
 
-            positionerId = await module.InvokeAsync<string>(
+            var virtualId = RootContext.VirtualAnchorId;
+            positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
                 "initializePositioner",
                 Element.Value,
                 anchorElement.Value,
@@ -320,79 +430,86 @@
                 Align.ToDataAttributeString(),
                 SideOffset,
                 AlignOffset,
-                CollisionPadding,
+                GetCollisionPaddingArg(),
                 CollisionBoundary.ToDataAttributeString(),
                 ArrowPadding,
                 arrowElement,
                 Sticky,
                 PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
                 DisableAnchorTracking,
-                ca.Side,
-                ca.Align,
-                ca.Fallback);
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                positionerDotNetRef,
+                virtualId,
+                SideOffsetFunction is not null,
+                AlignOffsetFunction is not null,
+                RootContext.HasViewport));
+
+            // Register positioner with root so cursor tracking can trigger updates
+            await module.InvokeVoidAsync("setPositionerId", RootContext.RootId, positionerInterop.PositionerId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
     private async Task UpdatePositionAsync()
     {
-        if (string.IsNullOrEmpty(positionerId) || RootContext is null)
+        if (!positionerInterop.IsInitialized || RootContext is null)
         {
             return;
         }
 
-        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
-        if (!anchorElement.HasValue)
+        // When cursor tracking is active, skip C# anchor override — JS uses virtual anchor
+        var isCursorTracking = RootContext.VirtualAnchorId is not null;
+        ElementReference? anchorElement = null;
+        if (!isCursorTracking)
         {
-            return;
+            anchorElement = Anchor ?? RootContext.GetTriggerElement();
+            if (!anchorElement.HasValue)
+            {
+                return;
+            }
         }
 
         try
         {
-            var module = await ModuleTask.Value;
-            var ca = GetCollisionAvoidanceStrings();
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
 
             await module.InvokeVoidAsync(
                 "updatePosition",
-                positionerId,
-                anchorElement.Value,
+                positionerInterop.PositionerId,
+                isCursorTracking ? null : (object?)anchorElement!.Value,
                 Side.ToDataAttributeString(),
                 Align.ToDataAttributeString(),
                 SideOffset,
                 AlignOffset,
-                CollisionPadding,
+                GetCollisionPaddingArg(),
                 CollisionBoundary.ToDataAttributeString(),
                 ArrowPadding,
                 arrowElement,
                 Sticky,
                 PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
-                ca.Side,
-                ca.Align,
-                ca.Fallback);
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                SideOffsetFunction is not null,
+                AlignOffsetFunction is not null,
+                RootContext?.HasViewport ?? false);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && hasRendered && !string.IsNullOrEmpty(positionerId))
-        {
-            try
-            {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposePositioner", positionerId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-            }
-        }
-
-        positionerId = null;
+        await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
     }
 }

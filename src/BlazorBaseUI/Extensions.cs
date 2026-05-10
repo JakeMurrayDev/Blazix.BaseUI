@@ -63,6 +63,7 @@ internal static class Extensions
                 Side.Right => "right",
                 Side.InlineEnd => "inline-end",
                 Side.InlineStart => "inline-start",
+                Side.None => "none",
                 _ => throw new InvalidEnumArgumentException(nameof(side), (int)side, typeof(Side))
             };
     }
@@ -149,6 +150,7 @@ internal static class Extensions
         "right" => Side.Right,
         "bottom" => Side.Bottom,
         "left" => Side.Left,
+        "none" => Side.None,
         _ => Side.Bottom
     };
 

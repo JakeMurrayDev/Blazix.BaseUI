@@ -1,11 +1,17 @@
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
+@using BlazorBaseUI.FocusGuard
 
 @typeparam TPayload
 
 @implements IAsyncDisposable
 
 @inject IJSRuntime JSRuntime
+
+@if (ShouldRenderFocusGuards)
+{
+    <FocusGuard OnFocus="HandlePreGuardFocusAsync" @ref="preGuardRef" />
+}
 
 <RenderElement TState="PopoverTriggerState"
                Tag="button"
@@ -19,6 +25,11 @@
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
+@if (ShouldRenderFocusGuards)
+{
+    <FocusGuard OnFocus="HandlePostGuardFocusAsync" @ref="postGuardRef" />
+}
+
 @code {
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
@@ -26,10 +37,12 @@
     private string? hoverRootId;
     private string triggerId = null!;
     private string lastPointerType = string.Empty;
-    private OpenChangeReason lastOpenReason;
+    private PopoverOpenChangeReason lastOpenReason;
     private PopoverTriggerState state;
     private PopoverHandle<TPayload>? registeredHandle;
     private RenderElement<PopoverTriggerState>? renderElementReference;
+    private FocusGuard? preGuardRef;
+    private FocusGuard? postGuardRef;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
 
@@ -40,6 +53,11 @@
     private bool HasHandle => Handle is not null;
 
     private bool HasRootContext => RootContext is not null;
+
+    private bool ShouldRenderFocusGuards =>
+        HasRootContext &&
+        IsOpenedByThisTrigger() &&
+        !RootContext!.FocusManagerModal;
 
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
@@ -185,6 +203,7 @@
             else
             {
                 RootContext?.SetTriggerElement(Element);
+                RootContext?.SetTriggerFocusTarget(postGuardRef?.Element);
             }
 
             if (OpenOnHover && !hoverInitialized)
@@ -207,32 +226,28 @@
 
         if (!NativeButton)
         {
-            attrs["role"] = "button";
-            if (Disabled)
-            {
-                attrs["aria-disabled"] = "true";
-            }
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
         }
         else
         {
-            attrs["type"] = "button";
-            if (Disabled)
-            {
-                attrs["disabled"] = true;
-            }
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
         }
 
         attrs["aria-haspopup"] = "dialog";
 
         var open = IsOpenedByThisTrigger();
         attrs["aria-expanded"] = open ? "true" : "false";
+        if (open && !string.IsNullOrEmpty(RootContext?.PopupId))
+        {
+            attrs["aria-controls"] = RootContext.PopupId;
+        }
         attrs["id"] = triggerId;
 
         attrs["data-popup-open"] = open;
 
-        var openReason = HasHandle ? lastOpenReason : (RootContext?.OpenChangeReason ?? OpenChangeReason.TriggerPress);
-        attrs["data-pressed"] = open && openReason == OpenChangeReason.TriggerPress;
-        attrs["data-base-ui-click-trigger"] = true;
+        var openReason = HasHandle ? lastOpenReason : (RootContext?.PopoverOpenChangeReason ?? PopoverOpenChangeReason.TriggerPress);
+        attrs["data-pressed"] = open && openReason == PopoverOpenChangeReason.TriggerPress;
+        attrs["data-blazor-base-ui-click-trigger"] = true;
 
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
@@ -255,6 +270,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -343,6 +359,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -350,7 +367,7 @@
         string? detectedInteractionType = e.Detail == 0 ? "keyboard" : lastPointerType;
         lastPointerType = string.Empty;
 
-        await RequestOpenAsync(nextOpen, OpenChangeReason.TriggerPress, detectedInteractionType);
+        await RequestOpenAsync(nextOpen, PopoverOpenChangeReason.TriggerPress, detectedInteractionType);
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
@@ -377,6 +394,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
         else
@@ -395,6 +413,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -407,7 +426,7 @@
     {
         if (HasHandle)
         {
-            Handle!.RequestOpen(triggerId, OpenChangeReason.TriggerHover);
+            Handle!.RequestOpen(triggerId, PopoverOpenChangeReason.TriggerHover);
         }
         return Task.CompletedTask;
     }
@@ -420,12 +439,45 @@
     {
         if (HasHandle)
         {
-            Handle!.RequestClose(OpenChangeReason.TriggerHover);
+            Handle!.RequestClose(PopoverOpenChangeReason.TriggerHover);
         }
         return Task.CompletedTask;
     }
 
-    private Task RequestOpenAsync(bool open, OpenChangeReason reason, string? requestInteractionType = null)
+    private async Task HandlePreGuardFocusAsync()
+    {
+        await RequestOpenAsync(false, PopoverOpenChangeReason.FocusOut);
+
+        if (preGuardRef is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("focusPreviousTabbable", preGuardRef.Element);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private async Task HandlePostGuardFocusAsync()
+    {
+        if (!HasRootContext) return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusPopoverContent", RootContext!.RootId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private Task RequestOpenAsync(bool open, PopoverOpenChangeReason reason, string? requestInteractionType = null)
     {
         if (HasHandle)
         {

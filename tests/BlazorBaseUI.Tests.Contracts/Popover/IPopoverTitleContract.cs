@@ -8,5 +8,4 @@ public interface IPopoverTitleContract
     Task SetsAriaLabelledByOnPopup();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
-    Task RendersWithDefaultContext();
 }

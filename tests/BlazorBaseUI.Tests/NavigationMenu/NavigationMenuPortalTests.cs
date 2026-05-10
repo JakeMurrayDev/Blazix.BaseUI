@@ -6,6 +6,7 @@ public class NavigationMenuPortalTests : BunitContext, INavigationMenuPortalCont
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     [Fact]
@@ -76,6 +77,44 @@ public class NavigationMenuPortalTests : BunitContext, INavigationMenuPortalCont
         });
 
         cut.Markup.ShouldContain("Portal content");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task CascadesPortalContext()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<NavigationMenuRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<NavigationMenuPortal>(0);
+                innerBuilder.AddAttribute(1, "KeepMounted", true);
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<NavigationMenuPositioner>(0);
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        // Positioner renders inside the portal, proving context cascades through
+        cut.Find("[role='presentation']").ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RequiresRootContext()
+    {
+        Should.Throw<InvalidOperationException>(() =>
+            Render<NavigationMenuPortal>(parameters => parameters
+                .Add(p => p.ChildContent, builder => builder.AddContent(0, "Content"))
+            )
+        );
 
         return Task.CompletedTask;
     }

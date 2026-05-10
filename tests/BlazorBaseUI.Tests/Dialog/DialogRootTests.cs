@@ -13,12 +13,13 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialog(
         bool? open = null,
         bool defaultOpen = false,
-        BlazorBaseUI.Dialog.ModalMode modal = BlazorBaseUI.Dialog.ModalMode.True,
+        BlazorBaseUI.Dialog.DialogModalMode modal = BlazorBaseUI.Dialog.DialogModalMode.True,
         EventCallback<DialogOpenChangeEventArgs>? onOpenChange = null,
         DialogRootActions? actionsRef = null,
         RenderFragment? customPopupContent = null,
@@ -123,7 +124,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public Task SetsAriaLabelledByFromTitle()
     {
-        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.ModalMode.False, includeTitle: true));
+        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.DialogModalMode.False, includeTitle: true));
 
         var popup = cut.Find("[role='dialog']");
         var title = cut.Find("h2");
@@ -136,7 +137,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public Task SetsAriaDescribedByFromDescription()
     {
-        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.ModalMode.False, includeDescription: true));
+        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.DialogModalMode.False, includeDescription: true));
 
         var popup = cut.Find("[role='dialog']");
         var description = cut.Find("p");
@@ -178,7 +179,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public Task OnOpenChangeReasonTriggerPress()
     {
-        BlazorBaseUI.Dialog.OpenChangeReason? capturedReason = null;
+        BlazorBaseUI.Dialog.DialogOpenChangeReason? capturedReason = null;
 
         var cut = Render(CreateDialog(
             defaultOpen: false,
@@ -191,7 +192,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         var trigger = cut.Find("button");
         trigger.Click();
 
-        capturedReason.ShouldBe(BlazorBaseUI.Dialog.OpenChangeReason.TriggerPress);
+        capturedReason.ShouldBe(BlazorBaseUI.Dialog.DialogOpenChangeReason.TriggerPress);
 
         return Task.CompletedTask;
     }
@@ -199,7 +200,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public Task OnOpenChangeReasonClosePress()
     {
-        BlazorBaseUI.Dialog.OpenChangeReason? capturedReason = null;
+        BlazorBaseUI.Dialog.DialogOpenChangeReason? capturedReason = null;
 
         var cut = Render(CreateDialog(
             defaultOpen: true,
@@ -212,7 +213,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         var closeButton = cut.Find("[data-testid='dialog-popup'] button");
         closeButton.Click();
 
-        capturedReason.ShouldBe(BlazorBaseUI.Dialog.OpenChangeReason.ClosePress);
+        capturedReason.ShouldBe(BlazorBaseUI.Dialog.DialogOpenChangeReason.ClosePress);
 
         return Task.CompletedTask;
     }
@@ -242,7 +243,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public Task RendersInternalBackdropWhenModalTrue()
     {
-        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.ModalMode.True, includeBackdrop: true));
+        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.DialogModalMode.True, includeBackdrop: true));
 
         var backdrop = cut.Find("[data-testid='backdrop']");
         backdrop.ShouldNotBeNull();
@@ -255,7 +256,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     public Task RendersInternalBackdropWhenModalFalse()
     {
         // Fix 02: Source has no modal guard on backdrop — backdrop renders for non-modal dialogs if included in markup
-        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.ModalMode.False, includeBackdrop: true));
+        var cut = Render(CreateDialog(defaultOpen: true, modal: BlazorBaseUI.Dialog.DialogModalMode.False, includeBackdrop: true));
 
         cut.FindAll("[data-testid='backdrop']").Count.ShouldBe(1);
 
@@ -347,11 +348,11 @@ public class DialogRootTests : BunitContext, IDialogRootContract
     [Fact]
     public async Task OnFocusOutClosesNonModalDialog()
     {
-        BlazorBaseUI.Dialog.OpenChangeReason? capturedReason = null;
+        BlazorBaseUI.Dialog.DialogOpenChangeReason? capturedReason = null;
 
         var cut = Render(CreateDialog(
             defaultOpen: true,
-            modal: BlazorBaseUI.Dialog.ModalMode.False,
+            modal: BlazorBaseUI.Dialog.DialogModalMode.False,
             onOpenChange: EventCallback.Factory.Create<DialogOpenChangeEventArgs>(this, args =>
             {
                 capturedReason = args.Reason;
@@ -364,7 +365,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         var rootComponent = cut.FindComponent<DialogRoot>();
         await cut.InvokeAsync(() => rootComponent.Instance.OnFocusOut());
 
-        capturedReason.ShouldBe(BlazorBaseUI.Dialog.OpenChangeReason.FocusOut);
+        capturedReason.ShouldBe(BlazorBaseUI.Dialog.DialogOpenChangeReason.FocusOut);
     }
 
 }

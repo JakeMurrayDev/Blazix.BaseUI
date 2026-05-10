@@ -47,7 +47,7 @@
             <DialogRoot Open="@controlledOpen"
                         OpenChanged="@(e => controlledOpen = e)"
                         OnOpenChange="HandleOpenChange"
-                        Modal="ModalMode.True">
+                        Modal="DialogModalMode.True">
                 <DialogTrigger ClassValue="@(s => TriggerClass(s))">
                     Toggle Dialog
                 </DialogTrigger>
@@ -126,9 +126,9 @@
 
     <DemoSection Title="Modal Modes"
                  Description="Compare True modal (with backdrop), TrapFocus (focus trap only), and False (non-modal)."
-                 CodeSnippet="@ModalModesCodeSnippet">
+                 CodeSnippet="@DialogModalModesCodeSnippet">
         <div class="flex flex-wrap gap-4">
-            <DialogRoot Modal="ModalMode.True">
+            <DialogRoot Modal="DialogModalMode.True">
                 <DialogTrigger ClassValue="@(s => TriggerClass(s))">
                     Modal (True)
                 </DialogTrigger>
@@ -150,7 +150,7 @@
                 </DialogPortal>
             </DialogRoot>
 
-            <DialogRoot Modal="ModalMode.TrapFocus">
+            <DialogRoot Modal="DialogModalMode.TrapFocus">
                 <DialogTrigger ClassValue="@(s => TriggerClass(s))">
                     TrapFocus Only
                 </DialogTrigger>
@@ -171,7 +171,7 @@
                 </DialogPortal>
             </DialogRoot>
 
-            <DialogRoot Modal="ModalMode.False">
+            <DialogRoot Modal="DialogModalMode.False">
                 <DialogTrigger ClassValue="@(s => TriggerClass(s))">
                     Non-Modal
                 </DialogTrigger>
@@ -542,7 +542,7 @@
 
 @code {
     private bool controlledOpen;
-    private OpenChangeReason lastReason = OpenChangeReason.None;
+    private DialogOpenChangeReason lastReason = DialogOpenChangeReason.None;
 
     [Parameter]
     public bool IsWasmMode { get; set; }
@@ -647,18 +647,18 @@
     ...
 </DialogRoot>";
 
-    private const string ModalModesCodeSnippet = @"// Full modal (default)
-<DialogRoot Modal=""ModalMode.True"">
+    private const string DialogModalModesCodeSnippet = @"// Full modal (default)
+<DialogRoot Modal=""DialogModalMode.True"">
     ...
 </DialogRoot>
 
 // Focus trap only (no backdrop)
-<DialogRoot Modal=""ModalMode.TrapFocus"">
+<DialogRoot Modal=""DialogModalMode.TrapFocus"">
     ...
 </DialogRoot>
 
 // Non-modal
-<DialogRoot Modal=""ModalMode.False"">
+<DialogRoot Modal=""DialogModalMode.False"">
     ...
 </DialogRoot>";
 

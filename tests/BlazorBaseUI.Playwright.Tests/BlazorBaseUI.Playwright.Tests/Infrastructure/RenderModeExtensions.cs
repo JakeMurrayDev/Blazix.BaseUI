@@ -499,6 +499,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithDisableInitialFocus(bool value)
+    {
+        queryParams["disableInitialFocus"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithLayout(string layout)
     {
         queryParams["layout"] = layout;
@@ -940,6 +946,12 @@ public sealed class TestPageUrlBuilder
     public TestPageUrlBuilder WithNavOrientation(string value)
     {
         queryParams["orientation"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithNavDisableItem1(bool value)
+    {
+        queryParams["disableItem1"] = value.ToString().ToLowerInvariant();
         return this;
     }
 

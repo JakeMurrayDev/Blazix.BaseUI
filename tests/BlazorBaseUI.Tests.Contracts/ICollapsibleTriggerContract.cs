@@ -14,7 +14,7 @@ public interface ICollapsibleTriggerContract
     Task HasDataPanelOpenWhenOpen();
     Task HasNoDataPanelOpenWhenClosed();
     Task HasDataDisabledWhenDisabled();
-    Task HasDisabledAttributeWhenDisabled();
+    Task HasAriaDisabledWhenDisabled();
     Task TogglesOnClick();
     Task DoesNotToggleWhenDisabled();
     Task ReceivesCorrectState();

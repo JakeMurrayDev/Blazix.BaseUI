@@ -1,5 +1,3 @@
-using BlazorBaseUI.Collapsible;
-
 namespace BlazorBaseUI.Accordion;
 
 /// <summary>
@@ -11,11 +9,9 @@ namespace BlazorBaseUI.Accordion;
 /// <param name="Orientation">The visual orientation of the accordion.</param>
 /// <param name="Index">The index of the accordion item.</param>
 /// <param name="Open">Whether the item is open.</param>
-/// <param name="TransitionStatus">The current transition status of the item.</param>
 public sealed record AccordionItemState<TValue>(
     TValue[] Value,
     bool Disabled,
     Orientation Orientation,
     int Index,
-    bool Open,
-    TransitionStatus TransitionStatus);
+    bool Open);

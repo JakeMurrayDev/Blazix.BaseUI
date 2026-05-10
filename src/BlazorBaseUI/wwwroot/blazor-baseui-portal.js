@@ -15,6 +15,10 @@ export function createPortal(id, target = "body") {
             portalMap.set(id, content.parentNode);
         }
         container.appendChild(content);
+        // Remove display:none immediately after moving so child positioners
+        // can measure layout. The FOUC CSS rule (visibility:hidden; position:fixed)
+        // on positioner elements keeps content invisible until positioned.
+        content.style.removeProperty('display');
     }
 }
 

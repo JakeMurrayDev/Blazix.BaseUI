@@ -8,7 +8,7 @@
     <DialogRoot
         @bind-Open="isOpen"
         DefaultOpen="@DefaultOpen"
-        Modal="@(Modal ? ModalMode.True : ModalMode.False)"
+        Modal="@(Modal ? DialogModalMode.True : DialogModalMode.False)"
         ActionsRef="@actionsRef"
         OnOpenChange="HandleOpenChange">
         <DialogTrigger data-testid="dialog-trigger">
@@ -68,7 +68,7 @@
         {
             <DialogRoot
                 @bind-Open="nestedIsOpen"
-                Modal="ModalMode.False"
+                Modal="DialogModalMode.False"
                 OnOpenChange="HandleNestedOpenChange">
                 <DialogTrigger data-testid="nested-dialog-trigger">
                     Open Nested

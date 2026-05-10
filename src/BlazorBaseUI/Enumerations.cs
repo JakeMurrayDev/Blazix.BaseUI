@@ -69,7 +69,10 @@ public enum Side
     InlineEnd,
 
     /// <summary>The inline-start side of the anchor element.</summary>
-    InlineStart
+    InlineStart,
+
+    /// <summary>No logical side — used when the popup overlaps the anchor (e.g. Select align-item-with-trigger).</summary>
+    None
 }
 
 /// <summary>
@@ -112,21 +115,94 @@ public enum CollisionBoundary
 }
 
 /// <summary>
-/// Specifies how to handle collisions when positioning the popup.
+/// Specifies how side collisions are handled when positioning the popup.
 /// </summary>
-public enum CollisionAvoidance
+public enum CollisionAvoidanceSideMode
 {
-    /// <summary>No collision avoidance is applied.</summary>
+    /// <summary>No collision avoidance on the side axis.</summary>
     None,
 
-    /// <summary>Shifts the popup along the axis to stay within the boundary.</summary>
-    Shift,
-
-    /// <summary>Flips the popup to the opposite side to stay within the boundary.</summary>
+    /// <summary>Flips to the opposite side when a collision is detected.</summary>
     Flip,
 
-    /// <summary>Flips the popup to the opposite side and shifts it along the axis to stay within the boundary.</summary>
-    FlipShift
+    /// <summary>Shifts along the side axis to avoid the collision.</summary>
+    Shift
+}
+
+/// <summary>
+/// Specifies how alignment collisions are handled when positioning the popup.
+/// </summary>
+public enum CollisionAvoidanceAlignMode
+{
+    /// <summary>No collision avoidance on the alignment axis.</summary>
+    None,
+
+    /// <summary>Flips the alignment when a collision is detected.</summary>
+    Flip,
+
+    /// <summary>Shifts along the alignment axis to avoid the collision.</summary>
+    Shift
+}
+
+/// <summary>
+/// Specifies the fallback axis side when the popup cannot avoid a collision on both axes.
+/// </summary>
+public enum CollisionAvoidanceFallbackAxisSide
+{
+    /// <summary>No fallback axis side.</summary>
+    None,
+
+    /// <summary>Falls back to the start of the axis.</summary>
+    Start,
+
+    /// <summary>Falls back to the end of the axis.</summary>
+    End
+}
+
+/// <summary>
+/// Determines how to handle collisions when positioning the popup.
+/// </summary>
+public sealed class CollisionAvoidance
+{
+    /// <summary>
+    /// Gets or sets how side collisions are handled.
+    /// When <see cref="CollisionAvoidanceSideMode.Flip"/>, the popup flips to the opposite side.
+    /// When <see cref="CollisionAvoidanceSideMode.Shift"/>, the popup shifts along the side axis.
+    /// </summary>
+    public CollisionAvoidanceSideMode Side { get; set; } = CollisionAvoidanceSideMode.Flip;
+
+    /// <summary>
+    /// Gets or sets how alignment collisions are handled.
+    /// When <see cref="CollisionAvoidanceAlignMode.Flip"/>, the alignment flips.
+    /// When <see cref="CollisionAvoidanceAlignMode.Shift"/>, the popup shifts along the alignment axis.
+    /// </summary>
+    public CollisionAvoidanceAlignMode Align { get; set; } = CollisionAvoidanceAlignMode.Flip;
+
+    /// <summary>
+    /// Gets or sets the fallback axis side used when collisions cannot be fully avoided.
+    /// </summary>
+    public CollisionAvoidanceFallbackAxisSide FallbackAxisSide { get; set; } = CollisionAvoidanceFallbackAxisSide.End;
+}
+
+/// <summary>
+/// Specifies how the user interacted to open or close a component.
+/// </summary>
+public enum InteractionType
+{
+    /// <summary>No interaction type.</summary>
+    None,
+
+    /// <summary>Mouse click.</summary>
+    Click,
+
+    /// <summary>Keyboard.</summary>
+    Keyboard,
+
+    /// <summary>Touch.</summary>
+    Touch,
+
+    /// <summary>Pen / stylus.</summary>
+    Pen
 }
 
 /// <summary>

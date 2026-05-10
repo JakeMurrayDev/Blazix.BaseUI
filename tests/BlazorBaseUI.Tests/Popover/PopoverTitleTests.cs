@@ -13,6 +13,8 @@ public class PopoverTitleTests : BunitContext, IPopoverTitleContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupPopoverModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateTitleInPopover(
@@ -26,7 +28,7 @@ public class PopoverTitleTests : BunitContext, IPopoverTitleContract
         {
             builder.OpenComponent<PopoverRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<PopoverTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
@@ -156,16 +158,4 @@ public class PopoverTitleTests : BunitContext, IPopoverTitleContract
         return Task.CompletedTask;
     }
 
-    [Fact]
-    public Task RendersWithDefaultContext()
-    {
-        // PopoverTitle can render without explicit context, using default values
-        var cut = Render<PopoverTitle>(parameters => parameters
-            .Add(p => p.ChildContent, builder => builder.AddContent(0, "Title"))
-        );
-
-        cut.Find("h2").ShouldNotBeNull();
-
-        return Task.CompletedTask;
-    }
 }

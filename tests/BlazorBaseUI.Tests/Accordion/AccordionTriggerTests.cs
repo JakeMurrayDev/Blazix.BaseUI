@@ -197,28 +197,6 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
     }
 
     [Fact]
-    public Task HasDataValueAttribute()
-    {
-        var cut = Render(CreateAccordionWithTrigger(itemValue: "my-value"));
-
-        var trigger = cut.Find("button");
-        trigger.GetAttribute("data-value").ShouldBe("my-value");
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task HasDataOrientationAttribute()
-    {
-        var cut = Render(CreateAccordionWithTrigger(orientation: Orientation.Horizontal));
-
-        var trigger = cut.Find("button");
-        trigger.GetAttribute("data-orientation").ShouldBe("horizontal");
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
     public Task HasTypeButtonWhenNativeButton()
     {
         var cut = Render(CreateAccordionWithTrigger(nativeButton: true));

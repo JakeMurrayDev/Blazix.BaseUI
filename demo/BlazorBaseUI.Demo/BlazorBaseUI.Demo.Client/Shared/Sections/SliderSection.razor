@@ -22,6 +22,44 @@
         </div>
     </DemoSection>
 
+    <DemoSection Title="Slider with Label"
+                 Description="SliderLabel provides an accessible label that auto-associates with the slider and focuses the thumb on click.">
+        <div class="w-full max-w-md space-y-6">
+            <div class="space-y-2">
+                <SliderRoot DefaultValue="50"
+                            ClassValue="@(state => SliderRootClass(state))">
+                    <SliderLabel ClassValue="@(_ => "text-sm font-medium text-gray-700 cursor-default select-none")">
+                        Volume
+                    </SliderLabel>
+                    <SliderControl ClassValue="@(state => SliderControlClass(state))">
+                        <SliderTrack ClassValue="@(state => SliderTrackClass(state))">
+                            <SliderIndicator ClassValue="@(state => SliderIndicatorClass(state))" />
+                            <SliderThumb ClassValue="@(state => SliderThumbClass(state))" />
+                        </SliderTrack>
+                    </SliderControl>
+                </SliderRoot>
+            </div>
+            <div class="space-y-2">
+                <SliderRoot DefaultValue="30"
+                            ClassValue="@(state => SliderRootClass(state))">
+                    <div class="flex items-center justify-between">
+                        <SliderLabel ClassValue="@(_ => "text-sm font-medium text-gray-700 cursor-default select-none")">
+                            Brightness
+                        </SliderLabel>
+                        <SliderValue ClassValue="@(_ => "text-sm font-semibold text-indigo-600")" />
+                    </div>
+                    <SliderControl ClassValue="@(state => SliderControlClass(state))">
+                        <SliderTrack ClassValue="@(state => SliderTrackClass(state))">
+                            <SliderIndicator ClassValue="@(state => SliderIndicatorClass(state))" />
+                            <SliderThumb ClassValue="@(state => SliderThumbClass(state))" />
+                        </SliderTrack>
+                    </SliderControl>
+                </SliderRoot>
+            </div>
+            <p class="text-xs text-gray-500">Click a label to focus its slider thumb. No FieldRoot wrapper needed.</p>
+        </div>
+    </DemoSection>
+
     <DemoSection Title="Controlled Slider"
                  Description="State controlled externally. Value can be changed via slider or input.">
         <div class="w-full max-w-md space-y-4">

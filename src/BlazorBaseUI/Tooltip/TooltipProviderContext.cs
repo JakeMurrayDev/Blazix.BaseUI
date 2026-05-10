@@ -15,34 +15,17 @@ internal sealed class TooltipProviderContext
     /// </summary>
     public int? CloseDelay { get; set; }
 
-    /// <summary>
-    /// Gets or sets the timeout in milliseconds for the instant phase.
-    /// </summary>
-    public int Timeout { get; set; }
+    private Func<bool> isInInstantPhaseFunc = () => false;
 
     /// <summary>
-    /// Gets or sets the delegate that returns when the last tooltip was closed.
+    /// Sets the delegate that determines whether the provider is in the instant phase.
     /// </summary>
-    public Func<DateTime?> GetLastClosedTime { get; set; } = null!;
-
-    /// <summary>
-    /// Gets or sets the delegate that records the current time as the last close time.
-    /// </summary>
-    public Action SetLastClosedTime { get; set; } = null!;
+    /// <param name="provider">A function returning <see langword="true"/> when in the instant phase.</param>
+    public void SetInstantPhaseProvider(Func<bool> provider) => isInInstantPhaseFunc = provider;
 
     /// <summary>
     /// Determines whether the provider is in the instant phase where tooltips open without delay.
     /// </summary>
     /// <returns><see langword="true"/> if within the instant phase timeout; otherwise, <see langword="false"/>.</returns>
-    public bool IsInInstantPhase()
-    {
-        var lastClosed = GetLastClosedTime();
-        if (!lastClosed.HasValue)
-        {
-            return false;
-        }
-
-        var elapsed = (DateTime.UtcNow - lastClosed.Value).TotalMilliseconds;
-        return elapsed < Timeout;
-    }
+    public bool IsInInstantPhase() => isInInstantPhaseFunc();
 }

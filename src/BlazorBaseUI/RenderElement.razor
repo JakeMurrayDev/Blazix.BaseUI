@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components.Rendering
+@using System.Globalization
 
 @typeparam TState
 
@@ -110,10 +111,17 @@ else
         }
 
         // 2. Component-computed attributes (win for same key)
+        string? componentStyle = null;
         if (ComponentAttributes is not null)
         {
             foreach (var kvp in ComponentAttributes)
             {
+                if (IsStyle(kvp.Key))
+                {
+                    componentStyle = Convert.ToString(kvp.Value, CultureInfo.InvariantCulture);
+                    continue;
+                }
+
                 result[kvp.Key] = kvp.Value;
             }
         }
@@ -129,9 +137,15 @@ else
         }
 
         // 4. Merged style
+        var stateStyle = State is not null ? StyleValue?.Invoke(State) : null;
+        var componentAndStateStyle = AttributeUtilities.CombineStyles(
+            componentStyle is not null
+                ? new Dictionary<string, object> { ["style"] = componentStyle }
+                : null,
+            stateStyle);
         var resolvedStyle = AttributeUtilities.CombineStyles(
             AdditionalAttributes,
-            State is not null ? StyleValue?.Invoke(State) : null);
+            componentAndStateStyle);
 
         if (!string.IsNullOrEmpty(resolvedStyle))
         {
@@ -152,5 +166,8 @@ else
 
     private static bool IsClassOrStyle(string key) =>
         string.Equals(key, "class", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "style", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsStyle(string key) =>
         string.Equals(key, "style", StringComparison.OrdinalIgnoreCase);
 }

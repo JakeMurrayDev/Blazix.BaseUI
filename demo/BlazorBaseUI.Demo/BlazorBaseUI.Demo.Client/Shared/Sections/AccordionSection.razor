@@ -299,8 +299,8 @@
     <DemoSection Title="Horizontal Orientation"
                  Description="Horizontal accordion with left/right arrow key navigation."
                  CodeSnippet="@HorizontalCodeSnippet">
-        <AccordionRoot TValue="string" Orientation="Orientation.Horizontal" ClassValue="@RootClass">
-            <AccordionItem Value=@("item-1") ClassValue="@ItemClass">
+        <AccordionRoot TValue="string" Orientation="Orientation.Horizontal" ClassValue="@HorizontalRootClass">
+            <AccordionItem Value=@("item-1") ClassValue="@HorizontalItemClass">
                 <AccordionHeader>
                     <AccordionTrigger ClassValue="@TriggerClass">
                         Horizontal 1
@@ -313,7 +313,7 @@
                     </div>
                 </AccordionPanel>
             </AccordionItem>
-            <AccordionItem Value=@("item-2") ClassValue="@ItemClass">
+            <AccordionItem Value=@("item-2") ClassValue="@HorizontalItemClass">
                 <AccordionHeader>
                     <AccordionTrigger ClassValue="@TriggerClass">
                         Horizontal 2
@@ -333,8 +333,8 @@
                  Description="Right-to-left support with reversed arrow key navigation."
                  CodeSnippet="@RtlCodeSnippet">
         <DirectionProvider Direction="Direction.Rtl">
-            <AccordionRoot TValue="string" Orientation="Orientation.Horizontal" ClassValue="@RootClass">
-                <AccordionItem Value=@("item-1") ClassValue="@ItemClass">
+            <AccordionRoot TValue="string" Orientation="Orientation.Horizontal" ClassValue="@HorizontalRootClass">
+                <AccordionItem Value=@("item-1") ClassValue="@HorizontalItemClass">
                     <AccordionHeader>
                         <AccordionTrigger ClassValue="@TriggerClass">
                             RTL Item 1
@@ -347,7 +347,7 @@
                         </div>
                     </AccordionPanel>
                 </AccordionItem>
-                <AccordionItem Value=@("item-2") ClassValue="@ItemClass">
+                <AccordionItem Value=@("item-2") ClassValue="@HorizontalItemClass">
                     <AccordionHeader>
                         <AccordionTrigger ClassValue="@TriggerClass">
                             RTL Item 2
@@ -551,14 +551,22 @@
     private Func<AccordionItemState<string>, string> ItemClass => _ =>
         "border-b border-gray-200";
 
+    private Func<AccordionRootState<string>, string> HorizontalRootClass => _ =>
+        "flex max-w-[calc(100vw-8rem)] flex-row text-gray-900";
+
+    private Func<AccordionItemState<string>, string> HorizontalItemClass => _ =>
+        "border-r border-gray-200";
+
     private Func<AccordionTriggerState, string> TriggerClass => _ =>
         "group relative flex w-full items-baseline justify-between gap-4 bg-gray-50 py-2 pr-1 pl-3 text-left font-medium hover:bg-gray-100 focus-visible:z-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800";
 
     private Func<AccordionTriggerState, string> DisabledTriggerClass => _ =>
         "group relative flex w-full cursor-not-allowed items-baseline justify-between gap-4 bg-gray-100 py-2 pr-1 pl-3 text-left font-medium text-gray-400";
 
-    private Func<AccordionPanelState, string> PanelClass => _ =>
-        "h-[var(--accordion-panel-height)] overflow-hidden text-base text-gray-600 transition-[height] ease-out data-[ending-style]:h-0 data-[starting-style]:h-0";
+    private Func<AccordionPanelState, string> PanelClass => state =>
+        state.Orientation == Orientation.Horizontal
+            ? "w-[var(--accordion-panel-width)] overflow-hidden whitespace-nowrap text-base text-gray-600 transition-[width] ease-out data-[ending-style]:w-0 data-[starting-style]:w-0"
+            : "h-[var(--accordion-panel-height)] overflow-hidden text-base text-gray-600 transition-[height] ease-out data-[ending-style]:h-0 data-[starting-style]:h-0";
 
     private const string BasicCodeSnippet = "";
     private const string DefaultValueCodeSnippet = "";

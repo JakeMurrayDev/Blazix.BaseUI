@@ -185,6 +185,7 @@
 
         attrs["dir"] = direction.ToAttributeString()!;
         attrs["role"] = "region";
+        attrs["data-blazor-base-ui-accordion-root"] = true;
         attrs["data-orientation"] = state.Orientation.ToDataAttributeString()!;
         attrs["data-disabled"] = state.Disabled;
 
@@ -213,7 +214,7 @@
         var args = new AccordionValueChangeEventArgs<TValue>(nextValue);
         _ = OnValueChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }

@@ -174,13 +174,13 @@
 
         attrs["data-open"] = state.Open;
         attrs["data-closed"] = !state.Open;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        attrs["data-disabled"] = state.Disabled;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }
 
-    private void HandleTrigger()
+    private async Task HandleTrigger()
     {
         if (Disabled)
         {
@@ -190,9 +190,9 @@
         var nextOpen = !CurrentOpen;
         var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
 
-        _ = OnOpenChange.InvokeAsync(args);
+        await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
@@ -209,7 +209,7 @@
         StateHasChanged();
     }
 
-    private void HandleBeforeMatch()
+    private async Task HandleBeforeMatch()
     {
         // beforematch event should only open, not toggle
         if (CurrentOpen || Disabled)
@@ -219,9 +219,9 @@
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
 
-        _ = OnOpenChange.InvokeAsync(args);
+        await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }

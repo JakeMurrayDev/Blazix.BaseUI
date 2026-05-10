@@ -256,25 +256,41 @@ internal static class SliderUtilities
 
         double[] result = [..values];
         var minDistance = step * minStepsBetweenValues;
+        var lastIndex = result.Length - 1;
+        var baseInitialValues = initialValues ?? values;
 
-        result[index] = Clamp(nextValue, min, max);
+        var indexMin = min + index * minDistance;
+        var indexMax = max - (lastIndex - index) * minDistance;
+        result[index] = Clamp(nextValue, indexMin, indexMax);
 
-        for (var i = index + 1; i < result.Length; i++)
+        for (var i = index + 1; i <= lastIndex; i++)
         {
             var minAllowed = result[i - 1] + minDistance;
-            if (result[i] < minAllowed)
+            var maxAllowed = max - (lastIndex - i) * minDistance;
+            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
+            var candidate = Math.Max(result[i], minAllowed);
+
+            if (initialValue < candidate)
             {
-                result[i] = Math.Min(minAllowed, max - (result.Length - 1 - i) * minDistance);
+                candidate = Math.Max(initialValue, minAllowed);
             }
+
+            result[i] = Clamp(candidate, minAllowed, maxAllowed);
         }
 
         for (var i = index - 1; i >= 0; i--)
         {
             var maxAllowed = result[i + 1] - minDistance;
-            if (result[i] > maxAllowed)
+            var minAllowed = min + i * minDistance;
+            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
+            var candidate = Math.Min(result[i], maxAllowed);
+
+            if (initialValue > candidate)
             {
-                result[i] = Math.Max(maxAllowed, min + i * minDistance);
+                candidate = Math.Min(initialValue, maxAllowed);
             }
+
+            result[i] = Clamp(candidate, minAllowed, maxAllowed);
         }
 
         for (var i = 0; i < result.Length; i++)

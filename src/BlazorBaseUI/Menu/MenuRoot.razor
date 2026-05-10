@@ -20,13 +20,12 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
-    private bool isMounted;
+    private readonly TransitionLifecycleManager transition = new();
     private int? activeIndex;
     private ElementReference? triggerElement;
     private ElementReference? positionerElement;
     private ElementReference? popupElement;
     private MenuOpenChangeReason openChangeReason = MenuOpenChangeReason.None;
-    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private MenuInstantType instantType = MenuInstantType.None;
     private bool preventUnmountOnClose;
     private bool hasViewport;
@@ -174,7 +173,12 @@
     protected override void OnInitialized()
     {
         isOpen = DefaultOpen;
-        isMounted = CurrentOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
         state = new MenuRootState(CurrentOpen);
         var effectiveDirection = DirectionContext?.Direction ?? Direction.Ltr;
 
@@ -183,17 +187,17 @@
             RootId = rootId,
             PopupId = $"{rootId}-popup",
             Open = CurrentOpen,
-            Mounted = isMounted,
+            Mounted = transition.IsMounted,
             Disabled = Disabled,
             ParentType = ParentType,
             Orientation = Orientation,
             HighlightItemOnHover = HighlightItemOnHover,
             MenuOpenChangeReason = openChangeReason,
-            TransitionStatus = transitionStatus,
+            TransitionStatus = transition.TransitionStatus,
             MenuInstantType = instantType,
             ActiveIndex = activeIndex,
             GetOpen = () => CurrentOpen,
-            GetMounted = () => isMounted,
+            GetMounted = () => transition.IsMounted,
             GetTriggerElement = () => triggerElement,
             SetTriggerElement = SetTriggerElement,
             SetPositionerElement = SetPositionerElement,
@@ -235,10 +239,10 @@
             state = new MenuRootState(currentOpen);
             if (currentOpen)
             {
-                isMounted = true;
+                transition.BeginOpen();
             }
             context.Open = currentOpen;
-            context.Mounted = isMounted;
+            context.Mounted = transition.IsMounted;
         }
 
         context.Disabled = Disabled;
@@ -323,10 +327,9 @@
     [JSInvokable]
     public void OnStartingStyleApplied()
     {
-        if (transitionStatus == TransitionStatus.Starting)
+        if (transition.HandleStartingStyleApplied())
         {
-            transitionStatus = TransitionStatus.Undefined;
-            context.TransitionStatus = transitionStatus;
+            context.TransitionStatus = transition.TransitionStatus;
             StateHasChanged();
         }
     }
@@ -337,12 +340,11 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        var unmounted = transition.HandleTransitionEnd(open, preventUnmountOnClose);
+        context.TransitionStatus = transition.TransitionStatus;
 
-        if (!open && !preventUnmountOnClose)
+        if (unmounted)
         {
-            isMounted = false;
             context.Mounted = false;
             activeIndex = null;
             context.ActiveIndex = activeIndex;
@@ -444,8 +446,7 @@
                 instantType = MenuInstantType.None;
             }
 
-            transitionStatus = TransitionStatus.Starting;
-            isMounted = true;
+            transition.BeginOpen();
             activeIndex = payload is "highlight-last" ? null : 0;
             activePayload = payload;
 
@@ -465,13 +466,13 @@
                 : isKeyboardClose
                     ? MenuInstantType.Click
                     : MenuInstantType.None;
-            transitionStatus = TransitionStatus.Ending;
+            transition.BeginClose();
             context.InteractionType = null;
         }
 
         context.MenuInstantType = instantType;
-        context.TransitionStatus = transitionStatus;
-        context.Mounted = isMounted;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
         context.ActiveIndex = activeIndex;
 
         if (!IsControlled)
@@ -728,10 +729,9 @@
 
     private void ForceUnmount()
     {
-        isMounted = false;
+        transition.ForceUnmount();
         context.Mounted = false;
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        context.TransitionStatus = transition.TransitionStatus;
         activePayload = null;
         _ = InvokeOpenChangeCompleteAsync(false);
         StateHasChanged();

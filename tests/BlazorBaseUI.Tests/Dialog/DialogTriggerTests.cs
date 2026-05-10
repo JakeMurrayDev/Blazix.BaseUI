@@ -13,6 +13,7 @@ public class DialogTriggerTests : BunitContext, IDialogTriggerContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithTrigger(
@@ -28,7 +29,7 @@ public class DialogTriggerTests : BunitContext, IDialogTriggerContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "Open", open);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<DialogTrigger>(0);
@@ -152,7 +153,7 @@ public class DialogTriggerTests : BunitContext, IDialogTriggerContract
         RenderFragment content = builder =>
         {
             builder.OpenComponent<DialogRoot>(0);
-            builder.AddAttribute(1, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(1, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(2, "OnOpenChange", EventCallback.Factory.Create<DialogOpenChangeEventArgs>(this, args =>
             {
                 openRequested = args.Open;

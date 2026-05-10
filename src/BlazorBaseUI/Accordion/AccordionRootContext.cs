@@ -52,8 +52,22 @@ internal interface IAccordionRootContext
     /// <summary>
     /// Registers an accordion item and returns its index.
     /// </summary>
+    /// <param name="itemRef">The object key identifying the item.</param>
     /// <returns>The index assigned to the item.</returns>
-    int RegisterItem();
+    int RegisterItem(object itemRef);
+
+    /// <summary>
+    /// Unregisters a previously registered accordion item.
+    /// </summary>
+    /// <param name="itemRef">The object key identifying the item.</param>
+    void UnregisterItem(object itemRef);
+
+    /// <summary>
+    /// Gets the current index of a registered accordion item.
+    /// </summary>
+    /// <param name="itemRef">The object key identifying the item.</param>
+    /// <returns>The current index of the item, or -1 if not found.</returns>
+    int GetItemIndex(object itemRef);
 }
 
 /// <summary>
@@ -62,7 +76,7 @@ internal interface IAccordionRootContext
 /// <typeparam name="TValue">The type of the value used to identify accordion items.</typeparam>
 internal sealed class AccordionRootContext<TValue> : IAccordionRootContext
 {
-    private int nextIndex;
+    private readonly List<object> items = new();
 
     /// <summary>The current value of the expanded item(s).</summary>
     public TValue[] Value { get; set; } = [];
@@ -104,5 +118,21 @@ internal sealed class AccordionRootContext<TValue> : IAccordionRootContext
     }
 
     /// <inheritdoc />
-    public int RegisterItem() => nextIndex++;
+    public int RegisterItem(object itemRef)
+    {
+        items.Add(itemRef);
+        return items.Count - 1;
+    }
+
+    /// <inheritdoc />
+    public void UnregisterItem(object itemRef)
+    {
+        items.Remove(itemRef);
+    }
+
+    /// <inheritdoc />
+    public int GetItemIndex(object itemRef)
+    {
+        return items.IndexOf(itemRef);
+    }
 }

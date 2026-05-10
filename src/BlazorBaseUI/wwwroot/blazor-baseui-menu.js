@@ -1126,8 +1126,8 @@ export async function setPopupElement(rootId, element, insideToolbar) {
 export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasViewport, shiftCrossAxis) {
     let onPositionUpdated = null;
     if (dotNetRef) {
-        onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden) => {
-            dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden).catch(() => { });
+        onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
+            dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden, arrowUncentered).catch(() => { });
         };
     }
 

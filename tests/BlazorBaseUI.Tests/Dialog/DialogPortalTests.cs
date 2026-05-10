@@ -13,6 +13,7 @@ public class DialogPortalTests : BunitContext, IDialogPortalContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupDialogModule(JSInterop);
+        JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
     private RenderFragment CreateDialogWithPortal(
@@ -23,7 +24,7 @@ public class DialogPortalTests : BunitContext, IDialogPortalContract
         {
             builder.OpenComponent<DialogRoot>(0);
             builder.AddAttribute(1, "Open", open);
-            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.ModalMode.False);
+            builder.AddAttribute(2, "Modal", BlazorBaseUI.Dialog.DialogModalMode.False);
             builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<DialogPortal>(0);

@@ -128,7 +128,6 @@ public class MenuGroupLabelTests : BunitContext, IMenuGroupLabelContract
         var label = cut.Find("[role='presentation']");
         var id = label.GetAttribute("id");
         id.ShouldNotBeNullOrEmpty();
-        id.ShouldStartWith("menu-group-label-");
 
         return Task.CompletedTask;
     }

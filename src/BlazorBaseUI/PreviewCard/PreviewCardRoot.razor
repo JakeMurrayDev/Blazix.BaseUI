@@ -23,13 +23,12 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
-    private bool isMounted;
+    private readonly TransitionLifecycleManager transition = new();
     private string? activeTriggerId;
     private object? payload;
     private ElementReference? positionerElement;
     private ElementReference? popupElement;
     private PreviewCardOpenChangeReason openChangeReason = PreviewCardOpenChangeReason.None;
-    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private PreviewCardInstantType instantType = PreviewCardInstantType.None;
     private PreviewCardRootState state;
     private PreviewCardRootContext context = null!;
@@ -123,7 +122,12 @@
     protected override void OnInitialized()
     {
         isOpen = DefaultOpen;
-        isMounted = CurrentOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
         activeTriggerId = DefaultTriggerId;
         state = new PreviewCardRootState(CurrentOpen);
         context = new PreviewCardRootContext
@@ -131,15 +135,15 @@
             RootId = rootId,
             PopupId = popupId,
             Open = CurrentOpen,
-            Mounted = isMounted,
+            Mounted = transition.IsMounted,
             OpenChangeReason = openChangeReason,
-            TransitionStatus = transitionStatus,
+            TransitionStatus = transition.TransitionStatus,
             InstantType = instantType,
             ActiveTriggerId = activeTriggerId,
             Payload = payload,
             HasViewport = hasViewport,
             GetOpen = () => CurrentOpen,
-            GetMounted = () => isMounted,
+            GetMounted = () => transition.IsMounted,
             GetPayload = () => payload,
             GetTriggerElement = GetTriggerElement,
             RegisterTriggerElement = RegisterTriggerElement,
@@ -172,10 +176,10 @@
             state = new PreviewCardRootState(currentOpen);
             if (currentOpen)
             {
-                isMounted = true;
+                transition.BeginOpen();
             }
             context.Open = currentOpen;
-            context.Mounted = isMounted;
+            context.Mounted = transition.IsMounted;
         }
 
         if (TriggerId is not null)
@@ -244,10 +248,9 @@
     [JSInvokable]
     public void OnStartingStyleApplied()
     {
-        if (transitionStatus == TransitionStatus.Starting)
+        if (transition.HandleStartingStyleApplied())
         {
-            transitionStatus = TransitionStatus.Undefined;
-            context.TransitionStatus = transitionStatus;
+            context.TransitionStatus = transition.TransitionStatus;
             StateHasChanged();
         }
     }
@@ -259,12 +262,11 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        var unmounted = transition.HandleTransitionEnd(open);
+        context.TransitionStatus = transition.TransitionStatus;
 
-        if (!open)
+        if (unmounted)
         {
-            isMounted = false;
             context.Mounted = false;
             activeTriggerId = null;
             context.ActiveTriggerId = null;
@@ -394,8 +396,7 @@
             instantType = reason == PreviewCardOpenChangeReason.TriggerFocus
                 ? PreviewCardInstantType.Focus
                 : PreviewCardInstantType.None;
-            transitionStatus = TransitionStatus.Starting;
-            isMounted = true;
+            transition.BeginOpen();
         }
         else
         {
@@ -404,12 +405,12 @@
                 PreviewCardOpenChangeReason.EscapeKey or PreviewCardOpenChangeReason.OutsidePress => PreviewCardInstantType.Dismiss,
                 _ => PreviewCardInstantType.None
             };
-            transitionStatus = TransitionStatus.Ending;
+            transition.BeginClose();
         }
 
         context.InstantType = instantType;
-        context.TransitionStatus = transitionStatus;
-        context.Mounted = isMounted;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
 
         if (!IsControlled)
         {
@@ -520,7 +521,7 @@
     /// <summary>
     /// Gets whether the preview card is currently mounted in the DOM.
     /// </summary>
-    internal bool GetMounted() => isMounted;
+    internal bool GetMounted() => transition.IsMounted;
 
     /// <summary>
     /// Gets the current payload value from the active trigger.
@@ -603,10 +604,9 @@
 
     private void ForceUnmount()
     {
-        isMounted = false;
+        transition.ForceUnmount();
         context.Mounted = false;
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        context.TransitionStatus = transition.TransitionStatus;
         activeTriggerId = null;
         context.ActiveTriggerId = null;
         payload = null;

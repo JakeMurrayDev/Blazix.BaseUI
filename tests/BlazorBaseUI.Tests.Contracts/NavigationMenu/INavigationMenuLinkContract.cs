@@ -9,4 +9,9 @@ public interface INavigationMenuLinkContract
     Task HasHref();
     Task AppliesClassValue();
     Task RequiresContext();
+    Task HasDataActiveWhenActive();
+    Task NoDataActiveWhenInactive();
+    Task CloseOnClickClosesMenu();
+    Task CloseOnClickFalseKeepsMenuOpen();
+    Task NestedCloseOnClickClosesParentMenu();
 }

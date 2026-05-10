@@ -82,11 +82,8 @@
         }
 
         var isOpen = RootContext?.GetOpen() ?? false;
-        attrs["data-open"] = isOpen;
-        attrs["data-closed"] = !isOpen;
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        attrs["data-starting-style"] = transitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = transitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, isOpen, transitionStatus);
 
         componentAttributes = attrs;
     }

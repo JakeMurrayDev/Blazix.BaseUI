@@ -98,13 +98,21 @@ public static class JsInteropSetup
     public static void SetupSliderModule(BunitJSInterop jsInterop)
     {
         var module = jsInterop.SetupModule(SliderModule);
-        module.SetupVoid("initialize", _ => true);
-        module.SetupVoid("dispose", _ => true);
-        module.SetupVoid("startDrag", _ => true);
-        module.SetupVoid("stopDrag", _ => true);
-        module.SetupVoid("setPointerCapture", _ => true);
-        module.SetupVoid("focusThumbInput", _ => true);
+        module.SetupVoid("initialize", _ => true).SetVoidResult();
+        module.SetupVoid("dispose", _ => true).SetVoidResult();
+        module.SetupVoid("startDrag", _ => true).SetVoidResult();
+        module.SetupVoid("stopDrag", _ => true).SetVoidResult();
+        module.SetupVoid("setPointerCapture", _ => true).SetVoidResult();
+        module.SetupVoid("focusThumbInput", _ => true).SetVoidResult();
+        module.SetupVoid("registerPointerGuard", _ => true).SetVoidResult();
+        module.SetupVoid("unregisterPointerGuard", _ => true).SetVoidResult();
+        module.SetupVoid("blurActiveElement", _ => true).SetVoidResult();
         module.Setup<object?>("getThumbRect", _ => true).SetResult(null);
+        module.SetupVoid("syncInsetPositions", _ => true).SetVoidResult();
+        module.SetupVoid("observeInsetResize", _ => true).SetVoidResult();
+        module.SetupVoid("unobserveInsetResize", _ => true).SetVoidResult();
+        module.SetupVoid("registerThumbInput", _ => true).SetVoidResult();
+        module.SetupVoid("unregisterThumbInput", _ => true).SetVoidResult();
     }
 
     private const string SwitchModule = "./_content/BlazorBaseUI/blazor-baseui-switch.js";
@@ -172,8 +180,6 @@ public static class JsInteropSetup
         module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
         module.SetupVoid("updatePosition", _ => true).SetVoidResult();
         module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
-        module.SetupVoid("initializePopup", _ => true).SetVoidResult();
-        module.SetupVoid("disposePopup", _ => true).SetVoidResult();
     }
 
     private const string FieldModule = "./_content/BlazorBaseUI/blazor-baseui-field.js";
@@ -202,6 +208,7 @@ public static class JsInteropSetup
         module.SetupVoid("addLabelMouseDownListener", _ => true);
         module.SetupVoid("removeLabelMouseDownListener", _ => true);
         module.SetupVoid("focusControlById", _ => true);
+        module.SetupVoid("focusSliderControl", _ => true);
     }
 
     private const string DialogModule = "./_content/BlazorBaseUI/blazor-baseui-dialog.js";

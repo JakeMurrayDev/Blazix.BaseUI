@@ -21,6 +21,7 @@
 </CascadingValue>
 
 @code {
+    private readonly object itemKey = new();
     private int index = -1;
     private string panelId = string.Empty;
     private TValue resolvedValue = default!;
@@ -103,7 +104,7 @@
 
         if (RootContext is not null)
         {
-            index = RootContext.RegisterItem();
+            index = RootContext.RegisterItem(itemKey);
         }
 
         if (TypedRootContext is not null)
@@ -114,8 +115,7 @@
                 ResolvedDisabled,
                 TypedRootContext.Orientation,
                 index,
-                currentOpen,
-                transitionStatus);
+                currentOpen);
 
             itemContext = new AccordionItemContext<TValue>
             {
@@ -153,6 +153,11 @@
 
         var currentOpen = IsOpen;
         var currentDisabled = ResolvedDisabled;
+
+        if (RootContext is not null)
+        {
+            index = RootContext.GetItemIndex(itemKey);
+        }
 
         if (itemContext is null)
         {
@@ -201,10 +206,9 @@
                 currentDisabled,
                 TypedRootContext.Orientation,
                 index,
-                currentOpen,
-                transitionStatus);
+                currentOpen);
         }
-        else if (state.Open != currentOpen || state.Disabled != currentDisabled || state.Index != index || state.Orientation != TypedRootContext.Orientation || state.TransitionStatus != transitionStatus || !ReferenceEquals(state.Value, TypedRootContext.Value))
+        else if (state.Open != currentOpen || state.Disabled != currentDisabled || state.Index != index || state.Orientation != TypedRootContext.Orientation || !ReferenceEquals(state.Value, TypedRootContext.Value))
         {
             state = state with
             {
@@ -212,8 +216,7 @@
                 Open = currentOpen,
                 Disabled = currentDisabled,
                 Index = index,
-                Orientation = TypedRootContext.Orientation,
-                TransitionStatus = transitionStatus
+                Orientation = TypedRootContext.Orientation
             };
         }
 
@@ -255,16 +258,11 @@
             {
                 collapsibleContext.TransitionStatus = status;
             }
-            if (state is not null)
-            {
-                state = state with { TransitionStatus = status };
-                BuildComponentAttributes();
-            }
             StateHasChanged();
         }
     }
 
-    private void HandleTrigger()
+    private async Task HandleTrigger()
     {
         if (ResolvedDisabled)
         {
@@ -274,9 +272,9 @@
         var nextOpen = !IsOpen;
         var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
 
-        _ = OnOpenChange.InvokeAsync(args);
+        await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
@@ -284,7 +282,7 @@
         RootContext?.HandleValueChange(resolvedValue, nextOpen);
     }
 
-    private void HandleBeforeMatch()
+    private async Task HandleBeforeMatch()
     {
         if (IsOpen || ResolvedDisabled)
         {
@@ -293,9 +291,9 @@
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
 
-        _ = OnOpenChange.InvokeAsync(args);
+        await OnOpenChange.InvokeAsync(args);
 
-        if (args.Canceled)
+        if (args.IsCanceled)
         {
             return;
         }
@@ -312,8 +310,6 @@
         attrs["data-open"] = state?.Open ?? false;
         attrs["data-closed"] = !(state?.Open ?? false);
         attrs["data-disabled"] = state?.Disabled ?? false;
-        attrs["data-starting-style"] = state?.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state?.TransitionStatus == TransitionStatus.Ending;
 
         componentAttributes = attrs;
     }

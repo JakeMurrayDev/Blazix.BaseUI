@@ -6,10 +6,12 @@ public class NavigationMenuContentTests : BunitContext, INavigationMenuContentCo
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateContentInRoot(
         string? defaultValue = null,
+        bool keepMounted = false,
         Func<NavigationMenuContentState, string>? classValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null)
     {
@@ -31,6 +33,8 @@ public class NavigationMenuContentTests : BunitContext, INavigationMenuContentCo
 
                     itemBuilder.OpenComponent<NavigationMenuContent>(2);
                     var attrIndex = 3;
+                    if (keepMounted)
+                        itemBuilder.AddAttribute(attrIndex++, "KeepMounted", true);
                     if (classValue is not null)
                         itemBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
                     if (additionalAttributes is not null)
@@ -81,12 +85,22 @@ public class NavigationMenuContentTests : BunitContext, INavigationMenuContentCo
     }
 
     [Fact]
-    public Task HasDataClosedWhenInactive()
+    public Task HasDataClosedWhenInactiveWithKeepMounted()
     {
-        var cut = Render(CreateContentInRoot());
+        var cut = Render(CreateContentInRoot(keepMounted: true));
 
         var content = cut.Find("div[data-closed]");
         content.HasAttribute("data-closed").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotRenderWhenInactiveWithoutKeepMounted()
+    {
+        var cut = Render(CreateContentInRoot());
+
+        cut.FindAll("div[data-closed]").ShouldBeEmpty();
 
         return Task.CompletedTask;
     }

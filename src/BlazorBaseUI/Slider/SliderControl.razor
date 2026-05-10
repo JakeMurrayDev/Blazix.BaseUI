@@ -22,6 +22,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isProcessingPointerDown;
+    private double[]? previousInsetValues;
     private DotNetObjectReference<SliderControl>? dotNetRef;
     private ElementReference element;
     private SliderRootState state = null!;
@@ -94,6 +95,15 @@
         };
 
         BuildComponentAttributes();
+
+        if (Context is { Inset: true } && hasRendered && !Context.Dragging)
+        {
+            if (previousInsetValues is null || !ValuesEqual(previousInsetValues, Context.Values))
+            {
+                previousInsetValues = [.. Context.Values];
+                _ = SyncInsetPositionsAsync();
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -111,6 +121,12 @@
             previousElement = currentElement;
             element = currentElement.Value;
             Context?.SetControlElement(element);
+            _ = RegisterPointerGuardAsync();
+        }
+
+        if (firstRender && Context?.Inset == true)
+        {
+            _ = SetupInsetIndicatorAsync();
         }
     }
 
@@ -124,11 +140,14 @@
             try
             {
                 var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("unregisterPointerGuard", element);
+                await module.InvokeVoidAsync("unobserveInsetResize", element);
                 await module.InvokeVoidAsync("stopDrag", element);
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -220,8 +239,6 @@
             {
                 var module = await ModuleTask.Value;
 
-                await module.InvokeVoidAsync("setPointerCapture", element, e.PointerId);
-
                 var result = await module.InvokeAsync<StartDragResult?>(
                     "startDrag",
                     element,
@@ -234,17 +251,29 @@
 
                 if (result is not null)
                 {
-                    Context.SetValueSilent(result.Values);
+                    if (result.WasTrackPress)
+                    {
+                        Context.SetValue(result.Values, SliderChangeReason.TrackPress, result.ThumbIndex);
+                    }
+                    else
+                    {
+                        Context.SetValueSilent(result.Values);
+                    }
+
                     Context.SetDragging(true);
                     Context.SetActiveThumbIndex(result.ThumbIndex);
 
-                    await FocusThumbAsync(result.ThumbIndex);
+                    if (!result.PressedOnFocusedThumb)
+                    {
+                        await FocusThumbAsync(result.ThumbIndex);
+                    }
                 }
 
                 await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
         finally
@@ -277,6 +306,22 @@
         }
     }
 
+    private async Task RegisterPointerGuardAsync()
+    {
+        if (!hasRendered || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("registerPointerGuard", element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
     private async Task FocusThumbAsync(int index)
     {
         if (!hasRendered || Context is null)
@@ -293,6 +338,91 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private async Task SetupInsetIndicatorAsync()
+    {
+        if (!hasRendered || Context is null || !Context.Inset)
+            return;
+
+        await SyncInsetPositionsAsync();
+        await ObserveInsetResizeAsync();
+    }
+
+    private async Task SyncInsetPositionsAsync()
+    {
+        if (!hasRendered || Context is null)
+            return;
+
+        var indicatorEl = Context.GetIndicatorElement();
+        if (!indicatorEl.HasValue)
+            return;
+
+        var thumbElements = GetOrderedThumbElements();
+        if (thumbElements.Length == 0)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("syncInsetPositions",
+                element, thumbElements, indicatorEl.Value, BuildInsetConfig());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task ObserveInsetResizeAsync()
+    {
+        if (!hasRendered || Context is null)
+            return;
+
+        var indicatorEl = Context.GetIndicatorElement();
+        if (!indicatorEl.HasValue)
+            return;
+
+        var thumbElements = GetOrderedThumbElements();
+        if (thumbElements.Length == 0)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("observeInsetResize",
+                element, thumbElements, indicatorEl.Value, BuildInsetConfig());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private ElementReference[] GetOrderedThumbElements() =>
+        Context!.GetAllThumbMetadata()
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => kvp.Value.ThumbElement)
+            .ToArray();
+
+    private object BuildInsetConfig() => new
+    {
+        min = Context!.Min,
+        max = Context.Max,
+        orientation = Context.Orientation.ToDataAttributeString() ?? "horizontal",
+        thumbAlignment = Context.ThumbAlignment.ToDataAttributeString(),
+        values = Context.Values
+    };
+
+    private static bool ValuesEqual(double[] a, double[] b)
+    {
+        if (a.Length != b.Length) return false;
+        for (var i = 0; i < a.Length; i++)
+        {
+            if (Math.Abs(a[i] - b[i]) > 1e-10) return false;
+        }
+        return true;
     }
 }

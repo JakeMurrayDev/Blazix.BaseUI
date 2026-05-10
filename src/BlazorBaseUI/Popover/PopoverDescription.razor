@@ -12,10 +12,13 @@
                @ref="renderElementReference" />
 
 @code {
-    private string descriptionId = string.Empty;
+    private string? defaultId;
     private PopoverDescriptionState state;
     private RenderElement<PopoverDescriptionState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
@@ -58,20 +61,16 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        descriptionId = AttributeUtilities.GetAttributeStringValue(AdditionalAttributes, "id")
-            ?? $"popover-description-{Guid.NewGuid():N}";
-
-        RootContext?.SetDescriptionId(descriptionId);
+        RootContext?.SetDescriptionId(ResolvedId);
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var userProvidedId = AttributeUtilities.GetAttributeStringValue(AdditionalAttributes, "id");
-        if (userProvidedId is not null && userProvidedId != descriptionId)
+        var currentId = ResolvedId;
+        if (RootContext is not null && RootContext.DescriptionId != currentId)
         {
-            descriptionId = userProvidedId;
-            RootContext?.SetDescriptionId(descriptionId);
+            RootContext.SetDescriptionId(currentId);
         }
 
         state = new PopoverDescriptionState();
@@ -81,7 +80,7 @@
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
-        attrs["id"] = descriptionId;
+        attrs["id"] = ResolvedId;
         componentAttributes = attrs;
     }
 

@@ -151,10 +151,10 @@
             {
                 var module = await moduleTask.Value;
                 await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            }            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
-            }
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
         }
     }
 
@@ -181,9 +181,9 @@
             await OnLoadingStatusChange.InvokeAsync(imageLoadingStatus);
             Context!.SetImageLoadingStatus(imageLoadingStatus);
             await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        }        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
-        }
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
     }
 }

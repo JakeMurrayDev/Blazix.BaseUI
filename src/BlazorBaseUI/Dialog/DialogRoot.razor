@@ -24,7 +24,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
-    private bool isMounted;
+    private readonly TransitionLifecycleManager transition = new(useIdleRestingState: true);
     private bool nested;
     private bool pendingOpenChange;
     private bool pendingBindingUpdate;
@@ -34,7 +34,6 @@
     private string? activeTriggerId;
     private ElementReference? popupElement;
     private DialogOpenChangeReason openChangeReason = DialogOpenChangeReason.None;
-    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private object? payload;
     private DialogRootState state;
     private DialogRootContext context = null!;
@@ -142,7 +141,12 @@
     protected override void OnInitialized()
     {
         isOpen = DefaultOpen;
-        isMounted = CurrentOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
         nested = ParentContext is not null;
         activeTriggerId = IsTriggerIdControlled ? TriggerId : DefaultTriggerId;
         state = new DialogRootState(CurrentOpen);
@@ -151,19 +155,19 @@
             RootId = rootId,
             Nested = nested,
             Open = CurrentOpen,
-            Mounted = isMounted,
+            Mounted = transition.IsMounted,
             Modal = Modal,
             Role = ResolvedRole,
             DisablePointerDismissal = DisablePointerDismissal,
             NestedDialogCount = nestedCount,
             DialogOpenChangeReason = openChangeReason,
-            TransitionStatus = transitionStatus,
+            TransitionStatus = transition.TransitionStatus,
             TitleId = titleId,
             DescriptionId = descriptionId,
             ActiveTriggerId = activeTriggerId,
             Payload = payload,
             GetOpen = () => CurrentOpen,
-            GetMounted = () => isMounted,
+            GetMounted = () => transition.IsMounted,
             GetPayload = () => payload,
             GetTriggerElement = GetTriggerElement,
             GetPopupElement = () => popupElement,
@@ -213,16 +217,15 @@
             state = new DialogRootState(currentOpen);
             if (currentOpen)
             {
-                isMounted = true;
-                transitionStatus = TransitionStatus.Starting;
+                transition.BeginOpen();
             }
             else
             {
-                transitionStatus = TransitionStatus.Ending;
+                transition.BeginClose();
             }
             context.Open = currentOpen;
-            context.Mounted = isMounted;
-            context.TransitionStatus = transitionStatus;
+            context.Mounted = transition.IsMounted;
+            context.TransitionStatus = transition.TransitionStatus;
             openChangeReason = DialogOpenChangeReason.None;
             context.DialogOpenChangeReason = openChangeReason;
 
@@ -327,10 +330,9 @@
     [JSInvokable]
     public void OnStartingStyleApplied()
     {
-        if (transitionStatus == TransitionStatus.Starting)
+        if (transition.HandleStartingStyleApplied())
         {
-            transitionStatus = TransitionStatus.Idle;
-            context.TransitionStatus = transitionStatus;
+            context.TransitionStatus = transition.TransitionStatus;
             StateHasChanged();
         }
     }
@@ -341,8 +343,8 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
-        transitionStatus = TransitionStatus.Idle;
-        context.TransitionStatus = transitionStatus;
+        transition.HandleTransitionEnd(open);
+        context.TransitionStatus = transition.TransitionStatus;
 
         if (!open)
         {
@@ -353,7 +355,6 @@
                 return;
             }
 
-            isMounted = false;
             context.Mounted = false;
             activeTriggerId = null;
             context.ActiveTriggerId = null;
@@ -513,7 +514,7 @@
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, Modal.ToDataAttributeString());
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, Modal.ToDataAttributeString(), DisablePointerDismissal);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -602,8 +603,7 @@
 
         if (nextOpen)
         {
-            transitionStatus = TransitionStatus.Starting;
-            isMounted = true;
+            transition.BeginOpen();
             context.PreventUnmountingOnClose = false;
 
             if (string.IsNullOrEmpty(activeTriggerId) && triggerElements.Count == 1)
@@ -620,13 +620,13 @@
                 context.PreventUnmountingOnClose = true;
             }
 
-            transitionStatus = TransitionStatus.Ending;
+            transition.BeginClose();
             payload = null;
             context.Payload = null;
         }
 
-        context.TransitionStatus = transitionStatus;
-        context.Mounted = isMounted;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
 
         if (!IsControlled)
         {
@@ -736,10 +736,9 @@
             ParentContext?.OnNestedDialogClose?.Invoke();
         }
 
-        isMounted = false;
+        transition.ForceUnmount();
         context.Mounted = false;
-        transitionStatus = TransitionStatus.Undefined;
-        context.TransitionStatus = transitionStatus;
+        context.TransitionStatus = transition.TransitionStatus;
         activeTriggerId = null;
         context.ActiveTriggerId = null;
         context.InteractionType = null;

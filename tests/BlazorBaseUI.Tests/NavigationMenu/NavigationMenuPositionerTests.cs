@@ -6,6 +6,7 @@ public class NavigationMenuPositionerTests : BunitContext, INavigationMenuPositi
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreatePositionerInRoot(
@@ -83,6 +84,31 @@ public class NavigationMenuPositionerTests : BunitContext, INavigationMenuPositi
 
         var div = cut.Find("div[role='presentation']");
         div.GetAttribute("data-align").ShouldBe("center");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DataSideAndAlignReflectComputedPlacement()
+    {
+        var cut = Render(CreatePositionerInRoot());
+        var positioner = cut.FindComponent<NavigationMenuPositioner>();
+
+        await positioner.InvokeAsync(() => positioner.Instance.OnPositionUpdated("top", "end", false, false));
+
+        var div = cut.Find("div[role='presentation']");
+        div.GetAttribute("data-side").ShouldBe("top");
+        div.GetAttribute("data-align").ShouldBe("end");
+
+    }
+
+    [Fact]
+    public Task IsInertWhenClosed()
+    {
+        var cut = Render(CreatePositionerInRoot());
+
+        var div = cut.Find("div[role='presentation']");
+        div.HasAttribute("inert").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

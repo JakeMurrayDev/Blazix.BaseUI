@@ -15,4 +15,18 @@ public interface ISliderIndicatorContract
     // Vertical orientation tests
     Task HasVerticalPositioningStyleForSingleValue();
     Task HasVerticalPositioningStyleForRangeValue();
+
+    // Inset/edge positioning tests
+    Task HasInsetPositioningStyleForSingleValue();
+    Task HasInsetPositioningStyleForRangeValue();
+    Task HasVerticalInsetPositioningStyleForSingleValue();
+    Task HasVerticalInsetPositioningStyleForRangeValue();
+
+    // Data attribute coverage
+    Task HasDataDragging();
+    Task HasDataValid();
+    Task HasDataInvalid();
+    Task HasDataTouched();
+    Task HasDataDirty();
+    Task HasDataFocused();
 }

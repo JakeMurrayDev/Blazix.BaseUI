@@ -36,7 +36,7 @@ function isElementDisabled(element) {
 }
 
 function getActiveTriggers(triggerElement) {
-    const accordionRoot = triggerElement.closest('[role="region"]');
+    const accordionRoot = triggerElement.closest('[data-blazor-base-ui-accordion-root]');
     if (!accordionRoot) return [];
 
     const items = accordionRoot.querySelectorAll('[data-index]');
@@ -44,8 +44,9 @@ function getActiveTriggers(triggerElement) {
 
     for (const item of items) {
         if (isElementDisabled(item)) continue;
+        if (item.closest('[data-blazor-base-ui-accordion-root]') !== accordionRoot) continue;
 
-        const trigger = item.querySelector('[type="button"]');
+        const trigger = item.querySelector('[type="button"], [role="button"]');
         if (trigger && !isElementDisabled(trigger)) {
             if (!activeTriggers.includes(trigger)) {
                 activeTriggers.push(trigger);
@@ -57,13 +58,27 @@ function getActiveTriggers(triggerElement) {
 }
 
 function handleKeyDown(event) {
-    if (!SUPPORTED_KEYS.has(event.key)) {
-        return;
-    }
-
     const element = event.currentTarget;
     const s = getState(element);
     if (!s) return;
+
+    if (isElementDisabled(element)) return;
+
+    if (event.key === ' ') {
+        event.preventDefault();
+        element.click();
+        return;
+    }
+
+    if (!s.isNativeButton && event.key === 'Enter') {
+        event.preventDefault();
+        element.click();
+        return;
+    }
+
+    if (!SUPPORTED_KEYS.has(event.key)) {
+        return;
+    }
 
     stopEvent(event);
 
@@ -136,20 +151,53 @@ function handleKeyDown(event) {
     }
 
     if (nextIndex > -1) {
-        triggers[nextIndex].focus({ preventScroll: true });
+        triggers[nextIndex].focus();
     }
 }
 
-export function initialize(element, isHorizontal, isRtl, loopFocus) {
+function handleKeyUp(event) {
+    if (event.key === ' ') {
+        event.preventDefault();
+    }
+}
+
+function handlePointerDown(event) {
+    if (isElementDisabled(event.currentTarget)) {
+        event.preventDefault();
+    }
+}
+
+function handleMouseDown(event) {
+    if (isElementDisabled(event.currentTarget)) {
+        event.preventDefault();
+    }
+}
+
+export function initialize(element, isHorizontal, isRtl, loopFocus, isNativeButton) {
     if (!element) return;
 
-    setState(element, { isHorizontal, isRtl, loopFocus });
+    setState(element, { isHorizontal, isRtl, loopFocus, isNativeButton });
     element.addEventListener('keydown', handleKeyDown);
+    element.addEventListener('keyup', handleKeyUp);
+    element.addEventListener('pointerdown', handlePointerDown);
+    element.addEventListener('mousedown', handleMouseDown);
+}
+
+export function updateConfig(element, isHorizontal, isRtl, loopFocus) {
+    if (!element) return;
+    const s = getState(element);
+    if (!s) return;
+    s.isHorizontal = isHorizontal;
+    s.isRtl = isRtl;
+    s.loopFocus = loopFocus;
 }
 
 export function dispose(element) {
     if (!element) return;
 
     element.removeEventListener('keydown', handleKeyDown);
+    element.removeEventListener('keyup', handleKeyUp);
+    element.removeEventListener('pointerdown', handlePointerDown);
+    element.removeEventListener('mousedown', handleMouseDown);
     state.delete(element);
 }

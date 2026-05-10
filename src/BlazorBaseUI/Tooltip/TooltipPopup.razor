@@ -1,8 +1,5 @@
 @using BlazorBaseUI.Popover
 @using Microsoft.AspNetCore.Components.Web
-@using Microsoft.JSInterop
-@implements IAsyncDisposable
-@inject IJSRuntime JSRuntime
 
 <RenderElement TState="TooltipPopupState"
                Tag="div"
@@ -17,17 +14,10 @@
                @ref="renderElementReference" />
 
 @code {
-    private Lazy<Task<IJSObjectReference>>? moduleTask;
-    private bool hasRendered;
     private TooltipPopupState state;
     private RenderElement<TooltipPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
-    private CancellationTokenSource? hoverCts;
-
-    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-tooltip.js").AsTask());
 
     [CascadingParameter]
     private TooltipRootContext? RootContext { get; set; }
@@ -83,23 +73,13 @@
     }
 
     /// <inheritdoc />
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnAfterRender(bool firstRender)
     {
-        if (firstRender)
-        {
-            hasRendered = true;
-        }
-
         var currentElement = Element;
         if (!Nullable.Equals(previousElement, currentElement))
         {
             previousElement = currentElement;
             RootContext?.SetPopupElement(currentElement);
-        }
-
-        if (firstRender)
-        {
-            await InitializePopupAsync();
         }
     }
 
@@ -127,118 +107,34 @@
         }
 
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        attrs["data-starting-style"] = transitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = transitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
+
+        if (transitionStatus == TransitionStatus.Starting)
+        {
+            attrs["style"] = "transition: none";
+        }
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
-
-        var disableHoverablePopup = RootContext?.DisableHoverablePopup ?? false;
-        if (!disableHoverablePopup)
-        {
-            attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-            attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
-        }
+        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
 
         componentAttributes = attrs;
     }
 
-    private async Task InitializePopupAsync()
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
-        if (!Element.HasValue || RootContext is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("initializePopup", Element.Value);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
-    }
-
-    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
-    {
-        if (RootContext is null)
-        {
-            return;
-        }
-
-        if (e.Key == "Escape")
-        {
-            await RootContext.SetOpenAsync(false, TooltipOpenChangeReason.EscapeKey, null);
-        }
-
-        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+        // Escape key is handled globally in JS (blazor-baseui-tooltip.js handleGlobalKeyDown).
+        // Do not handle Escape here to avoid double-close.
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 
     private Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        CancelHoverDelay();
         return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
     }
 
-    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
+    private Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        if (RootContext is null)
-        {
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (!RootContext.GetOpen())
-        {
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(100, token);
-            if (!token.IsCancellationRequested)
-            {
-                await RootContext.SetOpenAsync(false, TooltipOpenChangeReason.TriggerHover, null);
-            }
-        }
-        catch (TaskCanceledException)
-        {
-        }
-
-        await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-    }
-
-    private void CancelHoverDelay()
-    {
-        if (hoverCts is not null)
-        {
-            hoverCts.Cancel();
-            hoverCts.Dispose();
-            hoverCts = null;
-        }
-    }
-
-    /// <inheritdoc />
-    public async ValueTask DisposeAsync()
-    {
-        CancelHoverDelay();
-
-        if (moduleTask?.IsValueCreated == true && hasRendered && Element.HasValue)
-        {
-            try
-            {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposePopup", Element.Value);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-            }
-        }
-
+        return EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 }

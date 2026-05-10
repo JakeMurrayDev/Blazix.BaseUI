@@ -21,6 +21,11 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private string? defaultId;
+    private bool hasRendered;
+    private bool pendingConfigUpdate;
+    private bool previousIsHorizontal;
+    private bool previousIsRtl;
+    private bool previousLoopFocus;
     private AccordionTriggerState state = null!;
     private RenderElement<AccordionTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -122,6 +127,18 @@
             state = state with { Open = currentOpen, Orientation = currentOrientation, Value = currentValue, Disabled = currentDisabled };
         }
 
+        if (hasRendered && RootContext is not null)
+        {
+            var isHorizontal = RootContext.Orientation == Orientation.Horizontal;
+            var isRtl = RootContext.Direction == Direction.Rtl;
+            var loopFocus = RootContext.LoopFocus;
+
+            if (isHorizontal != previousIsHorizontal || isRtl != previousIsRtl || loopFocus != previousLoopFocus)
+            {
+                pendingConfigUpdate = true;
+            }
+        }
+
         BuildComponentAttributes();
     }
 
@@ -130,6 +147,8 @@
     {
         if (firstRender)
         {
+            hasRendered = true;
+
             if (Element.HasValue)
             {
                 try
@@ -139,11 +158,38 @@
                     var isRtl = RootContext?.Direction == Direction.Rtl;
                     var loopFocus = RootContext?.LoopFocus ?? true;
 
-                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus);
+                    previousIsHorizontal = isHorizontal;
+                    previousIsRtl = isRtl;
+                    previousLoopFocus = loopFocus;
+
+                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
+            }
+        }
+        else if (pendingConfigUpdate && Element.HasValue)
+        {
+            pendingConfigUpdate = false;
+
+            try
+            {
+                var module = await moduleTask.Value;
+                var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
+                var isRtl = RootContext?.Direction == Direction.Rtl;
+                var loopFocus = RootContext?.LoopFocus ?? true;
+
+                previousIsHorizontal = isHorizontal;
+                previousIsRtl = isRtl;
+                previousLoopFocus = loopFocus;
+
+                await module.InvokeVoidAsync("updateConfig", Element.Value, isHorizontal, isRtl, loopFocus);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -151,6 +197,8 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        ItemContext?.SetTriggerId(null);
+
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
             try
@@ -161,6 +209,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -174,38 +223,34 @@
         attrs["id"] = ResolvedId;
 
         if (NativeButton)
-            attrs["type"] = "button";
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, ResolvedDisabled, focusableWhenDisabled: true);
         else
-            attrs["role"] = "button";
-
-        attrs["tabindex"] = 0;
-
-        if (ResolvedDisabled)
-            attrs["aria-disabled"] = "true";
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, ResolvedDisabled, focusableWhenDisabled: true);
 
         attrs["aria-expanded"] = ItemContext.Open ? "true" : "false";
 
         if (ItemContext.Open)
             attrs["aria-controls"] = ItemContext.PanelId;
 
-        attrs["disabled"] = ResolvedDisabled;
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
-        attrs["data-value"] = state.Value;
-        attrs["data-orientation"] = state.Orientation.ToDataAttributeString()!;
         attrs["data-panel-open"] = state.Open;
         attrs["data-disabled"] = state.Disabled;
 
         componentAttributes = attrs;
     }
 
-    private Task HandleClickAsync(MouseEventArgs args)
+    private async Task HandleClickAsync(MouseEventArgs args)
     {
         if (ResolvedDisabled)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        ItemContext?.HandleTrigger();
-        return EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
+        if (ItemContext is not null)
+        {
+            await ItemContext.HandleTrigger();
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
     }
 }

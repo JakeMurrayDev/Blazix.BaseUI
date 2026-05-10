@@ -5,15 +5,18 @@
                State="state"
                Render="Render"
                ClassValue="ClassValue"
-               StyleValue="StyleValue"
+               StyleValue="computedStyleValue"
                ComponentAttributes="componentAttributes"
                ChildContent="ChildContent"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
+    private const string ForcedStyle = "pointer-events:none;";
+
     private bool shouldRender;
     private DialogViewportState state;
+    private Func<DialogViewportState, string>? computedStyleValue;
     private RenderElement<DialogViewportState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
@@ -73,6 +76,7 @@
 
         UpdateShouldRender();
         BuildComponentAttributes();
+        UpdateComputedStyleValue();
     }
 
     /// <inheritdoc />
@@ -97,6 +101,20 @@
         shouldRender = keepMounted || Context.Mounted;
     }
 
+    private void UpdateComputedStyleValue()
+    {
+        if (Context is null || Context.Open)
+        {
+            computedStyleValue = StyleValue;
+        }
+        else
+        {
+            computedStyleValue = StyleValue is not null
+                ? s => ForcedStyle + StyleValue(s)
+                : _ => ForcedStyle;
+        }
+    }
+
     private void BuildComponentAttributes()
     {
         if (Context is null)
@@ -115,8 +133,7 @@
 
         attrs["data-open"] = Context.Open;
         attrs["data-closed"] = !Context.Open;
-        attrs["data-starting-style"] = Context.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = Context.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, Context.TransitionStatus);
         attrs["data-nested"] = Context.Nested;
         attrs["data-nested-dialog-open"] = Context.NestedDialogCount > 0;
 

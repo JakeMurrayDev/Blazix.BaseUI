@@ -10,7 +10,7 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="ChildContent"
+               ChildContent="WrappedChildContent"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
@@ -23,6 +23,10 @@
     private RenderElement<PopoverViewportState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private DotNetObjectReference<PopoverViewport>? dotNetRef;
+    private string? lastTriggerId;
+    private object? lastPayload;
+    private bool pendingPayloadUpdate;
+    private int contentKey;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -69,6 +73,15 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    private RenderFragment? WrappedChildContent => ChildContent is null ? null : builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.SetKey(contentKey);
+        builder.AddAttribute(1, "data-current", true);
+        builder.AddContent(2, ChildContent);
+        builder.CloseElement();
+    };
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -78,7 +91,29 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        state = new PopoverViewportState(activationDirection, transitioning);
+        var currentTriggerId = RootContext?.ActiveTriggerId;
+        var currentPayload = RootContext?.Payload;
+        var triggerChanged = lastTriggerId is not null
+            && currentTriggerId is not null
+            && currentTriggerId != lastTriggerId;
+        var payloadChanged = !ReferenceEquals(lastPayload, currentPayload);
+
+        if (triggerChanged)
+        {
+            contentKey++;
+            pendingPayloadUpdate = !payloadChanged;
+        }
+        else if (pendingPayloadUpdate && payloadChanged)
+        {
+            contentKey++;
+            pendingPayloadUpdate = false;
+        }
+
+        lastTriggerId = currentTriggerId;
+        lastPayload = currentPayload;
+
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
+        state = new PopoverViewportState(activationDirection, transitioning, instant);
         BuildComponentAttributes();
     }
 
@@ -103,6 +138,7 @@
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
         }
@@ -116,7 +152,8 @@
     {
         activationDirection = direction;
         transitioning = true;
-        state = new PopoverViewportState(activationDirection, transitioning);
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
+        state = new PopoverViewportState(activationDirection, transitioning, instant);
         BuildComponentAttributes();
         StateHasChanged();
     }
@@ -129,8 +166,9 @@
     {
         activationDirection = null;
         transitioning = false;
-        RootContext?.SetInstantType(InstantType.TriggerChange);
-        state = new PopoverViewportState(activationDirection, transitioning);
+        RootContext?.SetPopoverInstantType(PopoverInstantType.TriggerChange);
+        var instant = RootContext?.PopoverInstantType ?? PopoverInstantType.None;
+        state = new PopoverViewportState(activationDirection, transitioning, instant);
         BuildComponentAttributes();
         StateHasChanged();
     }
@@ -145,7 +183,12 @@
         }
 
         attrs["data-transitioning"] = state.Transitioning;
-        attrs["data-current"] = true;
+
+        var instantAttr = state.Instant.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
 
         componentAttributes = attrs;
     }
@@ -166,6 +209,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 

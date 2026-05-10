@@ -15,7 +15,7 @@ internal sealed class DialogRootContext
 
     public bool Mounted { get; set; }
 
-    public ModalMode Modal { get; set; }
+    public DialogModalMode Modal { get; set; }
 
     public DialogRole Role { get; set; }
 
@@ -23,7 +23,7 @@ internal sealed class DialogRootContext
 
     public int NestedDialogCount { get; set; }
 
-    public OpenChangeReason OpenChangeReason { get; set; }
+    public DialogOpenChangeReason DialogOpenChangeReason { get; set; }
 
     public string? InteractionType { get; set; }
 
@@ -69,17 +69,19 @@ internal sealed class DialogRootContext
 
     public Action<string?> SetInteractionType { get; set; } = null!;
 
-    public Func<bool, OpenChangeReason, Task> SetOpenAsync { get; set; } = null!;
+    public Func<bool, DialogOpenChangeReason, Task> SetOpenAsync { get; set; } = null!;
 
-    public Func<object?, OpenChangeReason, Task> SetOpenWithPayloadAsync { get; set; } = null!;
+    public Func<object?, DialogOpenChangeReason, Task> SetOpenWithPayloadAsync { get; set; } = null!;
 
-    public Func<string?, object?, OpenChangeReason, Task> SetOpenWithTriggerIdAsync { get; set; } = null!;
+    public Func<string?, object?, DialogOpenChangeReason, Task> SetOpenWithTriggerIdAsync { get; set; } = null!;
 
     public Action<string, object?> SetTriggerPayload { get; set; } = null!;
 
     public Action Close { get; set; } = null!;
 
     public Action ForceUnmount { get; set; } = null!;
+
+    public IFloatingRootContext? FloatingRootContext { get; set; }
 
     public Action? OnNestedDialogOpen { get; set; }
 

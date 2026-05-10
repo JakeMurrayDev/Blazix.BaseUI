@@ -6,6 +6,7 @@ public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerCo
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateTriggerInRoot(
@@ -13,6 +14,7 @@ public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerCo
         bool triggerDisabled = false,
         bool includePopup = false,
         Func<NavigationMenuTriggerState, string>? classValue = null,
+        Func<NavigationMenuTriggerState, string>? styleValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null)
     {
         return builder =>
@@ -33,6 +35,8 @@ public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerCo
                         itemBuilder.AddAttribute(attrIndex++, "Disabled", true);
                     if (classValue is not null)
                         itemBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                    if (styleValue is not null)
+                        itemBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
                     if (additionalAttributes is not null)
                         itemBuilder.AddAttribute(attrIndex++, "AdditionalAttributes", additionalAttributes);
                     itemBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
@@ -224,6 +228,157 @@ public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerCo
         );
 
         cut.Markup.ShouldBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesAriaDisabledWhenDisabled()
+    {
+        var cut = Render(CreateTriggerInRoot(triggerDisabled: true));
+
+        var button = cut.Find("button");
+        button.GetAttribute("aria-disabled").ShouldBe("true");
+        button.HasAttribute("disabled").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RemainsInTabOrderWhenDisabled()
+    {
+        var cut = Render(CreateTriggerInRoot(triggerDisabled: true));
+
+        var button = cut.Find("button");
+        button.GetAttribute("tabindex").ShouldBe("0");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasKeyDownHandlerWired()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var button = cut.Find("button");
+        // bUnit registers event handlers as blazor:onkeydown attributes
+        button.HasAttribute("blazor:onkeydown").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasFocusHandlerWired()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var button = cut.Find("button");
+        button.HasAttribute("blazor:onfocus").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasPointerDownHandlerWired()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var button = cut.Find("button");
+        button.HasAttribute("blazor:onpointerdown").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersFocusGuardsWhenActive()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultValue: "item1"));
+
+        var guards = cut.FindAll("[data-blazor-base-ui-focus-guard]");
+        guards.Count.ShouldBe(2);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NoFocusGuardsWhenInactive()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var guards = cut.FindAll("[data-blazor-base-ui-focus-guard]");
+        guards.Count.ShouldBe(0);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersAriaOwnsWhenActive()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultValue: "item1"));
+
+        var ariaOwnsSpan = cut.FindAll("[aria-owns]");
+        ariaOwnsSpan.Count.ShouldBe(1);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NoAriaOwnsWhenInactive()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var ariaOwnsSpan = cut.FindAll("[aria-owns]");
+        ariaOwnsSpan.Count.ShouldBe(0);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AppliesStyleValue()
+    {
+        var cut = Render(CreateTriggerInRoot(
+            defaultValue: "item1",
+            styleValue: state => state.Open ? "color:red" : "color:blue"
+        ));
+
+        var button = cut.Find("button");
+        button.GetAttribute("style")!.ShouldContain("color:red");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasBlurHandlerWired()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var button = cut.Find("button");
+        button.HasAttribute("blazor:onblur").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasMouseMoveHandlerWired()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var button = cut.Find("button");
+        button.HasAttribute("blazor:onmousemove").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FocusGuardsRenderedAfterTrigger()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultValue: "item1"));
+
+        // The button should appear before the focus guards in the DOM
+        var markup = cut.Markup;
+        var buttonIndex = markup.IndexOf("<button");
+        var guardIndex = markup.IndexOf("data-blazor-base-ui-focus-guard");
+        guardIndex.ShouldBeGreaterThan(buttonIndex);
 
         return Task.CompletedTask;
     }

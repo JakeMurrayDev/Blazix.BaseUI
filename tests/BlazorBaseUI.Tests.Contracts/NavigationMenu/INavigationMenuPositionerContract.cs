@@ -7,6 +7,7 @@ public interface INavigationMenuPositionerContract
     Task HasRolePresentation();
     Task HasDataSide();
     Task HasDataAlign();
+    Task IsInertWhenClosed();
     Task AppliesClassValue();
     Task RequiresContext();
 }

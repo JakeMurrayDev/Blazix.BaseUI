@@ -150,8 +150,7 @@
 
         attrs["data-open"] = Context.Open;
         attrs["data-closed"] = !Context.Open;
-        attrs["data-starting-style"] = Context.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = Context.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, Context.TransitionStatus);
 
         componentAttributes = attrs;
     }

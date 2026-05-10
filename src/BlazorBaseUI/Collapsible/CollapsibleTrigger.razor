@@ -1,4 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
 
 <RenderElement TState="CollapsibleRootState"
                Tag="button"
@@ -13,13 +16,23 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-button.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton;
     private CollapsibleRootState state = new(false, false, TransitionStatus.Undefined);
     private RenderElement<CollapsibleRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
     private bool ResolvedDisabled => Disabled ?? Context?.Disabled ?? false;
 
-    private bool IsNativeButton => NativeButton;
+    private bool NeedsJsInterop => !NativeButton || ResolvedDisabled;
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
 
     [CascadingParameter]
     private CollapsibleRootContext? Context { get; set; }
@@ -75,6 +88,12 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    public CollapsibleTrigger()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
@@ -87,6 +106,65 @@
         }
 
         BuildComponentAttributes();
+
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        var stateChanged = currentDisabled != previousDisabled || NativeButton != previousNativeButton;
+
+        if (stateChanged)
+        {
+            var previousNeedsJs = !previousNativeButton || previousDisabled;
+            var currentNeedsJs = NeedsJsInterop;
+
+            previousDisabled = currentDisabled;
+            previousNativeButton = NativeButton;
+
+            if (currentNeedsJs)
+            {
+                _ = SyncJsAsync(dispose: false);
+            }
+            else if (previousNeedsJs)
+            {
+                _ = SyncJsAsync(dispose: true);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            previousDisabled = ResolvedDisabled;
+            previousNativeButton = NativeButton;
+
+            if (NeedsJsInterop)
+            {
+                await SyncJsAsync(dispose: false);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
     }
 
     private void BuildComponentAttributes()
@@ -94,34 +172,61 @@
         if (Context is null) return;
 
         var attrs = new Dictionary<string, object>();
+        var disabled = ResolvedDisabled;
 
-        if (IsNativeButton)
-            attrs["type"] = "button";
+        if (NativeButton)
+        {
+            // focusableWhenDisabled is always true for collapsible triggers (matches React useButton config)
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, focusableWhenDisabled: true);
+        }
         else
-            attrs["role"] = "button";
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: true);
+        }
 
         if (Context.Open)
             attrs["aria-controls"] = Context.PanelId;
 
         attrs["aria-expanded"] = Context.Open ? "true" : "false";
-        attrs["disabled"] = ResolvedDisabled;
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["data-panel-open"] = state.Open;
         attrs["data-disabled"] = state.Disabled;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }
 
-    private Task HandleClickAsync(MouseEventArgs args)
+    private async Task HandleClickAsync(MouseEventArgs args)
     {
         if (ResolvedDisabled)
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        Context?.HandleTrigger();
-        return EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
+        if (Context is not null)
+        {
+            await Context.HandleTrigger();
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
+    }
+
+    private async Task SyncJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            // focusableWhenDisabled is always true for collapsible triggers (matches React's useButton config)
+            await module.InvokeVoidAsync("sync", Element.Value, ResolvedDisabled, true, NativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 }

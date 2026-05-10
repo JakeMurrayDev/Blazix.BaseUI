@@ -7,6 +7,10 @@
 import {
     createHoverInteraction,
     createEscapeKeyHandler,
+    createDismissInteraction,
+    createVirtualElement,
+    updateVirtualElement,
+    disposeVirtualElement,
     waitForPopupAndStartTransition as floatingWaitForPopup,
     startSimpleTransition,
     disposeHoverInteractionOnRoot,
@@ -23,7 +27,6 @@ if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
         roots: new Map(),
         positioners: new Map(),
-        popups: new WeakMap(),
         globalListenersInitialized: false
     };
 }
@@ -100,6 +103,36 @@ export function setHoverInteractionOpen(rootId, isOpen) {
 }
 
 // ============================================================================
+// Dismiss Interaction Support
+// ============================================================================
+
+function updateDismissInteraction(rootState) {
+    if (!rootState.triggerElement || !rootState.popupElement) return;
+
+    // Dispose existing if any
+    if (rootState.dismissInteraction) {
+        rootState.dismissInteraction.cleanup();
+        rootState.dismissInteraction = null;
+    }
+
+    // Only create when open
+    if (!rootState.isOpen) return;
+
+    rootState.dismissInteraction = createDismissInteraction({
+        interactionId: `tooltip-dismiss-${rootState.rootId}`,
+        triggerElement: rootState.triggerElement,
+        floatingElement: rootState.popupElement,
+        escapeKey: false, // Already handled by global escape key handler
+        outsidePress: true,
+        onDismiss: (reason) => {
+            if (reason === 'outside-press' && rootState.dotNetRef) {
+                rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
+            }
+        }
+    });
+}
+
+// ============================================================================
 // Root Management
 // ============================================================================
 
@@ -107,12 +140,17 @@ export function initializeRoot(rootId, dotNetRef) {
     initGlobalListeners();
 
     state.roots.set(rootId, {
+        rootId,
         dotNetRef,
         isOpen: false,
         triggerElement: null,
         positionerElement: null,
         popupElement: null,
-        hoverInteraction: null
+        hoverInteraction: null,
+        dismissInteraction: null,
+        cursorTrackingCleanup: null,
+        virtualAnchor: null,
+        positionerId: null
     });
 }
 
@@ -123,6 +161,12 @@ export function disposeRoot(rootId) {
         if (rootState.hoverInteraction) {
             rootState.hoverInteraction.cleanup();
         }
+        // Clean up dismiss interaction
+        if (rootState.dismissInteraction) {
+            rootState.dismissInteraction.cleanup();
+        }
+        // Clean up cursor tracking
+        disposeCursorTrackingInternal(rootState);
     }
     state.roots.delete(rootId);
 }
@@ -137,6 +181,14 @@ export function setRootOpen(rootId, isOpen) {
     // Sync with hover interaction
     if (rootState.hoverInteraction) {
         rootState.hoverInteraction.setOpen(isOpen);
+    }
+
+    // Update dismiss interaction based on open state
+    if (isOpen) {
+        updateDismissInteraction(rootState);
+    } else if (rootState.dismissInteraction) {
+        rootState.dismissInteraction.cleanup();
+        rootState.dismissInteraction = null;
     }
 
     if (isOpen) {
@@ -154,6 +206,9 @@ export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.triggerElement = element;
+        if (rootState.isOpen) {
+            updateDismissInteraction(rootState);
+        }
     }
 }
 
@@ -164,6 +219,9 @@ export function setPopupElement(rootId, element) {
         // Update hover interaction with the new popup element
         if (rootState.hoverInteraction && element) {
             rootState.hoverInteraction.setFloatingElement(element);
+        }
+        if (rootState.isOpen) {
+            updateDismissInteraction(rootState);
         }
     }
 }
@@ -180,10 +238,26 @@ function buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign
     };
 }
 
-export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback) {
+export function setPositionerId(rootId, positionerId) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.positionerId = positionerId;
+    }
+}
+
+export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, virtualId, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
+    // Build optional position update callback when dotNetRef is provided
+    let onPositionUpdated = null;
+    if (dotNetRef) {
+        onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
+            dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden, arrowUncentered).catch(() => { });
+        };
+    }
+
     const positionerId = await floatingInitializePositioner({
         positionerElement,
-        triggerElement,
+        triggerElement: virtualId ? null : triggerElement,
+        virtualId,
         side,
         align,
         sideOffset,
@@ -195,7 +269,12 @@ export async function initializePositioner(positionerElement, triggerElement, si
         sticky: sticky || false,
         positionMethod: positionMethod || 'fixed',
         disableAnchorTracking: disableAnchorTracking || false,
-        collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback)
+        collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback),
+        onPositionUpdated,
+        dotNetRef: dotNetRef || null,
+        hasSideOffsetFn: hasSideOffsetFn || false,
+        hasAlignOffsetFn: hasAlignOffsetFn || false,
+        hasViewport: hasViewport || false
     });
 
     if (positionerId) {
@@ -205,9 +284,8 @@ export async function initializePositioner(positionerElement, triggerElement, si
     return positionerId;
 }
 
-export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback) {
-    await floatingUpdatePositioner(positionerId, {
-        triggerElement,
+export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
+    const options = {
         side,
         align,
         sideOffset,
@@ -218,8 +296,16 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
         arrowElement,
         sticky: sticky || false,
         positionMethod: positionMethod || 'fixed',
-        collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback)
-    });
+        collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback),
+        hasSideOffsetFn: hasSideOffsetFn || false,
+        hasAlignOffsetFn: hasAlignOffsetFn || false,
+        hasViewport: hasViewport || false
+    };
+    // Only include triggerElement when provided, so virtual anchor is not overwritten
+    if (triggerElement) {
+        options.triggerElement = triggerElement;
+    }
+    await floatingUpdatePositioner(positionerId, options);
 }
 
 export function disposePositioner(positionerId) {
@@ -228,16 +314,65 @@ export function disposePositioner(positionerId) {
 }
 
 // ============================================================================
-// Popup Management
+// Cursor Tracking
 // ============================================================================
 
-export function initializePopup(popupElement) {
-    if (!popupElement) return;
-
-    state.popups.set(popupElement, { popupElement });
+function disposeCursorTrackingInternal(rootState) {
+    if (rootState.clientPointInteraction) {
+        rootState.clientPointInteraction.dispose();
+        rootState.clientPointInteraction = null;
+    }
+    if (rootState.virtualAnchor) {
+        disposeVirtualElement(rootState.virtualAnchor.virtualId);
+        rootState.virtualAnchor = null;
+    }
+    rootState.cursorTrackingCleanup?.();
+    rootState.cursorTrackingCleanup = null;
+    rootState.virtualId = null;
 }
 
-export function disposePopup(popupElement) {
-    if (!popupElement) return;
-    state.popups.delete(popupElement);
+export function initializeCursorTracking(rootId, axis) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !rootState.triggerElement) return null;
+
+    // Clean up any existing cursor tracking
+    disposeCursorTrackingInternal(rootState);
+
+    // Create a virtual element at the trigger's center position
+    const triggerRect = rootState.triggerElement.getBoundingClientRect();
+    const centerX = triggerRect.x + triggerRect.width / 2;
+    const centerY = triggerRect.y + triggerRect.height / 2;
+
+    const virtualAnchor = createVirtualElement(centerX, centerY);
+    rootState.virtualAnchor = virtualAnchor;
+
+    // Set up mousemove listener on the trigger element to update virtual element
+    function onMouseMove(e) {
+        const newRect = rootState.triggerElement.getBoundingClientRect();
+
+        const newX = axis === 'y' ? newRect.x + newRect.width / 2 : e.clientX;
+        const newY = axis === 'x' ? newRect.y + newRect.height / 2 : e.clientY;
+
+        updateVirtualElement(virtualAnchor.virtualId, newX, newY);
+
+        // Trigger position re-computation using stored positioner ID
+        if (rootState.positionerId) {
+            floatingUpdatePositioner(rootState.positionerId, {});
+        }
+    }
+
+    rootState.triggerElement.addEventListener('mousemove', onMouseMove);
+
+    rootState.cursorTrackingCleanup = () => {
+        rootState.triggerElement?.removeEventListener('mousemove', onMouseMove);
+    };
+
+    return virtualAnchor.virtualId;
 }
+
+export function disposeCursorTracking(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+    disposeCursorTrackingInternal(rootState);
+}
+

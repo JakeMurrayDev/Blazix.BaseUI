@@ -1,3 +1,4 @@
+@using BlazorBaseUI.Collapsible
 @using Microsoft.JSInterop
 
 @implements IAsyncDisposable
@@ -63,6 +64,9 @@
 
     [CascadingParameter]
     private IAccordionItemContext? ItemContext { get; set; }
+
+    [CascadingParameter]
+    private CollapsibleRootContext? CollapsibleContext { get; set; }
 
     /// <summary>
     /// Determines whether to keep the element in the DOM while the panel is closed.
@@ -198,11 +202,12 @@
                 try
                 {
                     var module = await moduleTask.Value;
-                    await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, CurrentOpen, CssVarPrefix);
+                    await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, CurrentOpen, CssVarPrefix, ResolvedHiddenUntilFound, ResolvedKeepMounted);
                     jsInitialized = true;
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
 
@@ -234,6 +239,7 @@
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
@@ -277,6 +283,18 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Called from JavaScript when the browser's "find in page" reveals <c>hidden="until-found"</c> content.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnBeforeMatch()
+    {
+        if (CollapsibleContext is not null)
+        {
+            await CollapsibleContext.HandleBeforeMatch();
+        }
+    }
+
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
@@ -293,8 +311,7 @@
         attrs["data-open"] = state.Open;
         attrs["data-closed"] = !state.Open;
         attrs["data-disabled"] = state.Disabled;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }
@@ -313,7 +330,7 @@
 
             if (!jsInitialized)
             {
-                await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, false, CssVarPrefix);
+                await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, false, CssVarPrefix, ResolvedHiddenUntilFound, ResolvedKeepMounted);
                 jsInitialized = true;
             }
 
@@ -323,6 +340,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
@@ -340,6 +358,7 @@
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 }

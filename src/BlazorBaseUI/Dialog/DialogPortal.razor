@@ -4,6 +4,10 @@
 {
     <CascadingValue TValue="DialogPortalContext" Value="portalContext" IsFixed="true">
         <Portal Target="@Container">
+            @if (Context.Mounted && Context.Modal == DialogModalMode.True)
+            {
+                <InternalBackdrop Inert="@(!Context.Open)" @ref="internalBackdropRef" />
+            }
             @ChildContent
         </Portal>
     </CascadingValue>
@@ -11,6 +15,8 @@
 
 @code {
     private DialogPortalContext portalContext = null!;
+    private InternalBackdrop? internalBackdropRef;
+    private ElementReference? previousBackdropElement;
 
     [CascadingParameter]
     private DialogRootContext? Context { get; set; }
@@ -52,6 +58,17 @@
         if (portalContext is not null)
         {
             portalContext.KeepMounted = KeepMounted;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        var currentElement = internalBackdropRef?.Element;
+        if (!Nullable.Equals(previousBackdropElement, currentElement))
+        {
+            previousBackdropElement = currentElement;
+            Context?.SetBackdropElement(currentElement);
         }
     }
 }

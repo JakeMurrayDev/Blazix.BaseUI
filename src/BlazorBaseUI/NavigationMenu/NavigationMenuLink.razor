@@ -97,6 +97,8 @@
             attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         }
 
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
+
         componentAttributes = attrs;
     }
 
@@ -104,9 +106,17 @@
     {
         if (CloseOnClick)
         {
-            RootContext?.EmitClose();
+            if (RootContext is not null)
+            {
+                await RootContext.EmitLinkCloseAsync();
+            }
         }
 
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlurAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
     }
 }

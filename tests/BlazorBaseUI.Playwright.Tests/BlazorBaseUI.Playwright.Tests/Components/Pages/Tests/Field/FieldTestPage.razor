@@ -339,11 +339,11 @@
 
     private TestFormModel model = new();
     private bool agreeChecked;
-    private bool touchedState;
-    private bool dirtyState;
-    private bool filledState;
-    private bool focusedState;
-    private bool? validState;
+    private bool touchedState = false;
+    private bool dirtyState = false;
+    private bool filledState = false;
+    private bool focusedState = false;
+    private bool? validState = null;
     private int submitCount;
     private int validationCount;
     private string lastError = "";

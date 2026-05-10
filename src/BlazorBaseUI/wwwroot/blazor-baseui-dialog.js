@@ -41,7 +41,7 @@ function handleGlobalKeyDown(e) {
     }
 }
 
-export function initializeRoot(rootId, dotNetRef, modal) {
+export function initializeRoot(rootId, dotNetRef, modal, disablePointerDismissal) {
     initGlobalListeners();
 
     state.roots.set(rootId, {
@@ -49,6 +49,7 @@ export function initializeRoot(rootId, dotNetRef, modal) {
         dotNetRef,
         isOpen: false,
         modal: modal || 'true',
+        disablePointerDismissal: disablePointerDismissal || false,
         triggerElement: null,
         popupElement: null,
         backdropElement: null,
@@ -261,7 +262,7 @@ function focusPopup(rootState, popupElement) {
         initialFocus,
         returnFocus: returnFocusTarget,
         interactionType: effectiveInteractionType || '',
-        closeOnFocusOut: rootState.modal === 'false',
+        closeOnFocusOut: !rootState.disablePointerDismissal,
         insideElements,
         onClose: rootState.modal === 'false' ? () => {
             if (rootState.isOpen && rootState.dotNetRef) {
@@ -302,8 +303,9 @@ function setupOutsideClickListener(rootState) {
         if (!popupElement) return;
         if (!rootState.isOpen) return;
 
-        const clickedInsidePopup = popupElement.contains(e.target);
-        const clickedOnTrigger = triggerElement && triggerElement.contains(e.target);
+        const target = e.composedPath ? e.composedPath()[0] : e.target;
+        const clickedInsidePopup = popupElement.contains(target);
+        const clickedOnTrigger = triggerElement && triggerElement.contains(target);
 
         if (!clickedInsidePopup && !clickedOnTrigger && rootState.dotNetRef) {
             rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
