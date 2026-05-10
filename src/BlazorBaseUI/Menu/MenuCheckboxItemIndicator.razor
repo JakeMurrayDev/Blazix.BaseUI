@@ -200,8 +200,7 @@
         attrs["data-checked"] = state.Checked;
         attrs["data-unchecked"] = !state.Checked;
         attrs["data-disabled"] = state.Disabled;
-        attrs["data-starting-style"] = state.TransitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = state.TransitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }

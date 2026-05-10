@@ -126,8 +126,7 @@
         }
 
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        attrs["data-starting-style"] = transitionStatus == TransitionStatus.Starting;
-        attrs["data-ending-style"] = transitionStatus == TransitionStatus.Ending;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
 
@@ -149,10 +148,10 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("initializePopup", Element.Value);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        }        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
-        }
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
     }
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
@@ -201,8 +200,9 @@
                 await RootContext.SetOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover, null);
             }
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
@@ -230,10 +230,10 @@
                 var module = await ModuleTask.Value;
                 await module.InvokeVoidAsync("disposePopup", Element.Value);
                 await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            }            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
-            }
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
         }
 
     }
