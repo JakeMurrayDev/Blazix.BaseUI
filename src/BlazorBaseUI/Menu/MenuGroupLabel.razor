@@ -14,10 +14,14 @@
 @code {
     private static readonly MenuGroupLabelState CachedState = new();
 
-    private string id = default!;
+    private string? defaultId;
+    private string? lastRegisteredId;
     private bool hasRegisteredId;
     private RenderElement<MenuGroupLabelState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
     [CascadingParameter]
     private IMenuGroupContext? GroupContext { get; set; }
@@ -61,18 +65,17 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => $"menu-group-label-{Guid.NewGuid():N}");
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var newId = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => id);
-        if (newId != id)
+        var currentId = ResolvedId;
+        if (hasRegisteredId && currentId != lastRegisteredId)
         {
-            id = newId;
-            GroupContext?.SetLabelId(id);
+            lastRegisteredId = currentId;
+            GroupContext?.SetLabelId(currentId);
         }
 
         BuildComponentAttributes();
@@ -83,7 +86,8 @@
     {
         if (firstRender && !hasRegisteredId)
         {
-            GroupContext?.SetLabelId(id);
+            lastRegisteredId = ResolvedId;
+            GroupContext?.SetLabelId(lastRegisteredId);
             hasRegisteredId = true;
         }
     }
@@ -101,7 +105,7 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["id"] = id;
+        attrs["id"] = ResolvedId;
         attrs["role"] = "presentation";
 
         componentAttributes = attrs;
