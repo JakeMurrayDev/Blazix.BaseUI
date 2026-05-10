@@ -300,7 +300,7 @@ internal interface ISelectRootContext
     /// decide whether to render an <c>InternalBackdrop</c> and acquire a body
     /// scroll lock.
     /// </summary>
-    bool Modal { get; }
+    bool Modal { get; set; }
 
     /// <summary>
     /// Gets the ordered list of currently-mounted item values. Mirrors the
