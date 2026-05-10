@@ -6,6 +6,7 @@ public class NavigationMenuViewportTests : BunitContext, INavigationMenuViewport
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateViewportInRoot(
@@ -50,6 +51,39 @@ public class NavigationMenuViewportTests : BunitContext, INavigationMenuViewport
 
         var div = cut.Find("div[data-testid='viewport']");
         div.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasGeneratedId()
+    {
+        var cut = Render(CreateViewportInRoot());
+
+        var div = cut.Find("div[id]");
+        div.GetAttribute("id").ShouldNotBeNullOrEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasBlurHandlerWired()
+    {
+        var cut = Render(CreateViewportInRoot());
+
+        var div = cut.Find("div[id]");
+        div.HasAttribute("blazor:onblur").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersViewportTargetAndFocusGuards()
+    {
+        var cut = Render(CreateViewportInRoot());
+
+        cut.Find("div[data-blazor-base-ui-navigation-menu-viewport-target]");
+        cut.FindAll("span[data-blazor-base-ui-focus-guard]").Count.ShouldBe(2);
 
         return Task.CompletedTask;
     }

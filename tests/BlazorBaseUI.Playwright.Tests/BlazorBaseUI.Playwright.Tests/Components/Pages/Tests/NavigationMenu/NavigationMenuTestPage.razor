@@ -14,7 +14,7 @@
         OnValueChange="HandleValueChange">
         <NavigationMenuList>
             <NavigationMenuItem Value="item1">
-                <NavigationMenuTrigger data-testid="nav-trigger-1">
+                <NavigationMenuTrigger Disabled="@DisableItem1" data-testid="nav-trigger-1">
                     <NavigationMenuIcon />
                     Item 1
                 </NavigationMenuTrigger>
@@ -90,6 +90,9 @@
 
     [SupplyParameterFromQuery(Name = "showNestedNav")]
     public bool ShowNestedNav { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disableItem1")]
+    public bool DisableItem1 { get; set; }
 
     private string? currentValue;
     private int changeCount;

@@ -1,4 +1,5 @@
 @using BlazorBaseUI.Utilities
+@using BlazorBaseUI.FocusGuard
 @using Microsoft.AspNetCore.Components.Web
 
 <RenderElement TState="NavigationMenuTriggerState"
@@ -13,10 +14,23 @@
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
+@if (ShouldRenderFocusGuards)
+{
+    <FocusGuard OnFocus="HandleBeforeGuardFocusAsync" />
+    <span aria-owns="@RootContext?.ViewportId" style="@OwnerVisuallyHiddenStyle"></span>
+    <FocusGuard OnFocus="HandleAfterGuardFocusAsync" @ref="afterGuardRef" />
+}
+
 @code {
+    private const string OwnerVisuallyHiddenStyle =
+        "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0;";
+
     private NavigationMenuTriggerState state;
     private RenderElement<NavigationMenuTriggerState>? renderElementReference;
+    private FocusGuard? afterGuardRef;
     private Dictionary<string, object> componentAttributes = new();
+
+    private bool ShouldRenderFocusGuards => IsItemActive();
 
     [CascadingParameter]
     private NavigationMenuRootContext? RootContext { get; set; }
@@ -109,6 +123,7 @@
             attrs["aria-controls"] = RootContext.PopupId;
         }
 
+        // lint-ignore:RULE-05 React parity selector consumed by NavigationMenu JS.
         attrs["data-base-ui-navigation-menu-trigger"] = true;
 
         if (state.Open)
@@ -119,12 +134,53 @@
 
         if (Disabled)
         {
-            attrs["disabled"] = true;
+            attrs["aria-disabled"] = "true";
         }
 
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
+        attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseMoveAsync);
+        attrs["onpointerenter"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEnterAsync);
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
 
         componentAttributes = attrs;
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleFocusAsync(FocusEventArgs e)
+    {
+        if (IsItemActive())
+        {
+            RootContext?.SetViewportInert(false);
+        }
+
+        return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlurAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleMouseMoveAsync(MouseEventArgs e)
+    {
+        return EventUtilities.InvokeOnMouseMoveAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandlePointerEnterAsync(PointerEventArgs e)
+    {
+        return EventUtilities.InvokeOnPointerEnterAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        return EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleClickAsync(MouseEventArgs e)
@@ -135,11 +191,23 @@
         }
 
         var nextValue = IsItemActive() ? null : ItemContext.Value;
-        await RootContext.SetValueAsync(nextValue);
+        await RootContext.SetValueAsync(nextValue, NavigationMenuCloseReason.TriggerPress);
 
         state = new NavigationMenuTriggerState(IsItemActive());
         BuildComponentAttributes();
 
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBeforeGuardFocusAsync()
+    {
+        RootContext?.RequestFocusPrevious(Element);
+        return Task.CompletedTask;
+    }
+
+    private Task HandleAfterGuardFocusAsync()
+    {
+        RootContext?.RequestFocusInside(afterGuardRef?.Element, Element);
+        return Task.CompletedTask;
     }
 }

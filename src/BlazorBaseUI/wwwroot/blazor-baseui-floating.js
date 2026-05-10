@@ -488,6 +488,7 @@ export async function initializePositioner(options) {
         // position/top/left/visibility/data-positioned. Component-specific
         // align-item passes own those writes.
         alignItemWithTriggerActive: !!options.alignItemWithTriggerActive,
+        preservePositionerStyles: options.preservePositionerStyles !== false,
         onPositionUpdated: options.onPositionUpdated || null,
         dotNetRef: options.dotNetRef || null,
         hasSideOffsetFn: options.hasSideOffsetFn || false,
@@ -501,7 +502,9 @@ export async function initializePositioner(options) {
     };
 
     state.positioners.set(positionerId, positionerState);
-    setupPositionStylePreserver(positionerState);
+    if (positionerState.preservePositionerStyles) {
+        setupPositionStylePreserver(positionerState);
+    }
     await updatePositionInternal(positionerState);
     await setupAutoUpdate(positionerState);
 

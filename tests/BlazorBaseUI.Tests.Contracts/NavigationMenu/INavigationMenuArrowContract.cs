@@ -8,5 +8,10 @@ public interface INavigationMenuArrowContract
     Task HasDataSide();
     Task HasDataAlign();
     Task AppliesClassValue();
+    Task AppliesStyleValue();
+    Task RendersWithCustomRender();
+    Task HasDataOpenWhenOpen();
+    Task HasDataClosedWhenClosed();
+    Task HasDataUncenteredWhenUncentered();
     Task RequiresContext();
 }

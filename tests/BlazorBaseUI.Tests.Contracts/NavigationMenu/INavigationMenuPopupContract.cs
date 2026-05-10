@@ -10,4 +10,11 @@ public interface INavigationMenuPopupContract
     Task HasTabIndexMinusOne();
     Task AppliesClassValue();
     Task RequiresContext();
+    Task HasDataOpenWhenOpen();
+    Task HasDataClosedWhenClosed();
+    Task HasDataStartingStyleDuringTransition();
+    Task HasDataEndingStyleDuringTransition();
+    Task HasDataAnchorHiddenWhenAnchorHidden();
+    Task AppliesOriginSideStyleForTopSide();
+    Task AppliesRtlOriginSideStyleForInlineEnd();
 }

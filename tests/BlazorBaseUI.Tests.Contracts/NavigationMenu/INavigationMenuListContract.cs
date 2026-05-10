@@ -5,5 +5,6 @@ public interface INavigationMenuListContract
     Task RendersUlByDefault();
     Task ForwardsAdditionalAttributes();
     Task AppliesClassValue();
+    Task HasKeyDownHandlerWhenNotNested();
     Task RequiresContext();
 }

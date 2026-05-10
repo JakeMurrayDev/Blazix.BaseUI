@@ -15,7 +15,7 @@
                         <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                             <NavigationMenuIcon /> Getting Started
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-full left-0 mt-2 w-96 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-96 p-4">
                             <div class="flex flex-col gap-2">
                                 <NavigationMenuLink Href="#introduction" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Introduction</NavigationMenuLink>
                                 <NavigationMenuLink Href="#installation" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Installation</NavigationMenuLink>
@@ -27,7 +27,7 @@
                         <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                             <NavigationMenuIcon /> Components
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-full left-0 mt-2 w-96 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-96 p-4">
                             <div class="flex flex-col gap-2">
                                 <NavigationMenuLink Href="#buttons" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Buttons</NavigationMenuLink>
                                 <NavigationMenuLink Href="#inputs" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Inputs</NavigationMenuLink>
@@ -39,7 +39,7 @@
                         <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                             <NavigationMenuIcon /> Resources
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-full left-0 mt-2 w-96 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-96 p-4">
                             <div class="flex flex-col gap-2">
                                 <NavigationMenuLink Href="#docs" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Documentation</NavigationMenuLink>
                                 <NavigationMenuLink Href="#examples" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Examples</NavigationMenuLink>
@@ -47,6 +47,15 @@
                         </NavigationMenuContent>
                     </NavigationMenuItem>
                 </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
             </NavigationMenuRoot>
             <p class="text-sm text-gray-500">Active: @(basicValue ?? "none")</p>
         </div>
@@ -64,7 +73,7 @@
                         <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                             Tab 1
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-full left-0 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-80 p-4">
                             <p class="text-sm text-gray-600">Content for Tab 1</p>
                         </NavigationMenuContent>
                     </NavigationMenuItem>
@@ -72,11 +81,20 @@
                         <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                             Tab 2
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-full left-0 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-80 p-4">
                             <p class="text-sm text-gray-600">Content for Tab 2</p>
                         </NavigationMenuContent>
                     </NavigationMenuItem>
                 </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
             </NavigationMenuRoot>
             <div class="flex gap-2">
                 <button type="button"
@@ -108,7 +126,7 @@
                     <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
                         <NavigationMenuIcon /> Pages
                     </NavigationMenuTrigger>
-                    <NavigationMenuContent class="absolute top-full left-0 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                    <NavigationMenuContent class="w-80 p-4">
                         <div class="flex flex-col gap-2">
                             <NavigationMenuLink Href="/navigation-menu" Active="true"
                                                 class="block rounded-md p-2 text-sm font-semibold text-blue-700 bg-blue-50">
@@ -126,6 +144,15 @@
                     </NavigationMenuContent>
                 </NavigationMenuItem>
             </NavigationMenuList>
+            <NavigationMenuPortal KeepMounted="true">
+                <NavigationMenuPositioner SideOffset="8"
+                                          Align="Align.Start"
+                                          class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                    <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                    </NavigationMenuPopup>
+                </NavigationMenuPositioner>
+            </NavigationMenuPortal>
         </NavigationMenuRoot>
     </DemoSection>
 
@@ -141,7 +168,7 @@
                         <NavigationMenuTrigger class="w-full rounded-md px-3 py-2 text-sm font-medium text-gray-700 text-left hover:bg-white hover:shadow-sm transition-all">
                             <NavigationMenuIcon /> Dashboard
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-0 left-full ml-2 w-64 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-64 p-4">
                             <div class="flex flex-col gap-2">
                                 <NavigationMenuLink Href="#overview" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Overview</NavigationMenuLink>
                                 <NavigationMenuLink Href="#analytics" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Analytics</NavigationMenuLink>
@@ -152,7 +179,7 @@
                         <NavigationMenuTrigger class="w-full rounded-md px-3 py-2 text-sm font-medium text-gray-700 text-left hover:bg-white hover:shadow-sm transition-all">
                             <NavigationMenuIcon /> Settings
                         </NavigationMenuTrigger>
-                        <NavigationMenuContent class="absolute top-0 left-full ml-2 w-64 rounded-lg border border-gray-200 bg-white p-4 shadow-lg">
+                        <NavigationMenuContent class="w-64 p-4">
                             <div class="flex flex-col gap-2">
                                 <NavigationMenuLink Href="#profile" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Profile</NavigationMenuLink>
                                 <NavigationMenuLink Href="#security" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Security</NavigationMenuLink>
@@ -160,6 +187,16 @@
                         </NavigationMenuContent>
                     </NavigationMenuItem>
                 </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner Side="Side.Right"
+                                              SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
             </NavigationMenuRoot>
             <p class="text-sm text-gray-500">Active: @(verticalValue ?? "none")</p>
         </div>

@@ -145,6 +145,48 @@ public abstract class NavigationMenuTestsBase : TestBase
         await WaitForActiveValueAsync("none");
     }
 
+    /// <summary>
+    /// Tests that moving focus outside the navigation menu closes it through focusout handling.
+    /// </summary>
+    [Fact]
+    public virtual async Task ClosesWhenFocusLeavesMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu"));
+
+        var trigger = GetByTestId("nav-trigger-1");
+        await trigger.ClickAsync();
+        await WaitForActiveValueAsync("item1");
+
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.FocusAsync();
+        await WaitForActiveValueAsync("none");
+    }
+
+    #endregion
+
+    #region Disabled Tests
+
+    /// <summary>
+    /// Tests that disabled triggers stay focusable, expose aria-disabled, and do not open.
+    /// </summary>
+    [Fact]
+    public virtual async Task DisabledTriggerRemainsFocusableAndDoesNotOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu")
+            .WithNavDisableItem1(true));
+
+        var trigger = GetByTestId("nav-trigger-1");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-disabled", "true");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("tabindex", "0");
+
+        await trigger.FocusAsync();
+        var activeTestId = await Page.EvaluateAsync<string?>("() => document.activeElement?.getAttribute('data-testid')");
+        Assert.Equal("nav-trigger-1", activeTestId);
+
+        await trigger.ClickAsync(new LocatorClickOptions { Force = true });
+        await WaitForActiveValueAsync("none");
+    }
+
     #endregion
 
     #region Default Value Tests

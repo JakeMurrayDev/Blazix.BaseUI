@@ -1,3 +1,9 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
 <RenderElement TState="NavigationMenuListState"
                Tag="ul"
                State="state"
@@ -5,11 +11,28 @@
                Render="Render"
                ClassValue="ClassValue"
                StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
                ChildContent="ChildContent"
-               @attributes="AdditionalAttributes" />
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
 
 @code {
     private NavigationMenuListState state;
+    private RenderElement<NavigationMenuListState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? compositeModuleTask;
+    private bool hasRendered;
+    private bool compositeInitialized;
+
+    /// <summary>
+    /// Gets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    private Lazy<Task<IJSObjectReference>> CompositeModuleTask =>
+        compositeModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/BlazorBaseUI/blazor-baseui-composite.js").AsTask());
 
     [CascadingParameter]
     private NavigationMenuRootContext? RootContext { get; set; }
@@ -50,5 +73,79 @@
     {
         var open = RootContext?.GetValue() is not null;
         state = new NavigationMenuListState(open);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender || RootContext is null || RootContext.IsNested)
+        {
+            return;
+        }
+
+        hasRendered = true;
+        _ = InitializeCompositeAsync();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (compositeModuleTask?.IsValueCreated == true && hasRendered && compositeInitialized && Element.HasValue)
+        {
+            try
+            {
+                var module = await CompositeModuleTask.Value;
+                await module.InvokeVoidAsync("dispose", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private async Task InitializeCompositeAsync()
+    {
+        if (!Element.HasValue || RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await CompositeModuleTask.Value;
+            var orientation = RootContext.Orientation == NavigationMenuOrientation.Horizontal ? "horizontal" : "vertical";
+            await module.InvokeVoidAsync("initialize", Element.Value, new
+            {
+                orientation,
+                loop = false,
+                enableHomeAndEndKeys = true,
+                direction = RootContext.Direction
+            });
+            compositeInitialized = true;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (RootContext?.IsNested != true)
+        {
+            attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 }

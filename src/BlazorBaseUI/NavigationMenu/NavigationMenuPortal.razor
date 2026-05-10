@@ -43,6 +43,11 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("Base UI: NavigationMenuRootContext is missing. Navigation Menu parts must be placed within <NavigationMenu.Root>.");
+        }
+
         if (portalContext.KeepMounted != KeepMounted)
         {
             portalContext.KeepMounted = KeepMounted;

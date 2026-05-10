@@ -6,6 +6,7 @@ public class NavigationMenuListTests : BunitContext, INavigationMenuListContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateListInRoot(
@@ -63,6 +64,17 @@ public class NavigationMenuListTests : BunitContext, INavigationMenuListContract
 
         var ul = cut.Find("ul");
         ul.GetAttribute("class")!.ShouldContain("list-class");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasKeyDownHandlerWhenNotNested()
+    {
+        var cut = Render(CreateListInRoot());
+
+        var ul = cut.Find("ul");
+        ul.HasAttribute("blazor:onkeydown").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

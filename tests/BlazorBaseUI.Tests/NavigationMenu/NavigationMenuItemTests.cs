@@ -6,6 +6,7 @@ public class NavigationMenuItemTests : BunitContext, INavigationMenuItemContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateItemInRoot(

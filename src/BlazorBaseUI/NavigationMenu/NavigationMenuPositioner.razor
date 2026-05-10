@@ -18,18 +18,27 @@
 </CascadingValue>
 
 @code {
-    private Lazy<Task<IJSObjectReference>>? moduleTask;
-    private bool hasRendered;
+    private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
-    private string? positionerId;
+    private bool positioned;
     private NavigationMenuPositionerState state;
     private NavigationMenuPositionerContext positionerContext = null!;
     private RenderElement<NavigationMenuPositionerState>? renderElementReference;
+    private DotNetObjectReference<NavigationMenuPositioner>? dotNetRef;
     private Dictionary<string, object> componentAttributes = new();
 
-    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
-        JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.js").AsTask());
+    private CollisionAvoidance ResolvedCollisionAvoidance =>
+        CollisionAvoidance ?? new CollisionAvoidance
+        {
+            Side = CollisionAvoidanceSideMode.Flip,
+            Align = CollisionAvoidanceAlignMode.Flip,
+            FallbackAxisSide = RootContext?.IsNested == true
+                ? CollisionAvoidanceFallbackAxisSide.End
+                : CollisionAvoidanceFallbackAxisSide.None
+        };
+
+    private DotNetObjectReference<NavigationMenuPositioner> DotNetRef =>
+        dotNetRef ??= DotNetObjectReference.Create(this);
 
     [CascadingParameter]
     private NavigationMenuRootContext? RootContext { get; set; }
@@ -72,9 +81,10 @@
 
     /// <summary>
     /// Gets or sets how to handle collisions when positioning the popup.
+    /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
     /// </summary>
     [Parameter]
-    public CollisionAvoidance CollisionAvoidance { get; set; } = CollisionAvoidance.FlipShift;
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
 
     /// <summary>
     /// Gets or sets the minimum distance to maintain between the arrow and the edges of the popup.
@@ -148,6 +158,10 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        positionerInterop = new PositionerInterop(
+            JSRuntime,
+            "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.js");
+
         positionerContext = new NavigationMenuPositionerContext
         {
             Side = Side,
@@ -175,12 +189,13 @@
     {
         if (firstRender)
         {
-            hasRendered = true;
+            positionerInterop.MarkRendered();
+            RootContext?.SetPositionerElement(Element);
         }
 
-        if (hasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
         {
-            if (string.IsNullOrEmpty(positionerId))
+            if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
             }
@@ -194,18 +209,39 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && hasRendered && !string.IsNullOrEmpty(positionerId))
+        await positionerInterop.DisposeAsync();
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Updates the positioner state after JavaScript computes placement metadata.
+    /// </summary>
+    [JSInvokable]
+    public Task OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        positioned = true;
+
+        if (Enum.TryParse<Side>(side, ignoreCase: true, out var parsedSide))
         {
-            try
-            {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposePositioner", positionerId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-            }
+            positionerContext.Side = parsedSide;
         }
+
+        if (Enum.TryParse<Align>(align, ignoreCase: true, out var parsedAlign))
+        {
+            positionerContext.Align = parsedAlign;
+        }
+
+        positionerContext.AnchorHidden = anchorHidden;
+        positionerContext.ArrowUncentered = arrowUncentered;
+
+        state = state with
+        {
+            Side = positionerContext.Side,
+            Align = positionerContext.Align,
+            AnchorHidden = anchorHidden
+        };
+        BuildComponentAttributes();
+        return InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()
@@ -215,6 +251,7 @@
         var mounted = RootContext?.GetMounted() ?? false;
 
         attrs["role"] = "presentation";
+        attrs["data-blazor-base-ui-positioner"] = true;
 
         if (!mounted)
         {
@@ -223,11 +260,20 @@
 
         if (!open)
         {
-            attrs["style"] = "pointer-events: none";
+            attrs["inert"] = true;
         }
 
-        attrs["data-side"] = Side.ToDataAttributeString()!;
-        attrs["data-align"] = Align.ToDataAttributeString()!;
+        // NOTE: Do NOT set inline "style" here. JS manages position styles on this
+        // element; if C# sets the style attribute, Blazor's diff will clobber JS-set
+        // values on re-render. Pointer-events handled by global CSS in blazor-baseui-floating.js.
+
+        attrs["data-side"] = state.Side.ToDataAttributeString()!;
+        attrs["data-align"] = state.Align.ToDataAttributeString()!;
+
+        if (positioned)
+        {
+            attrs["data-positioned"] = true;
+        }
 
         if (open)
         {
@@ -260,11 +306,27 @@
 
         arrowElement = element;
 
-        if (hasRendered && !string.IsNullOrEmpty(positionerId))
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
         {
             _ = UpdatePositionAsync();
         }
     }
+
+    private PositionerConfig BuildConfig() => new()
+    {
+        Side = Side,
+        Align = Align,
+        SideOffset = SideOffset,
+        AlignOffset = AlignOffset,
+        CollisionPadding = CollisionPadding,
+        CollisionBoundary = CollisionBoundary,
+        ArrowPadding = ArrowPadding,
+        Sticky = Sticky,
+        PositionMethod = PositionMethod,
+        DisableAnchorTracking = DisableAnchorTracking,
+        CollisionAvoidance = ResolvedCollisionAvoidance,
+        UseCollisionAvoidanceObject = true
+    };
 
     private async Task InitializePositionerAsync()
     {
@@ -286,34 +348,13 @@
             return;
         }
 
-        try
-        {
-            var module = await ModuleTask.Value;
-            positionerId = await module.InvokeAsync<string>(
-                "initializePositioner",
-                Element.Value,
-                anchorElement.Value,
-                Side.ToDataAttributeString(),
-                Align.ToDataAttributeString(),
-                SideOffset,
-                AlignOffset,
-                CollisionPadding,
-                CollisionBoundary.ToDataAttributeString(),
-                ArrowPadding,
-                arrowElement,
-                Sticky,
-                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
-                DisableAnchorTracking,
-                CollisionAvoidance.ToDataAttributeString());
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
+        await positionerInterop.InitializeAsync(
+            Element.Value, anchorElement.Value, BuildConfig(), arrowElement, DotNetRef);
     }
 
     private async Task UpdatePositionAsync()
     {
-        if (string.IsNullOrEmpty(positionerId) || RootContext is null)
+        if (!positionerInterop.IsInitialized || RootContext is null)
         {
             return;
         }
@@ -330,27 +371,6 @@
             return;
         }
 
-        try
-        {
-            var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync(
-                "updatePosition",
-                positionerId,
-                anchorElement.Value,
-                Side.ToDataAttributeString(),
-                Align.ToDataAttributeString(),
-                SideOffset,
-                AlignOffset,
-                CollisionPadding,
-                CollisionBoundary.ToDataAttributeString(),
-                ArrowPadding,
-                arrowElement,
-                Sticky,
-                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
-                CollisionAvoidance.ToDataAttributeString());
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-        }
+        await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement);
     }
 }

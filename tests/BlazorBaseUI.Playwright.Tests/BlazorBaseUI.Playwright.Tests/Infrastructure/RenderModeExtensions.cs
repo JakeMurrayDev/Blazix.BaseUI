@@ -949,6 +949,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithNavDisableItem1(bool value)
+    {
+        queryParams["disableItem1"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithShowNestedNav(bool value)
     {
         queryParams["showNestedNav"] = value.ToString().ToLowerInvariant();

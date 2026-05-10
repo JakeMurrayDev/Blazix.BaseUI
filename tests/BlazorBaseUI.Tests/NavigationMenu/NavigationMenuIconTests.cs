@@ -6,6 +6,7 @@ public class NavigationMenuIconTests : BunitContext, INavigationMenuIconContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateIconInRoot(

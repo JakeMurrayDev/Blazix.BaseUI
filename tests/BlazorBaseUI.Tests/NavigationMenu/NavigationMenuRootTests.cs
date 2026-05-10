@@ -6,6 +6,7 @@ public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
     private RenderFragment CreateNavRoot(
@@ -107,6 +108,17 @@ public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
 
         var divs = cut.FindAll("div");
         divs.ShouldNotBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersDataOrientation()
+    {
+        var cut = Render(CreateNavRoot(orientation: NavigationMenuOrientation.Vertical));
+
+        var nav = cut.Find("nav");
+        nav.GetAttribute("data-orientation").ShouldBe("vertical");
 
         return Task.CompletedTask;
     }
@@ -223,6 +235,25 @@ public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
     }
 
     [Fact]
+    public Task ControlledNullValueDoesNotFallbackToDefaultValue()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<NavigationMenuRoot>(0);
+            builder.AddAttribute(1, "Value", (string?)null);
+            builder.AddAttribute(2, "ValueChanged", EventCallback.Factory.Create<string?>(this, _ => { }));
+            builder.AddAttribute(3, "DefaultValue", "item1");
+            builder.AddAttribute(4, "ChildContent", CreateChildContent());
+            builder.CloseComponent();
+        });
+
+        var trigger = cut.Find("button[id='nav-trigger-item1']");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task InvokesOnValueChange()
     {
         var invoked = false;
@@ -251,7 +282,7 @@ public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
         var cut = Render(CreateNavRoot(orientation: NavigationMenuOrientation.Vertical));
 
         var nav = cut.Find("nav");
-        nav.GetAttribute("aria-orientation").ShouldBe("vertical");
+        nav.HasAttribute("aria-orientation").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
