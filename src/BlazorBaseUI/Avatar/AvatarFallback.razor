@@ -138,8 +138,9 @@
             delayPassed = true;
             await InvokeAsync(StateHasChanged);
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException ex)
         {
+            _ = ex; // Expected during task cancellation - safe to ignore.
         }
     }
 }
