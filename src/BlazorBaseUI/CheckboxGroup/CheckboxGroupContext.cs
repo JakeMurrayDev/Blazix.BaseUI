@@ -222,4 +222,13 @@ internal sealed class CheckboxGroupParent
     {
         disabledStates[value] = disabled;
     }
+
+    /// <summary>
+    /// Removes the tracked disabled state for a child checkbox that has been disposed.
+    /// </summary>
+    /// <param name="value">The value of the child checkbox to remove.</param>
+    public void RemoveDisabledState(string value)
+    {
+        disabledStates.Remove(value);
+    }
 }
