@@ -91,9 +91,11 @@ Enforces coding standards from this document. Suppress a violation with `// lint
 
 ### 1. Pre-Generation Validation Rule (Mandatory)
 
-1. Check relevant files in `/.base-ui`
-2. List all relevant components found
-3. Create an implementation plan (Outline files, structure, and approach)
+1. **Consult the framework-agnostic spec** at `../base-ui-specs/<component>/SPEC.md` first — it captures the component's full behavioral surface and pre-flagged Blazor pitfalls (`pitfalls.md`). If the spec is missing for the target component, fall back to the React source.
+2. Check relevant files in `/.base-ui`
+3. List all relevant components found
+4. Create an implementation plan (Outline files, structure, and approach)
+5. When you discover a behavior the spec doesn't capture, **update the spec** in `../base-ui-specs/<component>/` in the same change — scar tissue belongs in the spec, not only in the Blazor port.
 
 ### 2. Code Ordering (Strict)
 
@@ -193,6 +195,7 @@ See [Event Handler Override Prevention](.claude/rules/event-handler-override.md)
 
 ## Commit and PR Style
 
+- Do NOT commit until I say that I have personally tested your changes
 - Do NOT add "Generated with Claude Code" or co-author footers to commits or PRs
 - Keep commit messages concise and descriptive
 - PR descriptions should focus on what changed and why

@@ -377,3 +377,4 @@ nul
 tests/BlazorBaseUI.Playwright.Tests/traces/
 .playwright-cli
 .playwright-mcp
+/.mcp.json

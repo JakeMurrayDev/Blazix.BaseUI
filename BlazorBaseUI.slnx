@@ -1,8 +1,10 @@
 <Solution>
   <Project Path="demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo.Client/BlazorBaseUI.Demo.Client.csproj" Id="3efa86e8-ea92-4195-a583-dc259f7a52d1" />
   <Project Path="demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo.csproj" Id="841184b9-1ce8-4637-8d8a-de9d33cf4dfd" />
+  <Project Path="src/BlazorBaseUI.Analyzers/BlazorBaseUI.Analyzers.csproj">
+    <Build Solution="Debug|*" Project="false" />
+  </Project>
   <Project Path="src/BlazorBaseUI.Utilities/BlazorBaseUI.Utilities.csproj" Id="d8794365-8a79-477f-9999-1faa26d6c393" />
-  <Project Path="src/BlazorBaseUI.Analyzers/BlazorBaseUI.Analyzers.csproj" />
   <Project Path="src/BlazorBaseUI/BlazorBaseUI.csproj" Id="d7bfad9f-d1f2-42c5-9d80-9fec3257980b" />
   <Project Path="tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.Client/BlazorBaseUI.Playwright.Tests.Client.csproj" />
   <Project Path="tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj" />
