@@ -8,25 +8,25 @@ namespace BlazorBaseUI.Popover;
 /// </summary>
 internal sealed class PopoverFloatingRootContextAdapter : IFloatingRootContext
 {
-    private readonly PopoverRootContext _context;
+    private readonly PopoverRootContext context;
 
-    public PopoverFloatingRootContextAdapter(PopoverRootContext context) => _context = context;
-
-    /// <inheritdoc />
-    public string FloatingId => _context.RootId;
+    public PopoverFloatingRootContextAdapter(PopoverRootContext context) => this.context = context;
 
     /// <inheritdoc />
-    public bool GetOpen() => _context.GetOpen();
+    public string FloatingId => context.RootId;
 
     /// <inheritdoc />
-    public ElementReference? GetTriggerElement() => _context.GetTriggerElement();
+    public bool GetOpen() => context.GetOpen();
 
     /// <inheritdoc />
-    public ElementReference? GetPopupElement() => _context.GetPopupElement?.Invoke();
+    public ElementReference? GetTriggerElement() => context.GetTriggerElement();
 
     /// <inheritdoc />
-    public void SetPopupElement(ElementReference element) => _context.SetPopupElement(element);
+    public ElementReference? GetPopupElement() => context.GetPopupElement?.Invoke();
 
     /// <inheritdoc />
-    public Task SetOpenAsync(bool open) => _context.SetOpenAsync(open, PopoverOpenChangeReason.FocusOut, null, null);
+    public void SetPopupElement(ElementReference element) => context.SetPopupElement(element);
+
+    /// <inheritdoc />
+    public Task SetOpenAsync(bool open) => context.SetOpenAsync(open, PopoverOpenChangeReason.FocusOut, null, null);
 }

@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- slopwatch-ignore: SW005 BBUI0001 (MemberOrderingAnalyzer) is out of scope for the lint refactor plan; analyzer is intentionally dormant. Editorconfig sets severity=none but Roslyn does not reliably apply editorconfig to source-generated razor.g.cs files, so this NoWarn is the load-bearing suppression. -->
+    <NoWarn>$(NoWarn);BBUI0001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <AdditionalFiles Include="**\*.razor" />

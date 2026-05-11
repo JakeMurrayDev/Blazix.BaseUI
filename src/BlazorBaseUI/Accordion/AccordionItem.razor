@@ -1,6 +1,7 @@
 @using BlazorBaseUI.Collapsible
 
 @typeparam TValue where TValue : notnull
+@implements IDisposable
 
 <CascadingValue Value="itemContext"
                 IsFixed="true">
@@ -312,5 +313,11 @@
         attrs["data-disabled"] = state?.Disabled ?? false;
 
         componentAttributes = attrs;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        RootContext?.UnregisterItem(itemKey);
     }
 }

@@ -1,15 +1,21 @@
 name: Lint Rules
 on:
   pull_request:
-    paths: ['src/**', 'scripts/**']
+    paths: ['src/**', 'scripts/**', '.editorconfig', 'Directory.Build.props']
   push:
     branches: [master]
-    paths: ['src/**', 'scripts/**']
+    paths: ['src/**', 'scripts/**', '.editorconfig', 'Directory.Build.props']
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run lint rules
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Run analyzer-enforced lint rules (BBUI0002–BBUI0015)
+        run: dotnet build BlazorBaseUI.slnx --configuration Debug /p:TreatWarningsAsErrors=true
+      - name: Run textual lint rules (R01, R04, R05, R06)
         run: bash scripts/lint-rules.sh

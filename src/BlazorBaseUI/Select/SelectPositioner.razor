@@ -786,13 +786,13 @@
 
             if (Element.HasValue)
             {
-                await module.InvokeVoidAsync("clearStyles", Element.Value, styles);
+                await module.InvokeVoidAsync("clearStyles", Element.Value, styles); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
             }
 
             var popup = RootContext.GetPopupElement();
             if (popup.HasValue)
             {
-                await module.InvokeVoidAsync("clearStyles", popup.Value, styles);
+                await module.InvokeVoidAsync("clearStyles", popup.Value, styles); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
             }
         }
         catch (Exception ex) when (IsJSInteropUnavailable(ex))
@@ -837,8 +837,8 @@
             var module = await SelectModule.Value;
             var trigger = RootContext.GetTriggerElement();
             scrollLockToken = trigger.HasValue
-                ? await module.InvokeAsync<string>("applyScrollLock", trigger.Value)
-                : await module.InvokeAsync<string>("applyScrollLock", (object?)null);
+                ? await module.InvokeAsync<string>("applyScrollLock", trigger.Value) // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+                : await module.InvokeAsync<string>("applyScrollLock", (object?)null); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
         }
         catch (Exception ex) when (IsJSInteropUnavailable(ex))
         {
@@ -857,7 +857,7 @@
         try
         {
             var module = await selectModuleTask.Value;
-            await module.InvokeVoidAsync("releaseScrollLock", scrollLockToken);
+            await module.InvokeVoidAsync("releaseScrollLock", scrollLockToken); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
         }
         catch (Exception ex) when (IsJSInteropUnavailable(ex))
         {

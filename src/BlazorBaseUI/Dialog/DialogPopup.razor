@@ -285,7 +285,7 @@
         attrs["id"] = popupId;
         attrs["role"] = Context.Role.ToRoleString();
         attrs["tabindex"] = "-1";
-        attrs["data-blazor-base-ui-focusable"] = string.Empty;
+        attrs["data-blazor-base-ui-focusable"] = true;
 
         // Set aria-modal for accessibility. Also set by FloatingFocusManager
         // at runtime, but kept here for SSR/bUnit where JS doesn't execute.

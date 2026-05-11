@@ -8,25 +8,25 @@ namespace BlazorBaseUI.Dialog;
 /// </summary>
 internal sealed class DialogFloatingRootContextAdapter : IFloatingRootContext
 {
-    private readonly DialogRootContext _context;
+    private readonly DialogRootContext context;
 
-    public DialogFloatingRootContextAdapter(DialogRootContext context) => _context = context;
-
-    /// <inheritdoc />
-    public string FloatingId => _context.RootId;
+    public DialogFloatingRootContextAdapter(DialogRootContext context) => this.context = context;
 
     /// <inheritdoc />
-    public bool GetOpen() => _context.GetOpen();
+    public string FloatingId => context.RootId;
 
     /// <inheritdoc />
-    public ElementReference? GetTriggerElement() => _context.GetTriggerElement();
+    public bool GetOpen() => context.GetOpen();
 
     /// <inheritdoc />
-    public ElementReference? GetPopupElement() => _context.GetPopupElement();
+    public ElementReference? GetTriggerElement() => context.GetTriggerElement();
 
     /// <inheritdoc />
-    public void SetPopupElement(ElementReference element) => _context.SetPopupElement(element);
+    public ElementReference? GetPopupElement() => context.GetPopupElement();
 
     /// <inheritdoc />
-    public Task SetOpenAsync(bool open) => _context.SetOpenAsync(open, DialogOpenChangeReason.FocusOut);
+    public void SetPopupElement(ElementReference element) => context.SetPopupElement(element);
+
+    /// <inheritdoc />
+    public Task SetOpenAsync(bool open) => context.SetOpenAsync(open, DialogOpenChangeReason.FocusOut);
 }

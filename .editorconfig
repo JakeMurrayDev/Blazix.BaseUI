@@ -1,0 +1,41 @@
+root = true
+
+# BlazorBaseUI analyzer rules (BBUI0001-BBUI0015)
+# Match both .cs and .razor files so analyzer diagnostics on Razor-generated
+# code (which Roslyn reports with mapped .razor paths) are also configured.
+[*.{cs,razor}]
+
+# BBUI0001 — MemberOrdering. Authored but not adopted; keep dormant.
+dotnet_diagnostic.BBUI0001.severity = none
+
+# BBUI0002 — No async void. Real correctness bug.
+dotnet_diagnostic.BBUI0002.severity = error
+
+# BBUI0003 — Lazy JS module. Field-level enforcement.
+dotnet_diagnostic.BBUI0003.severity = error
+
+# BBUI0007 — Empty class bodies must use `;` not `{}`.
+dotnet_diagnostic.BBUI0007.severity = warning
+
+# BBUI0009 — Circuit-safe JS guard. Critical for Blazor Server reliability.
+dotnet_diagnostic.BBUI0009.severity = error
+
+# BBUI0010 — [CascadingParameter] must be private. Encapsulation.
+dotnet_diagnostic.BBUI0010.severity = error
+
+# BBUI0011 — Sealed classes. Analyzer exempts public types in source; this
+# severity therefore only applies to internal types and is allowed to surface
+# as a warning (which becomes a build error under TreatWarningsAsErrors).
+dotnet_diagnostic.BBUI0011.severity = warning
+
+# BBUI0012 — Element.HasValue guard before Element.Value.
+dotnet_diagnostic.BBUI0012.severity = error
+
+# BBUI0013 — Lazy module guard in Dispose. Already correctly scoped to Dispose*.
+dotnet_diagnostic.BBUI0013.severity = error
+
+# BBUI0014 — No underscore prefix on fields.
+dotnet_diagnostic.BBUI0014.severity = warning
+
+# BBUI0015 — Lifecycle override missing /// <inheritdoc />.
+dotnet_diagnostic.BBUI0015.severity = warning
