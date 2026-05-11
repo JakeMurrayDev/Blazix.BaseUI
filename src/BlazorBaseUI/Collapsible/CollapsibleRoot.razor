@@ -190,7 +190,7 @@
         var nextOpen = !CurrentOpen;
         var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
 
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
         if (args.IsCanceled)
         {
@@ -202,7 +202,7 @@
             isOpen = nextOpen;
         }
 
-        _ = OpenChanged.InvokeAsync(nextOpen); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        _ = OpenChanged.InvokeAsync(nextOpen); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         state = state with { Open = nextOpen };
         context.Open = nextOpen;
         BuildComponentAttributes();
@@ -219,7 +219,7 @@
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
 
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
         if (args.IsCanceled)
         {
@@ -231,7 +231,7 @@
             isOpen = true;
         }
 
-        _ = OpenChanged.InvokeAsync(true); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        _ = OpenChanged.InvokeAsync(true); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         state = state with { Open = true };
         context.Open = true;
         BuildComponentAttributes();

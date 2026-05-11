@@ -465,7 +465,7 @@
             {
                 _ = InvokeAsync(async () =>
                 {
-                    await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                    await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
                     if (!eventArgs.IsCanceled)
                     {
                         ApplyValueChange(validatedValue, reason);
@@ -487,7 +487,7 @@
 
         if (ValueChanged.HasDelegate)
         {
-            _ = ValueChanged.InvokeAsync(newValue); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            _ = ValueChanged.InvokeAsync(newValue); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         }
 
         inputValue = FormatNumber(newValue);
@@ -574,7 +574,7 @@
         if (OnValueCommitted.HasDelegate)
         {
             var eventArgs = new NumberFieldValueCommittedEventArgs(value, reason);
-            _ = OnValueCommitted.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            _ = OnValueCommitted.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         }
 
         FieldContext?.SetTouched(true);

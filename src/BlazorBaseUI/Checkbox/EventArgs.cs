@@ -3,7 +3,8 @@ namespace BlazorBaseUI.Checkbox;
 /// <summary>
 /// Provides data for the <see cref="CheckboxRoot.OnCheckedChange"/> event.
 /// </summary>
-public sealed class CheckboxCheckedChangeEventArgs : EventArgs
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public class CheckboxCheckedChangeEventArgs : EventArgs
 {
     /// <summary>
     /// Gets the new checked state of the checkbox.

@@ -6,4 +6,5 @@ using BlazorBaseUI.Dialog;
 /// An accessible description for the alert dialog.
 /// Renders a <c>&lt;p&gt;</c> element.
 /// </summary>
-public sealed class AlertDialogDescription : DialogDescription;
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public class AlertDialogDescription : DialogDescription;

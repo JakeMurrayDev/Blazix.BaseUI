@@ -297,7 +297,7 @@
 
         if (OnValueChange.HasDelegate)
         {
-            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -313,7 +313,7 @@
 
         if (ValueChanged.HasDelegate)
         {
-            await ValueChanged.InvokeAsync(newGroupValue); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await ValueChanged.InvokeAsync(newGroupValue); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         }
 
         StateHasChanged();

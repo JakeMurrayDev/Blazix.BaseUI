@@ -3,4 +3,5 @@ namespace BlazorBaseUI.ContextMenu;
 /// <summary>
 /// A separator element within a context menu, accessible to screen readers.
 /// </summary>
-public sealed class ContextMenuSeparator : BlazorBaseUI.Separator.Separator;
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public class ContextMenuSeparator : BlazorBaseUI.Separator.Separator;

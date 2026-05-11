@@ -3,7 +3,8 @@ namespace BlazorBaseUI.CheckboxGroup;
 /// <summary>
 /// Provides data for the <see cref="CheckboxGroup.OnValueChange"/> event.
 /// </summary>
-public sealed class CheckboxGroupValueChangeEventArgs : EventArgs
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public class CheckboxGroupValueChangeEventArgs : EventArgs
 {
     /// <summary>
     /// Gets the new value of the checkbox group.

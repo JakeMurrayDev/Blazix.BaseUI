@@ -611,7 +611,7 @@
         }
 
         var args = new PopoverOpenChangeEventArgs(nextOpen, reason);
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
         if (args.IsCanceled)
         {
@@ -757,7 +757,7 @@
     {
         try
         {
-            await OnOpenChangeComplete.InvokeAsync(open); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnOpenChangeComplete.InvokeAsync(open); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         }
         catch (Exception ex)
         {

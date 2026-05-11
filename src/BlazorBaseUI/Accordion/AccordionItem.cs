@@ -5,4 +5,5 @@ namespace BlazorBaseUI.Accordion;
 /// Renders a <c>&lt;div&gt;</c> element.
 /// </summary>
 /// <typeparam name="TValue">The type of the value used to identify accordion items.</typeparam>
-public sealed partial class AccordionItem<TValue> where TValue : notnull;
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public partial class AccordionItem<TValue> where TValue : notnull;

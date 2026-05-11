@@ -631,7 +631,7 @@
             if (OnCheckedChange.HasDelegate)
             {
                 var eventArgs = new CheckboxCheckedChangeEventArgs(nextChecked);
-                await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
                 if (eventArgs.IsCanceled)
                 {
                     await ResetInputCheckedAsync();
@@ -648,7 +648,7 @@
             if (OnCheckedChange.HasDelegate)
             {
                 var eventArgs = new CheckboxCheckedChangeEventArgs(nextChecked);
-                await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
                 if (eventArgs.IsCanceled)
                 {
                     await ResetInputCheckedAsync();
@@ -682,7 +682,7 @@
 
         if (OnCheckedChange.HasDelegate)
         {
-            await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -699,7 +699,7 @@
 
         if (CheckedChanged.HasDelegate)
         {
-            await CheckedChanged.InvokeAsync(value); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await CheckedChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
         }
 
         if (!IsControlled)

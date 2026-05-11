@@ -6,4 +6,5 @@ using BlazorBaseUI.Menu;
 /// Positions the context menu popup relative to the cursor location.
 /// Renders a <c>&lt;div&gt;</c> element.
 /// </summary>
-public sealed class ContextMenuPositioner : MenuPositioner;
+// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
+public class ContextMenuPositioner : MenuPositioner;

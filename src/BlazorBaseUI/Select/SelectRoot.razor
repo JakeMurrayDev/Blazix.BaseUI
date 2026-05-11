@@ -710,7 +710,7 @@
         }
 
         var args = new SelectOpenChangeEventArgs(nextOpen, reason);
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
         if (args.IsCanceled)
         {
@@ -760,7 +760,7 @@
             await SyncRootOpenAsync(nextOpen, reason);
         }
 
-        await OpenChanged.InvokeAsync(nextOpen); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+        await OpenChanged.InvokeAsync(nextOpen); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
         typedContext.NotifyStateChanged();
         StateHasChanged();
@@ -808,7 +808,7 @@
             }
 
             var eventArgs = new SelectValueChangeEventArgs<TValue>(value, values);
-            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -822,12 +822,12 @@
 
             if (ValuesChanged.HasDelegate)
             {
-                await ValuesChanged.InvokeAsync(values); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await ValuesChanged.InvokeAsync(values); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
             }
 
             if (ValueChanged.HasDelegate)
             {
-                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
             }
 
             HandleValueChanged();
@@ -838,7 +838,7 @@
         else
         {
             var eventArgs = new SelectValueChangeEventArgs<TValue>(value);
-            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -852,7 +852,7 @@
 
             if (ValueChanged.HasDelegate)
             {
-                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
             }
 
             HandleValueChanged();
@@ -885,7 +885,7 @@
             var eventArgs = new SelectValueChangeEventArgs<TValue>(
                 replacement.Count > 0 ? replacement[0] : default,
                 replacement);
-            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -899,7 +899,7 @@
 
             if (ValuesChanged.HasDelegate)
             {
-                await ValuesChanged.InvokeAsync(replacement); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await ValuesChanged.InvokeAsync(replacement); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
             }
 
             HandleValueChanged();
@@ -911,7 +911,7 @@
             TValue? value = boxedValue is TValue tv ? tv : default;
 
             var eventArgs = new SelectValueChangeEventArgs<TValue>(value);
-            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
 
             if (eventArgs.IsCanceled)
             {
@@ -925,7 +925,7 @@
 
             if (ValueChanged.HasDelegate)
             {
-                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+                await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
             }
 
             HandleValueChanged();
@@ -1132,7 +1132,7 @@
             var module = await ModuleTask.Value;
             var modal = Modal == SelectModalMode.True;
             var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, false, modal, directionStr, ReadOnly, ResolvedDisabled); // lint-ignore:RULE-09 Either EventCallback.InvokeAsync (not JS interop) or JS interop wrapped in try/catch outside the lint's 20-line lookback window.
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, false, modal, directionStr, ReadOnly, ResolvedDisabled); // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
 
             if (triggerElement.HasValue)
             {
