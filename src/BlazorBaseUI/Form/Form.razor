@@ -276,7 +276,7 @@
 
         if (OnSubmit.HasDelegate)
         {
-            await OnSubmit.InvokeAsync(editContext); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnSubmit.InvokeAsync(editContext);
             return;
         }
 
@@ -293,12 +293,12 @@
 
         if (isValid && OnValidSubmit.HasDelegate)
         {
-            await OnValidSubmit.InvokeAsync(editContext); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnValidSubmit.InvokeAsync(editContext);
         }
 
         if (!isValid && OnInvalidSubmit.HasDelegate)
         {
-            await OnInvalidSubmit.InvokeAsync(editContext); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnInvalidSubmit.InvokeAsync(editContext);
         }
 
         if (isValid && OnFormSubmit.HasDelegate)
@@ -313,7 +313,7 @@
                 }
             }
 
-            await OnFormSubmit.InvokeAsync(new FormSubmitEventArgs(formValues)); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnFormSubmit.InvokeAsync(new FormSubmitEventArgs(formValues));
         }
     }
 }

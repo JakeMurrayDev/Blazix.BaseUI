@@ -388,7 +388,7 @@
                 var module = await ModuleTask.Value;
                 hoverDotNetRef = DotNetObjectReference.Create(this);
                 var hoverId = $"hover-{triggerId}";
-                await module.InvokeVoidAsync("initializeHoverInteraction", hoverId, Element.Value, Delay, CloseDelay, hoverDotNetRef); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("initializeHoverInteraction", hoverId, Element.Value, Delay, CloseDelay, hoverDotNetRef);
                 hoverInitialized = true;
                 hoverRootId = hoverId;
             }
@@ -407,7 +407,7 @@
             try
             {
                 var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, Delay, CloseDelay); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, Delay, CloseDelay);
                 hoverInitialized = true;
                 hoverRootId = RootContext.RootId;
             }

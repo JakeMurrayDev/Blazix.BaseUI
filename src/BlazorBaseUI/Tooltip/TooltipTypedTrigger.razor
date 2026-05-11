@@ -572,7 +572,7 @@
             var effectiveDelay = GetEffectiveDelay();
             var effectiveCloseDelay = GetEffectiveCloseDelay();
             var disableHoverablePopup = RootContext.DisableHoverablePopup || RootContext.TrackCursorAxis == TrackCursorAxis.Both;
-            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
             hoverInitialized = true;
             lastEffectiveDelay = effectiveDelay;
             lastEffectiveCloseDelay = effectiveCloseDelay;

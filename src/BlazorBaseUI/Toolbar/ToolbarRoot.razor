@@ -274,7 +274,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("initToolbar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -292,7 +292,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("updateToolbar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -310,7 +310,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerItem", Element.Value, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -328,7 +328,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterItem", Element.Value, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

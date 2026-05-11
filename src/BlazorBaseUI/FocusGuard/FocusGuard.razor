@@ -51,7 +51,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 var safari = await module.InvokeAsync<bool>("isSafari");
                 if (safari)
                 {

@@ -244,7 +244,7 @@
         if (!hasRendered) return;
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             if (Element.HasValue)
             {
                 await module.InvokeVoidAsync("applyStartingStyle", Element.Value, dotNetRef);
@@ -261,7 +261,7 @@
         if (!hasRendered) return;
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             if (Element.HasValue)
             {
                 await module.InvokeVoidAsync("waitForExitTransition", Element.Value, dotNetRef);

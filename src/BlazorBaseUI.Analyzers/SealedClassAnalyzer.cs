@@ -27,8 +27,10 @@ public sealed class SealedClassAnalyzer : DiagnosticAnalyzer
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
         description:
-            "Classes that are not inherited from should be declared as sealed " +
-            "to communicate intent and enable compiler optimizations.",
+            "Internal classes that are not inherited from should be declared as sealed " +
+            "to communicate intent and enable compiler optimizations. Public types are " +
+            "intentionally exempt because sealing them is a binary-breaking change for " +
+            "downstream consumers.",
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -65,8 +67,9 @@ public sealed class SealedClassAnalyzer : DiagnosticAnalyzer
                 if (symbol.IsSealed || symbol.IsAbstract || symbol.IsStatic)
                     return;
 
-                if (symbol.DeclaredAccessibility != Accessibility.Public &&
-                    symbol.DeclaredAccessibility != Accessibility.Internal)
+                // Public types are exempt: sealing them is a binary-breaking change
+                // for downstream consumers. Only internal types are enforced.
+                if (symbol.DeclaredAccessibility != Accessibility.Internal)
                     return;
 
                 // Skip partial stubs with semicolon token (e.g., `public partial class Foo;`)

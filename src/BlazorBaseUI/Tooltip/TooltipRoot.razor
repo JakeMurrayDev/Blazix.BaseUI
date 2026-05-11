@@ -449,7 +449,7 @@
         }
 
         var args = new TooltipOpenChangeEventArgs(nextOpen, reason);
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
@@ -808,7 +808,7 @@
     {
         try
         {
-            await OnOpenChangeComplete.InvokeAsync(open); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnOpenChangeComplete.InvokeAsync(open);
         }
         catch (Exception ex)
         {

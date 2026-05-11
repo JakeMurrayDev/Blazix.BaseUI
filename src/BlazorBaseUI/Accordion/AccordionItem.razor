@@ -273,7 +273,7 @@
         var nextOpen = !IsOpen;
         var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
 
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
@@ -292,7 +292,7 @@
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
 
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {

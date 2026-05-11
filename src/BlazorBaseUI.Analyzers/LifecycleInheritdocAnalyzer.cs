@@ -99,24 +99,31 @@ public sealed class LifecycleInheritdocAnalyzer : DiagnosticAnalyzer
 
     private static bool HasInheritdocComment(MethodDeclarationSyntax method)
     {
-        // Check leading trivia (works for most cases)
+        // Check leading trivia (works for most cases). A custom <summary> block
+        // is treated as authored documentation that intentionally overrides
+        // <inheritdoc/>, so we accept either marker.
         foreach (var trivia in method.GetLeadingTrivia())
         {
-            if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) &&
-                trivia.ToFullString().Contains("inheritdoc"))
+            if (trivia.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) ||
+                trivia.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
             {
-                return true;
+                var fullString = trivia.ToFullString();
+                if (fullString.Contains("inheritdoc") || fullString.Contains("<summary>"))
+                    return true;
             }
         }
 
-        // Fallback: scan up to 3 source lines before the method for /// <inheritdoc
+        // Fallback: scan source lines before the method for /// <inheritdoc or
+        // a <summary> block. The scan caps at 10 lines (covers most attribute
+        // stacks and multi-line XML doc comments without sweeping into the
+        // previous member).
         var sourceText = method.SyntaxTree.GetText();
         var methodLine = sourceText.Lines.GetLineFromPosition(method.SpanStart).LineNumber;
-        var linesToScan = System.Math.Min(3, methodLine);
+        var linesToScan = System.Math.Min(10, methodLine);
         for (int i = 1; i <= linesToScan; i++)
         {
             var lineText = sourceText.Lines[methodLine - i].ToString();
-            if (lineText.Contains("/// <inheritdoc"))
+            if (lineText.Contains("/// <inheritdoc") || lineText.Contains("<summary>"))
                 return true;
         }
 
@@ -151,12 +158,15 @@ public sealed class LifecycleInheritdocAnalyzer : DiagnosticAnalyzer
         if (razorText is null)
             return false;
 
-        // Scan the few lines before the mapped line for /// <inheritdoc
-        var linesToScan = Math.Min(3, mappedLine);
+        // Scan source lines before the mapped line for /// <inheritdoc or a
+        // <summary> block. Capped at 10 lines to cover multi-line XML doc
+        // comments and attribute stacks without sweeping into the previous
+        // member declaration.
+        var linesToScan = Math.Min(10, mappedLine);
         for (int i = 1; i <= linesToScan; i++)
         {
             var lineText = razorText.Lines[mappedLine - i].ToString();
-            if (lineText.Contains("/// <inheritdoc"))
+            if (lineText.Contains("/// <inheritdoc") || lineText.Contains("<summary>"))
                 return true;
         }
 

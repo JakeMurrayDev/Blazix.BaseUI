@@ -382,8 +382,8 @@
             var hasViewport = RootContext.HasViewport;
             positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
                 "initializePositioner",
-                Element.Value, // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
-                anchorElement.Value, // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                Element.Value,
+                anchorElement.Value,
                 computedSide.ToDataAttributeString(),
                 computedAlign.ToDataAttributeString(),
                 effectiveSideOffset,
@@ -428,7 +428,7 @@
             await module.InvokeVoidAsync(
                 "updatePosition",
                 positionerInterop.PositionerId,
-                anchorElement.Value, // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                anchorElement.Value,
                 computedSide.ToDataAttributeString(),
                 computedAlign.ToDataAttributeString(),
                 effectiveSideOffset,

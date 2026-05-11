@@ -591,7 +591,7 @@
             {
                 _ = InvokeAsync(async () =>
                 {
-                    await OnValuesChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+                    await OnValuesChange.InvokeAsync(eventArgs);
                     if (!eventArgs.IsCanceled)
                     {
                         ApplyValueChange(newValues);
@@ -607,7 +607,7 @@
             {
                 _ = InvokeAsync(async () =>
                 {
-                    await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+                    await OnValueChange.InvokeAsync(eventArgs);
                     if (!eventArgs.IsCanceled)
                     {
                         ApplyValueChange(newValues);
@@ -629,11 +629,11 @@
 
         if (IsRange && ValuesChanged.HasDelegate)
         {
-            _ = ValuesChanged.InvokeAsync(newValues); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            _ = ValuesChanged.InvokeAsync(newValues);
         }
         else if (!IsRange && ValueChanged.HasDelegate)
         {
-            _ = ValueChanged.InvokeAsync(newValues[0]); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            _ = ValueChanged.InvokeAsync(newValues[0]);
         }
 
         lastChangedValues = [.. newValues];
@@ -655,7 +655,7 @@
             if (OnValuesCommitted.HasDelegate)
             {
                 var eventArgs = new SliderValueCommittedEventArgs<double[]>(committedValues, reason);
-                _ = OnValuesCommitted.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+                _ = OnValuesCommitted.InvokeAsync(eventArgs);
             }
         }
         else
@@ -663,7 +663,7 @@
             if (OnValueCommitted.HasDelegate)
             {
                 var eventArgs = new SliderValueCommittedEventArgs<double>(committedValues[0], reason);
-                _ = OnValueCommitted.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+                _ = OnValueCommitted.InvokeAsync(eventArgs);
             }
         }
 

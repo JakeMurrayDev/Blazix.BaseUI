@@ -337,7 +337,7 @@
         }
 
         var args = new NavigationMenuValueChangeEventArgs(nextValue, reason);
-        await OnValueChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        await OnValueChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
@@ -399,20 +399,20 @@
 
             if (rootElementReference?.Element.HasValue == true)
             {
-                await module.InvokeVoidAsync("setRootElement", rootId, rootElementReference.Element.Value); // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
+                await module.InvokeVoidAsync("setRootElement", rootId, rootElementReference.Element.Value);
             }
 
             foreach (var (itemValue, element) in triggerElements)
             {
                 if (element.HasValue)
                 {
-                    await module.InvokeVoidAsync("setTriggerElement", rootId, itemValue, element.Value); // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
+                    await module.InvokeVoidAsync("setTriggerElement", rootId, itemValue, element.Value);
                 }
             }
 
             if (popupElement.HasValue)
             {
-                await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value); // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
+                await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value);
             }
 
             if (positionerElement.HasValue)

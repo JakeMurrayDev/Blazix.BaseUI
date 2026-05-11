@@ -167,7 +167,7 @@
             await OnLoadingStatusChange.InvokeAsync(imageLoadingStatus);
             Context!.SetImageLoadingStatus(imageLoadingStatus);
 
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var status = await module.InvokeAsync<string>("loadImage", Src, ReferrerPolicy, CrossOrigin);
 
             imageLoadingStatus = status switch

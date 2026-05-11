@@ -411,7 +411,7 @@
         }
 
         var args = new MenuOpenChangeEventArgs(nextOpen, reason, payload);
-        await OnOpenChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
@@ -533,7 +533,7 @@
                 MenuParentType.Menubar => "menubar",
                 _ => (string?)null
             };
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, CloseParentOnEsc, LoopFocus, modal, menubarElement, orientationStr, HighlightItemOnHover, directionStr, isNested, context?.FinalFocusMode, context?.FinalFocusElement, parentTypeStr); // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, CloseParentOnEsc, LoopFocus, modal, menubarElement, orientationStr, HighlightItemOnHover, directionStr, isNested, context?.FinalFocusMode, context?.FinalFocusElement, parentTypeStr);
 
             if (triggerElement.HasValue)
             {
@@ -768,7 +768,7 @@
     {
         try
         {
-            await OnOpenChangeComplete.InvokeAsync(open); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnOpenChangeComplete.InvokeAsync(open);
         }
         catch (Exception ex)
         {

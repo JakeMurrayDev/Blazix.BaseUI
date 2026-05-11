@@ -66,7 +66,7 @@
             previousCutout = Cutout;
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
 
                 if (backdropId is not null)
                 {
@@ -89,7 +89,7 @@
             previousCutout = null;
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("disposeBackdrop", backdropId);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

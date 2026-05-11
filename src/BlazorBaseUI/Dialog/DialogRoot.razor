@@ -752,7 +752,7 @@
     {
         try
         {
-            await OnOpenChangeComplete.InvokeAsync(open); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnOpenChangeComplete.InvokeAsync(open);
         }
         catch (Exception ex)
         {

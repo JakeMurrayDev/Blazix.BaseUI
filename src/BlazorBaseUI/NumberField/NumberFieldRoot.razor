@@ -465,7 +465,7 @@
             {
                 _ = InvokeAsync(async () =>
                 {
-                    await OnValueChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+                    await OnValueChange.InvokeAsync(eventArgs);
                     if (!eventArgs.IsCanceled)
                     {
                         ApplyValueChange(validatedValue, reason);
@@ -487,7 +487,7 @@
 
         if (ValueChanged.HasDelegate)
         {
-            _ = ValueChanged.InvokeAsync(newValue); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            _ = ValueChanged.InvokeAsync(newValue);
         }
 
         inputValue = FormatNumber(newValue);
@@ -520,7 +520,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, Step, Min ?? double.MinValue, Max ?? double.MaxValue);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -538,7 +538,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("stopAutoChange", inputElement.Value);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -574,7 +574,7 @@
         if (OnValueCommitted.HasDelegate)
         {
             var eventArgs = new NumberFieldValueCommittedEventArgs(value, reason);
-            _ = OnValueCommitted.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            _ = OnValueCommitted.InvokeAsync(eventArgs);
         }
 
         FieldContext?.SetTouched(true);
@@ -601,7 +601,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerWheelListener", inputElement.Value, dotNetRef, ResolvedDisabled, ReadOnly);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -616,7 +616,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("focusInput", inputElement.Value);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

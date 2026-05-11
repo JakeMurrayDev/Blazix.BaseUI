@@ -60,6 +60,7 @@ public sealed class ElementHasValueGuardAnalyzer : DiagnosticAnalyzer
             return;
 
         if (HasEnclosingHasValueGuard(memberAccess) ||
+            HasShortCircuitGuard(memberAccess) ||
             HasPrecedingEarlyReturnGuard(memberAccess))
             return;
 
@@ -83,10 +84,55 @@ public sealed class ElementHasValueGuardAnalyzer : DiagnosticAnalyzer
                     return true;
             }
 
+            // Conditional expression guard: `Element.HasValue ? Element.Value : ...`
+            if (current is ConditionalExpressionSyntax cond)
+            {
+                if (cond.Condition.ToString().Contains("Element.HasValue"))
+                    return true;
+            }
+
             current = current.Parent;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Recognizes short-circuit guards of the form
+    /// <c>Element.HasValue &amp;&amp; (... Element.Value ...)</c>.
+    /// The C# compiler short-circuits the right operand of <c>&amp;&amp;</c> when
+    /// the left operand is false, so <c>Element.Value</c> on the right is safe.
+    /// </summary>
+    private static bool HasShortCircuitGuard(SyntaxNode node)
+    {
+        var current = node;
+        while (current is not null)
+        {
+            if (current is MethodDeclarationSyntax or LambdaExpressionSyntax
+                or AnonymousMethodExpressionSyntax or LocalFunctionStatementSyntax)
+                break;
+
+            if (current.Parent is BinaryExpressionSyntax binary &&
+                binary.IsKind(SyntaxKind.LogicalAndExpression) &&
+                binary.Right == current)
+            {
+                if (LeftHasHasValueCheck(binary.Left))
+                    return true;
+            }
+
+            current = current.Parent;
+        }
+
+        return false;
+    }
+
+    private static bool LeftHasHasValueCheck(ExpressionSyntax left)
+    {
+        // Walk left-associatively: `A && B && Element.Value` parses as
+        // `(A && B) && Element.Value`. Check the rightmost operand of any
+        // chained && first, then fall back to the text of the whole subtree.
+        var leftText = left.ToString();
+        return leftText.Contains("Element.HasValue");
     }
 
     private static bool HasPrecedingEarlyReturnGuard(SyntaxNode node)

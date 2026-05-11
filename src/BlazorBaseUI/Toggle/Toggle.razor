@@ -246,7 +246,7 @@
 
                 if (!NativeButton)
                 {
-                    await module.InvokeVoidAsync("dispose", Element.Value); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                    await module.InvokeVoidAsync("dispose", Element.Value);
                 }
 
                 await module.DisposeAsync();
@@ -326,7 +326,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerToggle", GroupContext.GroupElement.Value, Element.Value, resolvedValue);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -344,7 +344,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterToggle", GroupContext.GroupElement.Value, Element.Value);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -362,7 +362,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("initialize", Element.Value, ResolvedDisabled);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -380,7 +380,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var orientationString = CurrentOrientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync("initializeGroupItem", Element.Value, orientationString);
         }
@@ -399,7 +399,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("updateState", Element.Value, ResolvedDisabled);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -417,7 +417,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var orientationString = CurrentOrientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync("updateGroupItemOrientation", Element.Value, orientationString);
         }
@@ -447,7 +447,7 @@
 
         if (OnPressedChange.HasDelegate)
         {
-            await OnPressedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnPressedChange.InvokeAsync(eventArgs);
 
             if (eventArgs.IsCanceled)
             {
@@ -463,7 +463,7 @@
 
         if (PressedChanged.HasDelegate)
         {
-            await PressedChanged.InvokeAsync(nextPressed); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await PressedChanged.InvokeAsync(nextPressed);
         }
 
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
@@ -491,22 +491,22 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             if (shouldNavigatePrevious)
             {
-                await module.InvokeVoidAsync("navigateToPrevious", GroupContext.GroupElement.Value, Element.Value); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("navigateToPrevious", GroupContext.GroupElement.Value, Element.Value);
             }
             else if (shouldNavigateNext)
             {
-                await module.InvokeVoidAsync("navigateToNext", GroupContext.GroupElement.Value, Element.Value); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("navigateToNext", GroupContext.GroupElement.Value, Element.Value);
             }
             else if (e.Key == "Home")
             {
-                await module.InvokeVoidAsync("navigateToFirst", GroupContext.GroupElement.Value); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("navigateToFirst", GroupContext.GroupElement.Value);
             }
             else if (e.Key == "End")
             {
-                await module.InvokeVoidAsync("navigateToLast", GroupContext.GroupElement.Value); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("navigateToLast", GroupContext.GroupElement.Value);
             }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

@@ -239,7 +239,7 @@
             {
                 var module = await ModuleTask.Value;
 
-                var result = await module.InvokeAsync<StartDragResult?>( // lint-ignore:RULE-09 JS interop guarded by surrounding try/catch; catch clause is outside the heuristic's 20-line lookback window.
+                var result = await module.InvokeAsync<StartDragResult?>(
                     "startDrag",
                     element,
                     dotNetRef,

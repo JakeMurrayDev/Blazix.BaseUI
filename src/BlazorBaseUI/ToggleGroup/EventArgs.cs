@@ -3,7 +3,6 @@ namespace BlazorBaseUI.ToggleGroup;
 /// <summary>
 /// Provides data for the <see cref="ToggleGroup.OnValueChange"/> event.
 /// </summary>
-// lint-ignore:RULE-11 Public type intentionally left unsealed; consumers may subclass for customization.
 public class ToggleGroupValueChangeEventArgs : EventArgs
 {
     /// <summary>

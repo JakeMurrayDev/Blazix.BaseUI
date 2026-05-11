@@ -153,7 +153,7 @@
             {
                 try
                 {
-                    var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                    var module = await moduleTask.Value;
                     var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
                     var isRtl = RootContext?.Direction == Direction.Rtl;
                     var loopFocus = RootContext?.LoopFocus ?? true;
@@ -162,7 +162,7 @@
                     previousIsRtl = isRtl;
                     previousLoopFocus = loopFocus;
 
-                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
@@ -176,7 +176,7 @@
 
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
                 var isRtl = RootContext?.Direction == Direction.Rtl;
                 var loopFocus = RootContext?.LoopFocus ?? true;
@@ -185,7 +185,7 @@
                 previousIsRtl = isRtl;
                 previousLoopFocus = loopFocus;
 
-                await module.InvokeVoidAsync("updateConfig", Element.Value, isHorizontal, isRtl, loopFocus); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("updateConfig", Element.Value, isHorizontal, isRtl, loopFocus);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

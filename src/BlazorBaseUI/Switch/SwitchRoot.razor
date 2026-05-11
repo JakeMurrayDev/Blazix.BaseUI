@@ -507,7 +507,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ReadOnly, NativeButton);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -525,7 +525,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("updateState", Element.Value, ResolvedDisabled, ReadOnly, NativeButton);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -591,7 +591,7 @@
 
         if (OnCheckedChange.HasDelegate)
         {
-            await OnCheckedChange.InvokeAsync(eventArgs); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await OnCheckedChange.InvokeAsync(eventArgs);
 
             if (eventArgs.IsCanceled)
             {
@@ -608,7 +608,7 @@
 
         if (CheckedChanged.HasDelegate)
         {
-            await CheckedChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await CheckedChanged.InvokeAsync(value);
         }
 
         if (!IsControlled)
@@ -626,7 +626,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("setInputChecked", inputElement, CurrentChecked);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -696,7 +696,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("focus", Element.Value);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

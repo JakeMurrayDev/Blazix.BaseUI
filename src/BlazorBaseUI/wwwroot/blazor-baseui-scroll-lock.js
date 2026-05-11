@@ -254,7 +254,7 @@ function preventScrollInsetScrollbars(referenceElement) {
 
         body.scrollTop = scrollTop;
         body.scrollLeft = scrollLeft;
-        html.setAttribute('data-base-ui-scroll-locked', ''); // lint-ignore:RULE-05 React parity selector consumed by external floating-ui adapters and tests.
+        html.setAttribute('data-base-ui-scroll-locked', '');
         html.style.scrollBehavior = 'unset';
     }
 
@@ -265,7 +265,7 @@ function preventScrollInsetScrollbars(referenceElement) {
         if (!updateGutterOnly) {
             html.scrollTop = scrollTop;
             html.scrollLeft = scrollLeft;
-            html.removeAttribute('data-base-ui-scroll-locked'); // lint-ignore:RULE-05 React parity selector consumed by external floating-ui adapters and tests.
+            html.removeAttribute('data-base-ui-scroll-locked');
             html.style.scrollBehavior = originalHtmlScrollBehavior;
         }
     }

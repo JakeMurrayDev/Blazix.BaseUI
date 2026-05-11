@@ -386,7 +386,7 @@
     {
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             if (Element.HasValue)
             {
                 dotNetRef = DotNetObjectReference.Create(this);
@@ -445,7 +445,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var isWithinGroup = Element.HasValue && await module.InvokeAsync<bool>("isBlurWithinGroup", Element.Value);
 
             if (!isWithinGroup)
@@ -506,7 +506,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var firstRadio = await module.InvokeAsync<IJSObjectReference?>("getFirstEnabledRadio", Element.Value);
             if (firstRadio is not null)
             {
@@ -541,7 +541,7 @@
 
         if (ValueChanged.HasDelegate)
         {
-            await ValueChanged.InvokeAsync(value); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+            await ValueChanged.InvokeAsync(value);
         }
 
         await HandleValueChangedAsync();

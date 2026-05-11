@@ -144,14 +144,14 @@
 
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 if (CspContext?.DisableStyleElements != true)
                 {
                     await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
                 }
                 await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, RootContext.HighlightItemOnHover);
                 previousHighlightItemOnHover = RootContext.HighlightItemOnHover;
-                await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!); // lint-ignore:RULE-12 Element.Value reached only after early-exit Element.HasValue guard outside the 10-line lookback window.
+                await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!);
                 jsInitialized = true;
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -168,7 +168,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, hov);
                 previousHighlightItemOnHover = hov;
             }
@@ -188,7 +188,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("clearPopupStyles", RootContext.RootId);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
@@ -203,7 +203,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("beginAlignItemWithTriggerPlacement", RootContext.RootId, true);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
@@ -215,7 +215,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("attachWindowResizeListener", RootContext.RootId);
                 resizeAttached = true;
             }
@@ -225,7 +225,7 @@
         {
             try
             {
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("detachWindowResizeListener", RootContext.RootId);
                 resizeAttached = false;
             }

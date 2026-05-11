@@ -148,7 +148,7 @@
             {
                 try
                 {
-                    var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                    var module = await moduleTask.Value;
                     selfReference = DotNetObjectReference.Create(this);
                     await module.InvokeVoidAsync("initializeTrigger", RootContext.RootId, Element.Value, selfReference);
                     jsInitialized = true;

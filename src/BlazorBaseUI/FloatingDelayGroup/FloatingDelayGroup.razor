@@ -73,7 +73,7 @@
             {
                 dotNetRef = DotNetObjectReference.Create(this);
 
-                var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+                var module = await moduleTask.Value;
                 var result = await module.InvokeAsync<JsonElement>("createDelayGroup", new
                 {
                     delay = new { open = OpenDelayMs, close = CloseDelayMs },
@@ -159,7 +159,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("updateDelayGroupOptions", groupId, new
             {
                 delay = new { open = OpenDelayMs, close = CloseDelayMs },
@@ -180,7 +180,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerDelayGroupMember", groupId, interactionId, new
             {
                 setIsInstantPhase = dotNetRef,
@@ -199,7 +199,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterDelayGroupMember", groupId, interactionId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -214,7 +214,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("notifyDelayGroupMemberOpened", groupId, interactionId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -229,7 +229,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("notifyDelayGroupMemberClosed", groupId, interactionId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

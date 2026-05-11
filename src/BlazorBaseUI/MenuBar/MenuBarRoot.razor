@@ -355,7 +355,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("initMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -373,7 +373,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("updateMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -391,7 +391,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             var shouldLock = Modal && hasSubmenuOpen && openMethod != "touch";
             await module.InvokeVoidAsync("updateScrollLock", Element.Value, shouldLock);
         }
@@ -410,7 +410,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerItem", Element.Value, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -428,7 +428,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterItem", Element.Value, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

@@ -220,7 +220,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             // focusableWhenDisabled is always true for collapsible triggers (matches React's useButton config)
             await module.InvokeVoidAsync("sync", Element.Value, ResolvedDisabled, true, NativeButton, dispose);
         }

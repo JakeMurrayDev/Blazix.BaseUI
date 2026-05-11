@@ -212,7 +212,7 @@
         }
 
         var args = new AccordionValueChangeEventArgs<TValue>(nextValue);
-        _ = OnValueChange.InvokeAsync(args); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        _ = OnValueChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
@@ -224,7 +224,7 @@
             currentValue = nextValue;
         }
 
-        _ = ValueChanged.InvokeAsync(nextValue); // lint-ignore:RULE-09 EventCallback.InvokeAsync, not a JS interop call (false positive for circuit-safety rule).
+        _ = ValueChanged.InvokeAsync(nextValue);
 
         context.Value = nextValue;
         state = state with { Value = nextValue };

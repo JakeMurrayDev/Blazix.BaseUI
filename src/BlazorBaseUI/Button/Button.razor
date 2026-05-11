@@ -225,7 +225,7 @@
 
         try
         {
-            var module = await moduleTask.Value; // lint-ignore:RULE-13 Lazy module access for first-time activation; IsValueCreated only required in Dispose paths.
+            var module = await moduleTask.Value;
             await module.InvokeVoidAsync("sync", Element.Value, Disabled, FocusableWhenDisabled, NativeButton, dispose);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
