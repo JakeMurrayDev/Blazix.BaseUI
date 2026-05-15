@@ -11,12 +11,13 @@
                ComponentAttributes="componentAttributes"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference">
-    <FloatingFocusManager Modal="@isContextMenu"
+        <FloatingFocusManager Modal="@isContextMenu"
                           Disabled="@(RootContext is null || !RootContext.GetMounted())"
                           InitialFocus="@(!nested)"
                           ReturnFocus="@resolvedReturnFocus"
                           ReturnFocusElement="@resolvedReturnFocusElement"
                           RestoreFocus="true"
+                          CloseOnFocusOut="false"
                           PreviousFocusableElement="@(RootContext?.GetTriggerElement())"
                           InteractionType="@(RootContext?.InteractionType)">
         @ChildContent

@@ -16,7 +16,8 @@ public class MenuTriggerTests : BunitContext, IMenuTriggerContract
         Func<MenuTriggerState, string>? styleValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         RenderFragment<RenderProps<MenuTriggerState>>? render = null,
-        bool includePositioner = true)
+        bool includePositioner = true,
+        bool nativeButton = true)
     {
         return builder =>
         {
@@ -31,6 +32,8 @@ public class MenuTriggerTests : BunitContext, IMenuTriggerContract
 
                 if (triggerDisabled)
                     innerBuilder.AddAttribute(attrIndex++, "Disabled", true);
+                if (!nativeButton)
+                    innerBuilder.AddAttribute(attrIndex++, "NativeButton", false);
                 if (classValue is not null)
                     innerBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
                 if (styleValue is not null)
@@ -296,6 +299,140 @@ public class MenuTriggerTests : BunitContext, IMenuTriggerContract
         // The trigger should render and have aria-haspopup
         var buttons = cut.FindAll("button[aria-haspopup='menu']");
         buttons.Count.ShouldBeGreaterThan(0);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsNonNativeButtonMode()
+    {
+        var cut = Render(CreateTriggerInRoot(nativeButton: false));
+
+        var trigger = cut.Find("div[role='button'][aria-haspopup='menu']");
+        trigger.HasAttribute("type").ShouldBeFalse();
+        trigger.GetAttribute("tabindex")!.ShouldBe("0");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HandleOpenUsesExplicitTriggerIdAndPayload()
+    {
+        var handle = new MenuHandle();
+        MenuRootPayloadContext? capturedPayloadContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuTrigger>(0);
+            builder.AddAttribute(1, "Handle", (IMenuHandle)handle);
+            builder.AddAttribute(2, "id", "detached-settings");
+            builder.AddAttribute(3, "Payload", "Settings payload");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Settings")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MenuRoot>(10);
+            builder.AddAttribute(11, "Handle", (IMenuHandle)handle);
+            builder.AddAttribute(12, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
+            {
+                capturedPayloadContext = ctx;
+                return innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<MenuPositioner>(0);
+                    innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<MenuPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<MenuItem>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, ctx.Payload?.ToString())));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    innerBuilder.CloseComponent();
+                };
+            }));
+            builder.CloseComponent();
+        });
+
+        var trigger = cut.Find("button#detached-settings");
+        trigger.GetAttribute("aria-expanded")!.ShouldBe("false");
+
+        handle.Open("detached-settings");
+        cut.Render();
+
+        handle.IsOpen.ShouldBeTrue();
+        handle.ActiveTriggerId.ShouldBe("detached-settings");
+        handle.Payload.ShouldBe("Settings payload");
+
+        trigger = cut.Find("button#detached-settings");
+        trigger.GetAttribute("aria-expanded")!.ShouldBe("true");
+        cut.WaitForAssertion(() =>
+        {
+            capturedPayloadContext.ShouldNotBeNull();
+            capturedPayloadContext.Value.Payload.ShouldBe("Settings payload");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task TypedHandleOpenUsesExplicitTriggerIdAndPayload()
+    {
+        var handle = new MenuHandle<string>();
+        MenuRootPayloadContext? capturedPayloadContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuTypedTrigger<string>>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "id", "detached-profile");
+            builder.AddAttribute(3, "Payload", "Profile payload");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Profile")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MenuRoot>(10);
+            builder.AddAttribute(11, "Handle", (IMenuHandle)handle);
+            builder.AddAttribute(12, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
+            {
+                capturedPayloadContext = ctx;
+                return innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<MenuPositioner>(0);
+                    innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<MenuPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<MenuItem>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, ctx.Payload?.ToString())));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    innerBuilder.CloseComponent();
+                };
+            }));
+            builder.CloseComponent();
+        });
+
+        var trigger = cut.Find("button#detached-profile");
+        trigger.GetAttribute("aria-expanded")!.ShouldBe("false");
+
+        handle.Open("detached-profile");
+        cut.Render();
+
+        handle.IsOpen.ShouldBeTrue();
+        handle.ActiveTriggerId.ShouldBe("detached-profile");
+        handle.Payload.ShouldBe("Profile payload");
+
+        trigger = cut.Find("button#detached-profile");
+        trigger.GetAttribute("aria-expanded")!.ShouldBe("true");
+        cut.WaitForAssertion(() =>
+        {
+            capturedPayloadContext.ShouldNotBeNull();
+            capturedPayloadContext.Value.Payload.ShouldBe("Profile payload");
+        });
 
         return Task.CompletedTask;
     }

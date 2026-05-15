@@ -16,6 +16,7 @@
 
 @code {
     private readonly string rootId = Guid.NewGuid().ToIdString();
+    private readonly Dictionary<string, MenuRootTriggerData> registeredTriggers = [];
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
@@ -36,6 +37,7 @@
     private object? activePayload;
     private MenuModalMode previousModal;
     private MenuOrientation previousOrientation;
+    private Direction previousDirection;
     private bool previousLoopFocus;
     private bool previousHighlightItemOnHover;
 
@@ -52,6 +54,10 @@
         ContextMenuContext is not null ? MenuParentType.ContextMenu :
         MenuBarContext is not null ? MenuParentType.Menubar :
         MenuParentType.None;
+
+    private Direction EffectiveDirection => Direction != Direction.Undefined
+        ? Direction
+        : DirectionContext?.Direction ?? Direction.Ltr;
 
     [CascadingParameter]
     private MenuRootContext? ParentMenuContext { get; set; }
@@ -84,6 +90,12 @@
     /// </summary>
     [Parameter]
     public MenuModalMode Modal { get; set; } = MenuModalMode.True;
+
+    /// <summary>
+    /// Gets or sets the text direction of the menu.
+    /// </summary>
+    [Parameter]
+    public Direction Direction { get; set; } = Direction.Undefined;
 
     /// <summary>
     /// Determines whether keyboard focus loops back to the first item when the end of the list is reached while using the arrow keys.
@@ -180,7 +192,7 @@
         }
 
         state = new MenuRootState(CurrentOpen);
-        var effectiveDirection = DirectionContext?.Direction ?? Direction.Ltr;
+        var effectiveDirection = EffectiveDirection;
 
         context = new MenuRootContext
         {
@@ -204,6 +216,11 @@
             SetPopupElement = SetPopupElement,
             SetActiveIndex = SetActiveIndex,
             SetOpenAsync = SetOpenAsyncFromContext,
+            SetOpenFromTriggerAsync = SetOpenFromTriggerAsync,
+            RegisterTrigger = RegisterTrigger,
+            UnregisterTrigger = UnregisterTrigger,
+            UpdateTriggerElement = UpdateTriggerElement,
+            UpdateTriggerPayload = UpdateTriggerPayload,
             EmitClose = EmitClose,
             Direction = effectiveDirection.ToAttributeString() ?? "ltr",
             TriggerId = TriggerId ?? DefaultTriggerId,
@@ -217,8 +234,10 @@
 
         previousModal = Modal;
         previousOrientation = Orientation;
+        previousDirection = effectiveDirection;
         previousLoopFocus = LoopFocus;
         previousHighlightItemOnHover = HighlightItemOnHover;
+        activeTriggerId = TriggerId ?? DefaultTriggerId;
 
         if (ActionsRef is not null)
         {
@@ -234,6 +253,7 @@
     protected override void OnParametersSet()
     {
         var currentOpen = CurrentOpen;
+        var effectiveDirection = EffectiveDirection;
         if (state.Open != currentOpen)
         {
             state = new MenuRootState(currentOpen);
@@ -248,16 +268,40 @@
         context.Disabled = Disabled;
         context.TriggerId = TriggerId ?? DefaultTriggerId;
         context.Orientation = Orientation;
+        context.Direction = effectiveDirection.ToAttributeString() ?? "ltr";
         context.HighlightItemOnHover = HighlightItemOnHover;
+
+        if (CurrentOpen && context.TriggerId is not null && context.TriggerId != activeTriggerId)
+        {
+            activeTriggerId = context.TriggerId;
+            if (Handle?.TryGetTriggerPayloadAsObject(activeTriggerId, out var handlePayload) == true)
+            {
+                activePayload = handlePayload;
+            }
+            else if (registeredTriggers.TryGetValue(activeTriggerId, out var data))
+            {
+                activePayload = data.Payload;
+            }
+
+            var element = GetTriggerElementById(activeTriggerId);
+            if (element.HasValue)
+            {
+                SetTriggerElement(element);
+            }
+
+            Handle?.SyncState(true, activeTriggerId, activePayload);
+        }
 
         if (hasRendered &&
             (Modal != previousModal ||
              Orientation != previousOrientation ||
+             previousDirection != effectiveDirection ||
              LoopFocus != previousLoopFocus ||
              HighlightItemOnHover != previousHighlightItemOnHover))
         {
             previousModal = Modal;
             previousOrientation = Orientation;
+            previousDirection = effectiveDirection;
             previousLoopFocus = LoopFocus;
             previousHighlightItemOnHover = HighlightItemOnHover;
             _ = UpdateRootJsAsync();
@@ -398,13 +442,27 @@
     /// <summary>
     /// Sets the open state of the menu with the specified reason and optional payload.
     /// </summary>
-    internal async Task SetOpenAsync(bool nextOpen, MenuOpenChangeReason reason, object? payload = null, string? triggerId = null)
+    internal async Task SetOpenAsync(
+        bool nextOpen,
+        MenuOpenChangeReason reason,
+        object? payload = null,
+        string? triggerId = null,
+        string? interactionType = null,
+        bool highlightLast = false)
     {
         if (CurrentOpen == nextOpen)
         {
-            if (nextOpen && triggerId is not null && triggerId != activeTriggerId && hasViewport)
+            if (nextOpen && triggerId is not null && triggerId != activeTriggerId)
             {
-                await HandleViewportTriggerSwapAsync(triggerId, payload);
+                var triggerSwapArgs = new MenuOpenChangeEventArgs(nextOpen, reason, payload);
+                await OnOpenChange.InvokeAsync(triggerSwapArgs);
+
+                if (triggerSwapArgs.IsCanceled)
+                {
+                    return;
+                }
+
+                await HandleTriggerSwapAsync(triggerId, payload);
             }
 
             return;
@@ -437,7 +495,7 @@
             {
                 instantType = MenuInstantType.Group;
             }
-            else if (reason == MenuOpenChangeReason.TriggerPress && payload is "keyboard")
+            else if (reason == MenuOpenChangeReason.TriggerPress && interactionType == "keyboard")
             {
                 instantType = MenuInstantType.Click;
             }
@@ -447,12 +505,20 @@
             }
 
             transition.BeginOpen();
-            activeIndex = payload is "highlight-last" ? null : 0;
+            activeIndex = highlightLast ? null : 0;
             activePayload = payload;
+            context.InteractionType = interactionType ?? context.InteractionType;
 
             if (triggerId is not null)
             {
                 activeTriggerId = triggerId;
+                context.TriggerId = triggerId;
+
+                var element = GetTriggerElementById(triggerId);
+                if (element.HasValue)
+                {
+                    SetTriggerElement(element);
+                }
             }
         }
         else
@@ -460,7 +526,7 @@
             var isKeyboardClose = (reason is MenuOpenChangeReason.TriggerPress
                 or MenuOpenChangeReason.ClosePress
                 or MenuOpenChangeReason.ItemPress)
-                && payload is "keyboard";
+                && interactionType == "keyboard";
             instantType = reason is MenuOpenChangeReason.EscapeKey
                 ? MenuInstantType.Dismiss
                 : isKeyboardClose
@@ -497,7 +563,6 @@
                     MenuOpenChangeReason.ClosePress => "close-press",
                     _ => null
                 };
-                var highlightLast = payload is "highlight-last";
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, highlightLast, context.InteractionType);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -525,7 +590,7 @@
             var modal = !isNested && Modal == MenuModalMode.True;
             var menubarElement = ParentType == MenuParentType.Menubar ? MenuBarContext?.GetElement() : null;
             var orientationStr = Orientation == MenuOrientation.Horizontal ? "horizontal" : "vertical";
-            var directionStr = (DirectionContext?.Direction ?? Direction.Ltr).ToAttributeString() ?? "ltr";
+            var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
             var parentTypeStr = ParentType switch
             {
                 MenuParentType.ContextMenu => "context-menu",
@@ -575,6 +640,82 @@
         {
             _ = SetTriggerElementAsync(element.Value);
         }
+
+        if (hasRendered && positionerElement.HasValue)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void RegisterTrigger(string triggerId, ElementReference? element, object? payload)
+    {
+        var payloadChanged = !registeredTriggers.TryGetValue(triggerId, out var existingData)
+            || !Equals(existingData.Payload, payload);
+
+        registeredTriggers[triggerId] = new MenuRootTriggerData(element, payload);
+
+        if (element.HasValue &&
+            !triggerElement.HasValue &&
+            activeTriggerId is null &&
+            context.TriggerId is null)
+        {
+            SetTriggerElement(element);
+        }
+
+        if (activeTriggerId == triggerId || (activeTriggerId is null && context.TriggerId == triggerId))
+        {
+            if (element.HasValue)
+            {
+                SetTriggerElement(element);
+            }
+
+            if (CurrentOpen && payloadChanged)
+            {
+                activePayload = payload;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void UnregisterTrigger(string triggerId)
+    {
+        registeredTriggers.Remove(triggerId);
+    }
+
+    private void UpdateTriggerElement(string triggerId, ElementReference? element)
+    {
+        if (registeredTriggers.TryGetValue(triggerId, out var data))
+        {
+            registeredTriggers[triggerId] = data with { Element = element };
+        }
+
+        if (activeTriggerId == triggerId && element.HasValue)
+        {
+            SetTriggerElement(element);
+        }
+    }
+
+    private void UpdateTriggerPayload(string triggerId, object? payload)
+    {
+        if (registeredTriggers.TryGetValue(triggerId, out var data))
+        {
+            if (Equals(data.Payload, payload))
+            {
+                return;
+            }
+
+            registeredTriggers[triggerId] = data with { Payload = payload };
+        }
+        else
+        {
+            registeredTriggers[triggerId] = new MenuRootTriggerData(null, payload);
+        }
+
+        if (CurrentOpen && activeTriggerId == triggerId)
+        {
+            activePayload = payload;
+            StateHasChanged();
+        }
     }
 
     private async Task SetTriggerElementAsync(ElementReference element)
@@ -597,6 +738,11 @@
         if (hasRendered && element.HasValue)
         {
             _ = SetPositionerElementAsync(element.Value);
+        }
+
+        if (hasRendered && element.HasValue && triggerElement.HasValue)
+        {
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -630,16 +776,21 @@
             return null;
         }
 
-        return Handle?.GetTriggerElement(triggerId);
+        if (Handle?.GetTriggerElement(triggerId) is { } handleElement)
+        {
+            return handleElement;
+        }
+
+        return registeredTriggers.TryGetValue(triggerId, out var data) ? data.Element : null;
     }
 
-    private async Task HandleViewportTriggerSwapAsync(string newTriggerId, object? payload)
+    private async Task HandleTriggerSwapAsync(string newTriggerId, object? payload)
     {
         var previousTriggerId = activeTriggerId;
         activeTriggerId = newTriggerId;
+        context.TriggerId = newTriggerId;
 
-        var handlePayload = Handle?.GetTriggerPayloadAsObject(newTriggerId);
-        if (handlePayload is not null)
+        if (Handle?.TryGetTriggerPayloadAsObject(newTriggerId, out var handlePayload) == true)
         {
             activePayload = handlePayload;
         }
@@ -647,13 +798,23 @@
         {
             activePayload = payload;
         }
+        else if (registeredTriggers.TryGetValue(newTriggerId, out var data))
+        {
+            activePayload = data.Payload;
+        }
+
+        var activeElement = GetTriggerElementById(newTriggerId);
+        if (activeElement.HasValue)
+        {
+            SetTriggerElement(activeElement);
+        }
 
         Handle?.SyncState(true, activeTriggerId, activePayload);
 
         instantType = MenuInstantType.None;
         context.MenuInstantType = instantType;
 
-        if (hasRendered)
+        if (hasRendered && hasViewport)
         {
             try
             {
@@ -722,6 +883,17 @@
         return SetOpenAsync(nextOpen, reason, payload);
     }
 
+    private Task SetOpenFromTriggerAsync(
+        bool nextOpen,
+        MenuOpenChangeReason reason,
+        object? payload,
+        string? triggerId,
+        string? interactionType,
+        bool highlightLast)
+    {
+        return SetOpenAsync(nextOpen, reason, payload, triggerId, interactionType, highlightLast);
+    }
+
     private void EmitClose(MenuOpenChangeReason reason, object? payload)
     {
         _ = SetOpenAsync(false, reason, payload);
@@ -744,7 +916,8 @@
             var module = await ModuleTask.Value;
             var modal = ParentType == MenuParentType.None && Modal == MenuModalMode.True;
             var orientationStr = Orientation == MenuOrientation.Horizontal ? "horizontal" : "vertical";
-            await module.InvokeVoidAsync("updateRoot", rootId, modal, orientationStr, LoopFocus, HighlightItemOnHover);
+            var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
+            await module.InvokeVoidAsync("updateRoot", rootId, modal, orientationStr, LoopFocus, HighlightItemOnHover, directionStr);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -778,9 +951,20 @@
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
-        if (element.HasValue)
+        if (element.HasValue && (activeTriggerId is null || activeTriggerId == triggerId))
         {
             SetTriggerElement(element);
+        }
+
+        if (CurrentOpen && activeTriggerId == triggerId)
+        {
+            var payload = Handle?.GetTriggerPayloadAsObject(triggerId);
+            if (!Equals(activePayload, payload))
+            {
+                activePayload = payload;
+                Handle?.SyncState(true, activeTriggerId, activePayload);
+                StateHasChanged();
+            }
         }
     }
 
@@ -790,7 +974,7 @@
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
     {
-        if (element.HasValue)
+        if (element.HasValue && (activeTriggerId is null || activeTriggerId == triggerId))
         {
             SetTriggerElement(element);
         }
@@ -799,7 +983,9 @@
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnOpenChangeRequested(bool open, MenuOpenChangeReason reason, string? triggerId, string? interactionType)
     {
         var payload = Handle?.GetTriggerPayloadAsObject(triggerId);
-        _ = SetOpenAsync(open, reason, payload, triggerId);
+        var highlightLast = interactionType == "highlight-last";
+        var openInteractionType = highlightLast ? "keyboard" : interactionType;
+        _ = InvokeAsync(async () => await SetOpenAsync(open, reason, payload, triggerId, openInteractionType, highlightLast));
 
         if (open && triggerId is not null)
         {
@@ -815,6 +1001,8 @@
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnStateChanged()
     {
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
+
+    private readonly record struct MenuRootTriggerData(ElementReference? Element, object? Payload);
 }

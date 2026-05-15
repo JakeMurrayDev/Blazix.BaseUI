@@ -118,6 +118,71 @@ export async function requestDoubleAnimationFrame(signal = null) {
     return requestAnimationFrameAsync(signal);
 }
 
+function invokeDotNet(dotNetRef, methodName, ...args) {
+    if (!dotNetRef) return;
+
+    dotNetRef.invokeMethodAsync(methodName, ...args).catch(() => { });
+}
+
+/**
+ * Keeps data-starting-style in place for one rendered frame, then notifies .NET
+ * to clear the starting transition status.
+ * @param {HTMLElement} element
+ * @param {object} dotNetRef
+ */
+export function applyStartingStyle(element, dotNetRef) {
+    if (!element) {
+        invokeDotNet(dotNetRef, 'OnTransitionStarted');
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        invokeDotNet(dotNetRef, 'OnTransitionStarted');
+    });
+}
+
+/**
+ * Waits for an element's exit animations/transitions to finish before notifying
+ * .NET that it can unmount the element.
+ * @param {HTMLElement} element
+ * @param {object} dotNetRef
+ */
+export function waitForExitTransition(element, dotNetRef) {
+    if (!element) {
+        invokeDotNet(dotNetRef, 'OnTransitionEnded');
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        waitForElementAnimations(element, dotNetRef);
+    });
+}
+
+function waitForElementAnimations(element, dotNetRef) {
+    if (typeof element.getAnimations !== 'function' || globalThis.BASE_UI_ANIMATIONS_DISABLED) {
+        invokeDotNet(dotNetRef, 'OnTransitionEnded');
+        return;
+    }
+
+    const animations = element.getAnimations();
+
+    Promise.all(animations.map(animation => animation.finished))
+        .then(() => {
+            invokeDotNet(dotNetRef, 'OnTransitionEnded');
+        })
+        .catch(() => {
+            const currentAnimations = element.getAnimations();
+            const hasRunningAnimations = currentAnimations.some(animation =>
+                animation.pending || animation.playState !== 'finished');
+
+            if (hasRunningAnimations) {
+                waitForElementAnimations(element, dotNetRef);
+            } else {
+                invokeDotNet(dotNetRef, 'OnTransitionEnded');
+            }
+        });
+}
+
 /**
  * Sets CSS custom properties on an element.
  * @param {HTMLElement} element

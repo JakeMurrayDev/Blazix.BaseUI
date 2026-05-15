@@ -35,6 +35,7 @@
     private MenuPositionerContext positionerContext = null!;
     private RenderElement<MenuPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
 
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
@@ -230,7 +231,18 @@
         {
             positionerInterop.MarkRendered();
             positionerDotNetRef = DotNetObjectReference.Create(this);
-            RootContext?.SetPositionerElement(Element);
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetPositionerElement(currentElement);
+        }
+
+        if (firstRender && !currentElement.HasValue)
+        {
+            await InvokeAsync(StateHasChanged);
         }
 
         if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)

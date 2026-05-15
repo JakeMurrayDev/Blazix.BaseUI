@@ -21,22 +21,6 @@ if (!window[STATE_KEY]) {
 
 const state = window[STATE_KEY];
 
-const POSITIONER_OWNED_STYLE_PROPERTIES = [
-    'position',
-    'top',
-    'right',
-    'bottom',
-    'left',
-    'visibility',
-    '--available-width',
-    '--available-height',
-    '--anchor-width',
-    '--anchor-height',
-    '--positioner-width',
-    '--positioner-height',
-    '--transform-origin'
-];
-
 // Inject CSS to hide positioners until JS has computed their position.
 // Prevents flash-of-unpositioned-content when elements are portaled.
 if (!document.querySelector('[data-baseui-positioner-css]')) {
@@ -488,23 +472,16 @@ export async function initializePositioner(options) {
         // position/top/left/visibility/data-positioned. Component-specific
         // align-item passes own those writes.
         alignItemWithTriggerActive: !!options.alignItemWithTriggerActive,
-        preservePositionerStyles: options.preservePositionerStyles !== false,
         onPositionUpdated: options.onPositionUpdated || null,
         dotNetRef: options.dotNetRef || null,
         hasSideOffsetFn: options.hasSideOffsetFn || false,
         hasAlignOffsetFn: options.hasAlignOffsetFn || false,
         cleanup: null,
-        styleObserver: null,
-        ownedPositionerStyles: null,
-        restoringPositionerStyles: false,
         computedSide: side,
         computedAlign: align
     };
 
     state.positioners.set(positionerId, positionerState);
-    if (positionerState.preservePositionerStyles) {
-        setupPositionStylePreserver(positionerState);
-    }
     await updatePositionInternal(positionerState);
     await setupAutoUpdate(positionerState);
 
@@ -525,7 +502,6 @@ export function disposePositioner(positionerId) {
     const positionerState = state.positioners.get(positionerId);
     if (positionerState) {
         cleanupAutoUpdate(positionerState);
-        cleanupPositionStylePreserver(positionerState);
         positionerState.positionerElement?.removeAttribute('data-positioned');
         state.positioners.delete(positionerId);
     }
@@ -577,82 +553,6 @@ function cleanupAutoUpdate(positionerState) {
     if (positionerState.cleanup) {
         positionerState.cleanup();
         positionerState.cleanup = null;
-    }
-}
-
-function setupPositionStylePreserver(positionerState) {
-    const { positionerElement } = positionerState;
-    if (!positionerElement || typeof MutationObserver === 'undefined') {
-        return;
-    }
-
-    cleanupPositionStylePreserver(positionerState);
-
-    positionerState.styleObserver = new MutationObserver(() => {
-        restoreOwnedPositionStylesIfNeeded(positionerState);
-    });
-
-    positionerState.styleObserver.observe(positionerElement, {
-        attributes: true,
-        attributeFilter: ['style']
-    });
-}
-
-function cleanupPositionStylePreserver(positionerState) {
-    if (positionerState.styleObserver) {
-        positionerState.styleObserver.disconnect();
-        positionerState.styleObserver = null;
-    }
-}
-
-function rememberOwnedPositionStyles(positionerState) {
-    const { positionerElement } = positionerState;
-    if (!positionerElement) {
-        return;
-    }
-
-    const snapshot = {};
-    for (const property of POSITIONER_OWNED_STYLE_PROPERTIES) {
-        snapshot[property] = positionerElement.style.getPropertyValue(property);
-    }
-    positionerState.ownedPositionerStyles = snapshot;
-}
-
-function restoreOwnedPositionStylesIfNeeded(positionerState) {
-    const { positionerElement, ownedPositionerStyles } = positionerState;
-    if (
-        !positionerElement ||
-        !ownedPositionerStyles ||
-        positionerState.restoringPositionerStyles ||
-        positionerState.alignItemWithTriggerActive ||
-        !positionerElement.hasAttribute('data-positioned')
-    ) {
-        return;
-    }
-
-    let needsRestore = false;
-    for (const [property, value] of Object.entries(ownedPositionerStyles)) {
-        if (positionerElement.style.getPropertyValue(property) !== value) {
-            needsRestore = true;
-            break;
-        }
-    }
-
-    if (!needsRestore) {
-        return;
-    }
-
-    positionerState.restoringPositionerStyles = true;
-    try {
-        for (const [property, value] of Object.entries(ownedPositionerStyles)) {
-            if (value) {
-                positionerElement.style.setProperty(property, value);
-            } else {
-                positionerElement.style.removeProperty(property);
-            }
-        }
-    } finally {
-        positionerState.restoringPositionerStyles = false;
     }
 }
 
@@ -710,7 +610,6 @@ async function updatePositionInternal(positionerState) {
         // causes offsetParent to be null, breaking absolute strategy calculations.
         // Using setProperty with 'important' overrides the stylesheet !important rule.
         const strategy = positionMethod === 'absolute' ? 'absolute' : 'fixed';
-        positionerElement.style.setProperty('position', strategy, 'important');
 
         const placement = toFloatingPlacement(side, align);
         const ca = normalizeCollisionAvoidance(collisionAvoidance);
@@ -829,6 +728,8 @@ async function updatePositionInternal(positionerState) {
             }));
         }
 
+        positionerElement.style.setProperty('position', strategy, 'important');
+
         const { x, y, placement: finalPlacement, middlewareData } = await FloatingUI.computePosition(
             triggerElement,
             positionerElement,
@@ -905,10 +806,6 @@ async function updatePositionInternal(positionerState) {
             positionerElement.style.visibility = '';
             positionerElement.setAttribute('data-positioned', '');
         }
-
-        // Set CSS custom properties
-        positionerElement.style.setProperty('--positioner-width', `${positionerElement.offsetWidth}px`);
-        positionerElement.style.setProperty('--positioner-height', `${positionerElement.offsetHeight}px`);
 
         // Set data attributes
         positionerElement.setAttribute('data-side', effectiveSide);
@@ -990,10 +887,6 @@ async function updatePositionInternal(positionerState) {
             : adjacentOrigins[effectiveSide];
 
         positionerElement.style.setProperty('--transform-origin', transformOrigin);
-
-        if (!positionerState.alignItemWithTriggerActive) {
-            rememberOwnedPositionStyles(positionerState);
-        }
 
         // Store computed placement for safePolygon
         positionerState.computedSide = effectiveSide;
@@ -1092,8 +985,6 @@ function updatePositionFallback(positionerState) {
 
     positionerElement.setAttribute('data-side', side);
     positionerElement.setAttribute('data-align', align);
-
-    rememberOwnedPositionStyles(positionerState);
 
     positionerState.computedSide = side;
     positionerState.computedAlign = align;
@@ -1720,6 +1611,8 @@ export function createHoverInteraction(options) {
     let placement = 'bottom';
     let interactedInside = false;
     let childCloseCleanup = null;
+    let currentOpenDelay = openDelay;
+    let currentCloseDelay = closeDelay;
 
     function cleanupChildCloseListener() {
         if (childCloseCleanup) {
@@ -1735,8 +1628,8 @@ export function createHoverInteraction(options) {
 
         closeTimeout.clear();
 
-        if (openDelay > 0) {
-            openTimeout.start(openDelay, () => {
+        if (currentOpenDelay > 0) {
+            openTimeout.start(currentOpenDelay, () => {
                 if (!isOpen) {
                     isOpen = true;
                     onOpen?.('trigger-hover');
@@ -1755,6 +1648,16 @@ export function createHoverInteraction(options) {
 
         // If moving to floating element, don't close
         if (floatingElement && event.relatedTarget && contains(floatingElement, event.relatedTarget)) {
+            return;
+        }
+
+        // A concrete outside target means the pointer did not move toward the
+        // floating element. Close immediately instead of waiting for a later
+        // mousemove that may never arrive in automated or low-motion paths.
+        if (event.relatedTarget &&
+            !contains(triggerElement, event.relatedTarget) &&
+            (!floatingElement || !contains(floatingElement, event.relatedTarget))) {
+            closeWithDelay();
             return;
         }
 
@@ -1782,6 +1685,13 @@ export function createHoverInteraction(options) {
             });
 
             document.addEventListener('mousemove', mouseMoveHandler);
+            closeTimeout.start(Math.max(currentCloseDelay, 100), () => {
+                cleanupMouseMove();
+                if (isOpen) {
+                    isOpen = false;
+                    onClose?.('trigger-hover');
+                }
+            });
         } else {
             closeWithDelay();
         }
@@ -1845,8 +1755,8 @@ export function createHoverInteraction(options) {
     }
 
     function closeWithDelay() {
-        if (closeDelay > 0) {
-            closeTimeout.start(closeDelay, () => {
+        if (currentCloseDelay > 0) {
+            closeTimeout.start(currentCloseDelay, () => {
                 if (isOpen) {
                     isOpen = false;
                     onClose?.('trigger-hover');
@@ -1904,6 +1814,11 @@ export function createHoverInteraction(options) {
                     }
                 }
             }
+        },
+
+        setDelays(open, close) {
+            currentOpenDelay = open ?? 0;
+            currentCloseDelay = close ?? 0;
         },
 
         cleanup() {
@@ -2749,14 +2664,10 @@ function createFocusOutHandler(mgr, interactionCtx) {
             // If focus moved to a focus guard, don't close
             if (relatedTarget?.hasAttribute('data-blazor-base-ui-focus-guard')) return;
 
-            // If no related target (focus went to body/outside), close
-            if (!relatedTarget) {
-                if (!interactionCtx?.pointerDownOutside) {
-                    if (interactionCtx) interactionCtx.preventReturnFocus = true;
-                    mgr.onClose?.();
-                }
-                return;
-            }
+            // Match Floating UI/Base UI: a null relatedTarget commonly means focus
+            // temporarily fell back to the document body during DOM updates. Do not
+            // dismiss until focus lands on a concrete unrelated element.
+            if (!relatedTarget) return;
 
             // Check if focus stayed inside floating element or trigger
             if (contains(mgr.floatingElement, relatedTarget)) return;

@@ -76,6 +76,105 @@ public abstract class MenuTestsBase : TestBase
 
     #endregion
 
+    #region Multi-Trigger Tests
+
+    [Fact]
+    public virtual async Task MultiTrigger_Contained_ShowsCorrectPayload()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger"));
+
+        var triggerA = GetByTestId("trigger-a");
+        await triggerA.ClickAsync();
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Payload A");
+
+        var close = GetByTestId("menu-close");
+        await close.ClickAsync();
+        await WaitForTextContentAsync(GetByTestId("open-state"), "false");
+
+        var triggerB = GetByTestId("trigger-b");
+        await triggerB.ClickAsync(new LocatorClickOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Payload B");
+    }
+
+    [Fact]
+    public virtual async Task MultiTrigger_Contained_DefaultOpenWithTriggerId()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")
+            .WithDefaultOpen(true)
+            .WithDefaultTriggerId("trigger-b"));
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var triggerB = GetByTestId("trigger-b");
+        await Assertions.Expect(triggerB).ToHaveAttributeAsync("data-popup-open", "");
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Payload B");
+    }
+
+    [Fact]
+    public virtual async Task MultiTrigger_Handle_ShowsCorrectPayload()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")
+            .WithUseHandle(true)
+            .WithShowPayload(true));
+
+        var triggerA = GetByTestId("trigger-a");
+        await triggerA.ClickAsync();
+
+        var payloadDisplay = GetByTestId("payload-display");
+        await Assertions.Expect(payloadDisplay).ToHaveTextAsync("Payload A");
+    }
+
+    [Fact]
+    public virtual async Task MultiTrigger_Handle_ProgrammaticOpenClose()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")
+            .WithUseHandle(true)
+            .WithShowProgrammaticButtons(true));
+
+        var openAButton = GetByTestId("open-a-button");
+        await openAButton.ClickAsync();
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Content A");
+
+        var closeButton = GetByTestId("close-button");
+        await closeButton.ClickAsync();
+
+        await WaitForTextContentAsync(GetByTestId("open-state"), "false");
+    }
+
+    [Fact]
+    public virtual async Task MultiTrigger_Handle_DefaultOpenWithTriggerId()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")
+            .WithUseHandle(true)
+            .WithDefaultOpen(true)
+            .WithDefaultTriggerId("trigger-b"));
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Content B");
+
+        var triggerB = GetByTestId("trigger-b");
+        await Assertions.Expect(triggerB).ToHaveAttributeAsync("data-popup-open", "");
+    }
+
+    #endregion
+
     #region Menu Item Interaction Tests
 
     /// <summary>
@@ -99,6 +198,69 @@ public abstract class MenuTestsBase : TestBase
         // Item 2 should now have tabindex="0", item 1 should have tabindex="-1"
         await Assertions.Expect(item1).ToHaveAttributeAsync("tabindex", "-1");
         await Assertions.Expect(item2).ToHaveAttributeAsync("tabindex", "0");
+    }
+
+    [Fact]
+    public virtual async Task CloseOnClickFalse_UpdatesStateWithoutClosing()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu"));
+
+        await OpenMenuAsync();
+
+        var noCloseItem = GetByTestId("menu-item-no-close");
+        var openState = GetByTestId("open-state");
+        var clickCount = GetByTestId("no-close-click-count");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("2");
+    }
+
+    [Fact]
+    public virtual async Task CloseOnClickFalse_ModalUpdatesStateWithoutFreezing()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu").WithModal(true));
+
+        await OpenMenuAsync();
+
+        var noCloseItem = GetByTestId("menu-item-no-close");
+        var openState = GetByTestId("open-state");
+        var clickCount = GetByTestId("no-close-click-count");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("2");
+    }
+
+    [Fact]
+    public virtual async Task CloseOnClickFalse_TriggerTextCanUpdateWhileMenuStaysOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu").WithShowCountInTrigger(true));
+
+        await OpenMenuAsync();
+
+        var trigger = GetByTestId("menu-trigger");
+        var noCloseItem = GetByTestId("menu-item-no-close");
+        var openState = GetByTestId("open-state");
+        var clickCount = GetByTestId("no-close-click-count");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(trigger).ToHaveTextAsync("Open Menu (1)");
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+
+        await noCloseItem.ClickAsync();
+        await Assertions.Expect(trigger).ToHaveTextAsync("Open Menu (2)");
+        await Assertions.Expect(openState).ToHaveTextAsync("true");
+        await Assertions.Expect(clickCount).ToHaveTextAsync("2");
     }
 
     #endregion
@@ -192,7 +354,7 @@ public abstract class MenuTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/menu").WithDefaultOpen(true));
 
         var item1 = GetByTestId("menu-item-1");
-        var item4 = GetByTestId("menu-item-4");
+        var item3 = GetByTestId("menu-item-3");
 
         // Wait for menu to be fully initialized
         await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "");
@@ -200,7 +362,7 @@ public abstract class MenuTestsBase : TestBase
         // Navigate to a later item
         await Page.Keyboard.PressAsync("ArrowDown");
         await Page.Keyboard.PressAsync("ArrowDown");
-        await Assertions.Expect(item4).ToHaveAttributeAsync("data-highlighted", "");
+        await Assertions.Expect(item3).ToHaveAttributeAsync("data-highlighted", "");
 
         // Press Home
         await Page.Keyboard.PressAsync("Home");
@@ -288,13 +450,13 @@ public abstract class MenuTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task ArrowDown_SkipsDisabledItems()
+    public virtual async Task ArrowDown_IncludesDisabledItems()
     {
         await NavigateAsync(CreateUrl("/tests/menu").WithDefaultOpen(true));
 
         var item1 = GetByTestId("menu-item-1");
         var item2 = GetByTestId("menu-item-2");
-        var item4 = GetByTestId("menu-item-4");
+        var item3 = GetByTestId("menu-item-3");
 
         // Wait for menu to be fully initialized
         await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "");
@@ -303,9 +465,10 @@ public abstract class MenuTestsBase : TestBase
         await Page.Keyboard.PressAsync("ArrowDown");
         await Assertions.Expect(item2).ToHaveAttributeAsync("data-highlighted", "");
 
-        // Navigate down - should skip item 3 (disabled) and highlight item 4
+        // Navigate down - disabled items are focusable but not activatable, matching React Base UI.
         await Page.Keyboard.PressAsync("ArrowDown");
-        await Assertions.Expect(item4).ToHaveAttributeAsync("data-highlighted", "");
+        await Assertions.Expect(item3).ToHaveAttributeAsync("data-highlighted", "");
+        await Assertions.Expect(item3).ToHaveAttributeAsync("aria-disabled", "true");
     }
 
     #endregion
@@ -423,6 +586,29 @@ public abstract class MenuTestsBase : TestBase
         await Assertions.Expect(openState).ToHaveTextAsync("true");
     }
 
+    [Fact]
+    public virtual async Task OpenOnHover_RespectsOpenDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(600));
+
+        await WaitForDelayAsync(500);
+
+        var trigger = GetByTestId("menu-trigger");
+        var openState = GetByTestId("open-state");
+
+        await trigger.HoverAsync();
+        await Page.WaitForTimeoutAsync(200);
+
+        Assert.Equal("false", await openState.TextContentAsync());
+
+        await Assertions.Expect(openState).ToHaveTextAsync("true", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 3000 * TimeoutMultiplier
+        });
+    }
+
     #endregion
 
     #region Outside Click Tests
@@ -478,6 +664,10 @@ public abstract class MenuTestsBase : TestBase
 
         var item1 = GetByTestId("menu-item-1");
         await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "");
+
+        var item2 = GetByTestId("menu-item-2");
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await Assertions.Expect(item2).ToHaveAttributeAsync("data-highlighted", "");
     }
 
     [Fact]
@@ -1038,6 +1228,40 @@ public abstract class MenuTestsBase : TestBase
     #endregion
 
     #region Checkbox Item Keyboard Tests
+
+    [Fact]
+    public virtual async Task CheckboxItem_Click_RendersIndicatorWithoutScriptError()
+    {
+        var browserErrors = new List<string>();
+        Page.Console += (_, message) =>
+        {
+            if (message.Type == "error")
+            {
+                browserErrors.Add(message.Text);
+            }
+        };
+        Page.PageError += (_, error) => browserErrors.Add(error);
+
+        await NavigateAsync(CreateUrl("/tests/menu")
+            .WithDefaultOpen(true)
+            .WithShowCheckbox(true));
+
+        var checkboxItem = GetByTestId("menu-checkbox-item");
+        var checkboxState = GetByTestId("checkbox-state");
+        var checkboxIndicator = GetByTestId("menu-checkbox-indicator");
+
+        await Assertions.Expect(checkboxItem).ToHaveAttributeAsync("aria-checked", "false");
+        await Assertions.Expect(checkboxIndicator).Not.ToBeAttachedAsync();
+
+        await checkboxItem.ClickAsync();
+
+        await Assertions.Expect(checkboxItem).ToHaveAttributeAsync("aria-checked", "true");
+        await Assertions.Expect(checkboxState).ToHaveTextAsync("true");
+        await Assertions.Expect(checkboxIndicator).ToBeAttachedAsync();
+        Assert.DoesNotContain(browserErrors, error =>
+            error.Contains("applyStartingStyle", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("JSException", StringComparison.OrdinalIgnoreCase));
+    }
 
     [Fact]
     public virtual async Task CheckboxItem_Space_TogglesCheckedState()

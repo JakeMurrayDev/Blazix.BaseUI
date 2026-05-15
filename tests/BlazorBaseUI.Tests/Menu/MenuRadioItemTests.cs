@@ -14,7 +14,8 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
         bool groupDisabled = false,
         bool itemDisabled = false,
         string? label = null,
-        RenderFragment<RenderProps<MenuRadioItemState>>? render = null)
+        RenderFragment<RenderProps<MenuRadioItemState>>? render = null,
+        bool nativeButton = false)
     {
         return builder =>
         {
@@ -47,6 +48,8 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
                             groupBuilder.AddAttribute(firstItemAttrIndex++, "Value", "option1");
                             if (itemDisabled)
                                 groupBuilder.AddAttribute(firstItemAttrIndex++, "Disabled", true);
+                            if (nativeButton)
+                                groupBuilder.AddAttribute(firstItemAttrIndex++, "NativeButton", true);
                             if (label is not null)
                                 groupBuilder.AddAttribute(firstItemAttrIndex++, "Label", label);
                             if (render is not null)
@@ -97,6 +100,17 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
 
         var item = cut.Find("span[role='menuitemradio']");
         item.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsNativeButtonMode()
+    {
+        var cut = Render(CreateRadioItemInRoot(nativeButton: true));
+
+        var item = cut.Find("button[role='menuitemradio']");
+        item.GetAttribute("type")!.ShouldBe("button");
 
         return Task.CompletedTask;
     }

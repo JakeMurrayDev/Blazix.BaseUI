@@ -124,6 +124,18 @@ public class MenuLinkItemTests : BunitContext, IMenuLinkItemContract
     }
 
     [Fact]
+    public Task ResolvesIdFromAdditionalAttributes()
+    {
+        var cut = Render(CreateMenuWithLinkItem(
+            additionalAttributes: new Dictionary<string, object> { ["id"] = "link-from-attrs" }));
+
+        var element = cut.Find("[role='menuitem']");
+        element.GetAttribute("id")!.ShouldBe("link-from-attrs");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task CloseOnClickDefaultsFalse()
     {
         // CloseOnClick defaults to false - clicking should not close the menu

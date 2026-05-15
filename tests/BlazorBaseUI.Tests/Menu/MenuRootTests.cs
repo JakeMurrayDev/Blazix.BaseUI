@@ -203,6 +203,44 @@ public class MenuRootTests : BunitContext, IMenuRootContract
     }
 
     [Fact]
+    public Task SupportsDirectionParameter()
+    {
+        var cut = Render<MenuRoot>(parameters => parameters
+            .Add(p => p.Direction, BlazorBaseUI.Direction.Rtl)
+            .Add(p => p.ChildContent, _ => CreateChildContent()));
+
+        cut.Find("button").ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsSubmenuDirectionParameter()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MenuSubmenuRoot>(0);
+                innerBuilder.AddAttribute(1, "Direction", BlazorBaseUI.Direction.Rtl);
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(submenuBuilder =>
+                {
+                    submenuBuilder.OpenComponent<MenuSubmenuTrigger>(0);
+                    submenuBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "More")));
+                    submenuBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[role='menuitem']").ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task ActionsRefProvidesCloseMethod()
     {
         var actions = new MenuRootActions();
@@ -245,5 +283,232 @@ public class MenuRootTests : BunitContext, IMenuRootContract
         capturedContext.ShouldNotBeNull();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DefaultOpenUsesDefaultTriggerIdPayload()
+    {
+        MenuRootPayloadContext? capturedContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "DefaultTriggerId", "trigger-2");
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
+            {
+                capturedContext = ctx;
+                return innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<MenuTrigger>(0);
+                    innerBuilder.AddAttribute(1, "id", "trigger-1");
+                    innerBuilder.AddAttribute(2, "Payload", "one");
+                    innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                    innerBuilder.CloseComponent();
+
+                    innerBuilder.OpenComponent<MenuTrigger>(10);
+                    innerBuilder.AddAttribute(11, "id", "trigger-2");
+                    innerBuilder.AddAttribute(12, "Payload", "two");
+                    innerBuilder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                    innerBuilder.CloseComponent();
+                };
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("two");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ControlledTriggerIdChangeUpdatesPayload()
+    {
+        MenuRootPayloadContext? capturedContext = null;
+        RenderFragment<MenuRootPayloadContext> childContent = ctx =>
+        {
+            capturedContext = ctx;
+            return innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MenuTrigger>(0);
+                innerBuilder.AddAttribute(1, "id", "trigger-1");
+                innerBuilder.AddAttribute(2, "Payload", "one");
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<MenuTrigger>(10);
+                innerBuilder.AddAttribute(11, "id", "trigger-2");
+                innerBuilder.AddAttribute(12, "Payload", "two");
+                innerBuilder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                innerBuilder.CloseComponent();
+            };
+        };
+
+        var cut = Render<MenuRoot>(parameters => parameters
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-1")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("one");
+        });
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("two");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HandleControlledTriggerIdChangeClearsPayloadWhenTriggerPayloadIsNull()
+    {
+        var handle = new MenuHandle<string?>();
+        MenuRootPayloadContext? capturedContext = null;
+        RenderFragment<MenuRootPayloadContext> childContent = ctx =>
+        {
+            capturedContext = ctx;
+            return innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MenuTypedTrigger<string?>>(0);
+                innerBuilder.AddAttribute(1, "Handle", handle);
+                innerBuilder.AddAttribute(2, "id", "trigger-1");
+                innerBuilder.AddAttribute(3, "Payload", "one");
+                innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<MenuTypedTrigger<string?>>(10);
+                innerBuilder.AddAttribute(11, "Handle", handle);
+                innerBuilder.AddAttribute(12, "id", "trigger-2");
+                innerBuilder.AddAttribute(13, "Payload", (string?)null);
+                innerBuilder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                innerBuilder.CloseComponent();
+            };
+        };
+
+        var cut = Render<MenuRoot>(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-1")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("one");
+        });
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBeNull();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HandleDefaultOpenUsesDefaultTriggerIdPayload()
+    {
+        var handle = new MenuHandle<string>();
+        MenuRootPayloadContext? capturedContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuRoot>(0);
+            builder.AddAttribute(1, "Handle", (IMenuHandle)handle);
+            builder.AddAttribute(2, "DefaultOpen", true);
+            builder.AddAttribute(3, "DefaultTriggerId", "trigger-2");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
+            {
+                capturedContext = ctx;
+                return innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<MenuTypedTrigger<string>>(0);
+                    innerBuilder.AddAttribute(1, "Handle", handle);
+                    innerBuilder.AddAttribute(2, "id", "trigger-1");
+                    innerBuilder.AddAttribute(3, "Payload", "one");
+                    innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                    innerBuilder.CloseComponent();
+
+                    innerBuilder.OpenComponent<MenuTypedTrigger<string>>(10);
+                    innerBuilder.AddAttribute(11, "Handle", handle);
+                    innerBuilder.AddAttribute(12, "id", "trigger-2");
+                    innerBuilder.AddAttribute(13, "Payload", "two");
+                    innerBuilder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                    innerBuilder.CloseComponent();
+                };
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("two");
+        });
+
+        handle.ActiveTriggerId.ShouldBe("trigger-2");
+        handle.Payload.ShouldBe("two");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task MultipleTriggersPassTheirOwnPayload()
+    {
+        MenuRootPayloadContext? capturedContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
+            {
+                capturedContext = ctx;
+                return innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<MenuTrigger>(0);
+                    innerBuilder.AddAttribute(1, "id", "trigger-1");
+                    innerBuilder.AddAttribute(2, "Payload", "one");
+                    innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                    innerBuilder.CloseComponent();
+
+                    innerBuilder.OpenComponent<MenuTrigger>(10);
+                    innerBuilder.AddAttribute(11, "id", "trigger-2");
+                    innerBuilder.AddAttribute(12, "Payload", "two");
+                    innerBuilder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                    innerBuilder.CloseComponent();
+                };
+            }));
+            builder.CloseComponent();
+        });
+
+        var triggers = cut.FindAll("button");
+        await triggers[1].TriggerEventAsync("onpointerdown", new Microsoft.AspNetCore.Components.Web.PointerEventArgs());
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext.ShouldNotBeNull();
+            capturedContext.Value.Payload.ShouldBe("two");
+        });
     }
 }

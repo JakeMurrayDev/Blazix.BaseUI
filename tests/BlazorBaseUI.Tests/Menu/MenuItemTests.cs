@@ -13,7 +13,8 @@ public class MenuItemTests : BunitContext, IMenuItemContract
         bool itemDisabled = false,
         bool closeOnClick = true,
         RenderFragment<RenderProps<MenuItemState>>? render = null,
-        IReadOnlyDictionary<string, object>? additionalAttributes = null)
+        IReadOnlyDictionary<string, object>? additionalAttributes = null,
+        bool nativeButton = false)
     {
         return builder =>
         {
@@ -36,6 +37,8 @@ public class MenuItemTests : BunitContext, IMenuItemContract
 
                         if (itemDisabled)
                             popupBuilder.AddAttribute(attrIndex++, "Disabled", true);
+                        if (nativeButton)
+                            popupBuilder.AddAttribute(attrIndex++, "NativeButton", true);
                         popupBuilder.AddAttribute(attrIndex++, "CloseOnClick", closeOnClick);
                         if (render is not null)
                             popupBuilder.AddAttribute(attrIndex++, "Render", render);
@@ -80,6 +83,29 @@ public class MenuItemTests : BunitContext, IMenuItemContract
 
         var item = cut.Find("span[role='menuitem']");
         item.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsNativeButtonMode()
+    {
+        var cut = Render(CreateMenuItemInRoot(nativeButton: true));
+
+        var item = cut.Find("button[role='menuitem']");
+        item.GetAttribute("type")!.ShouldBe("button");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ResolvesIdFromAdditionalAttributes()
+    {
+        var cut = Render(CreateMenuItemInRoot(
+            additionalAttributes: new Dictionary<string, object> { ["id"] = "item-from-attrs" }));
+
+        var item = cut.Find("[role='menuitem']");
+        item.GetAttribute("id")!.ShouldBe("item-from-attrs");
 
         return Task.CompletedTask;
     }

@@ -6,6 +6,7 @@
               LoopFocus="LoopFocus"
               HighlightItemOnHover="HighlightItemOnHover"
               Orientation="Orientation"
+              Direction="Direction"
               Handle="Handle"
               TriggerId="TriggerId"
               DefaultTriggerId="DefaultTriggerId"
@@ -69,6 +70,12 @@
     /// </summary>
     [Parameter]
     public MenuOrientation Orientation { get; set; } = MenuOrientation.Vertical;
+
+    /// <summary>
+    /// Gets or sets the text direction of the submenu.
+    /// </summary>
+    [Parameter]
+    public Direction Direction { get; set; } = Direction.Undefined;
 
     /// <summary>
     /// Gets or sets a handle to connect this root with detached trigger components.

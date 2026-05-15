@@ -20,7 +20,8 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
         Func<MenuCheckboxItemState, string?>? classValue = null,
         Func<MenuCheckboxItemState, string?>? styleValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
-        EventCallback<MenuCheckboxItemChangeEventArgs>? onCheckedChange = null)
+        EventCallback<MenuCheckboxItemChangeEventArgs>? onCheckedChange = null,
+        bool nativeButton = false)
     {
         return builder =>
         {
@@ -46,6 +47,8 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
                         popupBuilder.AddAttribute(attrIndex++, "DefaultChecked", defaultChecked);
                         if (itemDisabled)
                             popupBuilder.AddAttribute(attrIndex++, "Disabled", true);
+                        if (nativeButton)
+                            popupBuilder.AddAttribute(attrIndex++, "NativeButton", true);
                         popupBuilder.AddAttribute(attrIndex++, "CloseOnClick", closeOnClick);
                         if (label is not null)
                             popupBuilder.AddAttribute(attrIndex++, "Label", label);
@@ -100,6 +103,17 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
 
         var item = cut.Find("span[role='menuitemcheckbox']");
         item.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsNativeButtonMode()
+    {
+        var cut = Render(CreateCheckboxItemInRoot(nativeButton: true));
+
+        var item = cut.Find("button[role='menuitemcheckbox']");
+        item.GetAttribute("type")!.ShouldBe("button");
 
         return Task.CompletedTask;
     }
@@ -310,6 +324,18 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
 
         var item = cut.Find("[role='menuitemcheckbox']");
         item.GetAttribute("id")!.ShouldBe("custom-checkbox-id");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ResolvesIdFromAdditionalAttributes()
+    {
+        var cut = Render(CreateCheckboxItemInRoot(
+            additionalAttributes: new Dictionary<string, object> { ["id"] = "checkbox-from-attrs" }));
+
+        var item = cut.Find("[role='menuitemcheckbox']");
+        item.GetAttribute("id")!.ShouldBe("checkbox-from-attrs");
 
         return Task.CompletedTask;
     }

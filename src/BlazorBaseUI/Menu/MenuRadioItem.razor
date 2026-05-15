@@ -2,7 +2,7 @@
 
 <CascadingValue TValue="MenuRadioItemContext" Value="itemContext" IsFixed="true">
     <RenderElement TState="MenuRadioItemState"
-                   Tag="div"
+                   Tag="@(NativeButton ? "button" : "div")"
                    State="state"
                    Render="Render"
                    ClassValue="ClassValue"
@@ -21,6 +21,9 @@
     private MenuRadioItemState state;
     private RenderElement<MenuRadioItemState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
 
     private bool ResolvedDisabled => Disabled || (RadioGroupContext?.Disabled ?? false);
 
@@ -45,6 +48,13 @@
     /// </summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders as a native <c>&lt;button&gt;</c> element.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
 
     /// <summary>
     /// Gets or sets the text label to use when the item is matched during keyboard text navigation.
@@ -134,10 +144,19 @@
     {
         var attrs = new Dictionary<string, object>();
 
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, ResolvedDisabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, ResolvedDisabled);
+        }
+
         attrs["role"] = "menuitemradio";
         attrs["aria-checked"] = Checked ? "true" : "false";
 
-        attrs["id"] = Id ?? (defaultId ??= Guid.NewGuid().ToIdString());
+        attrs["id"] = ResolvedId;
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
 
@@ -187,7 +206,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!ResolvedDisabled && itemContext is not null)
+        if (!ResolvedDisabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             itemContext.Highlighted = true;
@@ -201,9 +220,9 @@
 
     private async Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        highlighted = false;
-        if (itemContext is not null)
+        if (highlighted && itemContext is not null)
         {
+            highlighted = false;
             itemContext.Highlighted = false;
             state = state with { Highlighted = false };
             BuildComponentAttributes();
@@ -215,7 +234,7 @@
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!ResolvedDisabled && !highlighted && itemContext is not null)
+        if (!ResolvedDisabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             itemContext.Highlighted = true;

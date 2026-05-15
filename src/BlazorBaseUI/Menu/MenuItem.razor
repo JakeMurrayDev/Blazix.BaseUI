@@ -1,7 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
 
 <RenderElement TState="MenuItemState"
-               Tag="div"
+               Tag="@(NativeButton ? "button" : "div")"
                State="state"
                Render="Render"
                ClassValue="ClassValue"
@@ -19,6 +19,9 @@
     private RenderElement<MenuItemState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
+
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
@@ -28,6 +31,13 @@
     /// </summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders as a native <c>&lt;button&gt;</c> element.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
 
     /// <summary>
     /// Determines whether the menu closes when this item is clicked.
@@ -96,9 +106,17 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["role"] = "menuitem";
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
+        }
 
-        attrs["id"] = Id ?? (defaultId ??= Guid.NewGuid().ToIdString());
+        attrs["role"] = "menuitem";
+        attrs["id"] = ResolvedId;
 
         attrs["tabindex"] = highlighted ? 0 : -1;
 
@@ -140,7 +158,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!Disabled)
+        if (!Disabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };
@@ -153,17 +171,20 @@
 
     private async Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        highlighted = false;
-        state = state with { Highlighted = false };
-        BuildComponentAttributes();
-        StateHasChanged();
+        if (highlighted)
+        {
+            highlighted = false;
+            state = state with { Highlighted = false };
+            BuildComponentAttributes();
+            StateHasChanged();
+        }
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!Disabled && !highlighted)
+        if (!Disabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };

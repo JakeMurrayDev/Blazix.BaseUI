@@ -19,6 +19,9 @@
     private RenderElement<MenuLinkItemState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
+
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
@@ -91,7 +94,7 @@
 
         attrs["role"] = "menuitem";
 
-        attrs["id"] = Id ?? (defaultId ??= Guid.NewGuid().ToIdString());
+        attrs["id"] = ResolvedId;
 
         attrs["tabindex"] = highlighted ? 0 : -1;
 
@@ -122,27 +125,33 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        highlighted = true;
-        state = state with { Highlighted = true };
-        BuildComponentAttributes();
-        StateHasChanged();
+        if (!highlighted && (RootContext?.HighlightItemOnHover ?? true))
+        {
+            highlighted = true;
+            state = state with { Highlighted = true };
+            BuildComponentAttributes();
+            StateHasChanged();
+        }
 
         await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        highlighted = false;
-        state = state with { Highlighted = false };
-        BuildComponentAttributes();
-        StateHasChanged();
+        if (highlighted)
+        {
+            highlighted = false;
+            state = state with { Highlighted = false };
+            BuildComponentAttributes();
+            StateHasChanged();
+        }
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!highlighted)
+        if (!highlighted && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };

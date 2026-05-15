@@ -6,7 +6,7 @@
 @inject IJSRuntime JSRuntime
 
 <RenderElement TState="MenuSubmenuTriggerState"
-               Tag="div"
+               Tag="@(NativeButton ? "button" : "div")"
                State="state"
                Enabled="RootContext is not null"
                Render="Render"
@@ -23,14 +23,20 @@
     private bool hoverInitialized;
     private string? hoverRootId;
     private int itemIndex = -1;
+    private string? defaultId;
     private string triggerId = null!;
     private MenuSubmenuTriggerState state;
     private RenderElement<MenuSubmenuTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private CancellationTokenSource? hoverOpenCancellationTokenSource;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/BlazorBaseUI/blazor-baseui-menu.js").AsTask());
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
 
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
@@ -44,6 +50,13 @@
     /// </summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders as a native <c>&lt;button&gt;</c> element.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
 
     /// <summary>
     /// Determines whether the submenu should also open when the trigger is hovered.
@@ -123,7 +136,7 @@
             throw new InvalidOperationException("MenuSubmenuTrigger must be placed inside a MenuSubmenuRoot.");
         }
 
-        triggerId = Id ?? Guid.NewGuid().ToIdString();
+        triggerId = ResolvedId;
         BuildComponentAttributes();
     }
 
@@ -133,6 +146,7 @@
         var open = RootContext?.GetOpen() ?? false;
         var highlighted = GetHighlighted();
         var disabled = Disabled || (RootContext?.Disabled ?? false);
+        triggerId = ResolvedId;
 
         state = new MenuSubmenuTriggerState(
             Disabled: disabled,
@@ -148,23 +162,42 @@
         if (firstRender)
         {
             hasRendered = true;
-            RootContext?.SetTriggerElement(Element);
-
-            if (SubmenuContext?.ParentMenu?.RootId is not null && Element.HasValue)
-            {
-                _ = UpdateItemIndexAsync();
-            }
 
             if (OpenOnHover && !hoverInitialized)
             {
                 _ = InitializeHoverInteractionAsync();
             }
         }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetTriggerElement(currentElement);
+
+            if (SubmenuContext?.ParentMenu?.RootId is not null && currentElement.HasValue)
+            {
+                _ = UpdateItemIndexAsync();
+            }
+
+            if (OpenOnHover && !hoverInitialized && currentElement.HasValue)
+            {
+                _ = InitializeHoverInteractionAsync();
+            }
+        }
+
+        if (firstRender && !currentElement.HasValue)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        hoverOpenCancellationTokenSource?.Cancel();
+        hoverOpenCancellationTokenSource?.Dispose();
+
         if (moduleTask?.IsValueCreated == true && hasRendered)
         {
             try
@@ -188,6 +221,15 @@
     {
         var attrs = new Dictionary<string, object>();
 
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, state.Disabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, state.Disabled);
+        }
+
         attrs["role"] = "menuitem";
         attrs["id"] = triggerId;
         attrs["aria-haspopup"] = "menu";
@@ -202,6 +244,7 @@
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeave);
         attrs["onfocusout"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusOutAsync);
 
         if (state.Disabled)
@@ -237,7 +280,7 @@
         return SubmenuContext.ParentMenu.ActiveIndex == itemIndex;
     }
 
-    private Task HandleMouseEnterAsync(MouseEventArgs e)
+    private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
         if (itemIndex >= 0 && SubmenuContext?.ParentMenu is not null)
         {
@@ -247,7 +290,41 @@
             StateHasChanged();
         }
 
-        return Task.CompletedTask;
+        if (!OpenOnHover || hoverInitialized || state.Disabled || RootContext is null || RootContext.GetOpen())
+        {
+            return;
+        }
+
+        hoverOpenCancellationTokenSource?.Cancel();
+        hoverOpenCancellationTokenSource?.Dispose();
+        hoverOpenCancellationTokenSource = new CancellationTokenSource();
+        var token = hoverOpenCancellationTokenSource.Token;
+
+        if (Delay > 0)
+        {
+            try
+            {
+                await Task.Delay(Delay, token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+
+        if (token.IsCancellationRequested || RootContext.GetOpen())
+        {
+            return;
+        }
+
+        await RootContext.SetOpenAsync(true, MenuOpenChangeReason.TriggerHover, null);
+        state = new MenuSubmenuTriggerState(state.Disabled, state.Highlighted, Open: true);
+        BuildComponentAttributes();
+    }
+
+    private void HandleMouseLeave(MouseEventArgs e)
+    {
+        hoverOpenCancellationTokenSource?.Cancel();
     }
 
     private Task HandleFocusOutAsync(FocusEventArgs e)

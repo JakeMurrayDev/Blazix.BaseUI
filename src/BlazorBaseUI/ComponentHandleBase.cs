@@ -159,6 +159,11 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     {
         if (registeredTriggers.TryGetValue(triggerId, out var data))
         {
+            if (EqualityComparer<TPayload?>.Default.Equals(data.Payload, triggerPayload))
+            {
+                return;
+            }
+
             registeredTriggers[triggerId] = data with { Payload = triggerPayload };
 
             if (activeTriggerId == triggerId && isOpen)
@@ -193,6 +198,21 @@ public abstract class ComponentHandleBase<TPayload, TReason>
         }
 
         return default;
+    }
+
+    /// <summary>
+    /// Tries to get the payload for a trigger.
+    /// </summary>
+    internal bool TryGetTriggerPayload(string? triggerId, out TPayload? triggerPayload)
+    {
+        if (triggerId is not null && registeredTriggers.TryGetValue(triggerId, out var data))
+        {
+            triggerPayload = data.Payload;
+            return true;
+        }
+
+        triggerPayload = default;
+        return false;
     }
 
     /// <summary>
@@ -235,9 +255,18 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     /// </summary>
     internal void SyncState(bool open, string? triggerId, TPayload? currentPayload)
     {
+        var changed = isOpen != open
+            || activeTriggerId != triggerId
+            || !EqualityComparer<TPayload?>.Default.Equals(payload, currentPayload);
+
         isOpen = open;
         activeTriggerId = triggerId;
         payload = currentPayload;
+
+        if (changed)
+        {
+            NotifyStateChanged();
+        }
     }
 
     /// <summary>

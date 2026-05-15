@@ -22,7 +22,7 @@
             Delay="@OpenDelay"
             CloseDelay="@CloseDelay"
             data-testid="menu-trigger">
-            Open Menu
+            @(ShowCountInTrigger ? $"Open Menu ({noCloseClickCount})" : "Open Menu")
         </MenuTrigger>
         <MenuPortal>
             <MenuPositioner data-testid="menu-positioner">
@@ -39,7 +39,7 @@
                     <MenuItem data-testid="menu-item-4" @onclick="() => HandleItemClick(4)">
                         Item 4
                     </MenuItem>
-                    <MenuItem data-testid="menu-item-no-close" CloseOnClick="false" @onclick="() => HandleItemClick(5)">
+                    <MenuItem data-testid="menu-item-no-close" CloseOnClick="false" @onclick="HandleNoCloseItemClick">
                         Item 5 (No Close)
                     </MenuItem>
 
@@ -66,6 +66,9 @@
                             DefaultChecked="@DefaultChecked"
                             OnCheckedChange="HandleCheckboxChange"
                             data-testid="menu-checkbox-item">
+                            <MenuCheckboxItemIndicator data-testid="menu-checkbox-indicator">
+                                Checked
+                            </MenuCheckboxItemIndicator>
                             Checkbox Item
                         </MenuCheckboxItem>
                     }
@@ -145,6 +148,7 @@
         <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
         <div>Complete Count: <span data-testid="complete-count">@completeCount</span></div>
         <div>Last Item Clicked: <span data-testid="last-item-clicked">@lastItemClicked</span></div>
+        <div>No Close Click Count: <span data-testid="no-close-click-count">@noCloseClickCount</span></div>
         @if (ShowCheckbox)
         {
             <div>Checkbox State: <span data-testid="checkbox-state">@checkboxChecked.ToString().ToLowerInvariant()</span></div>
@@ -217,6 +221,9 @@
     [SupplyParameterFromQuery(Name = "showTextNavItems")]
     public bool ShowTextNavItems { get; set; }
 
+    [SupplyParameterFromQuery(Name = "showCountInTrigger")]
+    public bool ShowCountInTrigger { get; set; }
+
     [SupplyParameterFromQuery(Name = "showNestedSubmenu")]
     public bool ShowNestedSubmenu { get; set; }
 
@@ -228,6 +235,7 @@
     private string lastReason = "";
     private int completeCount;
     private int lastItemClicked;
+    private int noCloseClickCount;
     private bool checkboxChecked;
     private object? radioValue;
     private bool submenuOpen;
@@ -256,6 +264,12 @@
     private void HandleItemClick(int itemNumber)
     {
         lastItemClicked = itemNumber;
+    }
+
+    private void HandleNoCloseItemClick()
+    {
+        noCloseClickCount++;
+        lastItemClicked = 5;
     }
 
     private void HandleCheckboxChange(MenuCheckboxItemChangeEventArgs args)

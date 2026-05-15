@@ -193,6 +193,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithShowCountInTrigger(bool value)
+    {
+        queryParams["showCountInTrigger"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithShowNestedSubmenu(bool value)
     {
         queryParams["showNestedSubmenu"] = value.ToString().ToLowerInvariant();

@@ -103,6 +103,31 @@ internal sealed class MenuRootContext
     public Func<bool, MenuOpenChangeReason, object?, Task> SetOpenAsync { get; init; } = null!;
 
     /// <summary>
+    /// Gets the delegate that sets the open state from a specific trigger.
+    /// </summary>
+    public Func<bool, MenuOpenChangeReason, object?, string?, string?, bool, Task> SetOpenFromTriggerAsync { get; init; } = null!;
+
+    /// <summary>
+    /// Gets the delegate that registers a trigger with this root.
+    /// </summary>
+    public Action<string, ElementReference?, object?> RegisterTrigger { get; init; } = null!;
+
+    /// <summary>
+    /// Gets the delegate that unregisters a trigger from this root.
+    /// </summary>
+    public Action<string> UnregisterTrigger { get; init; } = null!;
+
+    /// <summary>
+    /// Gets the delegate that updates a trigger element registered with this root.
+    /// </summary>
+    public Action<string, ElementReference?> UpdateTriggerElement { get; init; } = null!;
+
+    /// <summary>
+    /// Gets the delegate that updates a trigger payload registered with this root.
+    /// </summary>
+    public Action<string, object?> UpdateTriggerPayload { get; init; } = null!;
+
+    /// <summary>
     /// Gets the delegate that emits a close event with a reason and optional payload.
     /// </summary>
     public Action<MenuOpenChangeReason, object?> EmitClose { get; init; } = null!;
@@ -110,7 +135,7 @@ internal sealed class MenuRootContext
     /// <summary>
     /// Gets the text direction of the menu.
     /// </summary>
-    public string? Direction { get; init; }
+    public string? Direction { get; set; }
 
     /// <summary>
     /// Gets or sets the ID of the active trigger element.

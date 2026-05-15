@@ -45,6 +45,41 @@ public interface IMenuHandle
     internal object? GetTriggerPayloadAsObject(string? triggerId);
 
     /// <summary>
+    /// Tries to get the payload for a trigger as an object.
+    /// </summary>
+    internal bool TryGetTriggerPayloadAsObject(string? triggerId, out object? triggerPayload);
+
+    /// <summary>
+    /// Registers a trigger with this handle.
+    /// </summary>
+    internal void RegisterTrigger(string triggerId, ElementReference? element, object? triggerPayload);
+
+    /// <summary>
+    /// Unregisters a trigger from this handle.
+    /// </summary>
+    internal void UnregisterTrigger(string triggerId);
+
+    /// <summary>
+    /// Updates the element reference for a trigger.
+    /// </summary>
+    internal void UpdateTriggerElement(string triggerId, ElementReference? element);
+
+    /// <summary>
+    /// Updates the payload for a trigger.
+    /// </summary>
+    internal void UpdateTriggerPayload(string triggerId, object? triggerPayload);
+
+    /// <summary>
+    /// Requests that the menu opens for the specified trigger.
+    /// </summary>
+    internal void RequestOpen(string triggerId, MenuOpenChangeReason reason, string? interactionType = null);
+
+    /// <summary>
+    /// Requests that the menu closes.
+    /// </summary>
+    internal void RequestClose(MenuOpenChangeReason reason, string? interactionType = null);
+
+    /// <summary>
     /// Subscribes a component to handle state changes.
     /// </summary>
     internal void Subscribe(IMenuHandleSubscriber subscriber);
@@ -90,6 +125,36 @@ public class MenuHandle<TPayload> : ComponentHandleBase<TPayload, MenuOpenChange
 
     /// <inheritdoc />
     object? IMenuHandle.GetTriggerPayloadAsObject(string? triggerId) => GetTriggerPayload(triggerId);
+
+    /// <inheritdoc />
+    bool IMenuHandle.TryGetTriggerPayloadAsObject(string? triggerId, out object? triggerPayload)
+    {
+        var found = TryGetTriggerPayload(triggerId, out var typedPayload);
+        triggerPayload = typedPayload;
+        return found;
+    }
+
+    /// <inheritdoc />
+    void IMenuHandle.RegisterTrigger(string triggerId, ElementReference? element, object? triggerPayload)
+        => RegisterTrigger(triggerId, element, triggerPayload is TPayload typedPayload ? typedPayload : default);
+
+    /// <inheritdoc />
+    void IMenuHandle.UnregisterTrigger(string triggerId) => UnregisterTrigger(triggerId);
+
+    /// <inheritdoc />
+    void IMenuHandle.UpdateTriggerElement(string triggerId, ElementReference? element) => UpdateTriggerElement(triggerId, element);
+
+    /// <inheritdoc />
+    void IMenuHandle.UpdateTriggerPayload(string triggerId, object? triggerPayload)
+        => UpdateTriggerPayload(triggerId, triggerPayload is TPayload typedPayload ? typedPayload : default);
+
+    /// <inheritdoc />
+    void IMenuHandle.RequestOpen(string triggerId, MenuOpenChangeReason reason, string? interactionType)
+        => RequestOpen(triggerId, reason, interactionType);
+
+    /// <inheritdoc />
+    void IMenuHandle.RequestClose(MenuOpenChangeReason reason, string? interactionType)
+        => RequestClose(reason, interactionType);
 
     /// <inheritdoc />
     void IMenuHandle.Subscribe(IMenuHandleSubscriber subscriber) => Subscribe(subscriber);

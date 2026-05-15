@@ -13,7 +13,8 @@ public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
         bool submenuDefaultOpen = false,
         bool triggerDisabled = false,
         bool openOnHover = true,
-        RenderFragment<RenderProps<MenuSubmenuTriggerState>>? render = null)
+        RenderFragment<RenderProps<MenuSubmenuTriggerState>>? render = null,
+        bool nativeButton = false)
     {
         return builder =>
         {
@@ -44,6 +45,8 @@ public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
 
                             if (triggerDisabled)
                                 submenuBuilder.AddAttribute(attrIndex++, "Disabled", true);
+                            if (nativeButton)
+                                submenuBuilder.AddAttribute(attrIndex++, "NativeButton", true);
                             submenuBuilder.AddAttribute(attrIndex++, "OpenOnHover", openOnHover);
                             if (render is not null)
                                 submenuBuilder.AddAttribute(attrIndex++, "Render", render);
@@ -103,6 +106,17 @@ public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
 
         var submenuTrigger = cut.Find("span[role='menuitem'][aria-haspopup='menu']");
         submenuTrigger.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsNativeButtonMode()
+    {
+        var cut = Render(CreateSubmenuTriggerInRoot(nativeButton: true));
+
+        var submenuTrigger = cut.Find("button[role='menuitem'][aria-haspopup='menu']");
+        submenuTrigger.GetAttribute("type")!.ShouldBe("button");
 
         return Task.CompletedTask;
     }

@@ -6,10 +6,11 @@
 @typeparam TPayload
 
 @implements IAsyncDisposable
+@implements IMenuHandleSubscriber
 @inject IJSRuntime JSRuntime
 
 <RenderElement TState="MenuTriggerState"
-               Tag="button"
+               Tag="@(NativeButton ? "button" : "div")"
                State="state"
                Enabled="RootContext is not null || HasHandle"
                Render="Render"
@@ -25,6 +26,7 @@
     private bool hasRendered;
     private bool hoverInitialized;
     private string? hoverRootId;
+    private string? defaultId;
     private string triggerId = null!;
     private string lastPointerType = string.Empty;
     private bool openedByPointerDown;
@@ -43,6 +45,9 @@
 
     private bool HasHandle => Handle is not null;
 
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
@@ -55,6 +60,13 @@
     /// </summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders as a native <c>&lt;button&gt;</c> element.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
 
     /// <summary>
     /// Determines whether the menu should also open when the trigger is hovered.
@@ -129,28 +141,42 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        triggerId = Guid.NewGuid().ToIdString();
+        triggerId = ResolvedId;
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (Handle != registeredHandle)
+        var resolvedId = ResolvedId;
+        if (resolvedId != triggerId)
         {
             registeredHandle?.UnregisterTrigger(triggerId);
+            RootContext?.UnregisterTrigger(triggerId);
+            triggerId = resolvedId;
+        }
+
+        if (Handle != registeredHandle)
+        {
+            registeredHandle?.Unsubscribe(this);
+            registeredHandle?.UnregisterTrigger(triggerId);
             registeredHandle = Handle;
-            Handle?.RegisterTrigger(triggerId, Element, Payload);
+            if (Handle is not null)
+            {
+                Handle.Subscribe(this);
+                Handle.RegisterTrigger(triggerId, Element, Payload);
+            }
         }
         else if (Handle is not null)
         {
             Handle.UpdateTriggerPayload(triggerId, Payload);
         }
+        else
+        {
+            RootContext?.UpdateTriggerPayload(triggerId, Payload);
+        }
 
-        var open = IsOpenedByThisTrigger();
-        var disabled = Disabled || (RootContext?.Disabled ?? false) || (MenuBarContext?.Disabled ?? false);
-        state = new MenuTriggerState(open, disabled);
-        BuildComponentAttributes();
+        RebuildState();
     }
 
     /// <inheritdoc />
@@ -162,12 +188,13 @@
 
             if (HasHandle)
             {
+                Handle!.Subscribe(this);
                 Handle!.RegisterTrigger(triggerId, Element, Payload);
                 registeredHandle = Handle;
             }
             else
             {
-                RootContext?.SetTriggerElement(Element);
+                RootContext?.RegisterTrigger(triggerId, Element, Payload);
             }
 
             if (IsInMenuBar && Element.HasValue)
@@ -193,6 +220,8 @@
     public async ValueTask DisposeAsync()
     {
         registeredHandle?.UnregisterTrigger(triggerId);
+        registeredHandle?.Unsubscribe(this);
+        RootContext?.UnregisterTrigger(triggerId);
 
         if (IsInMenuBar && Element.HasValue)
         {
@@ -250,15 +279,41 @@
         }
         else
         {
-            RootContext?.SetTriggerElement(Element);
+            RootContext?.UpdateTriggerElement(triggerId, Element);
         }
+    }
+
+    private void RebuildState()
+    {
+        var open = IsOpenedByThisTrigger();
+        var disabled = Disabled || (RootContext?.Disabled ?? false) || (MenuBarContext?.Disabled ?? false);
+        state = new MenuTriggerState(open, disabled);
+        BuildComponentAttributes();
+    }
+
+    private void RebuildStateFromHandleRequest(bool open, string? requestedTriggerId)
+    {
+        var disabled = Disabled || (RootContext?.Disabled ?? false) || (MenuBarContext?.Disabled ?? false);
+        var openedByThisTrigger = open && requestedTriggerId == triggerId;
+        state = new MenuTriggerState(openedByThisTrigger, disabled);
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
-        var open = IsOpenedByThisTrigger();
+        var open = state.Open;
         var disabled = state.Disabled;
+
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled);
+        }
 
         if (IsInMenuBar)
         {
@@ -267,12 +322,6 @@
             {
                 attrs["aria-disabled"] = "true";
             }
-        }
-
-        attrs["type"] = "button";
-        if (disabled)
-        {
-            attrs["disabled"] = true;
         }
 
         attrs["aria-haspopup"] = "menu";
@@ -379,7 +428,7 @@
         {
             if (nextOpen)
             {
-                Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress);
+                Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress, InteractionTypeDetector.FromPointerEvent(e));
             }
             else
             {
@@ -388,7 +437,7 @@
         }
         else if (RootContext is not null)
         {
-            await RootContext.SetOpenAsync(nextOpen, MenuOpenChangeReason.TriggerPress, Payload);
+            await RootContext.SetOpenFromTriggerAsync(nextOpen, MenuOpenChangeReason.TriggerPress, Payload, triggerId, InteractionTypeDetector.FromPointerEvent(e), false);
         }
         else
         {
@@ -469,11 +518,11 @@
 
                 if (HasHandle)
                 {
-                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress);
+                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress, "keyboard");
                 }
                 else if (RootContext is not null)
                 {
-                    await RootContext.SetOpenAsync(true, MenuOpenChangeReason.TriggerPress, "keyboard");
+                    await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerPress, Payload, triggerId, "keyboard", false);
                 }
                 else
                 {
@@ -492,11 +541,11 @@
 
                 if (HasHandle)
                 {
-                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress);
+                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress, highlightLast ? "highlight-last" : "keyboard");
                 }
                 else if (RootContext is not null)
                 {
-                    await RootContext.SetOpenAsync(true, MenuOpenChangeReason.TriggerPress, highlightLast ? "highlight-last" : null);
+                    await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerPress, Payload, triggerId, "keyboard", highlightLast);
                 }
                 else
                 {
@@ -592,4 +641,26 @@
         }
     }
 
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerUnregistered(string triggerId)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnOpenChangeRequested(bool open, MenuOpenChangeReason reason, string? triggerId, string? interactionType)
+    {
+        RebuildStateFromHandleRequest(open, triggerId);
+    }
+
+    void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnStateChanged()
+    {
+        RebuildState();
+        _ = InvokeAsync(StateHasChanged);
+    }
 }
