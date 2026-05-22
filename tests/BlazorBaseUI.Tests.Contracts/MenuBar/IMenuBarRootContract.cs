@@ -8,11 +8,14 @@ public interface IMenuBarRootContract
     Task HasAriaOrientationHorizontalByDefault();
     Task HasAriaOrientationVerticalWhenSet();
     Task HasDataOrientationAttribute();
-    Task HasDataDisabledWhenDisabled();
+    Task DoesNotSetDataDisabledOnRootWhenDisabled();
     Task ForwardsAdditionalAttributes();
+    Task ForwardsProvidedId();
+    Task HasGeneratedId();
     Task AppliesClassValue();
     Task AppliesStyleValue();
     Task CascadesContextToChildren();
     Task HasDataModalWhenModal();
+    Task DoesNotSetDataModalWhenModalFalse();
     Task TracksHasSubmenuOpenState();
 }

@@ -23,6 +23,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool hoverInitialized;
+    private bool menubarTriggerInitialized;
     private string? hoverRootId;
     private string? defaultId;
     private string triggerId = null!;
@@ -155,6 +156,7 @@
         {
             if (registeredHandle is not null)
             {
+                registeredHandle.UnregisterMenubarContext(previousTriggerId);
                 registeredHandle.Unsubscribe(this);
                 registeredHandle.UnregisterTrigger(previousTriggerId);
             }
@@ -170,6 +172,10 @@
             {
                 registeredHandle.Subscribe(this);
                 registeredHandle.RegisterTrigger(triggerId, Element, Payload);
+                if (MenuBarContext is not null)
+                {
+                    registeredHandle.RegisterMenubarContext(triggerId, MenuBarContext);
+                }
             }
             else
             {
@@ -199,6 +205,10 @@
             {
                 Handle!.Subscribe(this);
                 Handle!.RegisterTrigger(triggerId, Element, Payload);
+                if (MenuBarContext is not null)
+                {
+                    Handle.RegisterMenubarContext(triggerId, MenuBarContext);
+                }
                 registeredHandle = Handle;
             }
             else
@@ -211,9 +221,13 @@
                 MenuBarContext!.RegisterItem(Element.Value);
             }
 
-            if ((OpenOnHover || IsInMenuBar) && !hoverInitialized)
+            if (OpenOnHover && !hoverInitialized)
             {
                 _ = InitializeHoverInteractionAsync();
+            }
+            else if (IsInMenuBar && !menubarTriggerInitialized)
+            {
+                _ = InitializeMenubarTriggerAsync();
             }
         }
 
@@ -228,6 +242,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        registeredHandle?.UnregisterMenubarContext(triggerId);
         registeredHandle?.UnregisterTrigger(triggerId);
         registeredHandle?.Unsubscribe(this);
         RootContext?.UnregisterTrigger(triggerId);
@@ -237,12 +252,20 @@
             MenuBarContext!.UnregisterItem(Element.Value);
         }
 
-        if (moduleTask?.IsValueCreated == true && hasRendered && hoverInitialized && hoverRootId is not null)
+        if (moduleTask?.IsValueCreated == true && hasRendered && hoverRootId is not null)
         {
             try
             {
                 var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposeHoverInteraction", hoverRootId);
+                if (menubarTriggerInitialized)
+                {
+                    await module.InvokeVoidAsync("disposeMenubarTrigger", hoverRootId);
+                }
+                else if (hoverInitialized)
+                {
+                    await module.InvokeVoidAsync("disposeHoverInteraction", hoverRootId);
+                }
+
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -255,17 +278,65 @@
     }
 
     /// <summary>
-    /// Handles a hover open event from JavaScript interop for handle-based triggers.
+    /// Handles a hover open event from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public Task OnHoverOpen()
+    public async Task OnHoverOpen()
     {
+        if (state.Disabled)
+        {
+            return;
+        }
+
+        if (IsInMenuBar && MenuBarContext is not null && !MenuBarContext.GetHasSubmenuOpen())
+        {
+            return;
+        }
+
+        if (IsOpenedByThisTrigger())
+        {
+            return;
+        }
+
         if (HasHandle)
         {
             Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerHover);
         }
+        else if (IsInMenuBar && RootContext is not null)
+        {
+            await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerHover, Payload, triggerId, null, false);
+        }
 
-        return Task.CompletedTask;
+        state = new MenuTriggerState(IsOpenedByThisTrigger(), state.Disabled);
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Handles a keyboard open request from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnKeyboardOpen()
+    {
+        if (state.Disabled || IsOpenedByThisTrigger())
+        {
+            return;
+        }
+
+        RootContext?.SetInteractionType?.Invoke("keyboard");
+
+        if (HasHandle)
+        {
+            Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress, "keyboard");
+        }
+        else if (RootContext is not null)
+        {
+            await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerPress, Payload, triggerId, "keyboard", false);
+        }
+
+        state = new MenuTriggerState(IsOpenedByThisTrigger(), state.Disabled);
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -384,7 +455,12 @@
             return false;
         }
 
-        return RootContext.GetOpen();
+        if (!RootContext.GetOpen())
+        {
+            return false;
+        }
+
+        return RootContext.TriggerId is null || RootContext.TriggerId == triggerId;
     }
 
     private async Task HandlePointerDownAsync(PointerEventArgs e)
@@ -496,6 +572,25 @@
             return;
         }
 
+        if (!IsOpenedByThisTrigger() && string.IsNullOrEmpty(lastPointerType))
+        {
+            RootContext?.SetInteractionType?.Invoke("keyboard");
+
+            if (HasHandle)
+            {
+                Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerPress, "keyboard");
+            }
+            else if (RootContext is not null)
+            {
+                await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerPress, Payload, triggerId, "keyboard", false);
+            }
+
+            state = new MenuTriggerState(IsOpenedByThisTrigger(), state.Disabled);
+            BuildComponentAttributes();
+            await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+            return;
+        }
+
         // Menubar close: when already open and pointerdown was skipped, close on click.
         if (IsInMenuBar && IsOpenedByThisTrigger())
         {
@@ -577,11 +672,18 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!state.Disabled && RootContext is not null && IsInMenuBar)
+        if (!state.Disabled && IsInMenuBar)
         {
             if (MenuBarContext!.GetHasSubmenuOpen() && !IsOpenedByThisTrigger())
             {
-                await RootContext.SetOpenAsync(true, MenuOpenChangeReason.TriggerHover, null);
+                if (HasHandle)
+                {
+                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerHover);
+                }
+                else if (RootContext is not null)
+                {
+                    await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerHover, Payload, triggerId, null, false);
+                }
 
                 state = new MenuTriggerState(IsOpenedByThisTrigger(), state.Disabled);
                 BuildComponentAttributes();
@@ -593,11 +695,18 @@
 
     private async Task HandleFocusAsync(FocusEventArgs e)
     {
-        if (!state.Disabled && RootContext is not null && IsInMenuBar)
+        if (!state.Disabled && IsInMenuBar)
         {
             if (MenuBarContext!.GetHasSubmenuOpen() && !IsOpenedByThisTrigger())
             {
-                await RootContext.SetOpenAsync(true, MenuOpenChangeReason.TriggerFocus, null);
+                if (HasHandle)
+                {
+                    Handle!.RequestOpen(triggerId, MenuOpenChangeReason.TriggerFocus);
+                }
+                else if (RootContext is not null)
+                {
+                    await RootContext.SetOpenFromTriggerAsync(true, MenuOpenChangeReason.TriggerFocus, Payload, triggerId, null, false);
+                }
 
                 state = new MenuTriggerState(IsOpenedByThisTrigger(), state.Disabled);
                 BuildComponentAttributes();
@@ -649,6 +758,28 @@
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
+        }
+    }
+
+    private async Task InitializeMenubarTriggerAsync()
+    {
+        var element = Element;
+        if (!element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            hoverDotNetRef = DotNetObjectReference.Create(this);
+            hoverRootId = $"menubar-{triggerId}";
+            await module.InvokeVoidAsync("initializeMenubarTrigger", hoverRootId, element.Value, hoverDotNetRef);
+            menubarTriggerInitialized = true;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 

@@ -178,12 +178,12 @@ public class MenuBarRootTests : BunitContext, IMenuBarRootContract
     }
 
     [Fact]
-    public Task HasDataDisabledWhenDisabled()
+    public Task DoesNotSetDataDisabledOnRootWhenDisabled()
     {
         var cut = Render(CreateMenuBarRoot(disabled: true, includeMenus: false));
 
         var menubar = cut.Find("[role='menubar']");
-        menubar.HasAttribute("data-disabled").ShouldBeTrue();
+        menubar.HasAttribute("data-disabled").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -196,6 +196,29 @@ public class MenuBarRootTests : BunitContext, IMenuBarRootContract
 
         var menubar = cut.Find("[role='menubar']");
         menubar.GetAttribute("data-testid")!.ShouldBe("my-menubar");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ForwardsProvidedId()
+    {
+        var attrs = new Dictionary<string, object> { ["id"] = "custom-menubar" };
+        var cut = Render(CreateMenuBarRoot(additionalAttributes: attrs, includeMenus: false));
+
+        var menubar = cut.Find("[role='menubar']");
+        menubar.GetAttribute("id")!.ShouldBe("custom-menubar");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasGeneratedId()
+    {
+        var cut = Render(CreateMenuBarRoot(includeMenus: false));
+
+        var menubar = cut.Find("[role='menubar']");
+        menubar.GetAttribute("id").ShouldNotBeNullOrWhiteSpace();
 
         return Task.CompletedTask;
     }
@@ -243,6 +266,15 @@ public class MenuBarRootTests : BunitContext, IMenuBarRootContract
         var cut = Render(CreateMenuBarRoot());
         var menubar = cut.Find("[role='menubar']");
         menubar.HasAttribute("data-modal").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotSetDataModalWhenModalFalse()
+    {
+        var cut = Render(CreateMenuBarRoot(modal: false, includeMenus: false));
+        var menubar = cut.Find("[role='menubar']");
+        menubar.HasAttribute("data-modal").ShouldBeFalse();
         return Task.CompletedTask;
     }
 

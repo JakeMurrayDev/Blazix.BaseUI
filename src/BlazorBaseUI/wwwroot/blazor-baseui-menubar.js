@@ -1,10 +1,15 @@
 import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
 
+const MENU_STATE_KEY = Symbol.for('BlazorBaseUI.Menu.State');
 const STATE_KEY = Symbol.for('BlazorBaseUI.MenuBar.State');
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = new WeakMap();
 }
 const state = window[STATE_KEY];
+
+function getMenuState() {
+    return window[MENU_STATE_KEY];
+}
 
 function getItems(element) {
     const menuBarState = state.get(element);
@@ -36,6 +41,76 @@ function focusItem(item) {
     }
 }
 
+function isMenuRootInMenubar(rootState, element) {
+    return rootState.menubarElement === element ||
+        (rootState.triggerElement instanceof HTMLElement && element.contains(rootState.triggerElement));
+}
+
+function getDirection(element, menuBarState) {
+    const menuState = getMenuState();
+    if (menuState?.roots) {
+        for (const rootState of menuState.roots.values()) {
+            if (isMenuRootInMenubar(rootState, element) && rootState.direction) {
+                return rootState.direction;
+            }
+        }
+    }
+
+    return menuBarState.direction || 'ltr';
+}
+
+function getLatestOpenMenuRoot(element) {
+    const menuState = getMenuState();
+    if (!menuState?.roots) return null;
+
+    let latestRoot = null;
+    for (const rootState of menuState.roots.values()) {
+        if (!isMenuRootInMenubar(rootState, element) || !rootState.isOpen || !rootState.positionerElement) {
+            continue;
+        }
+
+        if (!latestRoot || (rootState.openSequence ?? 0) > (latestRoot.openSequence ?? 0)) {
+            latestRoot = rootState;
+        }
+    }
+
+    return latestRoot;
+}
+
+function isViewportWidthPositioner(positionerElement) {
+    const doc = positionerElement.ownerDocument || document;
+    const win = doc.defaultView || window;
+    const rect = positionerElement.getBoundingClientRect();
+    return rect.width >= win.innerWidth - 20;
+}
+
+function getScrollLockElement(element, shouldEvaluate, openMethod) {
+    if (!shouldEvaluate) return null;
+
+    const latestRoot = getLatestOpenMenuRoot(element);
+    if (!latestRoot?.positionerElement) return null;
+
+    if (openMethod === 'touch' && !isViewportWidthPositioner(latestRoot.positionerElement)) {
+        return null;
+    }
+
+    return latestRoot.positionerElement;
+}
+
+function shouldDeferScrollLock(element, shouldEvaluate, openMethod) {
+    if (!shouldEvaluate) return false;
+
+    const latestRoot = getLatestOpenMenuRoot(element);
+    if (!latestRoot?.positionerElement) return true;
+
+    if (openMethod === 'touch') {
+        const rect = latestRoot.positionerElement.getBoundingClientRect();
+        return rect.width === 0;
+    }
+
+    return false;
+}
+
 function handleKeyDown(event) {
     const element = event.currentTarget;
     const menuBarState = state.get(element);
@@ -52,9 +127,11 @@ function handleKeyDown(event) {
 
     let nextIndex = -1;
     let handled = false;
+    let activateCurrent = false;
 
-    const prevKey = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
-    const nextKey = isHorizontal ? 'ArrowRight' : 'ArrowDown';
+    const isRtl = isHorizontal && getDirection(element, menuBarState) === 'rtl';
+    const prevKey = isHorizontal ? (isRtl ? 'ArrowRight' : 'ArrowLeft') : 'ArrowUp';
+    const nextKey = isHorizontal ? (isRtl ? 'ArrowLeft' : 'ArrowRight') : 'ArrowDown';
 
     if (event.key === nextKey) {
         if (currentIndex < items.length - 1) {
@@ -70,11 +147,8 @@ function handleKeyDown(event) {
             nextIndex = items.length - 1;
         }
         handled = true;
-    } else if (event.key === 'Home') {
-        nextIndex = 0;
-        handled = true;
-    } else if (event.key === 'End') {
-        nextIndex = items.length - 1;
+    } else if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space') {
+        activateCurrent = true;
         handled = true;
     }
 
@@ -82,65 +156,89 @@ function handleKeyDown(event) {
         event.preventDefault();
         event.stopPropagation();
 
-        if (nextIndex !== -1 && nextIndex !== currentIndex) {
+        if (activateCurrent) {
+            items[currentIndex].click();
+        } else if (nextIndex !== -1 && nextIndex !== currentIndex) {
             items[currentIndex].tabIndex = -1;
             focusItem(items[nextIndex]);
         }
     }
 }
 
-export function initMenuBar(element, orientation, loopFocus) {
+export function initMenuBar(element, orientation, loopFocus, direction) {
     if (!element) return;
 
     const menuBarState = {
         orientation,
         loopFocus,
+        direction: direction || 'ltr',
         items: new Set(),
-        releaseScrollLock: null
+        releaseScrollLock: null,
+        scrollLockRetryId: null
     };
 
     state.set(element, menuBarState);
-    element.addEventListener('keydown', handleKeyDown);
+    element.addEventListener('keydown', handleKeyDown, true);
 }
 
-export function updateMenuBar(element, orientation, loopFocus) {
+export function updateMenuBar(element, orientation, loopFocus, direction) {
     if (!element) return;
 
     const menuBarState = state.get(element);
     if (menuBarState) {
         menuBarState.orientation = orientation;
         menuBarState.loopFocus = loopFocus;
+        menuBarState.direction = direction || 'ltr';
     }
 }
 
 export function disposeMenuBar(element) {
     if (!element) return;
 
-    element.removeEventListener('keydown', handleKeyDown);
+    element.removeEventListener('keydown', handleKeyDown, true);
 
     const menuBarState = state.get(element);
     if (menuBarState?.releaseScrollLock) {
         menuBarState.releaseScrollLock();
         menuBarState.releaseScrollLock = null;
     }
+    if (menuBarState?.scrollLockRetryId) {
+        clearTimeout(menuBarState.scrollLockRetryId);
+        menuBarState.scrollLockRetryId = null;
+    }
 
     state.delete(element);
 }
 
-export function updateScrollLock(element, shouldLock) {
+export function updateScrollLock(element, shouldEvaluate, openMethod) {
     if (!element) return;
 
     const menuBarState = state.get(element);
     if (!menuBarState) return;
 
+    if (menuBarState.scrollLockRetryId) {
+        clearTimeout(menuBarState.scrollLockRetryId);
+        menuBarState.scrollLockRetryId = null;
+    }
+
+    const scrollLockElement = getScrollLockElement(element, shouldEvaluate, openMethod);
+    const shouldLock = !!scrollLockElement;
+
     if (shouldLock) {
         if (!menuBarState.releaseScrollLock) {
-            menuBarState.releaseScrollLock = acquireScrollLock(element);
+            menuBarState.releaseScrollLock = acquireScrollLock(scrollLockElement);
         }
     } else {
         if (menuBarState.releaseScrollLock) {
             menuBarState.releaseScrollLock();
             menuBarState.releaseScrollLock = null;
+        }
+
+        if (shouldDeferScrollLock(element, shouldEvaluate, openMethod)) {
+            menuBarState.scrollLockRetryId = setTimeout(() => {
+                menuBarState.scrollLockRetryId = null;
+                updateScrollLock(element, shouldEvaluate, openMethod);
+            }, 16);
         }
     }
 }

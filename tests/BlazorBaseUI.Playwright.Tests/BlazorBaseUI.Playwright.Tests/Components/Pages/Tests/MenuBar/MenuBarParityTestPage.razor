@@ -1,0 +1,118 @@
+@page "/tests/menubar-parity/server"
+@using BlazorBaseUI.Menu
+@using BlazorBaseUI.MenuBar
+@inject NavigationManager Navigation
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>MenuBar Parity Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <MenuBarRoot data-testid="menubar-root">
+        @if (activeScenario == MultipleContainedScenario)
+        {
+            <MenuRoot Context="payloadContext"
+                      @bind-Open="multipleOpen"
+                      OnOpenChange="HandleMultipleOpenChange">
+                <MenuTypedTrigger TPayload="string" Payload="@("File")" id="multi-file-trigger-id" data-testid="multi-file-trigger">
+                    File
+                </MenuTypedTrigger>
+                <MenuTypedTrigger TPayload="string" Payload="@("Edit")" id="multi-edit-trigger-id" data-testid="multi-edit-trigger">
+                    Edit
+                </MenuTypedTrigger>
+                <MenuTypedTrigger TPayload="string" Payload="@("View")" id="multi-view-trigger-id" data-testid="multi-view-trigger">
+                    View
+                </MenuTypedTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="multi-menu-positioner">
+                        <MenuPopup data-testid="multi-menu-popup">
+                            <MenuItem data-testid="multi-active-item">
+                                @(payloadContext.Payload?.ToString() ?? "")
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        }
+        else
+        {
+            <MenuTypedTrigger TPayload="string" Handle="detachedHandle" Payload="@("File")" id="detached-file-trigger-id" data-testid="detached-file-trigger">
+                File
+            </MenuTypedTrigger>
+            <MenuTypedTrigger TPayload="string" Handle="detachedHandle" Payload="@("Edit")" id="detached-edit-trigger-id" data-testid="detached-edit-trigger">
+                Edit
+            </MenuTypedTrigger>
+            <MenuTypedTrigger TPayload="string" Handle="detachedHandle" Payload="@("View")" id="detached-view-trigger-id" data-testid="detached-view-trigger">
+                View
+            </MenuTypedTrigger>
+        }
+    </MenuBarRoot>
+
+    @if (activeScenario != MultipleContainedScenario)
+    {
+        <MenuRoot Context="payloadContext"
+                  Handle="detachedHandle"
+                  OnOpenChange="HandleDetachedOpenChange">
+            <MenuPortal>
+                <MenuPositioner data-testid="detached-menu-positioner">
+                    <MenuPopup data-testid="detached-menu-popup">
+                        <MenuItem data-testid="detached-active-item">
+                            @(payloadContext.Payload?.ToString() ?? "")
+                        </MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    }
+
+    <div data-testid="state-display">
+        <span data-testid="detached-state">@detachedOpen.ToString().ToLowerInvariant()</span>
+        <span data-testid="multiple-state">@multipleOpen.ToString().ToLowerInvariant()</span>
+    </div>
+</div>
+
+@code {
+    private const string MultipleContainedScenario = "multiple-contained";
+
+    [SupplyParameterFromQuery(Name = "scenario")]
+    public string? Scenario { get; set; }
+
+    private readonly MenuHandle<string> detachedHandle = new();
+    private bool detachedOpen;
+    private bool multipleOpen;
+    private string activeScenario = "detached";
+
+    protected override void OnParametersSet()
+    {
+        activeScenario = Scenario ?? ReadScenarioFromUri() ?? "detached";
+    }
+
+    private void HandleDetachedOpenChange(MenuOpenChangeEventArgs args)
+    {
+        detachedOpen = args.Open;
+    }
+
+    private void HandleMultipleOpenChange(MenuOpenChangeEventArgs args)
+    {
+        multipleOpen = args.Open;
+    }
+
+    private string? ReadScenarioFromUri()
+    {
+        var query = Navigation.ToAbsoluteUri(Navigation.Uri).Query;
+        if (string.IsNullOrEmpty(query))
+        {
+            return null;
+        }
+
+        foreach (var part in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var values = part.Split('=', 2);
+            if (Uri.UnescapeDataString(values[0]) == "scenario")
+            {
+                return values.Length == 2 ? Uri.UnescapeDataString(values[1].Replace("+", " ")) : string.Empty;
+            }
+        }
+
+        return null;
+    }
+}

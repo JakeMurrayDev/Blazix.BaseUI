@@ -6,6 +6,17 @@ namespace BlazorBaseUI.Playwright.Tests.Tests.MenuBar;
 
 public abstract class MenuBarTestsBase : TestBase
 {
+    private const string ScrollLockedScript = @"() => {
+        const doc = document.documentElement;
+        const body = document.body;
+        const docOverflow = getComputedStyle(doc).overflow;
+        const bodyOverflow = getComputedStyle(body).overflow;
+        return doc.hasAttribute('data-base-ui-scroll-locked') ||
+               body.hasAttribute('data-base-ui-scroll-locked') ||
+               docOverflow === 'hidden' ||
+               bodyOverflow === 'hidden';
+    }";
+
     protected MenuBarTestsBase(PlaywrightFixture playwrightFixture)
         : base(playwrightFixture)
     {
@@ -37,6 +48,37 @@ public abstract class MenuBarTestsBase : TestBase
         {
             Timeout = (float)effectiveTimeout
         });
+    }
+
+    protected async Task TouchOpenAsync(ILocator trigger)
+    {
+        await trigger.DispatchEventAsync("pointerdown", new Dictionary<string, object>
+        {
+            ["pointerType"] = "touch",
+            ["button"] = 0,
+            ["buttons"] = 1,
+            ["isPrimary"] = true
+        });
+        await trigger.DispatchEventAsync("mousedown", new Dictionary<string, object>
+        {
+            ["button"] = 0,
+            ["buttons"] = 1
+        });
+    }
+
+    protected async Task WaitForScrollLockedAsync()
+    {
+        await Page.WaitForFunctionAsync(ScrollLockedScript, null, new PageWaitForFunctionOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    protected async Task AssertScrollUnlockedAsync()
+    {
+        await WaitForDelayAsync(300);
+        var isLocked = await Page.EvaluateAsync<bool>(ScrollLockedScript);
+        Assert.False(isLocked);
     }
 
     #endregion
@@ -391,6 +433,29 @@ public abstract class MenuBarTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task MenuBar_LoopFocusFalse_DoesNotWrapOpenLastMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar").WithLoopFocus(false));
+
+        var trigger3 = GetByTestId("menu-3-trigger");
+        await trigger3.ClickAsync();
+
+        var popup3 = GetByTestId("menu-3-popup");
+        await popup3.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await WaitForDelayAsync(300);
+
+        await Assertions.Expect(GetByTestId("menu-3-state")).ToHaveTextAsync("true");
+        await Assertions.Expect(GetByTestId("menu-1-state")).ToHaveTextAsync("false");
+        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+    }
+
+    [Fact]
     public virtual async Task MenuBar_LoopFocusFalse_StaysOnFirstItem()
     {
         await NavigateAsync(CreateUrl("/tests/menubar").WithLoopFocus(false));
@@ -409,6 +474,145 @@ public abstract class MenuBarTestsBase : TestBase
 
         // Focus should still be on first trigger
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_RtlArrowRight_NavigatesToPreviousMenubarItem()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar").WithDirection("rtl"));
+
+        var trigger1 = GetByTestId("menu-1-trigger");
+        var trigger3 = GetByTestId("menu-3-trigger");
+
+        await trigger1.FocusAsync();
+        await WaitForDelayAsync(100);
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_HomeAndEnd_DoNotMoveMenubarFocus()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar"));
+
+        var trigger2 = GetByTestId("menu-2-trigger");
+
+        await trigger2.FocusAsync();
+        await WaitForDelayAsync(100);
+
+        await Page.Keyboard.PressAsync("End");
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(trigger2).ToBeFocusedAsync();
+
+        await Page.Keyboard.PressAsync("Home");
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(trigger2).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_DetachedTriggers_HoverSwitchesOpenMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar-parity").WithTestScenario("detached"));
+
+        var root = GetByTestId("menubar-root");
+        var fileTrigger = GetByTestId("detached-file-trigger");
+        var editTrigger = GetByTestId("detached-edit-trigger");
+
+        await fileTrigger.ClickAsync();
+
+        var popup = GetByTestId("detached-menu-popup");
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await Assertions.Expect(GetByTestId("detached-active-item")).ToHaveTextAsync("File");
+        await Assertions.Expect(root).ToHaveAttributeAsync("data-has-submenu-open", "");
+
+        await editTrigger.HoverAsync();
+        await Assertions.Expect(GetByTestId("detached-active-item")).ToHaveTextAsync("Edit", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_MultipleContainedTriggers_HoverSwitchesPayload()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar-parity").WithTestScenario("multiple-contained"));
+
+        var root = GetByTestId("menubar-root");
+        var fileTrigger = GetByTestId("multi-file-trigger");
+        var editTrigger = GetByTestId("multi-edit-trigger");
+
+        await fileTrigger.ClickAsync();
+
+        var popup = GetByTestId("multi-menu-popup");
+        await popup.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await Assertions.Expect(GetByTestId("multi-active-item")).ToHaveTextAsync("File");
+        await Assertions.Expect(root).ToHaveAttributeAsync("data-has-submenu-open", "");
+
+        await editTrigger.HoverAsync();
+        await Assertions.Expect(GetByTestId("multi-active-item")).ToHaveTextAsync("Edit", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_TouchOpenedFullWidthMenu_LocksScroll()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar").WithTestScenario("touch-scroll-lock-full-width"));
+
+        var trigger1 = GetByTestId("menu-1-trigger");
+        await TouchOpenAsync(trigger1);
+        await WaitForMenu1OpenAsync();
+
+        await WaitForScrollLockedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_TouchOpenedNarrowMenu_DoesNotLockScroll()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar").WithTestScenario("touch-scroll-lock-narrow"));
+
+        var trigger1 = GetByTestId("menu-1-trigger");
+        await TouchOpenAsync(trigger1);
+        await WaitForMenu1OpenAsync();
+
+        await AssertScrollUnlockedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MenuBar_TouchHandoffFromFullWidthToNarrowMenu_ReleasesScrollLock()
+    {
+        await NavigateAsync(CreateUrl("/tests/menubar").WithTestScenario("touch-scroll-lock-handoff"));
+
+        var trigger1 = GetByTestId("menu-1-trigger");
+        var trigger2 = GetByTestId("menu-2-trigger");
+
+        await TouchOpenAsync(trigger1);
+        await WaitForMenu1OpenAsync();
+        await WaitForScrollLockedAsync();
+
+        await TouchOpenAsync(trigger2);
+        var popup2 = GetByTestId("menu-2-popup");
+        await popup2.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Visible,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await AssertScrollUnlockedAsync();
     }
 
     #endregion

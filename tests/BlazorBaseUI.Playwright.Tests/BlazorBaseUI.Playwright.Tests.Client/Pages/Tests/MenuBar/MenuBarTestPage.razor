@@ -1,5 +1,6 @@
 @page "/tests/menubar/wasm"
 @using BlazorBaseUI
+@using BlazorBaseUI.DirectionProvider
 @using BlazorBaseUI.Menu
 @using BlazorBaseUI.MenuBar
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
@@ -7,64 +8,66 @@
 <PageTitle>MenuBar Test Page (WASM)</PageTitle>
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
-    <MenuBarRoot
-        Orientation="@(Orientation == "vertical" ? BlazorBaseUI.Orientation.Vertical : BlazorBaseUI.Orientation.Horizontal)"
-        LoopFocus="@LoopFocus"
-        Disabled="@Disabled"
-        data-testid="menubar-root">
+    <DirectionProvider Direction="@EffectiveDirection">
+        <MenuBarRoot
+            Orientation="@(Orientation == "vertical" ? BlazorBaseUI.Orientation.Vertical : BlazorBaseUI.Orientation.Horizontal)"
+            LoopFocus="@(LoopFocus ?? true)"
+            Modal="@(Modal ?? true)"
+            Disabled="@Disabled"
+            data-testid="menubar-root">
 
-        @* First Menu *@
-        <MenuRoot Context="_"
-            @bind-Open="menu1Open"
-            OnOpenChange="args => HandleMenuOpenChange(1, args)"
-            >
-            <MenuTrigger data-testid="menu-1-trigger">
-                File
-            </MenuTrigger>
-            <MenuPortal>
-                <MenuPositioner data-testid="menu-1-positioner">
-                    <MenuPopup data-testid="menu-1-popup">
-                        <MenuItem data-testid="menu-1-item-1" @onclick="() => HandleItemClick(1, 1)">
-                            New
-                        </MenuItem>
-                        <MenuItem data-testid="menu-1-item-2" @onclick="() => HandleItemClick(1, 2)">
-                            Open
-                        </MenuItem>
-                        <MenuItem data-testid="menu-1-item-3" @onclick="() => HandleItemClick(1, 3)">
-                            Save
-                        </MenuItem>
-                    </MenuPopup>
-                </MenuPositioner>
-            </MenuPortal>
-        </MenuRoot>
+            @* First Menu *@
+            <MenuRoot Context="_"
+                @bind-Open="menu1Open"
+                OnOpenChange="args => HandleMenuOpenChange(1, args)"
+                >
+                <MenuTrigger data-testid="menu-1-trigger">
+                    File
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-1-positioner" style="@GetPositionerStyle(1)">
+                        <MenuPopup data-testid="menu-1-popup">
+                            <MenuItem data-testid="menu-1-item-1" @onclick="() => HandleItemClick(1, 1)">
+                                New
+                            </MenuItem>
+                            <MenuItem data-testid="menu-1-item-2" @onclick="() => HandleItemClick(1, 2)">
+                                Open
+                            </MenuItem>
+                            <MenuItem data-testid="menu-1-item-3" @onclick="() => HandleItemClick(1, 3)">
+                                Save
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
 
-        @* Second Menu *@
-        <MenuRoot Context="_"
-            @bind-Open="menu2Open"
-            OnOpenChange="args => HandleMenuOpenChange(2, args)"
-            >
-            <MenuTrigger data-testid="menu-2-trigger">
-                Edit
-            </MenuTrigger>
-            <MenuPortal>
-                <MenuPositioner data-testid="menu-2-positioner">
-                    <MenuPopup data-testid="menu-2-popup">
-                        <MenuItem data-testid="menu-2-item-1" @onclick="() => HandleItemClick(2, 1)">
-                            Undo
-                        </MenuItem>
-                        <MenuItem data-testid="menu-2-item-2" @onclick="() => HandleItemClick(2, 2)">
-                            Redo
-                        </MenuItem>
-                        <MenuItem data-testid="menu-2-item-3" Disabled="true">
-                            Cut (Disabled)
-                        </MenuItem>
-                        <MenuItem data-testid="menu-2-item-4" @onclick="() => HandleItemClick(2, 4)">
-                            Copy
-                        </MenuItem>
-                    </MenuPopup>
-                </MenuPositioner>
-            </MenuPortal>
-        </MenuRoot>
+            @* Second Menu *@
+            <MenuRoot Context="_"
+                @bind-Open="menu2Open"
+                OnOpenChange="args => HandleMenuOpenChange(2, args)"
+                >
+                <MenuTrigger data-testid="menu-2-trigger">
+                    Edit
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-2-positioner" style="@GetPositionerStyle(2)">
+                        <MenuPopup data-testid="menu-2-popup">
+                            <MenuItem data-testid="menu-2-item-1" @onclick="() => HandleItemClick(2, 1)">
+                                Undo
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-2" @onclick="() => HandleItemClick(2, 2)">
+                                Redo
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-3" Disabled="true">
+                                Cut (Disabled)
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-4" @onclick="() => HandleItemClick(2, 4)">
+                                Copy
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
 
         @* Third Menu *@
         <MenuRoot Context="_"
@@ -129,7 +132,8 @@
                 </MenuPortal>
             </MenuRoot>
         }
-    </MenuBarRoot>
+        </MenuBarRoot>
+    </DirectionProvider>
 
     <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
         <div>Menu 1 Open: <span data-testid="menu-1-state">@menu1Open.ToString().ToLowerInvariant()</span></div>
@@ -153,13 +157,22 @@
     public string Orientation { get; set; } = "horizontal";
 
     [SupplyParameterFromQuery(Name = "loopFocus")]
-    public bool LoopFocus { get; set; } = true;
+    public bool? LoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modal")]
+    public bool? Modal { get; set; }
 
     [SupplyParameterFromQuery(Name = "disabled")]
     public bool Disabled { get; set; }
 
     [SupplyParameterFromQuery(Name = "showSubmenu")]
     public bool ShowSubmenu { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string Direction { get; set; } = "ltr";
+
+    [SupplyParameterFromQuery(Name = "scenario")]
+    public string TestScenario { get; set; } = "";
 
     private bool menu1Open;
     private bool menu2Open;
@@ -169,6 +182,11 @@
     private int activeMenu;
     private string lastItemClicked = "";
     private int changeCount;
+
+    private BlazorBaseUI.Direction EffectiveDirection =>
+        string.Equals(Direction, "rtl", StringComparison.OrdinalIgnoreCase)
+            ? BlazorBaseUI.Direction.Rtl
+            : BlazorBaseUI.Direction.Ltr;
 
     private void HandleMenuOpenChange(int menuNumber, MenuOpenChangeEventArgs args)
     {
@@ -196,5 +214,17 @@
     private void HandleSubmenuItemClick(int itemNumber)
     {
         lastItemClicked = $"Submenu-Item{itemNumber}";
+    }
+
+    private string? GetPositionerStyle(int menuNumber)
+    {
+        return TestScenario switch
+        {
+            "touch-scroll-lock-full-width" when menuNumber == 1 => "width: calc(100vw - 10px);",
+            "touch-scroll-lock-narrow" when menuNumber == 1 => "width: 240px;",
+            "touch-scroll-lock-handoff" when menuNumber == 1 => "width: calc(100vw - 10px);",
+            "touch-scroll-lock-handoff" when menuNumber == 2 => "width: 240px;",
+            _ => null
+        };
     }
 }

@@ -28,6 +28,10 @@ if (!isWebServer)
 // Note: This path doesn't return a value because app.Run() blocks until shutdown
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
 // Add services to the container.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddRazorComponents()

@@ -428,7 +428,7 @@
                 hasViewport,
                 shiftCrossAxis));
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

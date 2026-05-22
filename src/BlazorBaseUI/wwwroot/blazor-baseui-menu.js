@@ -18,15 +18,24 @@ import {
 const PATIENT_CLICK_THRESHOLD = 500;
 const TYPEAHEAD_TIMEOUT = 500;
 const STATE_KEY = Symbol.for('BlazorBaseUI.Menu.State');
+const MENUBAR_STATE_KEY = Symbol.for('BlazorBaseUI.MenuBar.State');
 
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
         roots: new Map(),
         positioners: new Map(),
+        menubarTriggers: new Map(),
+        openSequence: 0,
         globalListenersInitialized: false
     };
 }
 const state = window[STATE_KEY];
+state.openSequence ??= 0;
+state.menubarTriggers ??= new Map();
+
+function getMenuBarState(element) {
+    return window[MENUBAR_STATE_KEY]?.get(element) ?? null;
+}
 
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
@@ -242,7 +251,7 @@ function handleGlobalKeyDown(e) {
                     });
 
                     if (allowCycling && topmostRoot.typingBuffer === char) {
-                        // Same letter typed again — reset buffer, search from current+1
+                        // Same letter typed again - reset buffer, search from current+1
                         topmostRoot.typingBuffer = '';
                     }
 
@@ -294,8 +303,24 @@ function navigateMenubarSibling(menubarRoot, direction) {
     const menubarElement = menubarRoot.menubarElement;
     if (!menubarElement) return;
 
-    // Get all menubar triggers
-    const triggers = Array.from(menubarElement.querySelectorAll('[aria-haspopup="menu"]'));
+    const menuBarState = getMenuBarState(menubarElement);
+    const loopFocus = menuBarState?.loopFocus ?? true;
+    const triggers = Array.from(menubarElement.querySelectorAll('[aria-haspopup="menu"]'))
+        .filter(trigger => {
+            if (!(trigger instanceof HTMLElement) || !document.contains(trigger)) {
+                return false;
+            }
+
+            if (trigger.hasAttribute('disabled') && !trigger.hasAttribute('data-focusable')) {
+                return false;
+            }
+
+            if (trigger.getAttribute('aria-disabled') === 'true' && !trigger.hasAttribute('data-focusable')) {
+                return false;
+            }
+
+            return true;
+        });
     if (triggers.length === 0) return;
 
     // Find the current trigger (the one whose menu is open)
@@ -303,16 +328,20 @@ function navigateMenubarSibling(menubarRoot, direction) {
     const currentIndex = triggers.indexOf(currentTrigger);
     if (currentIndex === -1) return;
 
-    // Calculate next index (with wrapping)
     let nextIndex = currentIndex + direction;
-    if (nextIndex < 0) nextIndex = triggers.length - 1;
-    if (nextIndex >= triggers.length) nextIndex = 0;
+    if (nextIndex < 0 || nextIndex >= triggers.length) {
+        if (!loopFocus) {
+            return;
+        }
+
+        nextIndex = nextIndex < 0 ? triggers.length - 1 : 0;
+    }
 
     const nextTrigger = triggers[nextIndex];
     if (!nextTrigger || nextTrigger === currentTrigger) return;
 
     // Close current menu first
-    menubarRoot.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => { });
+    menubarRoot.dotNetRef.invokeMethodAsync('OnSiblingOpen').catch(() => { });
 
     // Focus the next trigger and click it to open its menu
     setTimeout(() => {
@@ -362,7 +391,7 @@ function getMenuItems(popupElement) {
     if (!popupElement) return [];
 
     // Include disabled items in keyboard navigation (focusableWhenDisabled: true).
-    // Disabled items are focusable but non-activatable — the activation guard is
+    // Disabled items are focusable but non-activatable - the activation guard is
     // in the keydown handler (Enter/Space) and click handler.
     const selector = '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]';
 
@@ -466,7 +495,7 @@ function handleGlobalPointerDown(e) {
             }
 
             // Touch close prevention: don't dismiss via touch within 300ms of
-            // opening via trigger-focus to prevent focus→open→click→close flicker
+            // opening via trigger-focus to prevent focus->open->click->close flicker
             if (rootState.allowTouchToCloseAt && Date.now() < rootState.allowTouchToCloseAt
                 && e.pointerType === 'touch') {
                 continue;
@@ -496,6 +525,7 @@ export function initializeRoot(rootId, dotNetRef, closeParentOnEsc, loopFocus, m
         modal: modal ?? true,
         releaseScrollLock: null,
         hoverInteraction: null,
+        openSequence: 0,
         menubarElement: menubarElement || null,
         orientation: orientation || 'vertical',
         highlightItemOnHover: highlightItemOnHover ?? true,
@@ -538,6 +568,25 @@ function stopHandledKeyEvent(event) {
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation?.();
+}
+
+function closeSiblingMenubarRoots(rootState) {
+    if (rootState.parentType !== 'menubar') return;
+
+    for (const siblingState of state.roots.values()) {
+        const sameMenubar = rootState.menubarElement && siblingState.menubarElement
+            ? siblingState.menubarElement === rootState.menubarElement
+            : siblingState.parentType === 'menubar';
+
+        if (siblingState === rootState ||
+            !sameMenubar ||
+            !isRootEffectivelyOpen(siblingState) ||
+            !siblingState.dotNetRef) {
+            continue;
+        }
+
+        siblingState.dotNetRef.invokeMethodAsync('OnSiblingOpen').catch(() => { });
+    }
 }
 
 function invokeMenuMethodAsync(dotNetRef, methodName) {
@@ -632,7 +681,7 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
     // Use callback dotnet ref if provided, otherwise fall back to root dotnet ref
     const dotNetRef = callbackDotNetRef || rootState.dotNetRef;
 
-    // allowMouseEnter starts false — hover opens instantly until deliberate mouse movement
+    // allowMouseEnter starts false - hover opens instantly until deliberate mouse movement
     const configuredOpenDelay = openDelay || 0;
     const configuredCloseDelay = closeDelay || 0;
     rootState.allowMouseEnter = false;
@@ -658,10 +707,17 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
                 return;
             }
             if (dotNetRef && !rootState.isOpen) {
-                dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+                const openTask = dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+                if (rootState.parentType === 'menubar') {
+                    openTask.then(() => closeSiblingMenubarRoots(rootState));
+                }
             }
         },
         onClose: (reason) => {
+            if (rootState.parentType === 'menubar') {
+                return;
+            }
+
             if (dotNetRef && rootState.isOpen) {
                 dotNetRef.invokeMethodAsync('OnHoverClose').catch(() => { });
             }
@@ -684,6 +740,56 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
         rootState.triggerElement?.removeEventListener('mousemove', onAllowMouseEnter);
         rootState.popupElement?.removeEventListener('mousemove', onAllowMouseEnter);
     };
+}
+
+export function closeMenubarSiblingRoots(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        closeSiblingMenubarRoots(rootState);
+    }
+}
+
+export function initializeMenubarTrigger(interactionId, triggerElement, dotNetRef) {
+    disposeMenubarTrigger(interactionId);
+
+    if (!triggerElement || !dotNetRef) {
+        return;
+    }
+
+    let lastOpenAt = 0;
+    const onPointerEnter = () => {
+        const now = Date.now();
+        if (now - lastOpenAt < 20) {
+            return;
+        }
+
+        lastOpenAt = now;
+        dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+    };
+    const onKeyDown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space') {
+            dotNetRef.invokeMethodAsync('OnKeyboardOpen').catch(() => { });
+        }
+    };
+
+    triggerElement.addEventListener('pointerenter', onPointerEnter);
+    triggerElement.addEventListener('pointerover', onPointerEnter);
+    triggerElement.addEventListener('mouseenter', onPointerEnter);
+    triggerElement.addEventListener('keydown', onKeyDown);
+    state.menubarTriggers.set(interactionId, () => {
+        triggerElement.removeEventListener('pointerenter', onPointerEnter);
+        triggerElement.removeEventListener('pointerover', onPointerEnter);
+        triggerElement.removeEventListener('mouseenter', onPointerEnter);
+        triggerElement.removeEventListener('keydown', onKeyDown);
+    });
+}
+
+export function disposeMenubarTrigger(interactionId) {
+    const cleanup = state.menubarTriggers.get(interactionId);
+    if (cleanup) {
+        cleanup();
+        state.menubarTriggers.delete(interactionId);
+    }
 }
 
 export function disposeHoverInteraction(rootId) {
@@ -782,6 +888,8 @@ export async function setRootOpen(rootId, isOpen, reason, highlightLast, interac
     }
 
     if (isOpen) {
+        rootState.openSequence = ++state.openSequence;
+
         // For menubar menus, don't auto-highlight - user must press arrow key first
         // For other menus, start with first item highlighted (accessibility best practice)
         // If highlightLast is true, we'll set the index after we know the item count
@@ -793,7 +901,7 @@ export async function setRootOpen(rootId, isOpen, reason, highlightLast, interac
         }
 
         // Touch close prevention: after opening via trigger-focus, block touch-click
-        // dismissals for 300ms to prevent focus→open→click→close flicker on mobile
+        // dismissals for 300ms to prevent focus->open->click->close flicker on mobile
         if (reason === 'trigger-focus') {
             rootState.allowTouchToCloseAt = Date.now() + 300;
         } else {
@@ -928,7 +1036,7 @@ function waitForPopupAndStartTransition(rootState, isOpen) {
 
             // Add mouseup listener for click-and-drag from trigger activation
             // When allowMouseUpTrigger is set (by trigger pointerdown), releasing
-            // the mouse over a menu item activates it — matching React's behavior.
+            // the mouse over a menu item activates it - matching React's behavior.
             if (!rootState.popupMouseUpHandler) {
                 rootState.popupMouseUpHandler = (e) => {
                     if (!rootState.allowMouseUpTrigger) return;
@@ -1180,7 +1288,7 @@ export async function setPopupElement(rootId, element, insideToolbar) {
     rootState.popupElement = element;
     rootState.insideToolbar = !!insideToolbar;
 
-    // Set up mouse highlight delegation for cross-mode (keyboard→mouse) consistency
+    // Set up mouse highlight delegation for cross-mode (keyboard->mouse) consistency
     if (element) {
         setupPopupMouseDelegation(rootId, rootState, element);
     }

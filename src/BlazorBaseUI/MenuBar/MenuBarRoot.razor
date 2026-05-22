@@ -1,3 +1,4 @@
+@using BlazorBaseUI.DirectionProvider
 @using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
 
@@ -30,13 +31,25 @@
     private Orientation previousOrientation;
     private bool previousLoopFocus;
     private bool previousModal;
+    private Direction previousDirection;
+    private bool menuBarInitialized;
+    private bool elementRetryRequested;
     private bool hasSubmenuOpen;
     private int openSubmenuCount;
     private string? openMethod;
+    private string? defaultId;
     private MenuBarRootState state;
     private MenuBarRootContext context = null!;
     private RenderElement<MenuBarRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(
+        AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    private Direction ResolvedDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
 
     /// <summary>
     /// Determines whether the whole menubar is disabled.
@@ -164,13 +177,15 @@
 
         var stateChanged = Disabled != previousDisabled ||
                            Orientation != previousOrientation ||
-                           LoopFocus != previousLoopFocus;
+                           LoopFocus != previousLoopFocus ||
+                           ResolvedDirection != previousDirection;
         var modalChanged = Modal != previousModal;
 
         previousDisabled = Disabled;
         previousOrientation = Orientation;
         previousLoopFocus = LoopFocus;
         previousModal = Modal;
+        previousDirection = ResolvedDirection;
 
         if (stateChanged)
         {
@@ -193,11 +208,21 @@
             previousOrientation = Orientation;
             previousLoopFocus = LoopFocus;
             previousModal = Modal;
-
-            await InitMenuBarAsync();
-            await ProcessPendingRegistrationsAsync();
+            previousDirection = ResolvedDirection;
         }
-        else
+
+        if (!menuBarInitialized)
+        {
+            var initialized = await InitMenuBarAsync();
+            if (!initialized && !Element.HasValue && !elementRetryRequested)
+            {
+                elementRetryRequested = true;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+        }
+
+        if (menuBarInitialized)
         {
             await ProcessPendingRegistrationsAsync();
         }
@@ -227,11 +252,19 @@
         var orientationString = Orientation.ToDataAttributeString();
 
         attrs["role"] = "menubar";
+        attrs["id"] = ResolvedId;
         attrs["aria-orientation"] = orientationString!;
         attrs["data-orientation"] = orientationString!;
-        attrs["data-has-submenu-open"] = hasSubmenuOpen;
-        attrs["data-modal"] = Modal;
-        attrs["data-disabled"] = Disabled;
+
+        if (hasSubmenuOpen)
+        {
+            attrs["data-has-submenu-open"] = string.Empty;
+        }
+
+        if (Modal)
+        {
+            attrs["data-modal"] = string.Empty;
+        }
 
         componentAttributes = attrs;
     }
@@ -240,7 +273,7 @@
 
     private void RegisterItem(ElementReference element)
     {
-        if (!hasRendered)
+        if (!hasRendered || !menuBarInitialized)
         {
             pendingRegistrations.Add(element);
             return;
@@ -261,8 +294,9 @@
 
     private void UnregisterItem(ElementReference element)
     {
-        if (!hasRendered)
+        if (!hasRendered || !menuBarInitialized)
         {
+            pendingRegistrations.Remove(element);
             pendingUnregistrations.Add(element);
             return;
         }
@@ -284,15 +318,15 @@
     {
         // Use counter-based tracking to handle multiple menus correctly.
         // This prevents scroll lock jank when hovering between menu items:
-        // - Menu A opens: count 0 â 1, hasSubmenuOpen becomes true, lock
-        // - Menu B opens: count 1 â 2, hasSubmenuOpen stays true, no change
-        // - Menu A closes: count 2 â 1, hasSubmenuOpen stays true, no change (no unlock!)
-        // - Menu B closes: count 1 â 0, hasSubmenuOpen becomes false, unlock
+        // - Menu A opens: count 0 to 1, hasSubmenuOpen becomes true, lock
+        // - Menu B opens: count 1 to 2, hasSubmenuOpen stays true, no change
+        // - Menu A closes: count 2 to 1, hasSubmenuOpen stays true, no change
+        // - Menu B closes: count 1 to 0, hasSubmenuOpen becomes false, unlock
         if (value)
         {
             openSubmenuCount++;
 
-            if (openSubmenuCount == 1 && interactionType is not null)
+            if (interactionType is not null)
             {
                 openMethod = interactionType;
             }
@@ -311,6 +345,11 @@
 
         if (hasSubmenuOpen == newHasSubmenuOpen)
         {
+            if (hasRendered)
+            {
+                _ = UpdateScrollLockAsync();
+            }
+
             return;
         }
 
@@ -346,21 +385,24 @@
         pendingRegistrations.Clear();
     }
 
-    private async Task InitMenuBarAsync()
+    private async Task<bool> InitMenuBarAsync()
     {
         if (!Element.HasValue)
         {
-            return;
+            return false;
         }
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("initMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
+            await module.InvokeVoidAsync("initMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus, ResolvedDirection.ToAttributeString());
+            menuBarInitialized = true;
+            return true;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
+            return false;
         }
     }
 
@@ -374,7 +416,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("updateMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus);
+            await module.InvokeVoidAsync("updateMenuBar", Element.Value, Orientation.ToDataAttributeString(), LoopFocus, ResolvedDirection.ToAttributeString());
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -392,8 +434,8 @@
         try
         {
             var module = await moduleTask.Value;
-            var shouldLock = Modal && hasSubmenuOpen && openMethod != "touch";
-            await module.InvokeVoidAsync("updateScrollLock", Element.Value, shouldLock);
+            var shouldEvaluate = Modal && hasSubmenuOpen;
+            await module.InvokeVoidAsync("updateScrollLock", Element.Value, shouldEvaluate, openMethod);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

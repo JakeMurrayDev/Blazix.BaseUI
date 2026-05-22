@@ -52,8 +52,10 @@
     private MenuParentType ParentType =>
         ParentMenuContext is not null ? MenuParentType.Menu :
         ContextMenuContext is not null ? MenuParentType.ContextMenu :
-        MenuBarContext is not null ? MenuParentType.Menubar :
+        EffectiveMenuBarContext is not null ? MenuParentType.Menubar :
         MenuParentType.None;
+
+    private MenuBarRootContext? EffectiveMenuBarContext => MenuBarContext ?? Handle?.MenubarContext;
 
     private Direction EffectiveDirection => Direction != Direction.Undefined
         ? Direction
@@ -266,7 +268,8 @@
         }
 
         context.Disabled = Disabled;
-        context.TriggerId = TriggerId ?? DefaultTriggerId;
+        context.ParentType = ParentType;
+        context.TriggerId = TriggerId ?? activeTriggerId ?? DefaultTriggerId;
         context.Orientation = Orientation;
         context.Direction = effectiveDirection.ToAttributeString() ?? "ltr";
         context.HighlightItemOnHover = HighlightItemOnHover;
@@ -370,6 +373,15 @@
     }
 
     /// <summary>
+    /// Invoked from JavaScript when another menubar sibling menu has opened.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSiblingOpen()
+    {
+        await SetOpenAsync(false, MenuOpenChangeReason.SiblingOpen);
+    }
+
+    /// <summary>
     /// Invoked from JavaScript after the starting transition style has been applied.
     /// </summary>
     [JSInvokable]
@@ -426,7 +438,8 @@
     [JSInvokable]
     public Task OnHoverOpen()
     {
-        if (MenuBarContext is not null && !MenuBarContext.GetHasSubmenuOpen())
+        var menuBarContext = EffectiveMenuBarContext;
+        if (menuBarContext is not null && !menuBarContext.GetHasSubmenuOpen())
         {
             return Task.CompletedTask;
         }
@@ -594,6 +607,11 @@
                     _ => null
                 };
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, highlightLast, context.InteractionType);
+
+                if (nextOpen && ParentType == MenuParentType.Menubar)
+                {
+                    await module.InvokeVoidAsync("closeMenubarSiblingRoots", rootId);
+                }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
@@ -605,7 +623,7 @@
 
         if (ParentType == MenuParentType.Menubar)
         {
-            MenuBarContext?.SetHasSubmenuOpen(nextOpen, nextOpen ? context.InteractionType : null);
+            EffectiveMenuBarContext?.SetHasSubmenuOpen(nextOpen, nextOpen ? context.InteractionType : null);
         }
 
         StateHasChanged();
@@ -618,7 +636,7 @@
             var module = await ModuleTask.Value;
             var isNested = ParentType != MenuParentType.None;
             var modal = (ParentType is MenuParentType.None or MenuParentType.ContextMenu) && Modal == MenuModalMode.True;
-            var menubarElement = ParentType == MenuParentType.Menubar ? MenuBarContext?.GetElement() : null;
+            var menubarElement = ParentType == MenuParentType.Menubar ? EffectiveMenuBarContext?.GetElement() : null;
             var orientationStr = Orientation == MenuOrientation.Horizontal ? "horizontal" : "vertical";
             var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
             var parentTypeStr = ParentType switch

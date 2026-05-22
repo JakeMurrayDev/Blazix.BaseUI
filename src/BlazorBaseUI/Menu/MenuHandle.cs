@@ -1,3 +1,4 @@
+using BlazorBaseUI.MenuBar;
 using Microsoft.AspNetCore.Components;
 
 namespace BlazorBaseUI.Menu;
@@ -22,6 +23,11 @@ public interface IMenuHandle
     /// Gets the unique identifier for the popup element.
     /// </summary>
     string? PopupId { get; }
+
+    /// <summary>
+    /// Gets the menubar context associated with the active trigger.
+    /// </summary>
+    internal MenuBarRootContext? MenubarContext { get; }
 
     /// <summary>
     /// Opens the menu and associates it with the trigger with the given ID.
@@ -55,9 +61,19 @@ public interface IMenuHandle
     internal void RegisterTrigger(string triggerId, ElementReference? element, object? triggerPayload);
 
     /// <summary>
+    /// Registers the menubar context associated with a trigger.
+    /// </summary>
+    internal void RegisterMenubarContext(string triggerId, MenuBarRootContext context);
+
+    /// <summary>
     /// Unregisters a trigger from this handle.
     /// </summary>
     internal void UnregisterTrigger(string triggerId);
+
+    /// <summary>
+    /// Unregisters the menubar context associated with a trigger.
+    /// </summary>
+    internal void UnregisterMenubarContext(string triggerId);
 
     /// <summary>
     /// Updates the element reference for a trigger.
@@ -107,6 +123,7 @@ public interface IMenuHandle
 /// <typeparam name="TPayload">The type of payload to pass to the menu.</typeparam>
 public class MenuHandle<TPayload> : ComponentHandleBase<TPayload, MenuOpenChangeReason>, IMenuHandle
 {
+    private readonly Dictionary<string, MenuBarRootContext> menuBarContexts = [];
     private string? popupId;
 
     /// <inheritdoc />
@@ -119,6 +136,25 @@ public class MenuHandle<TPayload> : ComponentHandleBase<TPayload, MenuOpenChange
     /// Gets the unique identifier for the popup element.
     /// </summary>
     public string? PopupId => popupId;
+
+    /// <inheritdoc />
+    MenuBarRootContext? IMenuHandle.MenubarContext => MenubarContext;
+
+    /// <summary>
+    /// Gets the menubar context associated with the active trigger.
+    /// </summary>
+    internal MenuBarRootContext? MenubarContext
+    {
+        get
+        {
+            if (ActiveTriggerId is not null && menuBarContexts.TryGetValue(ActiveTriggerId, out var activeContext))
+            {
+                return activeContext;
+            }
+
+            return menuBarContexts.Values.FirstOrDefault();
+        }
+    }
 
     /// <inheritdoc />
     ElementReference? IMenuHandle.GetTriggerElement(string? triggerId) => GetTriggerElement(triggerId);
@@ -139,7 +175,18 @@ public class MenuHandle<TPayload> : ComponentHandleBase<TPayload, MenuOpenChange
         => RegisterTrigger(triggerId, element, triggerPayload is TPayload typedPayload ? typedPayload : default);
 
     /// <inheritdoc />
-    void IMenuHandle.UnregisterTrigger(string triggerId) => UnregisterTrigger(triggerId);
+    void IMenuHandle.RegisterMenubarContext(string triggerId, MenuBarRootContext context)
+        => RegisterMenubarContext(triggerId, context);
+
+    /// <inheritdoc />
+    void IMenuHandle.UnregisterTrigger(string triggerId)
+    {
+        UnregisterMenubarContext(triggerId);
+        UnregisterTrigger(triggerId);
+    }
+
+    /// <inheritdoc />
+    void IMenuHandle.UnregisterMenubarContext(string triggerId) => UnregisterMenubarContext(triggerId);
 
     /// <inheritdoc />
     void IMenuHandle.UpdateTriggerElement(string triggerId, ElementReference? element) => UpdateTriggerElement(triggerId, element);
@@ -168,6 +215,22 @@ public class MenuHandle<TPayload> : ComponentHandleBase<TPayload, MenuOpenChange
 
     /// <inheritdoc />
     void IMenuHandle.SetPopupId(string? value) { popupId = value; }
+
+    /// <summary>
+    /// Registers the menubar context associated with a trigger.
+    /// </summary>
+    internal void RegisterMenubarContext(string triggerId, MenuBarRootContext context)
+    {
+        menuBarContexts[triggerId] = context;
+    }
+
+    /// <summary>
+    /// Unregisters the menubar context associated with a trigger.
+    /// </summary>
+    internal void UnregisterMenubarContext(string triggerId)
+    {
+        menuBarContexts.Remove(triggerId);
+    }
 }
 
 /// <summary>
