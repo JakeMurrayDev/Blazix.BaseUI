@@ -24,6 +24,8 @@ public abstract class MeterTestsBase : TestBase
     protected ILocator GetMeterTrack() => GetByTestId("meter-track");
     protected ILocator GetMeterValue() => GetByTestId("meter-value");
     protected ILocator GetMeterLabel() => GetByTestId("meter-label");
+    protected ILocator GetMeterHiddenPresentationSpan() =>
+        Page.Locator("[data-testid='meter-root'] > span[role='presentation']:not([data-testid])");
 
     private async Task WaitForStyleContainsAsync(ILocator element, string substring, int timeout = 5000)
     {
@@ -101,6 +103,20 @@ public abstract class MeterTestsBase : TestBase
         Assert.NotEmpty(ariaValueText);
     }
 
+    [Fact]
+    public virtual async Task Root_RendersHiddenPresentationSpanForScreenReaders()
+    {
+        await NavigateAsync(CreateUrl("/tests/meter")
+            .WithMeterValue(50));
+
+        var hidden = GetMeterHiddenPresentationSpan();
+        await Assertions.Expect(hidden).ToHaveTextAsync("x");
+
+        var style = await hidden.GetAttributeAsync("style");
+        Assert.Contains("clip-path:inset(50%)", style);
+        Assert.Contains("position:fixed", style);
+    }
+
     #endregion
 
     #region Dynamic Value Update Tests
@@ -153,6 +169,7 @@ public abstract class MeterTestsBase : TestBase
 
         await Assertions.Expect(root).ToHaveAttributeAsync("aria-labelledby", labelId!);
         await Assertions.Expect(label).ToHaveTextAsync("Battery Level");
+        await Assertions.Expect(label).ToHaveAttributeAsync("role", "presentation");
     }
 
     #endregion

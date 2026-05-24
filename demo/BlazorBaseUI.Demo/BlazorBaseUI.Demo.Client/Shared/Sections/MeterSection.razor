@@ -58,7 +58,7 @@
                  Description="Meter with custom number formatting using Format parameter.">
         <div class="w-80">
             <MeterRoot Value="86.49"
-                       Format="F1"
+                       FormatString="F1"
                        ClassValue="@(state => "flex flex-col gap-2")">
                 <div class="flex justify-between text-sm text-gray-700">
                     <MeterLabel>CPU Usage</MeterLabel>
@@ -75,7 +75,7 @@
                  Description="Meter with locale-specific formatting using FormatProvider.">
         <div class="w-80">
             <MeterRoot Value="86.49"
-                       Format="F2"
+                       FormatString="F2"
                        FormatProvider="germanCulture"
                        ClassValue="@(state => "flex flex-col gap-2")">
                 <div class="flex justify-between text-sm text-gray-700">

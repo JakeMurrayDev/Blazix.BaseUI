@@ -11,7 +11,8 @@ public class MeterValueTests : BunitContext, IMeterValueContract
 
     private RenderFragment CreateMeterWithValue(
         double value = 50,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
         IFormatProvider? formatProvider = null,
         Func<MeterRootState, string?>? valueClassValue = null,
         Func<MeterRootState, string?>? valueStyleValue = null,
@@ -28,6 +29,8 @@ public class MeterValueTests : BunitContext, IMeterValueContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
 
@@ -138,6 +141,32 @@ public class MeterValueTests : BunitContext, IMeterValueContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AdditionalAriaHiddenOverridesDefault()
+    {
+        var cut = Render(CreateMeterWithValue(
+            valueAttributes: new Dictionary<string, object>
+            {
+                { "aria-hidden", "false" }
+            }
+        ));
+        var valueEl = cut.Find("[data-testid='value']");
+        valueEl.GetAttribute("aria-hidden").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedOutsideRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<MeterValue>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: MeterRootContext is missing. Meter parts must be placed within <Meter.Root>.");
+        return Task.CompletedTask;
+    }
+
     // Content rendering
 
     [Fact]
@@ -153,7 +182,7 @@ public class MeterValueTests : BunitContext, IMeterValueContract
     [Fact]
     public Task RendersCustomFormattedValue()
     {
-        var cut = Render(CreateMeterWithValue(value: 30, format: "F1"));
+        var cut = Render(CreateMeterWithValue(value: 30, formatString: "F1"));
         var valueEl = cut.Find("[data-testid='value']");
         var expected = 30.0.ToString("F1", CultureInfo.CurrentCulture);
         valueEl.TextContent.ShouldBe(expected);
@@ -168,7 +197,7 @@ public class MeterValueTests : BunitContext, IMeterValueContract
 
         var cut = Render(CreateMeterWithValue(
             value: 30,
-            format: "F1",
+            formatString: "F1",
             childContent: (formatted, val) =>
             {
                 capturedFormatted = formatted;

@@ -6,6 +6,8 @@ namespace BlazorBaseUI.Meter;
 /// </summary>
 internal sealed class MeterRootContext
 {
+    internal const string MissingContextMessage = "Base UI: MeterRootContext is missing. Meter parts must be placed within <Meter.Root>.";
+
     /// <summary>
     /// Gets or sets the formatted value of the component.
     /// </summary>

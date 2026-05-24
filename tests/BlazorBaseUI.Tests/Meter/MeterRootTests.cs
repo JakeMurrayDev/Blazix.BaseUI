@@ -13,7 +13,9 @@ public class MeterRootTests : BunitContext, IMeterRootContract
         double value = 50,
         double min = 0,
         double max = 100,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null,
         Func<string, double, string>? getAriaValueText = null,
         RenderFragment<RenderProps<MeterRootState>>? render = null,
@@ -33,6 +35,10 @@ public class MeterRootTests : BunitContext, IMeterRootContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(attrIndex++, "Locale", locale);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
             if (getAriaValueText is not null)
@@ -75,7 +81,9 @@ public class MeterRootTests : BunitContext, IMeterRootContract
 
     private RenderFragment CreateMeterWithValue(
         double value = 50,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null)
     {
         return builder =>
@@ -87,6 +95,10 @@ public class MeterRootTests : BunitContext, IMeterRootContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(attrIndex++, "Locale", locale);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
 
@@ -188,6 +200,21 @@ public class MeterRootTests : BunitContext, IMeterRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task RendersHiddenPresentationSpanForScreenReaders()
+    {
+        var cut = Render(CreateMeterRoot());
+        var hidden = cut.Find("span[role='presentation']");
+
+        hidden.TextContent.ShouldBe("x");
+        var style = hidden.GetAttribute("style");
+        style.ShouldContain("clip-path:inset(50%)");
+        style.ShouldContain("position:fixed");
+        style.ShouldContain("top:0");
+        style.ShouldContain("left:0");
+        return Task.CompletedTask;
+    }
+
     // ARIA attributes
 
     [Fact]
@@ -236,6 +263,59 @@ public class MeterRootTests : BunitContext, IMeterRootContract
     }
 
     [Fact]
+    public Task UsesInvariantRawValueForDefaultAriaValueText()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var originalUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("de-DE");
+
+            var cut = Render(CreateMeterRoot(value: 86.49));
+            var meter = cut.Find("[role='meter']");
+            meter.GetAttribute("aria-valuetext").ShouldBe("86.49%");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+            CultureInfo.CurrentUICulture = originalUiCulture;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesJavaScriptNumberStringForDefaultAriaValueText()
+    {
+        var small = Render(CreateMeterRoot(value: 0.000001));
+        var smallMeter = small.Find("[role='meter']");
+        smallMeter.GetAttribute("aria-valuetext").ShouldBe("0.000001%");
+
+        var large = Render(CreateMeterRoot(value: 100000000000000000000.0));
+        var largeMeter = large.Find("[role='meter']");
+        largeMeter.GetAttribute("aria-valuetext").ShouldBe("100000000000000000000%");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AdditionalAriaValueTextOverridesComputedValue()
+    {
+        var cut = Render(CreateMeterRoot(
+            value: 30,
+            formatString: "F1",
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "aria-valuetext", "Battery charge: 30 percent" }
+            }
+        ));
+        var meter = cut.Find("[role='meter']");
+        meter.GetAttribute("aria-valuetext").ShouldBe("Battery charge: 30 percent");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task SetsAriaLabelledByWhenLabelPresent()
     {
         var cut = Render(CreateMeterWithLabel(value: 30, labelText: "Disk Usage"));
@@ -263,9 +343,9 @@ public class MeterRootTests : BunitContext, IMeterRootContract
     // Formatting
 
     [Fact]
-    public Task FormatsValueWithCustomFormat()
+    public Task FormatsValueWithFormatString()
     {
-        var cut = Render(CreateMeterWithValue(value: 30, format: "F1"));
+        var cut = Render(CreateMeterWithValue(value: 30, formatString: "F1"));
         var meter = cut.Find("[role='meter']");
         var expected = 30.0.ToString("F1", CultureInfo.CurrentCulture);
         meter.GetAttribute("aria-valuetext").ShouldBe(expected);
@@ -280,11 +360,75 @@ public class MeterRootTests : BunitContext, IMeterRootContract
         var germanCulture = CultureInfo.GetCultureInfo("de-DE");
         var cut = Render(CreateMeterWithValue(
             value: 70.51,
-            format: "F2",
+            formatString: "F2",
             formatProvider: germanCulture));
         var valueElement = cut.Find("[data-testid='value']");
         var expected = 70.51.ToString("F2", germanCulture);
         valueElement.TextContent.ShouldBe(expected);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FormatsValueWithNumberFormatOptionsAndLocale()
+    {
+        var format = new NumberFormatOptions(
+            Style: "decimal",
+            MinimumFractionDigits: 2,
+            MaximumFractionDigits: 2);
+
+        var cut = Render(CreateMeterWithValue(
+            value: 86.49,
+            format: format,
+            locale: "de-DE"));
+
+        var meter = cut.Find("[role='meter']");
+        var valueElement = cut.Find("[data-testid='value']");
+
+        meter.GetAttribute("aria-valuetext").ShouldBe("86,49");
+        valueElement.TextContent.ShouldBe("86,49");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FormatsValueWithSignificantDigitOptions()
+    {
+        var format = new NumberFormatOptions(
+            MinimumSignificantDigits: 3,
+            MaximumSignificantDigits: 3);
+
+        var grouped = Render(CreateMeterWithValue(
+            value: 12345,
+            format: format,
+            locale: "en-US"));
+
+        grouped.Find("[role='meter']").GetAttribute("aria-valuetext").ShouldBe("12,300");
+        grouped.Find("[data-testid='value']").TextContent.ShouldBe("12,300");
+
+        var padded = Render(CreateMeterWithValue(
+            value: 1.2,
+            format: format,
+            locale: "en-US"));
+
+        padded.Find("[role='meter']").GetAttribute("aria-valuetext").ShouldBe("1.20");
+        padded.Find("[data-testid='value']").TextContent.ShouldBe("1.20");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FormatsValueWithMinimumIntegerAndSignificantDigitOptions()
+    {
+        var format = new NumberFormatOptions(
+            MinimumIntegerDigits: 3,
+            MinimumSignificantDigits: 3,
+            MaximumSignificantDigits: 3);
+
+        var cut = Render(CreateMeterWithValue(
+            value: 1.2,
+            format: format,
+            locale: "en-US"));
+
+        cut.Find("[role='meter']").GetAttribute("aria-valuetext").ShouldBe("001.20");
+        cut.Find("[data-testid='value']").TextContent.ShouldBe("001.20");
         return Task.CompletedTask;
     }
 
@@ -305,7 +449,7 @@ public class MeterRootTests : BunitContext, IMeterRootContract
     {
         var cut = Render(CreateMeterRoot(
             value: 50,
-            format: "F1"
+            formatString: "F1"
         ));
         var meter = cut.Find("[role='meter']");
         var expected = 50.0.ToString("F1", CultureInfo.CurrentCulture);

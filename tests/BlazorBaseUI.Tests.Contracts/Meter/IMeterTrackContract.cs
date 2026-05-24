@@ -8,4 +8,5 @@ public interface IMeterTrackContract
     Task ForwardsAdditionalAttributes();
     Task AppliesClassValue();
     Task AppliesStyleValue();
+    Task RendersOutsideRoot();
 }

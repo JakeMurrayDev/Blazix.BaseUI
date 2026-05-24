@@ -123,6 +123,26 @@ public class MeterIndicatorTests : BunitContext, IMeterIndicatorContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AdditionalStyleOverridesIntrinsicStylesWhenConflicting()
+    {
+        var cut = Render(CreateMeterWithIndicator(
+            value: 50,
+            indicatorAttributes: new Dictionary<string, object>
+            {
+                { "style", "width:25%" }
+            }
+        ));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+
+        style.ShouldContain("width:50%");
+        style.ShouldContain("width:25%");
+        style.LastIndexOf("width:25%", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(style.LastIndexOf("width:50%", StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
     // Indicator styles
 
     [Fact]
@@ -157,6 +177,45 @@ public class MeterIndicatorTests : BunitContext, IMeterIndicatorContract
         var style = indicator.GetAttribute("style");
         style.ShouldContain("background: green");
         style.ShouldContain("width:50%");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task StyleValueOverridesIntrinsicStylesWhenConflicting()
+    {
+        var cut = Render(CreateMeterWithIndicator(
+            value: 50,
+            indicatorStyleValue: _ => "width:25%"
+        ));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+
+        style.ShouldContain("width:50%");
+        style.ShouldContain("width:25%");
+        style.LastIndexOf("width:25%", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(style.LastIndexOf("width:50%", StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesReactValueToPercentWhenRangeIsZero()
+    {
+        var cut = Render(CreateMeterWithIndicator(value: 1, min: 0, max: 0));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+        style.ShouldContain("width:Infinity%");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedOutsideRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<MeterIndicator>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: MeterRootContext is missing. Meter parts must be placed within <Meter.Root>.");
         return Task.CompletedTask;
     }
 }

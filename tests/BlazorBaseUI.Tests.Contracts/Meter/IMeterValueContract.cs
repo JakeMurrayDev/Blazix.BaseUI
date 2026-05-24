@@ -11,6 +11,8 @@ public interface IMeterValueContract
 
     // ARIA
     Task HasAriaHidden();
+    Task AdditionalAriaHiddenOverridesDefault();
+    Task ThrowsWhenRenderedOutsideRoot();
 
     // Content rendering
     Task RendersFormattedValueWhenNoChildContent();
