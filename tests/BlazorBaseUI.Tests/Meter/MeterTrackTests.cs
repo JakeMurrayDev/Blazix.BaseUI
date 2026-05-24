@@ -114,4 +114,19 @@ public class MeterTrackTests : BunitContext, IMeterTrackContract
         track.GetAttribute("style").ShouldContain("height: 8px");
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public Task RendersOutsideRoot()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MeterTrack>(0);
+            builder.AddAttribute(1, "data-testid", "track");
+            builder.CloseComponent();
+        });
+
+        var track = cut.Find("[data-testid='track']");
+        track.TagName.ShouldBe("DIV");
+        return Task.CompletedTask;
+    }
 }

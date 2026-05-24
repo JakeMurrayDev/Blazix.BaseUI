@@ -1,7 +1,6 @@
 <RenderElement TState="MeterRootState"
                Tag="div"
-               State="Context?.State"
-               Enabled="Context is not null"
+               State="CurrentState"
                Render="Render"
                ClassValue="ClassValue"
                StyleValue="StyleValue"
@@ -11,8 +10,11 @@
                @ref="renderElementReference" />
 
 @code {
+    private MeterRootState state = new();
     private RenderElement<MeterRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private MeterRootState CurrentState => Context?.State ?? state;
 
     [CascadingParameter]
     private MeterRootContext? Context { get; set; }

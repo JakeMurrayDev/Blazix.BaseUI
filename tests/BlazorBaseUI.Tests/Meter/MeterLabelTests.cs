@@ -121,6 +121,27 @@ public class MeterLabelTests : BunitContext, IMeterLabelContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task HasRolePresentation()
+    {
+        var cut = Render(CreateMeterWithLabel());
+        var label = cut.Find("[data-testid='label']");
+        label.GetAttribute("role").ShouldBe("presentation");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedOutsideRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<MeterLabel>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: MeterRootContext is missing. Meter parts must be placed within <Meter.Root>.");
+        return Task.CompletedTask;
+    }
+
     // ID generation
 
     [Fact]
@@ -157,6 +178,44 @@ public class MeterLabelTests : BunitContext, IMeterLabelContract
         var label = cut.Find("[data-testid='label']");
         var labelId = label.GetAttribute("id");
         meter.GetAttribute("aria-labelledby").ShouldBe(labelId);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UpdatesParentWhenIdChanges()
+    {
+        var labelId = "meter-label-one";
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MeterRoot>(0);
+            builder.AddAttribute(1, "Value", 50.0);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MeterLabel>(0);
+                innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "id", labelId },
+                        { "data-testid", "label" }
+                    });
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b =>
+                {
+                    b.AddContent(0, "Usage");
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var meter = cut.Find("[role='meter']");
+        meter.GetAttribute("aria-labelledby").ShouldBe("meter-label-one");
+
+        labelId = "meter-label-two";
+        cut.Render();
+        cut.FindComponent<MeterRoot>().Render();
+
+        cut.Find("[role='meter']").GetAttribute("aria-labelledby").ShouldBe("meter-label-two");
+        cut.Find("[data-testid='label']").GetAttribute("id").ShouldBe("meter-label-two");
         return Task.CompletedTask;
     }
 

@@ -8,6 +8,8 @@ public interface IMeterLabelContract
     Task ForwardsAdditionalAttributes();
     Task AppliesClassValue();
     Task AppliesStyleValue();
+    Task HasRolePresentation();
+    Task ThrowsWhenRenderedOutsideRoot();
 
     // ID generation
     Task GeneratesAutoId();
@@ -15,5 +17,6 @@ public interface IMeterLabelContract
 
     // Label-root association
     Task NotifiesParentOfLabelId();
+    Task UpdatesParentWhenIdChanges();
     Task CleansUpLabelIdOnDispose();
 }

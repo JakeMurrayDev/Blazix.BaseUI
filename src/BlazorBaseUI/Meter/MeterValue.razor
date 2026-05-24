@@ -6,12 +6,11 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="resolvedContent"
+               ChildContent="GetResolvedContent()"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
-    private RenderFragment? resolvedContent;
     private RenderElement<MeterRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -60,34 +59,52 @@
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(MeterRootContext.MissingContextMessage);
         }
 
         BuildComponentAttributes();
-        BuildResolvedContent();
     }
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["aria-hidden"] = "true";
+        SetDefaultAttribute(attrs, "aria-hidden", "true");
 
         componentAttributes = attrs;
     }
 
-    private void BuildResolvedContent()
+    private RenderFragment GetResolvedContent()
     {
         if (ChildContent is not null)
         {
-            resolvedContent = ChildContent(Context!.FormattedValue, Context.Value);
-            return;
+            return ChildContent(Context!.FormattedValue, Context.Value);
         }
 
         var displayText = !string.IsNullOrEmpty(Context!.FormattedValue)
             ? Context.FormattedValue
-            : Context.Value.ToString();
+            : Context.Value.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
 
-        resolvedContent = b => b.AddContent(0, displayText);
+        return b => b.AddContent(0, displayText);
+    }
+
+    private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
+    {
+        if (HasAdditionalAttribute(attribute))
+        {
+            return;
+        }
+
+        attrs[attribute] = value;
+    }
+
+    private bool HasAdditionalAttribute(string attribute)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        return AdditionalAttributes.Keys.Any(key => string.Equals(key, attribute, StringComparison.OrdinalIgnoreCase));
     }
 }

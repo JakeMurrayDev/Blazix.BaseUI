@@ -14,6 +14,7 @@
 
 @code {
     private string? defaultId;
+    private string? registeredLabelId;
     private RenderElement<MeterRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -59,20 +60,25 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
-    protected override void OnInitialized()
-    {
-        Context?.SetLabelIdAction(ResolvedId);
-    }
-
-    /// <inheritdoc />
     protected override void OnParametersSet()
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(MeterRootContext.MissingContextMessage);
         }
 
         BuildComponentAttributes();
+        RegisterLabelId();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (registeredLabelId is not null)
+        {
+            Context?.SetLabelIdAction(null);
+            registeredLabelId = null;
+        }
     }
 
     private void BuildComponentAttributes()
@@ -80,13 +86,40 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["id"] = ResolvedId;
+        SetDefaultAttribute(attrs, "role", "presentation");
 
         componentAttributes = attrs;
     }
 
-    /// <inheritdoc />
-    public void Dispose()
+    private void RegisterLabelId()
     {
-        Context?.SetLabelIdAction(null);
+        var id = ResolvedId;
+        if (registeredLabelId == id)
+        {
+            return;
+        }
+
+        registeredLabelId = id;
+        Context!.SetLabelIdAction(id);
+    }
+
+    private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
+    {
+        if (HasAdditionalAttribute(attribute))
+        {
+            return;
+        }
+
+        attrs[attribute] = value;
+    }
+
+    private bool HasAdditionalAttribute(string attribute)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        return AdditionalAttributes.Keys.Any(key => string.Equals(key, attribute, StringComparison.OrdinalIgnoreCase));
     }
 }

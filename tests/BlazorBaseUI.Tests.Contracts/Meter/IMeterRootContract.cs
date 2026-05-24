@@ -9,6 +9,7 @@ public interface IMeterRootContract
     Task AppliesClassValue();
     Task AppliesStyleValue();
     Task CombinesClassFromBothSources();
+    Task RendersHiddenPresentationSpanForScreenReaders();
 
     // ARIA attributes
     Task HasRoleMeter();
@@ -16,12 +17,18 @@ public interface IMeterRootContract
     Task SetsAriaValueMax();
     Task SetsAriaValueNow();
     Task SetsAriaValueText();
+    Task UsesInvariantRawValueForDefaultAriaValueText();
+    Task UsesJavaScriptNumberStringForDefaultAriaValueText();
+    Task AdditionalAriaValueTextOverridesComputedValue();
     Task SetsAriaLabelledByWhenLabelPresent();
     Task UpdatesAriaValueNowWhenValueChanges();
 
     // Formatting
-    Task FormatsValueWithCustomFormat();
+    Task FormatsValueWithFormatString();
     Task FormatsValueWithFormatProvider();
+    Task FormatsValueWithNumberFormatOptionsAndLocale();
+    Task FormatsValueWithSignificantDigitOptions();
+    Task FormatsValueWithMinimumIntegerAndSignificantDigitOptions();
     Task GetAriaValueTextCallbackOverridesDefault();
     Task AriaValueTextUsesFormattedValueWhenFormatProvided();
 
