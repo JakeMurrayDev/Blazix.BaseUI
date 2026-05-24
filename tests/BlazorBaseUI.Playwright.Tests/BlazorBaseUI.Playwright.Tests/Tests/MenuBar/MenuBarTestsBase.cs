@@ -149,6 +149,9 @@ public abstract class MenuBarTestsBase : TestBase
         // First menu should now be open
         var menu1State = GetByTestId("menu-1-state");
         await Assertions.Expect(menu1State).ToHaveTextAsync("true");
+
+        var changeCount = GetByTestId("change-count");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("1");
     }
 
     [Fact]
@@ -200,6 +203,9 @@ public abstract class MenuBarTestsBase : TestBase
 
         var menu1State = GetByTestId("menu-1-state");
         await Assertions.Expect(menu1State).ToHaveTextAsync("true");
+
+        var changeCount = GetByTestId("change-count");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("1");
     }
 
     [Fact]

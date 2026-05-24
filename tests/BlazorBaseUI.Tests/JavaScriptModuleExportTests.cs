@@ -15,6 +15,18 @@ public class JavaScriptModuleExportTests
         ShouldExportFunction(source, "waitForExitTransition");
     }
 
+    [Fact]
+    public async Task MenuModule_DoesNotForwardMenubarTriggerKeyboardEvents()
+    {
+        var source = await File.ReadAllTextAsync(GetRepositoryFile(
+            "src",
+            "BlazorBaseUI",
+            "wwwroot",
+            "blazor-baseui-menu.js"));
+
+        source.ShouldNotContain("invokeMethodAsync('OnKeyboardOpen')");
+    }
+
     private static string GetRepositoryFile(params string[] pathSegments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

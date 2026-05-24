@@ -303,6 +303,9 @@
             }
 
             Handle?.SyncState(true, activeTriggerId, activePayload);
+            effectiveMenuBarContext = EffectiveMenuBarContext;
+            parentType = ParentType;
+            context.ParentType = parentType;
         }
 
         if (hasRendered &&

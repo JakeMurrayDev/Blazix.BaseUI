@@ -611,6 +611,8 @@ public class MenuRootTests : BunitContext, IMenuRootContract
         handle.Open("first-trigger");
         cut.Render();
 
+        var initialRootInvocation = menuModule.Invocations.Last(invocation => invocation.Identifier == "initializeRoot");
+        var initialMenubarElement = initialRootInvocation.Arguments[5];
         var updateRootCountBefore = menuModule.Invocations.Count(invocation => invocation.Identifier == "updateRoot");
 
         handle.Open("second-trigger");
@@ -626,9 +628,101 @@ public class MenuRootTests : BunitContext, IMenuRootContract
             updateRootInvocations.Count.ShouldBeGreaterThan(0);
             var updateRootInvocation = updateRootInvocations[^1];
             updateRootInvocation.Arguments.Count.ShouldBeGreaterThan(7);
+            updateRootInvocation.Arguments[6].ShouldNotBe(initialMenubarElement);
             updateRootInvocation.Arguments[7].ShouldBe("menubar");
         });
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ControlledTriggerIdSwitchUpdatesJavaScriptMenubarContext()
+    {
+        var handle = new MenuHandle<string>();
+        RenderFragment<MenuRootPayloadContext> menuContent = _ => menuBuilder =>
+        {
+            menuBuilder.OpenComponent<MenuPositioner>(0);
+            menuBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(positionerBuilder =>
+            {
+                positionerBuilder.OpenComponent<MenuPopup>(0);
+                positionerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                {
+                    popupBuilder.OpenComponent<MenuItem>(0);
+                    popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Item")));
+                    popupBuilder.CloseComponent();
+                }));
+                positionerBuilder.CloseComponent();
+            }));
+            menuBuilder.CloseComponent();
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuBarRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(menuBarBuilder =>
+            {
+                menuBarBuilder.OpenComponent<MenuTypedTrigger<string>>(0);
+                menuBarBuilder.AddAttribute(1, "Handle", handle);
+                menuBarBuilder.AddAttribute(2, "id", "first-trigger");
+                menuBarBuilder.AddAttribute(3, "Payload", "first");
+                menuBarBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "First")));
+                menuBarBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MenuBarRoot>(10);
+            builder.AddAttribute(11, "ChildContent", (RenderFragment)(menuBarBuilder =>
+            {
+                menuBarBuilder.OpenComponent<MenuTypedTrigger<string>>(0);
+                menuBarBuilder.AddAttribute(1, "Handle", handle);
+                menuBarBuilder.AddAttribute(2, "id", "second-trigger");
+                menuBarBuilder.AddAttribute(3, "Payload", "second");
+                menuBarBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Second")));
+                menuBarBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+
+            builder.OpenComponent<MenuRoot>(20);
+            builder.AddAttribute(21, "Handle", (IMenuHandle)handle);
+            builder.AddAttribute(22, "Open", true);
+            builder.AddAttribute(23, "TriggerId", "first-trigger");
+            builder.AddAttribute(24, "ChildContent", menuContent);
+            builder.CloseComponent();
+        });
+
+        var initialRootInvocation = menuModule.Invocations.Last(invocation => invocation.Identifier == "initializeRoot");
+        var initialMenubarElement = initialRootInvocation.Arguments[5];
+        var updateRootCountBefore = menuModule.Invocations.Count(invocation => invocation.Identifier == "updateRoot");
+
+        var root = cut.FindComponent<MenuRoot>();
+        root.Render(parameters => parameters
+            .Add(p => p.Handle, (IMenuHandle)handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "second-trigger")
+            .Add(p => p.ChildContent, menuContent));
+
+        handle.ActiveTriggerId.ShouldBe("second-trigger");
+
+        var updateRootInvocations = new List<JSRuntimeInvocation>();
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            updateRootInvocations = menuModule.Invocations
+                .Skip(updateRootCountBefore)
+                .Where(invocation => invocation.Identifier == "updateRoot")
+                .ToList();
+
+            if (updateRootInvocations.Count > 0)
+            {
+                break;
+            }
+
+            await Task.Delay(25);
+        }
+
+        updateRootInvocations.Count.ShouldBeGreaterThan(0);
+        var updateRootInvocation = updateRootInvocations[^1];
+        updateRootInvocation.Arguments.Count.ShouldBeGreaterThan(7);
+        updateRootInvocation.Arguments[6].ShouldNotBe(initialMenubarElement);
+        updateRootInvocation.Arguments[7].ShouldBe("menubar");
     }
 }

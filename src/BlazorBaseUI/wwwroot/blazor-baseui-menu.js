@@ -769,21 +769,13 @@ export function initializeMenubarTrigger(interactionId, triggerElement, dotNetRe
         lastOpenAt = now;
         dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
     };
-    const onKeyDown = (event) => {
-        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar' || event.code === 'Space') {
-            dotNetRef.invokeMethodAsync('OnKeyboardOpen').catch(() => { });
-        }
-    };
-
     triggerElement.addEventListener('pointerenter', onPointerEnter);
     triggerElement.addEventListener('pointerover', onPointerEnter);
     triggerElement.addEventListener('mouseenter', onPointerEnter);
-    triggerElement.addEventListener('keydown', onKeyDown);
     state.menubarTriggers.set(interactionId, () => {
         triggerElement.removeEventListener('pointerenter', onPointerEnter);
         triggerElement.removeEventListener('pointerover', onPointerEnter);
         triggerElement.removeEventListener('mouseenter', onPointerEnter);
-        triggerElement.removeEventListener('keydown', onKeyDown);
     });
 }
 
