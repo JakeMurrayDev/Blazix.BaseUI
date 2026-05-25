@@ -32,7 +32,7 @@
     private Lazy<Task<IJSObjectReference>> CompositeModuleTask =>
         compositeModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/BlazorBaseUI/blazor-baseui-composite.js").AsTask());
+                "import", "./_content/BlazorBaseUI/blazor-baseui-composite.min.js").AsTask());
 
     [CascadingParameter]
     private NavigationMenuRootContext? RootContext { get; set; }

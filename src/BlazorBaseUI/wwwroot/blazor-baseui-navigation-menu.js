@@ -11,7 +11,7 @@ import {
     disposePositioner as disposeFloatingPositioner,
     cleanupTransitionState,
     startSimpleTransition
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.NavigationMenu.State');
 
@@ -79,8 +79,7 @@ function handleGlobalFocusOut(e) {
 }
 
 function isNavigationMenuTrigger(target) {
-    // lint-ignore:RULE-05 React parity selector emitted by NavigationMenuTrigger.
-    return target instanceof Element && target.closest('[data-base-ui-navigation-menu-trigger]') != null;
+    return target instanceof Element && target.closest('[data-blazor-base-ui-navigation-menu-trigger]') != null;
 }
 
 function isInsideAnyNavigationMenu(target) {

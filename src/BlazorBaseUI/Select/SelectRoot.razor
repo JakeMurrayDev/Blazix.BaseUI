@@ -86,7 +86,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-select.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-select.min.js").AsTask());
 
     private bool IsControlled => Open.HasValue;
 

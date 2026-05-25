@@ -83,7 +83,7 @@
         moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import",
-                "./_content/BlazorBaseUI/blazor-baseui-avatar-image.js").AsTask());
+                "./_content/BlazorBaseUI/blazor-baseui-avatar-image.min.js").AsTask());
     }
 
     /// <inheritdoc />

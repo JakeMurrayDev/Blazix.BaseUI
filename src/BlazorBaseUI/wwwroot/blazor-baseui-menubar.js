@@ -1,4 +1,4 @@
-import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
+import { acquireScrollLock } from './blazor-baseui-scroll-lock.min.js';
 
 const MENU_STATE_KEY = Symbol.for('BlazorBaseUI.Menu.State');
 const STATE_KEY = Symbol.for('BlazorBaseUI.MenuBar.State');

@@ -6,7 +6,7 @@
  * Uses vendored Floating UI library for positioning.
  */
 
-import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Floating.State');
 

@@ -86,7 +86,7 @@
     protected override void OnInitialized()
     {
         moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-animations.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-animations.min.js").AsTask());
         dotNetRef = DotNetObjectReference.Create(this);
     }
 

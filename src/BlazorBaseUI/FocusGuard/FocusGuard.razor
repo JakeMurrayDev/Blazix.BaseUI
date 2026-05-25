@@ -23,7 +23,7 @@
     public FocusGuard()
     {
         moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-floating.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-floating.min.js").AsTask());
     }
 
     /// <summary>

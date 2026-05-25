@@ -22,7 +22,7 @@ internal sealed class PositionerInterop : IAsyncDisposable
     /// Initializes a new instance of <see cref="PositionerInterop"/>.
     /// </summary>
     /// <param name="jsRuntime">The JS runtime for module import.</param>
-    /// <param name="modulePath">The component JS module path (e.g., "./_content/BlazorBaseUI/blazor-baseui-tooltip.js").</param>
+    /// <param name="modulePath">The component JS module path (e.g., "./_content/BlazorBaseUI/blazor-baseui-tooltip.min.js").</param>
     public PositionerInterop(IJSRuntime jsRuntime, string modulePath)
     {
         getModule = () => jsRuntime.InvokeAsync<IJSObjectReference>("import", modulePath).AsTask();

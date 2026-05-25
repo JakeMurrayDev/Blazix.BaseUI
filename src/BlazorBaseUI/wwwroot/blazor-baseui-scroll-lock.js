@@ -254,7 +254,7 @@ function preventScrollInsetScrollbars(referenceElement) {
 
         body.scrollTop = scrollTop;
         body.scrollLeft = scrollLeft;
-        html.setAttribute('data-base-ui-scroll-locked', '');
+        html.setAttribute('data-blazor-base-ui-scroll-locked', '');
         html.style.scrollBehavior = 'unset';
     }
 
@@ -265,7 +265,7 @@ function preventScrollInsetScrollbars(referenceElement) {
         if (!updateGutterOnly) {
             html.scrollTop = scrollTop;
             html.scrollLeft = scrollLeft;
-            html.removeAttribute('data-base-ui-scroll-locked');
+            html.removeAttribute('data-blazor-base-ui-scroll-locked');
             html.style.scrollBehavior = originalHtmlScrollBehavior;
         }
     }

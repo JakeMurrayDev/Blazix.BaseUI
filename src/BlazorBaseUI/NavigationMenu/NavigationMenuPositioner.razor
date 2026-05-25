@@ -160,7 +160,7 @@
     {
         positionerInterop = new PositionerInterop(
             JSRuntime,
-            "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.js");
+            "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.min.js");
 
         positionerContext = new NavigationMenuPositionerContext
         {
@@ -265,7 +265,7 @@
 
         // NOTE: Do NOT set inline "style" here. JS manages position styles on this
         // element; if C# sets the style attribute, Blazor's diff will clobber JS-set
-        // values on re-render. Pointer-events handled by global CSS in blazor-baseui-floating.js.
+        // values on re-render. Pointer-events handled by global CSS in blazor-baseui-floating.min.js.
 
         attrs["data-side"] = state.Side.ToDataAttributeString()!;
         attrs["data-align"] = state.Align.ToDataAttributeString()!;

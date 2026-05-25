@@ -1,12 +1,12 @@
-import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
-import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
+import { acquireScrollLock } from './blazor-baseui-scroll-lock.min.js';
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.min.js';
 import {
     createFloatingFocusManager,
     disposeFloatingFocusManager,
     checkForTransitionOrAnimation,
     setupTransitionEndListener,
     cleanupTransitionState
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Dialog.State');
 

@@ -41,7 +41,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-menu.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-menu.min.js").AsTask());
 
     private bool IsInMenuBar => MenuBarContext is not null;
 

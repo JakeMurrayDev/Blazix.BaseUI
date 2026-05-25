@@ -44,7 +44,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-navigation-menu.min.js").AsTask());
 
     private bool IsControlled => Value is not null || ValueChanged.HasDelegate;
 

@@ -8,7 +8,7 @@
     {
         <div @ref="internalBackdropElement"
              role="presentation"
-             data-base-ui-inert
+             data-blazor-base-ui-inert
              style="position:fixed;inset:0;pointer-events:auto;user-select:none"
              inert="@(!RootContext?.GetOpen() ?? true)" />
     }
@@ -193,7 +193,7 @@
     {
         positionerInterop = new PositionerInterop(
             JSRuntime,
-            "./_content/BlazorBaseUI/blazor-baseui-popover.js");
+            "./_content/BlazorBaseUI/blazor-baseui-popover.min.js");
 
         computedSide = Side;
         computedAlign = Align;
@@ -295,7 +295,7 @@
         // manages position, left, top, z-index, and visibility on this element's style.
         // If C# sets the style attribute, Blazor's diff will clobber JS-set values on
         // re-render, causing a flash-of-unpositioned-content. Initial hiding and
-        // pointer-events are handled by global CSS rules in blazor-baseui-floating.js.
+        // pointer-events are handled by global CSS rules in blazor-baseui-floating.min.js.
 
         attrs["data-side"] = computedSide.ToDataAttributeString()!;
         attrs["data-align"] = computedAlign.ToDataAttributeString()!;

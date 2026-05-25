@@ -38,7 +38,7 @@ internal sealed class SelectPositionerContext
     /// (consumed at <c>SelectPopup.tsx:269</c>) and is used to gate Blazor's
     /// align-item-with-trigger pass so it doesn't run before the positioner has
     /// resolved its initial placement (avoids the FOUC race documented in
-    /// <c>blazor-baseui-floating.js</c>'s <c>data-positioned</c> hide rule).
+    /// <c>blazor-baseui-floating.min.js</c>'s <c>data-positioned</c> hide rule).
     /// Resets to <see langword="false"/> on every popup close.
     /// </summary>
     public bool IsPositioned { get; set; }

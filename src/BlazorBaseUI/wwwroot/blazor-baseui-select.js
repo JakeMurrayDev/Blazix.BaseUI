@@ -4,7 +4,7 @@
  * Select-specific functionality that builds on the shared floating infrastructure.
  */
 
-import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
+import { acquireScrollLock } from './blazor-baseui-scroll-lock.min.js';
 import {
     initializePositioner as floatingInitializePositioner,
     updatePositioner as floatingUpdatePositioner,
@@ -13,7 +13,7 @@ import {
     setupTransitionEndListener,
     cleanupTransitionState,
     contains
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const BOUNDARY_OFFSET = 2;
 

@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="BlazorBaseUI JavaScript Source Files" pattern="file:src/BlazorBaseUI/wwwroot//*&amp;&amp;!file:src/BlazorBaseUI/wwwroot/vendor//*&amp;&amp;!file:src/BlazorBaseUI/wwwroot//*.min.js" />
+</component>
