@@ -56,6 +56,11 @@
                 return 0;
             }
 
+            if (Disabled)
+            {
+                return -1;
+            }
+
             if (IsActive)
             {
                 return 0;
@@ -365,31 +370,25 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (Disabled || IsActive)
+        if (!Disabled && !IsActive && e.Button == 0)
         {
-            return;
+            await ActivateTabAsync(e);
         }
 
-        await ActivateTabAsync();
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleFocusAsync(FocusEventArgs e)
     {
-        if (Disabled)
+        if (!Disabled && ListContext?.ActivateOnFocus == true && !IsActive)
         {
-            return;
-        }
-
-        if (ListContext?.ActivateOnFocus == true && !IsActive)
-        {
-            await ActivateTabAsync();
+            await ActivateTabAsync(e);
         }
 
         await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
     }
 
-    private async Task ActivateTabAsync()
+    private async Task ActivateTabAsync(EventArgs? sourceEventArgs = null)
     {
         if (ListContext is null || RootContext is null)
         {
@@ -397,7 +396,11 @@
         }
 
         var direction = await DetectActivationDirectionAsync();
-        await ListContext.OnTabActivationAsync(Value, direction);
+        await ListContext.OnTabActivationAsync(
+            Value,
+            direction,
+            TabsValueChangeReason.None,
+            sourceEventArgs);
     }
 
     private async Task<ActivationDirection> DetectActivationDirectionAsync()

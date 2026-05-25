@@ -64,7 +64,7 @@
     [SupplyParameterFromQuery(Name = "showIndicator")]
     public bool? QueryShowIndicator { get; set; }
 
-    private string? ResolvedDefaultValue => QueryDefaultValue ?? "tab1";
+    private string? ResolvedDefaultValue => QueryDefaultValue == "null" ? null : QueryDefaultValue ?? "tab1";
     private Orientation ResolvedOrientation => QueryOrientation?.ToLowerInvariant() == "vertical"
         ? Orientation.Vertical
         : Orientation.Horizontal;

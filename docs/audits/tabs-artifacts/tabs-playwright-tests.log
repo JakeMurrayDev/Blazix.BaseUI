@@ -1,0 +1,13 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  BlazorBaseUI.Tests.Contracts -> /Users/jakemurray/RiderProjects/BlazorBaseUI/tests/BlazorBaseUI.Tests.Contracts/bin/Debug/net10.0/BlazorBaseUI.Tests.Contracts.dll
+  BlazorBaseUI.Utilities -> /Users/jakemurray/RiderProjects/BlazorBaseUI/src/BlazorBaseUI.Utilities/bin/Debug/net10.0/BlazorBaseUI.Utilities.dll
+  BlazorBaseUI.Analyzers -> /Users/jakemurray/RiderProjects/BlazorBaseUI/src/BlazorBaseUI.Analyzers/bin/Debug/netstandard2.0/BlazorBaseUI.Analyzers.dll
+  BlazorBaseUI -> /Users/jakemurray/RiderProjects/BlazorBaseUI/src/BlazorBaseUI/bin/Debug/net10.0/BlazorBaseUI.dll
+  BlazorBaseUI.Playwright.Tests.Client -> /Users/jakemurray/RiderProjects/BlazorBaseUI/tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.Client/bin/Debug/net10.0/BlazorBaseUI.Playwright.Tests.Client.dll
+  BlazorBaseUI.Playwright.Tests.Client (Blazor output) -> /Users/jakemurray/RiderProjects/BlazorBaseUI/tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.Client/bin/Debug/net10.0/wwwroot
+  BlazorBaseUI.Playwright.Tests -> /Users/jakemurray/RiderProjects/BlazorBaseUI/tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/bin/Debug/net10.0/BlazorBaseUI.Playwright.Tests.dll
+Test run for /Users/jakemurray/RiderProjects/BlazorBaseUI/tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/bin/Debug/net10.0/BlazorBaseUI.Playwright.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:    80, Skipped:     0, Total:    80, Duration: 1 m 11 s - BlazorBaseUI.Playwright.Tests.dll (net10.0)

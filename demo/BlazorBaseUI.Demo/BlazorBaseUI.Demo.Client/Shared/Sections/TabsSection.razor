@@ -493,8 +493,8 @@
     </div>
 </DemoSection>
 
-<DemoSection Title="Keyboard Navigation: Skip Disabled Tabs"
-             Description="Arrow key navigation automatically skips disabled tabs.">
+<DemoSection Title="Keyboard Navigation: Disabled Tabs"
+             Description="Arrow key navigation can focus disabled tabs, but disabled tabs cannot be activated.">
     <div class="flex flex-col gap-4">
         <div class="w-full max-w-md">
             <TabsRoot TValue="string"
@@ -561,7 +561,7 @@
             <strong>Selected:</strong> @(skipDisabledValue ?? "(none)")
         </div>
         <p class="text-sm text-gray-500">
-            Select Item 1, then press ArrowRight → jumps directly to Item 4 (skipping disabled Items 2 and 3)
+            Select Item 1, then press ArrowRight → focus moves to disabled Item 2 without changing the selected tab.
         </p>
     </div>
 </DemoSection>

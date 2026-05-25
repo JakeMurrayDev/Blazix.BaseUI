@@ -207,6 +207,15 @@ public class TabsRootTests : BunitContext, ITabsRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task HasDataOrientationHorizontalByDefault()
+    {
+        var cut = Render(CreateTabsRoot());
+        var element = cut.Find("div");
+        element.GetAttribute("data-orientation").ShouldBe("horizontal");
+        return Task.CompletedTask;
+    }
+
     // State
 
     [Fact]
@@ -332,6 +341,153 @@ public class TabsRootTests : BunitContext, ITabsRootContract
         tabs[0].GetAttribute("aria-selected").ShouldBe("true");
         tabs[1].GetAttribute("aria-selected").ShouldBe("false");
         tabs[2].GetAttribute("aria-selected").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FiresOnValueChangeWithInitialReasonForImplicitAutoSelection()
+    {
+        TabsValueChangeEventArgs<string>? receivedArgs = null;
+        var cut = Render(CreateFullTabs(
+            defaultValue: null,
+            onValueChange: args => receivedArgs = args));
+
+        cut.WaitForAssertion(() =>
+        {
+            receivedArgs.ShouldNotBeNull();
+            receivedArgs!.Value.ShouldBe("tab1");
+            receivedArgs.Reason.ShouldBe(TabsValueChangeReason.Initial);
+            receivedArgs.ActivationDirection.ShouldBe(ActivationDirection.None);
+        });
+
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("true");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AutomaticInitialSelectionCannotBeCanceled()
+    {
+        TabsValueChangeEventArgs<string>? receivedArgs = null;
+        var cut = Render(CreateFullTabs(
+            defaultValue: null,
+            tab1Disabled: true,
+            onValueChange: args =>
+            {
+                receivedArgs = args;
+                args.Cancel();
+            }));
+
+        cut.WaitForAssertion(() =>
+        {
+            receivedArgs.ShouldNotBeNull();
+            receivedArgs!.Value.ShouldBe("tab2");
+            receivedArgs.Reason.ShouldBe(TabsValueChangeReason.Initial);
+        });
+
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("false");
+        tabs[1].GetAttribute("aria-selected").ShouldBe("true");
+        tabs[2].GetAttribute("aria-selected").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExplicitNullDefaultValueDoesNotAutoSelect()
+    {
+        TabsValueChangeEventArgs<string>? receivedArgs = null;
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<TabsRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", (string?)null);
+            builder.AddAttribute(2, "OnValueChange", EventCallback.Factory.Create<TabsValueChangeEventArgs<string>>(this, args => receivedArgs = args));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<TabsList<string>>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(tabBuilder =>
+                {
+                    tabBuilder.OpenComponent<TabsTab<string>>(0);
+                    tabBuilder.AddAttribute(1, "Value", "tab1");
+                    tabBuilder.CloseComponent();
+
+                    tabBuilder.OpenComponent<TabsTab<string>>(10);
+                    tabBuilder.AddAttribute(11, "Value", "tab2");
+                    tabBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        receivedArgs.ShouldBeNull();
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("false");
+        tabs[1].GetAttribute("aria-selected").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ValueParameterControlsSelectionWithoutValueChanged()
+    {
+        var cut = Render(CreateFullTabs(
+            defaultValue: null,
+            value: "tab1",
+            tab1Disabled: true));
+
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("true");
+        tabs[1].GetAttribute("aria-selected").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SelectedTabDisabledAfterInitialValidityFallsBackWithDisabledReason()
+    {
+        var disableFirst = false;
+        TabsValueChangeEventArgs<string>? receivedArgs = null;
+
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<TabsRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", "tab1");
+            builder.AddAttribute(2, "OnValueChange", EventCallback.Factory.Create<TabsValueChangeEventArgs<string>>(this, args => receivedArgs = args));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<TabsList<string>>(0);
+                rootBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(tabBuilder =>
+                {
+                    tabBuilder.OpenComponent<TabsTab<string>>(0);
+                    tabBuilder.AddAttribute(1, "Value", "tab1");
+                    tabBuilder.AddAttribute(2, "Disabled", disableFirst);
+                    tabBuilder.CloseComponent();
+
+                    tabBuilder.OpenComponent<TabsTab<string>>(10);
+                    tabBuilder.AddAttribute(11, "Value", "tab2");
+                    tabBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+        receivedArgs.ShouldBeNull();
+
+        disableFirst = true;
+        cut.FindComponent<TabsRoot<string>>().Render();
+
+        cut.WaitForAssertion(() =>
+        {
+            receivedArgs.ShouldNotBeNull();
+            receivedArgs!.Value.ShouldBe("tab2");
+            receivedArgs.Reason.ShouldBe(TabsValueChangeReason.Disabled);
+            receivedArgs.ActivationDirection.ShouldBe(ActivationDirection.None);
+
+            var tabs = cut.FindAll("[role='tab']");
+            tabs[0].GetAttribute("aria-selected").ShouldBe("false");
+            tabs[1].GetAttribute("aria-selected").ShouldBe("true");
+        });
+
         return Task.CompletedTask;
     }
 

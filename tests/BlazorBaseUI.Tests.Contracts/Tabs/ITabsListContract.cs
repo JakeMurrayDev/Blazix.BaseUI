@@ -18,6 +18,10 @@ public interface ITabsListContract
     Task CanBeNamedViaAriaLabel();
     Task CanBeNamedViaAriaLabelledby();
 
+    // Data attributes
+    Task HasDataOrientationHorizontal();
+    Task HasDataActivationDirection();
+
     // Element reference
     Task ExposesElementReference();
 

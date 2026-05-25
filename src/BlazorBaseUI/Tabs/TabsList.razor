@@ -6,7 +6,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="listContext" IsFixed="true">
+<CascadingValue Value="listContext">
     <RenderElement TState="TabsRootState"
                    Tag="div"
                    State="state"
@@ -34,6 +34,8 @@
     private Orientation Orientation => RootContext?.Orientation ?? Orientation.Horizontal;
 
     private ActivationDirection ActivationDirection => RootContext?.ActivationDirection ?? ActivationDirection.None;
+
+    private Direction Direction => RootContext?.Direction ?? Direction.Ltr;
 
     [CascadingParameter]
     private ITabsRootContext<TValue>? RootContext { get; set; }
@@ -124,6 +126,7 @@
         {
             listContext.ActivateOnFocus = ActivateOnFocus;
             listContext.LoopFocus = LoopFocus;
+            listContext.Direction = Direction;
         }
 
         BuildComponentAttributes();
@@ -136,6 +139,10 @@
         {
             hasRendered = true;
             await InitializeJsAsync();
+        }
+        else if (hasRendered)
+        {
+            await UpdateJsAsync();
         }
     }
 
@@ -191,7 +198,7 @@
         if (value is not null)
         {
             var direction = await DetectActivationDirectionAsync(value);
-            await RootContext.OnValueChangeAsync(value, direction);
+            await RootContext.OnValueChangeAsync(value, direction, TabsValueChangeReason.None);
         }
     }
 
@@ -209,6 +216,7 @@
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
         attrs["data-activation-direction"] = ActivationDirection.ToDataAttributeString();
+        attrs["data-orientation"] = orientation.ToDataAttributeString() ?? "horizontal";
 
         componentAttributes = attrs;
     }
@@ -216,6 +224,7 @@
     private TabsListContext<TValue> CreateContext() => new(
         activateOnFocus: ActivateOnFocus,
         loopFocus: LoopFocus,
+        direction: Direction,
         getTabsListElement: () => Element,
         rootContext: RootContext!);
 
@@ -228,7 +237,26 @@
             {
                 dotNetRef = DotNetObjectReference.Create(this);
                 var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
-                await module.InvokeVoidAsync("initializeList", Element.Value, orientationString, LoopFocus, ActivateOnFocus, dotNetRef);
+                var directionString = Direction.ToAttributeString() ?? "ltr";
+                await module.InvokeVoidAsync("initializeList", Element.Value, orientationString, LoopFocus, ActivateOnFocus, directionString, dotNetRef);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateJsAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
+                var directionString = Direction.ToAttributeString() ?? "ltr";
+                await module.InvokeVoidAsync("updateList", Element.Value, orientationString, LoopFocus, ActivateOnFocus, directionString);
             }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -244,16 +272,23 @@
             return;
         }
 
+        if (e.ShiftKey || e.CtrlKey || e.AltKey || e.MetaKey)
+        {
+            await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+            return;
+        }
+
         var orientation = Orientation;
         var isHorizontal = orientation == Orientation.Horizontal;
         var isVertical = orientation == Orientation.Vertical;
+        var isRtl = Direction == Direction.Rtl;
 
         var shouldNavigatePrevious =
-            (isHorizontal && e.Key == "ArrowLeft") ||
+            (isHorizontal && ((isRtl && e.Key == "ArrowRight") || (!isRtl && e.Key == "ArrowLeft"))) ||
             (isVertical && e.Key == "ArrowUp");
 
         var shouldNavigateNext =
-            (isHorizontal && e.Key == "ArrowRight") ||
+            (isHorizontal && ((isRtl && e.Key == "ArrowLeft") || (!isRtl && e.Key == "ArrowRight"))) ||
             (isVertical && e.Key == "ArrowDown");
 
         if (shouldNavigatePrevious || shouldNavigateNext || e.Key == "Home" || e.Key == "End")

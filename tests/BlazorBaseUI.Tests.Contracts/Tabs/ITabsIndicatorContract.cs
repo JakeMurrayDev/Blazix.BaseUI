@@ -15,9 +15,11 @@ public interface ITabsIndicatorContract
 
     // Visibility
     Task DoesNotRenderWhenValueIsNull();
+    Task RenderBeforeHydrationEmitsScript();
 
     // Data attributes
     Task HasDataActivationDirection();
+    Task HasDataOrientation();
 
     // Element reference
     Task ExposesElementReference();

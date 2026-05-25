@@ -7,10 +7,16 @@ namespace BlazorBaseUI.Tabs;
 /// <param name="Hidden">Whether the panel is currently hidden.</param>
 /// <param name="Orientation">The orientation of the tabs.</param>
 /// <param name="ActivationDirection">The direction of the most recent tab activation.</param>
-public sealed record TabsPanelState(bool Hidden, Orientation Orientation, ActivationDirection ActivationDirection)
+/// <param name="TransitionStatus">The current transition status of the panel.</param>
+public sealed record TabsPanelState(
+    bool Hidden,
+    Orientation Orientation,
+    ActivationDirection ActivationDirection,
+    TransitionStatus TransitionStatus)
 {
     internal static TabsPanelState Default { get; } = new(
         Hidden: true,
         Orientation: Orientation.Horizontal,
-        ActivationDirection: ActivationDirection.None);
+        ActivationDirection: ActivationDirection.None,
+        TransitionStatus: TransitionStatus.Undefined);
 }

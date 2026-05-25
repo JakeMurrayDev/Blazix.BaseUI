@@ -5,19 +5,24 @@ if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
         resizeObservers: new WeakMap(),
         dotNetRefs: new WeakMap(),
-        listHandlers: new WeakMap()
+        listHandlers: new WeakMap(),
+        tabPreActivationHandlers: new WeakMap(),
+        panelHandoffObservers: new WeakMap()
     };
 }
 const state = window[STATE_KEY];
+state.tabPreActivationHandlers ??= new WeakMap();
+state.panelHandoffObservers ??= new WeakMap();
 
 if (!window[LIST_STATE_KEY]) {
     window[LIST_STATE_KEY] = new WeakMap();
 }
 const listStateMap = window[LIST_STATE_KEY];
+const pendingTabsByList = new WeakMap();
 
 const NAVIGATION_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
 
-export function initializeList(element, orientation, loopFocus, activateOnFocus, dotNetRef) {
+export function initializeList(element, orientation, loopFocus, activateOnFocus, direction, dotNetRef) {
     if (!element) return;
 
     const listState = {
@@ -25,12 +30,14 @@ export function initializeList(element, orientation, loopFocus, activateOnFocus,
         orientation,
         loopFocus,
         activateOnFocus,
+        direction,
         dotNetRef,
         tabs: new Set()
     };
 
     const handler = (e) => {
         if (!NAVIGATION_KEYS.includes(e.key)) return;
+        if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
 
         const isHorizontal = listState.orientation === 'horizontal';
         const isVertical = listState.orientation === 'vertical';
@@ -49,9 +56,10 @@ export function initializeList(element, orientation, loopFocus, activateOnFocus,
     element.addEventListener('keydown', handler);
     state.listHandlers.set(element, handler);
     listStateMap.set(element, listState);
+    hydratePendingTabs(element, listState);
 }
 
-export function updateList(element, orientation, loopFocus, activateOnFocus) {
+export function updateList(element, orientation, loopFocus, activateOnFocus, direction) {
     if (!element) return;
 
     const listState = listStateMap.get(element);
@@ -59,11 +67,21 @@ export function updateList(element, orientation, loopFocus, activateOnFocus) {
         listState.orientation = orientation;
         listState.loopFocus = loopFocus;
         listState.activateOnFocus = activateOnFocus;
+        listState.direction = direction;
     }
 }
 
 export function disposeList(element) {
     if (!element) return;
+
+    disposePanelHandoff(element);
+
+    const listState = listStateMap.get(element);
+    if (listState) {
+        for (const item of listState.tabs) {
+            detachPreActivationHandler(item.element);
+        }
+    }
 
     const handler = state.listHandlers.get(element);
     if (handler) {
@@ -72,39 +90,57 @@ export function disposeList(element) {
     }
 
     listStateMap.delete(element);
+    pendingTabsByList.delete(element);
     unobserveResize(element);
 }
 
 export function registerTab(listElement, tabElement, value) {
     if (!listElement || !tabElement) return;
 
-    const listState = listStateMap.get(listElement);
-    if (!listState) return;
+    tabElement._tabsValue = value;
 
-    for (const item of listState.tabs) {
-        if (item.element === tabElement) {
-            item.value = value;
-            updateTabIndexes(listElement);
-            return;
+    const listState = listStateMap.get(listElement);
+    if (!listState) {
+        let pendingTabs = pendingTabsByList.get(listElement);
+        if (!pendingTabs) {
+            pendingTabs = new Set();
+            pendingTabsByList.set(listElement, pendingTabs);
         }
+
+        upsertTab(pendingTabs, tabElement, value);
+        return;
     }
 
-    listState.tabs.add({ element: tabElement, value });
+    upsertTab(listState.tabs, tabElement, value);
+    attachPreActivationHandler(listElement, tabElement);
+    observeTabForIndicators(listElement, tabElement);
     updateTabIndexes(listElement);
+    notifyIndicatorRefs(listElement);
 }
 
 export function unregisterTab(listElement, tabElement) {
     if (!listElement || !tabElement) return;
 
-    const listState = listStateMap.get(listElement);
-    if (!listState) return;
+    delete tabElement._tabsValue;
 
-    for (const item of listState.tabs) {
-        if (item.element === tabElement) {
-            listState.tabs.delete(item);
-            updateTabIndexes(listElement);
-            return;
+    const listState = listStateMap.get(listElement);
+    if (!listState) {
+        const pendingTabs = pendingTabsByList.get(listElement);
+        if (pendingTabs) {
+            deleteTab(pendingTabs, tabElement);
+            if (pendingTabs.size === 0) {
+                pendingTabsByList.delete(listElement);
+            }
         }
+
+        return;
+    }
+
+    if (deleteTab(listState.tabs, tabElement)) {
+        detachPreActivationHandler(tabElement);
+        unobserveTabForIndicators(listElement, tabElement);
+        updateTabIndexes(listElement);
+        notifyIndicatorRefs(listElement);
     }
 }
 
@@ -122,8 +158,196 @@ function getOrderedTabs(listElement) {
     return items;
 }
 
+function hydratePendingTabs(listElement, listState) {
+    const pendingTabs = pendingTabsByList.get(listElement);
+    if (!pendingTabs) return;
+
+    for (const item of pendingTabs) {
+        upsertTab(listState.tabs, item.element, item.value);
+        attachPreActivationHandler(listElement, item.element);
+        observeTabForIndicators(listElement, item.element);
+    }
+
+    pendingTabsByList.delete(listElement);
+    updateTabIndexes(listElement);
+    notifyIndicatorRefs(listElement);
+}
+
+function upsertTab(tabs, tabElement, value) {
+    for (const item of tabs) {
+        if (item.element === tabElement) {
+            item.value = value;
+            return;
+        }
+    }
+
+    tabs.add({ element: tabElement, value });
+}
+
+function deleteTab(tabs, tabElement) {
+    for (const item of tabs) {
+        if (item.element === tabElement) {
+            tabs.delete(item);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function attachPreActivationHandler(listElement, tabElement) {
+    detachPreActivationHandler(tabElement);
+
+    const clickHandler = (event) => {
+        if (event.button !== 0 || isTabDisabled(tabElement)) return;
+        armCurrentPanelHandoffIfNoMotion(listElement, tabElement);
+    };
+
+    const focusHandler = () => {
+        const listState = listStateMap.get(listElement);
+        if (!listState?.activateOnFocus || isTabDisabled(tabElement)) return;
+        armCurrentPanelHandoffIfNoMotion(listElement, tabElement);
+    };
+
+    tabElement.addEventListener('click', clickHandler, true);
+    tabElement.addEventListener('focus', focusHandler, true);
+    state.tabPreActivationHandlers.set(tabElement, { clickHandler, focusHandler });
+}
+
+function detachPreActivationHandler(tabElement) {
+    const handlers = state.tabPreActivationHandlers.get(tabElement);
+    if (!handlers) return;
+
+    tabElement.removeEventListener('click', handlers.clickHandler, true);
+    tabElement.removeEventListener('focus', handlers.focusHandler, true);
+    state.tabPreActivationHandlers.delete(tabElement);
+}
+
+function armCurrentPanelHandoffIfNoMotion(listElement, nextTabElement) {
+    const activeTab = listElement.querySelector('[role="tab"][aria-selected="true"]');
+    if (!activeTab || activeTab === nextTabElement) return;
+
+    const panelId = activeTab.getAttribute('aria-controls');
+    if (!panelId) return;
+
+    const activePanel = document.getElementById(panelId);
+    if (!activePanel || activePanel.hidden || !shouldPreHidePanelImmediately(activePanel)) {
+        return;
+    }
+
+    armPanelHandoff(listElement, activePanel);
+}
+
+function armPanelHandoff(listElement, activePanel) {
+    disposePanelHandoff(listElement);
+
+    const rootElement = listElement.parentElement ?? document.body;
+    let disposed = false;
+    let frameId = 0;
+    let timeoutId = 0;
+
+    const cleanup = () => {
+        if (disposed) return;
+
+        disposed = true;
+        observer.disconnect();
+
+        if (frameId) {
+            cancelAnimationFrame(frameId);
+        }
+
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+
+        state.panelHandoffObservers.delete(listElement);
+    };
+
+    const completeIfReady = () => {
+        if (disposed) {
+            return true;
+        }
+
+        if (!document.contains(activePanel)) {
+            cleanup();
+            return true;
+        }
+
+        if (!hasAlternateVisiblePanel(rootElement, activePanel)) {
+            return false;
+        }
+
+        hidePanelImmediately(activePanel);
+        cleanup();
+        return true;
+    };
+
+    const observer = new MutationObserver(() => {
+        completeIfReady();
+    });
+
+    observer.observe(rootElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['aria-selected', 'hidden', 'data-hidden', 'style', 'class']
+    });
+
+    frameId = requestAnimationFrame(() => {
+        frameId = 0;
+        completeIfReady();
+    });
+
+    timeoutId = setTimeout(cleanup, 2000);
+    state.panelHandoffObservers.set(listElement, { dispose: cleanup });
+}
+
+function disposePanelHandoff(listElement) {
+    const handoff = state.panelHandoffObservers.get(listElement);
+    if (!handoff) return;
+
+    handoff.dispose();
+}
+
+function hasAlternateVisiblePanel(container, activePanel) {
+    const panels = container.querySelectorAll('[role="tabpanel"]');
+    for (const panel of panels) {
+        if (panel !== activePanel && isPanelVisible(panel)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function isPanelVisible(panel) {
+    if (panel.hidden) {
+        return false;
+    }
+
+    const style = getComputedStyle(panel);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+}
+
+function shouldPreHidePanelImmediately(element) {
+    const hadEndingStyle = element.hasAttribute('data-ending-style');
+
+    if (!hadEndingStyle) {
+        element.setAttribute('data-ending-style', '');
+    }
+
+    const shouldHide = shouldCompletePanelTransitionImmediately(element);
+
+    if (!hadEndingStyle) {
+        element.removeAttribute('data-ending-style');
+    }
+
+    return shouldHide;
+}
+
 function isTabDisabled(tabElement) {
-    return tabElement.hasAttribute('data-disabled') || tabElement.disabled || tabElement.getAttribute('aria-disabled') === 'true';
+    const dataDisabled = tabElement.getAttribute('data-disabled');
+    return dataDisabled === '' || dataDisabled === 'true' || tabElement.disabled || tabElement.getAttribute('aria-disabled') === 'true';
 }
 
 function updateTabIndexes(listElement) {
@@ -158,18 +382,14 @@ export async function navigateToPrevious(listElement, currentElement) {
     if (currentIndex < 0) return false;
 
     for (let i = currentIndex - 1; i >= 0; i--) {
-        if (!isTabDisabled(items[i].element)) {
-            await setFocusedTab(listElement, items[i]);
-            return true;
-        }
+        await setFocusedTab(listElement, items[i]);
+        return true;
     }
 
     if (listState.loopFocus) {
         for (let i = items.length - 1; i > currentIndex; i--) {
-            if (!isTabDisabled(items[i].element)) {
-                await setFocusedTab(listElement, items[i]);
-                return true;
-            }
+            await setFocusedTab(listElement, items[i]);
+            return true;
         }
     }
 
@@ -185,18 +405,14 @@ export async function navigateToNext(listElement, currentElement) {
     if (currentIndex < 0) return false;
 
     for (let i = currentIndex + 1; i < items.length; i++) {
-        if (!isTabDisabled(items[i].element)) {
-            await setFocusedTab(listElement, items[i]);
-            return true;
-        }
+        await setFocusedTab(listElement, items[i]);
+        return true;
     }
 
     if (listState.loopFocus) {
         for (let i = 0; i < currentIndex; i++) {
-            if (!isTabDisabled(items[i].element)) {
-                await setFocusedTab(listElement, items[i]);
-                return true;
-            }
+            await setFocusedTab(listElement, items[i]);
+            return true;
         }
     }
 
@@ -205,22 +421,20 @@ export async function navigateToNext(listElement, currentElement) {
 
 export async function navigateToFirst(listElement) {
     const items = getOrderedTabs(listElement);
-    for (const item of items) {
-        if (!isTabDisabled(item.element)) {
-            await setFocusedTab(listElement, item);
-            return true;
-        }
+    const item = items[0];
+    if (item) {
+        await setFocusedTab(listElement, item);
+        return true;
     }
     return false;
 }
 
 export async function navigateToLast(listElement) {
     const items = getOrderedTabs(listElement);
-    for (let i = items.length - 1; i >= 0; i--) {
-        if (!isTabDisabled(items[i].element)) {
-            await setFocusedTab(listElement, items[i]);
-            return true;
-        }
+    const item = items[items.length - 1];
+    if (item) {
+        await setFocusedTab(listElement, item);
+        return true;
     }
     return false;
 }
@@ -237,7 +451,7 @@ async function setFocusedTab(listElement, item) {
     item.element.focus({ preventScroll: true });
     item.element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
-    if (listState.activateOnFocus && listState.dotNetRef) {
+    if (listState.activateOnFocus && !isTabDisabled(item.element) && listState.dotNetRef) {
         try {
             await listState.dotNetRef.invokeMethodAsync('OnNavigateToTab', item.value);
         } catch {
@@ -287,6 +501,157 @@ export function focus(element) {
     if (!element) return;
     element.focus({ preventScroll: true });
     element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+export function startPanelTransition(element, dotNetRef, opening) {
+    if (!element || !dotNetRef) return;
+
+    disposePanel(element);
+    const token = {};
+    element._tabsPanelTransitionToken = token;
+
+    if (opening) {
+        showPanelImmediately(element);
+    }
+
+    if (!opening && shouldCompletePanelTransitionImmediately(element)) {
+        completePanelExitTransition(element, token, dotNetRef);
+        return;
+    }
+
+    const callback = () => {
+        element._tabsPanelTransitionFrame = null;
+        if (opening) {
+            invokePanelTransitionCallback(element, token, dotNetRef, 'OnPanelStartingStyleApplied');
+        } else {
+            waitForPanelAnimations(element, token, dotNetRef);
+        }
+    };
+
+    element._tabsPanelTransitionFrame = requestAnimationFrame(callback);
+}
+
+export function disposePanel(element) {
+    if (!element) return;
+
+    if (element._tabsPanelTransitionFrame) {
+        cancelAnimationFrame(element._tabsPanelTransitionFrame);
+        delete element._tabsPanelTransitionFrame;
+    }
+
+    delete element._tabsPanelTransitionToken;
+}
+
+function waitForPanelAnimations(element, token, dotNetRef) {
+    if (typeof element.getAnimations !== 'function' || globalThis.BASE_UI_ANIMATIONS_DISABLED) {
+        completePanelExitTransition(element, token, dotNetRef);
+        return;
+    }
+
+    const animations = element.getAnimations();
+    if (animations.length === 0) {
+        completePanelExitTransition(element, token, dotNetRef);
+        return;
+    }
+
+    Promise.all(animations.map(animation => animation.finished))
+        .then(() => completePanelExitTransition(element, token, dotNetRef))
+        .catch(() => {
+            if (element._tabsPanelTransitionToken !== token) {
+                return;
+            }
+
+            const currentAnimations = element.getAnimations();
+            const hasRunningAnimations = currentAnimations.some(animation =>
+                animation.pending || animation.playState !== 'finished');
+
+            if (hasRunningAnimations) {
+                waitForPanelAnimations(element, token, dotNetRef);
+            } else {
+                completePanelExitTransition(element, token, dotNetRef);
+            }
+        });
+}
+
+function completePanelExitTransition(element, token, dotNetRef) {
+    const container = element.parentElement;
+    hidePanelImmediately(element);
+
+    invokePanelTransitionCallback(element, token, dotNetRef, 'OnPanelTransitionEnded')
+        .finally(() => scheduleOpenPanelCleanup(container));
+}
+
+function shouldCompletePanelTransitionImmediately(element) {
+    if (globalThis.BASE_UI_ANIMATIONS_DISABLED || typeof element.getAnimations !== 'function') {
+        return true;
+    }
+
+    if (element.getAnimations().length > 0) {
+        return false;
+    }
+
+    return !hasCssMotion(element);
+}
+
+function hasCssMotion(element) {
+    const style = getComputedStyle(element);
+    return hasNonZeroTime(style.transitionDuration) || hasNonZeroTime(style.animationDuration);
+}
+
+function hasNonZeroTime(value) {
+    if (!value) {
+        return false;
+    }
+
+    return value
+        .split(',')
+        .some(part => parseCssTime(part.trim()) > 0);
+}
+
+function parseCssTime(value) {
+    if (value.endsWith('ms')) {
+        return Number.parseFloat(value);
+    }
+
+    if (value.endsWith('s')) {
+        return Number.parseFloat(value) * 1000;
+    }
+
+    return 0;
+}
+
+function hidePanelImmediately(element) {
+    element.hidden = true;
+    element.setAttribute('hidden', '');
+    element.setAttribute('data-hidden', '');
+    element.removeAttribute('data-ending-style');
+}
+
+function showPanelImmediately(element) {
+    element.hidden = false;
+    element.removeAttribute('hidden');
+    element.removeAttribute('data-hidden');
+}
+
+function scheduleOpenPanelCleanup(container) {
+    if (!container) {
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        for (const panel of container.querySelectorAll('[role="tabpanel"][tabindex="0"]')) {
+            showPanelImmediately(panel);
+        }
+    });
+}
+
+function invokePanelTransitionCallback(element, token, dotNetRef, methodName) {
+    if (element._tabsPanelTransitionToken !== token) {
+        return Promise.resolve();
+    }
+
+    delete element._tabsPanelTransitionToken;
+    return dotNetRef.invokeMethodAsync(methodName).catch(() => { });
 }
 
 export function getTabPosition(listElement, tabElement) {
@@ -360,24 +725,45 @@ export function observeResize(listElement, dotNetRef) {
 
     if (typeof ResizeObserver === 'undefined') return;
 
+    let refs = state.dotNetRefs.get(listElement);
+    if (!refs) {
+        refs = new Set();
+        state.dotNetRefs.set(listElement, refs);
+    }
+    refs.add(dotNetRef);
+
     if (state.resizeObservers.has(listElement)) {
         return;
     }
 
     const observer = new ResizeObserver(() => {
-        const ref = state.dotNetRefs.get(listElement);
-        if (ref) {
-            ref.invokeMethodAsync('OnResizeAsync').catch(() => { });
+        const currentRefs = state.dotNetRefs.get(listElement);
+        if (currentRefs) {
+            for (const ref of currentRefs) {
+                ref.invokeMethodAsync('OnResizeAsync').catch(() => { });
+            }
         }
     });
 
     observer.observe(listElement);
+    for (const item of getOrderedTabs(listElement)) {
+        observer.observe(item.element);
+    }
     state.resizeObservers.set(listElement, observer);
-    state.dotNetRefs.set(listElement, dotNetRef);
+
+    requestAnimationFrame(() => notifyIndicatorRefs(listElement));
 }
 
-export function unobserveResize(listElement) {
+export function unobserveResize(listElement, dotNetRef) {
     if (!listElement) return;
+
+    const refs = state.dotNetRefs.get(listElement);
+    if (refs && dotNetRef) {
+        refs.delete(dotNetRef);
+        if (refs.size > 0) {
+            return;
+        }
+    }
 
     const observer = state.resizeObservers.get(listElement);
     if (observer) {
@@ -386,4 +772,27 @@ export function unobserveResize(listElement) {
     }
 
     state.dotNetRefs.delete(listElement);
+}
+
+function observeTabForIndicators(listElement, tabElement) {
+    const observer = state.resizeObservers.get(listElement);
+    if (observer && tabElement) {
+        observer.observe(tabElement);
+    }
+}
+
+function unobserveTabForIndicators(listElement, tabElement) {
+    const observer = state.resizeObservers.get(listElement);
+    if (observer && tabElement) {
+        observer.unobserve(tabElement);
+    }
+}
+
+function notifyIndicatorRefs(listElement) {
+    const refs = state.dotNetRefs.get(listElement);
+    if (!refs) return;
+
+    for (const ref of refs) {
+        ref.invokeMethodAsync('OnResizeAsync').catch(() => { });
+    }
 }

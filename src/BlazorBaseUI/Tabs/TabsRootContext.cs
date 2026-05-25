@@ -19,6 +19,11 @@ internal interface ITabsRootContext
     ActivationDirection ActivationDirection { get; }
 
     /// <summary>
+    /// Gets the text direction used for horizontal keyboard navigation.
+    /// </summary>
+    Direction Direction { get; }
+
+    /// <summary>
     /// Gets the panel ID associated with the given tab value.
     /// </summary>
     /// <param name="tabValue">The tab value to look up.</param>
@@ -40,11 +45,39 @@ internal interface ITabsRootContext
     ElementReference? GetTabElementByValue(object? value);
 
     /// <summary>
+    /// Gets the tab registration order associated with the given value.
+    /// </summary>
+    /// <param name="value">The value to look up.</param>
+    /// <returns>The tab order, or <see langword="null"/> if not found.</returns>
+    int? GetTabOrderByValue(object? value);
+
+    /// <summary>
+    /// Gets the panel index associated with the given value.
+    /// </summary>
+    /// <param name="panelValue">The panel value to look up.</param>
+    /// <returns>The panel index, or <see langword="null"/> if not found.</returns>
+    int? GetPanelIndexByValue(object? panelValue);
+
+    /// <summary>
     /// Registers a panel with the given value and ID.
     /// </summary>
     /// <param name="panelValue">The panel value.</param>
     /// <param name="panelId">The panel element ID.</param>
     void RegisterPanel(object? panelValue, string panelId);
+
+    /// <summary>
+    /// Registers panel metadata with the given value and ID.
+    /// </summary>
+    /// <param name="panelValue">The panel value.</param>
+    /// <param name="panelId">The panel element ID.</param>
+    void RegisterPanelInfo(object? panelValue, string panelId);
+
+    /// <summary>
+    /// Unregisters panel metadata with the given value and ID.
+    /// </summary>
+    /// <param name="panelValue">The panel value.</param>
+    /// <param name="panelId">The panel element ID.</param>
+    void UnregisterPanelInfo(object? panelValue, string panelId);
 
     /// <summary>
     /// Unregisters a panel with the given value and ID.
@@ -71,7 +104,13 @@ internal interface ITabsRootContext<TValue> : ITabsRootContext
     /// </summary>
     /// <param name="value">The new tab value.</param>
     /// <param name="direction">The direction of activation.</param>
-    Task OnValueChangeAsync(TValue? value, ActivationDirection direction);
+    /// <param name="reason">The reason for the value change.</param>
+    /// <param name="sourceEventArgs">The event args that triggered the change, if available.</param>
+    Task OnValueChangeAsync(
+        TValue? value,
+        ActivationDirection direction,
+        TabsValueChangeReason reason,
+        EventArgs? sourceEventArgs = null);
 
     /// <summary>
     /// Registers tab information including its element reference, ID, and disabled state.
@@ -122,6 +161,22 @@ internal sealed class TabInfo<TValue>(TValue? value, ElementReference element, s
 }
 
 /// <summary>
+/// Stores registration information for a single panel.
+/// </summary>
+internal sealed class PanelInfo(string id, int order)
+{
+    /// <summary>
+    /// Gets or sets the panel's element ID.
+    /// </summary>
+    public string Id { get; set; } = id;
+
+    /// <summary>
+    /// Gets the registration order of the panel.
+    /// </summary>
+    public int Order { get; } = order;
+}
+
+/// <summary>
 /// Default implementation of <see cref="ITabsRootContext{TValue}"/> that manages tab and panel registrations.
 /// </summary>
 /// <typeparam name="TValue">The type of value used to identify tabs.</typeparam>
@@ -129,23 +184,28 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
 {
     private readonly Dictionary<object, TabInfo<TValue>> tabsByValue = [];
     private readonly Dictionary<object, string> panelIdsByValue = [];
+    private readonly Dictionary<object, PanelInfo> panelInfoByValue = [];
     private int nextOrder;
+    private int nextPanelOrder;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TabsRootContext{TValue}"/> class.
     /// </summary>
     /// <param name="orientation">The tabs orientation.</param>
     /// <param name="activationDirection">The initial activation direction.</param>
+    /// <param name="direction">The text direction.</param>
     /// <param name="getValue">A function that returns the current active tab value.</param>
     /// <param name="onValueChange">A callback invoked when the active tab value changes.</param>
     public TabsRootContext(
         Orientation orientation,
         ActivationDirection activationDirection,
+        Direction direction,
         Func<TValue?> getValue,
-        Func<TValue?, ActivationDirection, Task> onValueChange)
+        Func<TValue?, ActivationDirection, TabsValueChangeReason, EventArgs?, Task> onValueChange)
     {
         Orientation = orientation;
         ActivationDirection = activationDirection;
+        Direction = direction;
         GetValue = getValue;
         OnValueChange = onValueChange;
     }
@@ -155,6 +215,9 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
 
     /// <inheritdoc />
     public ActivationDirection ActivationDirection { get; set; }
+
+    /// <inheritdoc />
+    public Direction Direction { get; set; }
 
     /// <summary>
     /// Gets a value indicating whether any tabs are registered.
@@ -167,15 +230,19 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
     public Action? OnTabRegistered { get; set; }
 
     private Func<TValue?> GetValue { get; }
-    private Func<TValue?, ActivationDirection, Task> OnValueChange { get; }
+    private Func<TValue?, ActivationDirection, TabsValueChangeReason, EventArgs?, Task> OnValueChange { get; }
 
     /// <inheritdoc />
     public TValue? Value => GetValue();
 
     /// <inheritdoc />
-    public async Task OnValueChangeAsync(TValue? value, ActivationDirection direction)
+    public async Task OnValueChangeAsync(
+        TValue? value,
+        ActivationDirection direction,
+        TabsValueChangeReason reason,
+        EventArgs? sourceEventArgs = null)
     {
-        await OnValueChange(value, direction);
+        await OnValueChange(value, direction, reason, sourceEventArgs);
     }
 
     /// <inheritdoc />
@@ -204,7 +271,10 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
         if (value is null)
             return;
 
-        tabsByValue.Remove(value!);
+        if (tabsByValue.Remove(value!))
+        {
+            OnTabRegistered?.Invoke();
+        }
     }
 
     /// <summary>
@@ -218,6 +288,19 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
             return false;
 
         return tabsByValue.TryGetValue(value, out var info) && info.Disabled;
+    }
+
+    /// <summary>
+    /// Determines whether the tab with the specified value is registered.
+    /// </summary>
+    /// <param name="value">The tab value to check.</param>
+    /// <returns><see langword="true"/> if the tab is registered; otherwise, <see langword="false"/>.</returns>
+    public bool HasTab(TValue? value)
+    {
+        if (value is null)
+            return false;
+
+        return tabsByValue.ContainsKey(value);
     }
 
     /// <summary>
@@ -247,6 +330,34 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
     }
 
     /// <inheritdoc />
+    public void RegisterPanelInfo(object? panelValue, string panelId)
+    {
+        if (panelValue is null)
+            return;
+
+        if (panelInfoByValue.TryGetValue(panelValue, out var existing))
+        {
+            existing.Id = panelId;
+        }
+        else
+        {
+            panelInfoByValue[panelValue] = new PanelInfo(panelId, nextPanelOrder++);
+        }
+    }
+
+    /// <inheritdoc />
+    public void UnregisterPanelInfo(object? panelValue, string panelId)
+    {
+        if (panelValue is null)
+            return;
+
+        if (panelInfoByValue.TryGetValue(panelValue, out var existing) && existing.Id == panelId)
+        {
+            panelInfoByValue.Remove(panelValue);
+        }
+    }
+
+    /// <inheritdoc />
     public void UnregisterPanel(object? panelValue, string panelId)
     {
         if (panelValue is null)
@@ -268,6 +379,23 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
     }
 
     /// <inheritdoc />
+    public int? GetPanelIndexByValue(object? panelValue)
+    {
+        if (panelValue is null)
+            return null;
+
+        if (!panelInfoByValue.TryGetValue(panelValue, out var target))
+        {
+            return null;
+        }
+
+        return panelInfoByValue.Values
+            .OrderBy(static info => info.Order)
+            .TakeWhile(info => !ReferenceEquals(info, target))
+            .Count();
+    }
+
+    /// <inheritdoc />
     public string? GetTabIdByPanelValue(object? panelValue)
     {
         if (panelValue is not TValue typedValue)
@@ -283,5 +411,14 @@ internal sealed class TabsRootContext<TValue> : ITabsRootContext<TValue>
             return null;
 
         return tabsByValue.TryGetValue(typedValue, out var info) ? info.Element : null;
+    }
+
+    /// <inheritdoc />
+    public int? GetTabOrderByValue(object? value)
+    {
+        if (value is not TValue typedValue)
+            return null;
+
+        return tabsByValue.TryGetValue(typedValue, out var info) ? info.Order : null;
     }
 }

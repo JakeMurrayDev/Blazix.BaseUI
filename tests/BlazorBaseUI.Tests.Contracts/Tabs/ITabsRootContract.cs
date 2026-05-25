@@ -13,6 +13,7 @@ public interface ITabsRootContract
 
     // Data attributes
     Task HasDataActivationDirectionNoneByDefault();
+    Task HasDataOrientationHorizontalByDefault();
 
     // State
     Task ClassValueReceivesTabsRootState();
@@ -29,6 +30,11 @@ public interface ITabsRootContract
     Task SupportsControlledValue();
     Task FiresValueChangedCallback();
     Task FiresOnValueChangeWithCancellation();
+    Task FiresOnValueChangeWithInitialReasonForImplicitAutoSelection();
+    Task AutomaticInitialSelectionCannotBeCanceled();
+    Task ExplicitNullDefaultValueDoesNotAutoSelect();
+    Task ValueParameterControlsSelectionWithoutValueChanged();
+    Task SelectedTabDisabledAfterInitialValidityFallsBackWithDisabledReason();
 
     // Composite (Tab + Panel integration)
     Task SetsAriaControlsOnTabsToCorrespondingPanelId();

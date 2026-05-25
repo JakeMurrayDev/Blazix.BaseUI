@@ -1,11 +1,14 @@
+@using Microsoft.JSInterop
+
 @typeparam TValue
 
-@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <RenderElement TState="TabsPanelState"
                Tag="div"
                State="state"
-               Enabled="!IsHidden || KeepMounted"
+               Enabled="isMounted || KeepMounted"
                Render="Render"
                ClassValue="ClassValue"
                StyleValue="StyleValue"
@@ -15,28 +18,38 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-tabs.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private TValue previousValue = default!;
     private string? defaultId;
     private string panelId = null!;
-    private bool previousHidden;
+    private bool previousOpen;
+    private bool isMounted;
     private Orientation previousOrientation;
     private ActivationDirection previousActivationDirection;
+    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
+    private DotNetObjectReference<TabsPanel<TValue>>? dotNetRef;
     private TabsPanelState state = TabsPanelState.Default;
     private RenderElement<TabsPanelState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private bool isRegistered;
 
-    private bool IsHidden
+    private bool IsOpen
     {
         get
         {
             if (RootContext is null)
             {
-                return true;
+                return false;
             }
 
-            return !EqualityComparer<TValue>.Default.Equals(RootContext.Value, Value);
+            return EqualityComparer<TValue>.Default.Equals(RootContext.Value, Value);
         }
     }
+
+    private bool IsHidden => !isMounted;
 
     private Orientation Orientation => RootContext?.Orientation ?? Orientation.Horizontal;
 
@@ -98,6 +111,12 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    public TabsPanel()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -107,10 +126,13 @@
         }
 
         panelId = ResolvedId;
-        previousHidden = IsHidden;
+        previousValue = Value;
+        previousOpen = IsOpen;
+        isMounted = previousOpen;
         previousOrientation = Orientation;
         previousActivationDirection = ActivationDirection;
-        state = new TabsPanelState(previousHidden, previousOrientation, previousActivationDirection);
+        RootContext.RegisterPanelInfo(Value, panelId);
+        state = new TabsPanelState(IsHidden, previousOrientation, previousActivationDirection, transitionStatus);
         BuildComponentAttributes();
     }
 
@@ -118,31 +140,56 @@
     protected override void OnParametersSet()
     {
         var newId = ResolvedId;
-        if (newId != panelId)
+        var valueChanged = !EqualityComparer<TValue>.Default.Equals(previousValue, Value);
+        if (newId != panelId || valueChanged)
         {
             if (isRegistered)
             {
-                RootContext?.UnregisterPanel(Value, panelId);
+                RootContext?.UnregisterPanel(previousValue, panelId);
             }
+
+            RootContext?.UnregisterPanelInfo(previousValue, panelId);
             panelId = newId;
+            previousValue = Value;
             isRegistered = false;
+            RootContext?.RegisterPanelInfo(Value, panelId);
         }
 
-        var currentHidden = IsHidden;
+        var currentOpen = IsOpen;
         var currentOrientation = Orientation;
         var currentActivationDirection = ActivationDirection;
 
-        if (currentHidden != previousHidden ||
-            currentOrientation != previousOrientation ||
-            currentActivationDirection != previousActivationDirection)
+        if (currentOpen != previousOpen)
         {
-            state = new TabsPanelState(currentHidden, currentOrientation, currentActivationDirection);
-            previousHidden = currentHidden;
+            transitionStatus = currentOpen ? TransitionStatus.Starting : TransitionStatus.Ending;
+
+            if (currentOpen)
+            {
+                isMounted = true;
+            }
+        }
+
+        var currentHidden = IsHidden;
+
+        if (currentOpen != previousOpen ||
+            currentHidden != state.Hidden ||
+            currentOrientation != previousOrientation ||
+            currentActivationDirection != previousActivationDirection ||
+            state.TransitionStatus != transitionStatus)
+        {
+            state = new TabsPanelState(
+                currentHidden,
+                currentOrientation,
+                currentActivationDirection,
+                transitionStatus);
+            previousOpen = currentOpen;
             previousOrientation = currentOrientation;
             previousActivationDirection = currentActivationDirection;
         }
 
-        var shouldBeRegistered = !currentHidden || KeepMounted;
+        RootContext?.RegisterPanelInfo(Value, panelId);
+
+        var shouldBeRegistered = isMounted || KeepMounted;
 
         if (shouldBeRegistered && !isRegistered)
         {
@@ -159,29 +206,123 @@
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (transitionStatus is not (TransitionStatus.Starting or TransitionStatus.Ending) || !Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync(
+                "startPanelTransition",
+                Element.Value,
+                dotNetRef,
+                transitionStatus == TransitionStatus.Starting);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
     {
         if (isRegistered)
         {
             RootContext?.UnregisterPanel(Value, panelId);
             isRegistered = false;
         }
+
+        RootContext?.UnregisterPanelInfo(Value, panelId);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposePanel", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Handles the end of the panel starting-style frame. Called from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnPanelStartingStyleApplied()
+    {
+        if (transitionStatus != TransitionStatus.Starting)
+        {
+            return;
+        }
+
+        transitionStatus = TransitionStatus.Undefined;
+        state = state with { Hidden = IsHidden, TransitionStatus = transitionStatus };
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Handles the end of a panel exit transition. Called from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnPanelTransitionEnded()
+    {
+        if (transitionStatus != TransitionStatus.Ending)
+        {
+            return;
+        }
+
+        transitionStatus = TransitionStatus.Undefined;
+
+        if (!IsOpen)
+        {
+            isMounted = false;
+            if (!KeepMounted && isRegistered)
+            {
+                RootContext?.UnregisterPanel(Value, panelId);
+                isRegistered = false;
+            }
+        }
+
+        state = state with { Hidden = IsHidden, TransitionStatus = transitionStatus };
+        BuildComponentAttributes();
+        StateHasChanged();
     }
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
         var isHidden = IsHidden;
+        var isOpen = IsOpen;
         var tabId = RootContext?.GetTabIdByPanelValue(Value);
         var orientationValue = Orientation.ToDataAttributeString();
 
         attrs["id"] = panelId;
         attrs["role"] = "tabpanel";
-        attrs["tabindex"] = isHidden ? -1 : 0;
+        attrs["tabindex"] = isOpen ? 0 : -1;
+        attrs["data-index"] = RootContext?.GetPanelIndexByValue(Value) ?? 0;
 
         if (isHidden)
         {
             attrs["hidden"] = true;
+        }
+
+        if (!isOpen)
+        {
+            attrs["inert"] = true;
         }
 
         if (tabId is not null)
@@ -196,6 +337,7 @@
 
         attrs["data-activation-direction"] = ActivationDirection.ToDataAttributeString();
         attrs["data-hidden"] = isHidden;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
 
         componentAttributes = attrs;
     }

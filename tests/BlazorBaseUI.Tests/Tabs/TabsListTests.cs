@@ -180,6 +180,26 @@ public class TabsListTests : BunitContext, ITabsListContract
         return Task.CompletedTask;
     }
 
+    // Data attributes
+
+    [Fact]
+    public Task HasDataOrientationHorizontal()
+    {
+        var cut = Render(CreateTabsList());
+        var element = cut.Find("[role='tablist']");
+        element.GetAttribute("data-orientation").ShouldBe("horizontal");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataActivationDirection()
+    {
+        var cut = Render(CreateTabsList());
+        var element = cut.Find("[role='tablist']");
+        element.GetAttribute("data-activation-direction").ShouldBe("none");
+        return Task.CompletedTask;
+    }
+
     // Element reference
 
     [Fact]

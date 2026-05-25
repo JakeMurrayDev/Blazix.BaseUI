@@ -69,16 +69,26 @@ public class TabsTabTests : BunitContext, ITabsTabContract
         string? defaultValue = "tab1",
         bool tab1Disabled = false,
         bool tab2Disabled = false,
+        string? value = null,
+        EventCallback<string?>? valueChanged = null,
+        Action<TabsValueChangeEventArgs<string>>? onValueChange = null,
         Orientation orientation = Orientation.Horizontal,
         bool keepMounted = true)
     {
         return builder =>
         {
             builder.OpenComponent<TabsRoot<string>>(0);
+            var seq = 1;
             if (defaultValue is not null)
-                builder.AddAttribute(1, "DefaultValue", defaultValue);
-            builder.AddAttribute(2, "Orientation", orientation);
-            builder.AddAttribute(3, "ChildContent", (RenderFragment)(rootInner =>
+                builder.AddAttribute(seq++, "DefaultValue", defaultValue);
+            if (value is not null)
+                builder.AddAttribute(seq++, "Value", value);
+            if (valueChanged.HasValue)
+                builder.AddAttribute(seq++, "ValueChanged", valueChanged.Value);
+            if (onValueChange is not null)
+                builder.AddAttribute(seq++, "OnValueChange", EventCallback.Factory.Create(this, onValueChange));
+            builder.AddAttribute(seq++, "Orientation", orientation);
+            builder.AddAttribute(seq++, "ChildContent", (RenderFragment)(rootInner =>
             {
                 rootInner.OpenComponent<TabsList<string>>(0);
                 rootInner.AddAttribute(1, "ChildContent", (RenderFragment)(listInner =>
@@ -319,6 +329,73 @@ public class TabsTabTests : BunitContext, ITabsTabContract
         var cut = Render(CreateTabInRoot(disabled: true));
         var element = cut.Find("[role='tab']");
         element.GetAttribute("aria-disabled").ShouldBe("true");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DisabledActiveTabDoesNotEnterTabOrder()
+    {
+        var cut = Render(CreateMultipleTabsInRoot(
+            defaultValue: null,
+            value: "tab1",
+            tab1Disabled: true));
+
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("true");
+        tabs[0].GetAttribute("tabindex").ShouldBe("-1");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RightClickDoesNotActivateTab()
+    {
+        TabsValueChangeEventArgs<string>? receivedArgs = null;
+        var cut = Render(CreateMultipleTabsInRoot(
+            defaultValue: "tab1",
+            onValueChange: args => receivedArgs = args));
+
+        var tabs = cut.FindAll("[role='tab']");
+        tabs[1].Click(new MouseEventArgs { Button = 2 });
+
+        receivedArgs.ShouldBeNull();
+        tabs = cut.FindAll("[role='tab']");
+        tabs[0].GetAttribute("aria-selected").ShouldBe("true");
+        tabs[1].GetAttribute("aria-selected").ShouldBe("false");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InvokesClickHandlerWhenTabIsAlreadyActive()
+    {
+        var clicked = false;
+        var cut = Render(CreateTabInRoot(
+            tabValue: "tab1",
+            defaultValue: "tab1",
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, () => clicked = true) }
+            }));
+
+        cut.Find("[role='tab']").Click();
+
+        clicked.ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InvokesFocusHandlerWhenTabIsDisabled()
+    {
+        var focused = false;
+        var cut = Render(CreateTabInRoot(
+            disabled: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, () => focused = true) }
+            }));
+
+        cut.Find("[role='tab']").Focus();
+
+        focused.ShouldBeTrue();
         return Task.CompletedTask;
     }
 

@@ -14,6 +14,7 @@ public class TabsIndicatorTests : BunitContext, ITabsIndicatorContract
         RenderFragment<RenderProps<TabsIndicatorState>>? render = null,
         Func<TabsIndicatorState, string>? classValue = null,
         Func<TabsIndicatorState, string>? styleValue = null,
+        bool renderBeforeHydration = false,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         RenderFragment? childContent = null)
     {
@@ -41,6 +42,8 @@ public class TabsIndicatorTests : BunitContext, ITabsIndicatorContract
                         listInner.AddAttribute(seq++, "ClassValue", classValue);
                     if (styleValue is not null)
                         listInner.AddAttribute(seq++, "StyleValue", styleValue);
+                    if (renderBeforeHydration)
+                        listInner.AddAttribute(seq++, "RenderBeforeHydration", true);
                     if (additionalAttributes is not null)
                         listInner.AddAttribute(seq++, "AdditionalAttributes", additionalAttributes);
                     if (childContent is not null)
@@ -136,9 +139,40 @@ public class TabsIndicatorTests : BunitContext, ITabsIndicatorContract
     [Fact]
     public Task DoesNotRenderWhenValueIsNull()
     {
-        var cut = Render(CreateIndicatorInRoot(defaultValue: null));
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<TabsRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", (string?)null);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(rootInner =>
+            {
+                rootInner.OpenComponent<TabsList<string>>(0);
+                rootInner.AddAttribute(1, "ChildContent", (RenderFragment)(listInner =>
+                {
+                    listInner.OpenComponent<TabsTab<string>>(0);
+                    listInner.AddAttribute(1, "Value", "tab1");
+                    listInner.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Tab 1")));
+                    listInner.CloseComponent();
+
+                    listInner.OpenComponent<TabsIndicator<string>>(10);
+                    listInner.AddAttribute(11, "data-testid", "indicator");
+                    listInner.CloseComponent();
+                }));
+                rootInner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
         var elements = cut.FindAll("[role='presentation']");
         elements.Count.ShouldBe(0);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RenderBeforeHydrationEmitsScript()
+    {
+        var cut = Render(CreateIndicatorInRoot(renderBeforeHydration: true));
+        var scripts = cut.FindAll("script");
+        scripts.Count.ShouldBe(1);
+        scripts[0].TextContent.ShouldContain("--active-tab-");
         return Task.CompletedTask;
     }
 
@@ -150,6 +184,15 @@ public class TabsIndicatorTests : BunitContext, ITabsIndicatorContract
         var cut = Render(CreateIndicatorInRoot());
         var element = cut.Find("[role='presentation']");
         element.GetAttribute("data-activation-direction").ShouldBe("none");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasDataOrientation()
+    {
+        var cut = Render(CreateIndicatorInRoot());
+        var element = cut.Find("[role='presentation']");
+        element.GetAttribute("data-orientation").ShouldBe("horizontal");
         return Task.CompletedTask;
     }
 

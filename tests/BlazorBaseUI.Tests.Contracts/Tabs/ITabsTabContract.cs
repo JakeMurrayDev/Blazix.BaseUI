@@ -29,6 +29,10 @@ public interface ITabsTabContract
 
     // Disabled behavior
     Task HasAriaDisabledWhenDisabled();
+    Task DisabledActiveTabDoesNotEnterTabOrder();
+    Task RightClickDoesNotActivateTab();
+    Task InvokesClickHandlerWhenTabIsAlreadyActive();
+    Task InvokesFocusHandlerWhenTabIsDisabled();
 
     // State
     Task ClassValueReceivesTabsTabState();

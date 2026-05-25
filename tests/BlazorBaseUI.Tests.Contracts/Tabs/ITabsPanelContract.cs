@@ -26,8 +26,13 @@ public interface ITabsPanelContract
     // Data attributes
     Task HasDataOrientationHorizontal();
     Task HasDataActivationDirection();
+    Task HasDataIndex();
     Task HasDataHiddenWhenNotActive();
     Task DoesNotHaveDataHiddenWhenActive();
+    Task HasInertWhenHiddenAndKeptMounted();
+    Task ClassValueReceivesTransitionStatus();
+    Task AddsStartingStyleWhenPanelOpens();
+    Task KeepsExitingPanelVisibleUntilTransitionCompletes();
 
     // State
     Task ClassValueReceivesTabsPanelState();
