@@ -48,7 +48,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-popover.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-popover.min.js").AsTask());
 
     private bool HasHandle => Handle is not null;
 

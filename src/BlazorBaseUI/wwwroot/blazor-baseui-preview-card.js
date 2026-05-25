@@ -15,7 +15,7 @@ import {
     initializePositioner as floatingInitializePositioner,
     updatePositioner as floatingUpdatePositioner,
     disposePositioner as floatingDisposePositioner
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.PreviewCard.State');
 

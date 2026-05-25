@@ -4,7 +4,7 @@
  * Menu-specific functionality that builds on the shared floating infrastructure.
  */
 
-import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
+import { acquireScrollLock } from './blazor-baseui-scroll-lock.min.js';
 import {
     createHoverInteraction,
     checkForTransitionOrAnimation,
@@ -13,7 +13,7 @@ import {
     initializePositioner as floatingInitializePositioner,
     updatePositioner as floatingUpdatePositioner,
     disposePositioner as floatingDisposePositioner
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const PATIENT_CLICK_THRESHOLD = 500;
 const TYPEAHEAD_TIMEOUT = 500;

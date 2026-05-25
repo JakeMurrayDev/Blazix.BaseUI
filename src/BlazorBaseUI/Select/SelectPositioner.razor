@@ -180,7 +180,7 @@
     {
         positionerInterop = new PositionerInterop(
             JSRuntime,
-            "./_content/BlazorBaseUI/blazor-baseui-select.js");
+            "./_content/BlazorBaseUI/blazor-baseui-select.min.js");
         positionerDotNetRef = DotNetObjectReference.Create(this);
 
         controlledAlignItemWithTrigger = AlignItemWithTrigger;
@@ -765,12 +765,12 @@
     private Lazy<Task<IJSObjectReference>> FloatingModule =>
         floatingModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/BlazorBaseUI/blazor-baseui-floating.js").AsTask());
+                "import", "./_content/BlazorBaseUI/blazor-baseui-floating.min.js").AsTask());
 
     private Lazy<Task<IJSObjectReference>> SelectModule =>
         selectModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import", "./_content/BlazorBaseUI/blazor-baseui-select.js").AsTask());
+                "import", "./_content/BlazorBaseUI/blazor-baseui-select.min.js").AsTask());
 
     private async Task ClearHeightStylesAsync()
     {

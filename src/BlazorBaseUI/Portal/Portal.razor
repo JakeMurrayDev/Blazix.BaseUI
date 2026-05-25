@@ -21,7 +21,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-portal.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-portal.min.js").AsTask());
 
     private string Id => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId);
 

@@ -1,4 +1,4 @@
-import { activeElement, contains, getTarget, getDocument, isElement } from './blazor-baseui-floating.js';
+import { activeElement, contains, getTarget, getDocument, isElement } from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Slider.State');
 if (!window[STATE_KEY]) {

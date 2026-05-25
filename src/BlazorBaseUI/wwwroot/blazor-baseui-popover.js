@@ -4,8 +4,8 @@
  * Popover-specific functionality that builds on the shared floating infrastructure.
  */
 
-import { acquireScrollLock } from './blazor-baseui-scroll-lock.js';
-import { requestDoubleAnimationFrame } from './blazor-baseui-animations.js';
+import { acquireScrollLock } from './blazor-baseui-scroll-lock.min.js';
+import { requestDoubleAnimationFrame } from './blazor-baseui-animations.min.js';
 
 const PATIENT_CLICK_THRESHOLD = 500;
 
@@ -23,7 +23,7 @@ import {
     initializePositioner as floatingInitializePositioner,
     updatePositioner as floatingUpdatePositioner,
     disposePositioner as floatingDisposePositioner
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Popover.State');
 

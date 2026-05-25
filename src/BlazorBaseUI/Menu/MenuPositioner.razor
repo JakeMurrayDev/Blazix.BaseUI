@@ -162,7 +162,7 @@
     {
         positionerInterop = new PositionerInterop(
             JSRuntime,
-            "./_content/BlazorBaseUI/blazor-baseui-menu.js");
+            "./_content/BlazorBaseUI/blazor-baseui-menu.min.js");
 
         positionerContext = new MenuPositionerContext
         {
@@ -330,7 +330,7 @@
 
         // NOTE: Do NOT set inline "style" here. JS (initializePositioner/updatePosition)
         // manages position, left, top, z-index, and visibility on this element's style.
-        // pointer-events are handled by global CSS rules in blazor-baseui-floating.js.
+        // pointer-events are handled by global CSS rules in blazor-baseui-floating.min.js.
 
         attrs["data-side"] = computedSide.ToDataAttributeString()!;
         attrs["data-align"] = computedAlign.ToDataAttributeString()!;

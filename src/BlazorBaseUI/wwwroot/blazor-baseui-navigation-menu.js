@@ -11,7 +11,7 @@ import {
     disposePositioner as disposeFloatingPositioner,
     cleanupTransitionState,
     startSimpleTransition
-} from './blazor-baseui-floating.js';
+} from './blazor-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.NavigationMenu.State');
 

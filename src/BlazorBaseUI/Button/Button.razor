@@ -101,7 +101,7 @@
         moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import",
-                "./_content/BlazorBaseUI/blazor-baseui-button.js").AsTask());
+                "./_content/BlazorBaseUI/blazor-baseui-button.min.js").AsTask());
     }
 
     /// <inheritdoc />

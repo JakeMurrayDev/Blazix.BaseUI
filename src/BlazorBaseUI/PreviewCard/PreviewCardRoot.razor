@@ -38,7 +38,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-preview-card.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-preview-card.min.js").AsTask());
 
     /// <summary>
     /// Determines whether the preview card is currently open.

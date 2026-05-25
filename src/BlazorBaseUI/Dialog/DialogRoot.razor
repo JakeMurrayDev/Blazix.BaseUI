@@ -43,7 +43,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-dialog.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-dialog.min.js").AsTask());
 
     [CascadingParameter]
     private DialogRootContext? ParentContext { get; set; }

@@ -36,7 +36,7 @@
     public FloatingFocusManager()
     {
         moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-floating.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-floating.min.js").AsTask());
     }
 
     private bool ShouldRenderGuards => !Disabled && (Modal || PortalContext is not null);

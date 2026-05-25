@@ -32,7 +32,7 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
-            "import", "./_content/BlazorBaseUI/blazor-baseui-tooltip-viewport.js").AsTask());
+            "import", "./_content/BlazorBaseUI/blazor-baseui-tooltip-viewport.min.js").AsTask());
 
     [CascadingParameter]
     private TooltipRootContext? RootContext { get; set; }

@@ -5,7 +5,7 @@ import {
     requestAnimationFrameAsync,
     setCssVariables,
     setDataAttribute
-} from './blazor-baseui-animations.js';
+} from './blazor-baseui-animations.min.js';
 
 const STATE_KEY = Symbol.for('BlazorBaseUI.Collapsible.State');
 if (!window[STATE_KEY]) {
