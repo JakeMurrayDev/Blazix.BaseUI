@@ -79,8 +79,7 @@ function handleGlobalFocusOut(e) {
 }
 
 function isNavigationMenuTrigger(target) {
-    // lint-ignore:RULE-05 React parity selector emitted by NavigationMenuTrigger.
-    return target instanceof Element && target.closest('[data-base-ui-navigation-menu-trigger]') != null;
+    return target instanceof Element && target.closest('[data-blazor-base-ui-navigation-menu-trigger]') != null;
 }
 
 function isInsideAnyNavigationMenu(target) {

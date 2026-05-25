@@ -15,7 +15,7 @@
       </option>
       <option name="outputFromStdout" value="false" />
       <option name="passParentEnvs" value="true" />
-      <option name="program" value="/opt/homebrew/bin/pnpm" />
+      <option name="program" value="pnpm" />
       <option name="runOnExternalChanges" value="false" />
       <option name="scopeName" value="Tailwind Source Files" />
       <option name="trackOnlyRoot" value="false" />
@@ -36,7 +36,7 @@
       </option>
       <option name="outputFromStdout" value="false" />
       <option name="passParentEnvs" value="true" />
-      <option name="program" value="/opt/homebrew/bin/pnpm" />
+      <option name="program" value="pnpm" />
       <option name="runOnExternalChanges" value="false" />
       <option name="scopeName" value="BlazorBaseUI JavaScript Source Files" />
       <option name="trackOnlyRoot" value="false" />
