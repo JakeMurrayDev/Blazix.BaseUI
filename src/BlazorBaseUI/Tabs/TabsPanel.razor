@@ -31,6 +31,7 @@
     private ActivationDirection previousActivationDirection;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
     private DotNetObjectReference<TabsPanel<TValue>>? dotNetRef;
+    private ElementReference? capturedElement;
     private TabsPanelState state = TabsPanelState.Default;
     private RenderElement<TabsPanelState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -216,10 +217,12 @@
         try
         {
             dotNetRef ??= DotNetObjectReference.Create(this);
+            var element = Element.Value;
+            capturedElement = element;
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync(
                 "startPanelTransition",
-                Element.Value,
+                element,
                 dotNetRef,
                 transitionStatus == TransitionStatus.Starting);
         }
@@ -240,12 +243,16 @@
 
         RootContext?.UnregisterPanelInfo(Value, panelId);
 
-        if (moduleTask.IsValueCreated && Element.HasValue)
+        if (moduleTask.IsValueCreated)
         {
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("disposePanel", Element.Value);
+                if (capturedElement.HasValue)
+                {
+                    await module.InvokeVoidAsync("disposePanel", capturedElement.Value);
+                }
+
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

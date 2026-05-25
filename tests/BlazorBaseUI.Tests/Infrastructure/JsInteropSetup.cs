@@ -273,7 +273,7 @@ public static class JsInteropSetup
 
     private const string TabsModule = "./_content/BlazorBaseUI/blazor-baseui-tabs.js";
 
-    public static void SetupTabsModule(BunitJSInterop jsInterop)
+    public static BunitJSModuleInterop SetupTabsModule(BunitJSInterop jsInterop)
     {
         var module = jsInterop.SetupModule(TabsModule);
         module.SetupVoid("initializeList", _ => true).SetVoidResult();
@@ -296,6 +296,7 @@ public static class JsInteropSetup
         module.SetupVoid("observeResize", _ => true).SetVoidResult();
         module.SetupVoid("unobserveResize", _ => true).SetVoidResult();
         module.Setup<object?>("getFirstEnabledTab", _ => true).SetResult(null);
+        return module;
     }
 
     private const string NumberFieldModule = "./_content/BlazorBaseUI/blazor-baseui-number-field.js";

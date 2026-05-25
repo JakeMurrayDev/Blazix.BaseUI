@@ -2,10 +2,12 @@ namespace BlazorBaseUI.Tests.Tabs;
 
 public class TabsPanelTests : BunitContext, ITabsPanelContract
 {
+    private readonly BunitJSModuleInterop module;
+
     public TabsPanelTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupTabsModule(JSInterop);
+        module = JsInteropSetup.SetupTabsModule(JSInterop);
     }
 
     private RenderFragment CreatePanelInRoot(
@@ -381,6 +383,37 @@ public class TabsPanelTests : BunitContext, ITabsPanelContract
         exitingPanel.GetAttribute("tabindex").ShouldBe("-1");
         exitingPanel.HasAttribute("inert").ShouldBeTrue();
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DisposeAsync_DisposesImportedModuleAfterPanelElementUnmounts()
+    {
+        var cut = Render(CreateMultiplePanelsInRoot(defaultValue: "tab1", keepMounted: false));
+
+        cut.FindAll("[role='tab']")[1].Click();
+
+        module.Invocations
+            .Any(invocation => invocation.Identifier == "startPanelTransition")
+            .ShouldBeTrue();
+
+        var exitingPanel = cut.FindComponents<TabsPanel<string>>()
+            .Single(panel => panel.Instance.Value == "tab1");
+
+        await exitingPanel.InvokeAsync(() => exitingPanel.Instance.OnPanelTransitionEnded());
+
+        var renderElementField = typeof(TabsPanel<string>).GetField(
+            "renderElementReference",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        renderElementField.ShouldNotBeNull();
+        renderElementField.SetValue(exitingPanel.Instance, null);
+
+        exitingPanel.Instance.Element.HasValue.ShouldBeFalse();
+
+        await exitingPanel.InvokeAsync(async () => await exitingPanel.Instance.DisposeAsync());
+
+        module.Invocations
+            .Any(invocation => invocation.Identifier == "disposePanel")
+            .ShouldBeTrue();
     }
 
     // State

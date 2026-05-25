@@ -7,12 +7,14 @@ if (!window[STATE_KEY]) {
         dotNetRefs: new WeakMap(),
         listHandlers: new WeakMap(),
         tabPreActivationHandlers: new WeakMap(),
-        panelHandoffObservers: new WeakMap()
+        panelHandoffObservers: new WeakMap(),
+        panelVisibilityObservers: new WeakMap()
     };
 }
 const state = window[STATE_KEY];
 state.tabPreActivationHandlers ??= new WeakMap();
 state.panelHandoffObservers ??= new WeakMap();
+state.panelVisibilityObservers ??= new WeakMap();
 
 if (!window[LIST_STATE_KEY]) {
     window[LIST_STATE_KEY] = new WeakMap();
@@ -57,6 +59,7 @@ export function initializeList(element, orientation, loopFocus, activateOnFocus,
     state.listHandlers.set(element, handler);
     listStateMap.set(element, listState);
     hydratePendingTabs(element, listState);
+    observePanelVisibility(element);
 }
 
 export function updateList(element, orientation, loopFocus, activateOnFocus, direction) {
@@ -89,6 +92,7 @@ export function disposeList(element) {
         state.listHandlers.delete(element);
     }
 
+    disposePanelVisibilityObserver(element);
     listStateMap.delete(element);
     pendingTabsByList.delete(element);
     unobserveResize(element);
@@ -307,6 +311,81 @@ function disposePanelHandoff(listElement) {
     if (!handoff) return;
 
     handoff.dispose();
+}
+
+function observePanelVisibility(listElement) {
+    disposePanelVisibilityObserver(listElement);
+
+    const rootElement = listElement.parentElement ?? document.body;
+    let disposed = false;
+    let isChecking = false;
+
+    const observer = new MutationObserver(() => {
+        checkPanelVisibility();
+    });
+
+    const cleanup = () => {
+        if (disposed) return;
+
+        disposed = true;
+        observer.disconnect();
+        state.panelVisibilityObservers.delete(listElement);
+    };
+
+    const checkPanelVisibility = () => {
+        if (disposed || isChecking) {
+            return;
+        }
+
+        isChecking = true;
+        try {
+            hideInactiveNoMotionPanels(rootElement);
+        } finally {
+            isChecking = false;
+        }
+    };
+
+    observer.observe(rootElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['aria-selected', 'hidden', 'data-hidden', 'style', 'class']
+    });
+
+    state.panelVisibilityObservers.set(listElement, { dispose: cleanup });
+    checkPanelVisibility();
+}
+
+function disposePanelVisibilityObserver(listElement) {
+    const observer = state.panelVisibilityObservers.get(listElement);
+    if (!observer) return;
+
+    observer.dispose();
+}
+
+function hideInactiveNoMotionPanels(rootElement) {
+    const activeTab = rootElement.querySelector('[role="tab"][aria-selected="true"]');
+    const activePanelId = activeTab?.getAttribute('aria-controls');
+    const activePanel = activePanelId ? document.getElementById(activePanelId) : null;
+
+    if (activeTab && !activePanel) {
+        return;
+    }
+
+    if (activePanel && !isPanelVisible(activePanel)) {
+        return;
+    }
+
+    const panels = rootElement.querySelectorAll('[role="tabpanel"]');
+    for (const panel of panels) {
+        if (panel === activePanel || !isPanelVisible(panel)) {
+            continue;
+        }
+
+        if (shouldPreHidePanelImmediately(panel)) {
+            hidePanelImmediately(panel);
+        }
+    }
 }
 
 function hasAlternateVisiblePanel(container, activePanel) {
@@ -574,6 +653,10 @@ function waitForPanelAnimations(element, token, dotNetRef) {
 }
 
 function completePanelExitTransition(element, token, dotNetRef) {
+    if (element._tabsPanelTransitionToken !== token) {
+        return;
+    }
+
     const container = element.parentElement;
     hidePanelImmediately(element);
 
