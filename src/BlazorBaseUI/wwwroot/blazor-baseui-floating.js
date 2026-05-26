@@ -2220,6 +2220,7 @@ export function getTabbableElements(container) {
     collectElements(container, elements);
 
     return elements.filter(el => {
+        if (el.hasAttribute('data-blazor-base-ui-focus-guard')) return false;
         if (el.hasAttribute('data-tabindex')) return true;
         const tabindex = el.getAttribute('tabindex');
         if (tabindex !== null && parseInt(tabindex, 10) < 0) return false;

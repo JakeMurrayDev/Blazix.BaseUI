@@ -38,7 +38,7 @@
         <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
     </div>
 
-    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+    <button data-testid="outside-button" style="@OutsideButtonStyle">Outside Button</button>
     <input data-testid="focusable-input" type="text" placeholder="Focusable input" style="margin-top: 10px;" />
 
     @if (ShowActionsButtons)
@@ -109,6 +109,9 @@
     [SupplyParameterFromQuery(Name = "showBackdrop")]
     public bool ShowBackdrop { get; set; }
 
+    [SupplyParameterFromQuery(Name = "outsideAboveBackdrop")]
+    public bool OutsideAboveBackdrop { get; set; }
+
     [SupplyParameterFromQuery(Name = "showViewport")]
     public bool ShowViewport { get; set; }
 
@@ -128,6 +131,10 @@
     private DialogRootActions? actionsRef = new();
     private DialogClose? closeButtonComponent;
     private ElementReference? closeButtonRef => closeButtonComponent?.Element;
+
+    private string OutsideButtonStyle => OutsideAboveBackdrop
+        ? "position: fixed; top: 0; right: 0; z-index: 60; margin-top: 10px;"
+        : "margin-top: 10px;";
 
     protected override void OnInitialized()
     {

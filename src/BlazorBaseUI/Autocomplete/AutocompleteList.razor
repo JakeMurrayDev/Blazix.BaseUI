@@ -1,0 +1,187 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="AutocompleteListState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/BlazorBaseUI/blazor-baseui-autocomplete.min.js";
+
+    private AutocompleteListState state;
+    private RenderElement<AutocompleteListState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private ElementReference? previousElement;
+    private bool subscribed;
+
+    private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteListState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteListState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteListState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Element;
+        if (RootContext is not null && !Nullable.Equals(previousElement, current))
+        {
+            previousElement = current;
+            RootContext.SetListElement(current);
+
+            if (current.HasValue)
+            {
+                try
+                {
+                    var module = await ModuleTask;
+                    await module.InvokeVoidAsync("setListElement", RootContext.RootId, current.Value);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        var currentListId = RootContext is null ? null : $"{RootContext.RootId}-list";
+
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        if (RootContext is not null)
+        {
+            RootContext.SetListElement(null);
+            if (RootContext.ListId == currentListId)
+            {
+                RootContext.ListId = null;
+            }
+        }
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await ModuleTask;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var empty = RootContext?.ListEmpty == true;
+        state = new AutocompleteListState(empty);
+
+        var listId = RootContext is null ? null : $"{RootContext.RootId}-list";
+        var attrs = new Dictionary<string, object>
+        {
+            ["tabindex"] = -1,
+            ["role"] = RootContext?.Grid == true ? "grid" : "listbox",
+            ["data-empty"] = empty
+        };
+
+        if (listId is not null)
+        {
+            attrs["id"] = listId;
+            if (RootContext is not null)
+            {
+                RootContext.ListId = listId;
+            }
+        }
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is not null && !RootContext.Disabled && !RootContext.ReadOnly && e.Key == "Enter")
+        {
+            await RootContext.CommitActiveItemAsync();
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+}

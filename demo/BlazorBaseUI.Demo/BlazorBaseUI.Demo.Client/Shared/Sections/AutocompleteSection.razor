@@ -1,0 +1,1730 @@
+@using System.Globalization
+@using BlazorBaseUI
+@using BlazorBaseUI.Autocomplete
+@using BlazorBaseUI.Dialog
+
+<ComponentShowcase ComponentName="Autocomplete"
+                   Description="A text input with filterable suggestions, keyboard navigation, inline completion, and native form participation."
+                   BaseRoute="/autocomplete"
+                   IsWasmMode="IsWasmMode">
+    <DemoSection Title="Basic">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-basic-input"
+                       class="text-sm font-medium text-gray-700">Search tags</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  @bind-Value="basicValue"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-basic-input"
+                                           Placeholder="e.g. feature"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteClear ClassValue="@ClearClass"
+                                               aria-label="Clear selection">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-linecap="square"
+                                     stroke-linejoin="round"
+                                     style="display: block">
+                                    <path d="m4.5 4.5 7 7m-7 0 7-7" />
+                                </svg>
+                            </AutocompleteClear>
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No tags found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+            <p class="text-sm text-gray-600">Value: <span class="font-medium text-gray-900">@DisplayValue(basicValue)</span></p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Async search">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-async-input"
+                       class="text-sm font-medium text-gray-700">Search movies by name or year</label>
+                <AutocompleteRoot TValue="MovieItem"
+                                  Items="@asyncSearchResults"
+                                  Value="@asyncSearchValue"
+                                  OnValueChange="@HandleAsyncSearchValueChange"
+                                  ItemToStringValue="@MovieItemToString"
+                                  FilterDisabled>
+                    <AutocompleteInput Id="autocomplete-async-input"
+                                       Placeholder="e.g. Pulp Fiction or 1994"
+                                       ClassValue="@AsyncInputClass" />
+                    @if (asyncSearchStatus is not null)
+                    {
+                        <AutocompletePortal>
+                            <AutocompletePositioner SideOffset="4"
+                                                    ClassValue="@PositionerClass"
+                                                    StyleValue="@PositionerStyle">
+                                <AutocompletePopup ClassValue="@PopupClass"
+                                                   StyleValue="@PopupStyle"
+                                                   aria-busy="@(asyncSearchPending ? "true" : null)">
+                                    <div class="max-h-[min(var(--available-height,22.5rem),22.5rem)] overflow-y-auto overscroll-contain py-1">
+                                        <AutocompleteStatus ClassValue="@AsyncStatusClass">
+                                            <span class="flex items-center gap-2 px-3 py-1 text-sm text-gray-500">
+                                                @if (asyncSearchPending)
+                                                {
+                                                    <span class="inline-block h-3 w-3 animate-spin rounded-full border border-current border-r-transparent"
+                                                          aria-hidden="true"></span>
+                                                }
+                                                <span>@asyncSearchStatus</span>
+                                            </span>
+                                        </AutocompleteStatus>
+                                        <AutocompleteList ClassValue="@ListClass"
+                                                          StyleValue="@ListStyle">
+                                            <AutocompleteCollection TValue="MovieItem" Context="entry">
+                                                <AutocompleteItem TValue="MovieItem"
+                                                                  Value="@entry.Item"
+                                                                  Index="@entry.Index"
+                                                                  ClassValue="@AsyncMovieItemClass">
+                                                    <span class="flex w-full flex-col gap-1">
+                                                        <span class="font-medium text-gray-900">@entry.Item.Title</span>
+                                                        <span class="text-sm text-gray-500">@entry.Item.Year</span>
+                                                    </span>
+                                                </AutocompleteItem>
+                                            </AutocompleteCollection>
+                                        </AutocompleteList>
+                                    </div>
+                                </AutocompletePopup>
+                            </AutocompletePositioner>
+                        </AutocompletePortal>
+                    }
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Inline completion">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-inline-input"
+                       class="text-sm font-medium text-gray-700">Search tags</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  Mode="AutocompleteMode.Both">
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-inline-input"
+                                           Placeholder="e.g. component"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No matches.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Grouped">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-grouped-input"
+                       class="text-sm font-medium text-gray-700">Select a tag</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  @bind-Value="groupedValue"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-grouped-input"
+                                           Placeholder="e.g. feature"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No tags found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    @{
+                                        var visibleTypeTags = GetFilteredTags(TypeTagItems, groupedValue);
+                                        var visibleComponentTags = GetFilteredTags(ComponentTagItems, groupedValue);
+                                    }
+                                    @if (visibleTypeTags.Count > 0)
+                                    {
+                                        <AutocompleteGroup ClassValue="@GroupClass">
+                                            <AutocompleteGroupLabel ClassValue="@GroupLabelClass">Type</AutocompleteGroupLabel>
+                                            @foreach (var tag in visibleTypeTags)
+                                            {
+                                                <AutocompleteItem TValue="string"
+                                                                  Value="@tag"
+                                                                  ClassValue="@ItemClass">
+                                                    @tag
+                                                </AutocompleteItem>
+                                            }
+                                        </AutocompleteGroup>
+                                    }
+                                    @if (visibleComponentTags.Count > 0)
+                                    {
+                                        <AutocompleteGroup ClassValue="@GroupClass">
+                                            <AutocompleteGroupLabel ClassValue="@GroupLabelClass">Component</AutocompleteGroupLabel>
+                                            @foreach (var tag in visibleComponentTags)
+                                            {
+                                                <AutocompleteItem TValue="string"
+                                                                  Value="@tag"
+                                                                  ClassValue="@ItemClass">
+                                                    @tag
+                                                </AutocompleteItem>
+                                            }
+                                        </AutocompleteGroup>
+                                    }
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Fuzzy matching">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-fuzzy-input"
+                       class="text-sm font-medium text-gray-700">Fuzzy search documentation</label>
+                <AutocompleteRoot TValue="DocsSearchItem"
+                                  Items="@DocsSearchItems"
+                                  Filter="@DocsSearchFilter"
+                                  ItemToStringValue="@DocsSearchItemToString"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-fuzzy-input"
+                                           Placeholder="e.g. rct perf"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No documentation found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="DocsSearchItem" Context="entry">
+                                        <AutocompleteItem TValue="DocsSearchItem"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@DocsSearchItemClass">
+                                            <span class="flex w-full flex-col gap-1">
+                                                <span class="font-medium text-gray-900">@entry.Item.Title</span>
+                                                <span class="text-sm text-gray-500">@entry.Item.Description</span>
+                                            </span>
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Limit results">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-limit-input"
+                       class="text-sm font-medium text-gray-700">Limit results to 8</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  @bind-Value="limitValue"
+                                  Limit="@VisibleResultLimit"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-limit-input"
+                                           Placeholder="e.g. component"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No tags found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                                <AutocompleteStatus ClassValue="@StatusClass">
+                                    @{
+                                        var hiddenResultCount = GetHiddenResultCount(limitValue);
+                                    }
+                                    @if (hiddenResultCount > 0)
+                                    {
+                                        <span>Hiding @hiddenResultCount results. Type a more specific query to narrow results.</span>
+                                    }
+                                </AutocompleteStatus>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Auto highlight">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-auto-highlight-input"
+                       class="text-sm font-medium text-gray-700">Auto highlight on type</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-auto-highlight-input"
+                                           Placeholder="e.g. feature"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No tags found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Command palette">
+        <div class="flex w-full justify-center">
+            <DialogRoot Open="@commandPaletteOpen"
+                        OpenChanged="@HandleCommandPaletteOpenChanged">
+                <DialogTrigger ClassValue="@CommandPaletteTriggerClass">
+                    Open command palette
+                </DialogTrigger>
+                <DialogPortal>
+                    <DialogBackdrop ClassValue="@CommandPaletteBackdropClass" />
+                    <DialogViewport ClassValue="@CommandPaletteViewportClass"
+                                    StyleValue="@CommandPaletteViewportStyle">
+                        <DialogPopup ClassValue="@CommandPalettePopupClass"
+                                     InitialFocus="@CommandPaletteInitialFocus"
+                                     aria-label="Command palette">
+                            <AutocompleteRoot TValue="CommandPaletteItem"
+                                              Open="true"
+                                              Inline
+                                              Items="@CommandPaletteItems"
+                                              ItemToStringValue="@CommandPaletteItemToString"
+                                              AutoHighlight="AutocompleteAutoHighlight.Always"
+                                              KeepHighlight
+                                              @bind-Value="commandPaletteValue">
+                                <AutocompleteInput @ref="commandPaletteInput"
+                                                   Placeholder="Search for apps and commands..."
+                                                   ClassValue="@CommandPaletteInputClass"
+                                                   StyleValue="@CommandPaletteInputStyle" />
+                                <DialogClose ClassValue="@CommandPaletteCloseClass">
+                                    Close command palette
+                                </DialogClose>
+                                <div class="min-h-0 flex-1 overflow-y-auto border-t border-gray-200">
+                                    <AutocompleteEmpty ClassValue="@CommandPaletteEmptyClass">No results found.</AutocompleteEmpty>
+                                    <AutocompleteList ClassValue="@CommandPaletteListClass"
+                                                      StyleValue="@CommandPaletteListStyle">
+                                        @{
+                                            var visibleSuggestionItems = GetFilteredCommandItems(CommandSuggestionItems, commandPaletteValue);
+                                            var visibleCommandItems = GetFilteredCommandItems(CommandActionItems, commandPaletteValue);
+                                        }
+                                        @if (visibleSuggestionItems.Count > 0)
+                                        {
+                                            <AutocompleteGroup ClassValue="@CommandPaletteGroupClass">
+                                                <AutocompleteGroupLabel ClassValue="@CommandPaletteGroupLabelClass">Suggestions</AutocompleteGroupLabel>
+                                                @foreach (var item in visibleSuggestionItems)
+                                                {
+                                                    <AutocompleteItem TValue="CommandPaletteItem"
+                                                                      Value="@item"
+                                                                      ClassValue="@CommandPaletteItemClass"
+                                                                      @onclick="@HandleCommandPaletteItemClick">
+                                                        <span class="min-w-0 truncate">@item.Label</span>
+                                                        <span class="shrink-0 text-xs text-gray-500">Application</span>
+                                                    </AutocompleteItem>
+                                                }
+                                            </AutocompleteGroup>
+                                        }
+                                        @if (visibleCommandItems.Count > 0)
+                                        {
+                                            <AutocompleteGroup ClassValue="@CommandPaletteGroupClass">
+                                                <AutocompleteGroupLabel ClassValue="@CommandPaletteGroupLabelClass">Commands</AutocompleteGroupLabel>
+                                                @foreach (var item in visibleCommandItems)
+                                                {
+                                                    <AutocompleteItem TValue="CommandPaletteItem"
+                                                                      Value="@item"
+                                                                      ClassValue="@CommandPaletteItemClass"
+                                                                      @onclick="@HandleCommandPaletteItemClick">
+                                                        <span class="min-w-0 truncate">@item.Label</span>
+                                                        <span class="shrink-0 text-xs text-gray-500">Command</span>
+                                                    </AutocompleteItem>
+                                                }
+                                            </AutocompleteGroup>
+                                        }
+                                    </AutocompleteList>
+                                </div>
+                            </AutocompleteRoot>
+                        </DialogPopup>
+                    </DialogViewport>
+                </DialogPortal>
+            </DialogRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Grid layout">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full flex-col gap-1"
+                 style="max-width:16rem;">
+                <label for="autocomplete-grid-message-input"
+                       class="text-sm font-medium text-gray-700">Message</label>
+                <div class="relative flex w-full">
+                    <input id="autocomplete-grid-message-input"
+                           type="text"
+                           placeholder="iMessage"
+                           value="@gridTextValue"
+                           @oninput="@HandleGridTextInput"
+                           class="min-w-0 flex-1 rounded-l-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                           style="height:2.25rem;border-right-width:0;" />
+                    <AutocompleteRoot TValue="GridPickerItem"
+                                  Open="@gridOpen"
+                                  OpenChanged="@HandleGridOpenChanged"
+                                  OnOpenChangeComplete="@HandleGridOpenComplete"
+                                  Value="@gridSearchValue"
+                                  OnValueChange="@HandleGridSearchValueChange"
+                                  Items="@GridPickerItems"
+                                  ItemToStringValue="@GridPickerItemToString"
+                                  Grid>
+                        <AutocompleteTrigger ClassValue="@GridTriggerClass"
+                                             StyleValue="@GridTriggerStyle"
+                                             aria-label="Choose emoji">
+                            <span aria-hidden="true">☺</span>
+                        </AutocompleteTrigger>
+                        <AutocompletePortal>
+                            <AutocompletePositioner SideOffset="4"
+                                                    Align="Align.End"
+                                                    ClassValue="@PositionerClass"
+                                                    StyleValue="@GridPositionerStyle">
+                                <AutocompletePopup ClassValue="@GridPopupClass"
+                                                   StyleValue="@GridPopupStyle"
+                                                   aria-label="Select emoji">
+                                    <AutocompleteInput Id="autocomplete-grid-input"
+                                                       Placeholder="Search emojis..."
+                                                       ClassValue="@GridSearchInputClass"
+                                                       StyleValue="@GridSearchInputStyle" />
+                                    <AutocompleteEmpty ClassValue="@EmptyClass">No emojis found.</AutocompleteEmpty>
+                                    <AutocompleteList ClassValue="@GridListClass"
+                                                      StyleValue="@GridListStyle">
+                                        @{
+                                            var visibleGridGroups = GetFilteredGridGroups(gridSearchValue);
+                                        }
+                                        @foreach (var group in visibleGridGroups)
+                                        {
+                                            <AutocompleteGroup ClassValue="@GroupClass">
+                                                <AutocompleteGroupLabel ClassValue="@GroupLabelClass">@group.Label</AutocompleteGroupLabel>
+                                                <div class="px-2 pb-2"
+                                                     role="presentation">
+                                                    @foreach (var row in GetGridRows(group.Items))
+                                                    {
+                                                        <AutocompleteRow ClassValue="@GridRowClass"
+                                                                         StyleValue="@GridRowStyle">
+                                                            @foreach (var item in row)
+                                                            {
+                                                                <AutocompleteItem TValue="GridPickerItem"
+                                                                                  Value="@item"
+                                                                                  ClassValue="@GridItemClass"
+                                                                                  StyleValue="@GridItemStyle"
+                                                                                  @onclick="@(() => HandleGridPickerItemClick(item))">
+                                                                    <span class="leading-none"
+                                                                          aria-hidden="true">@item.Symbol</span>
+                                                                    <span class="sr-only">@item.Name</span>
+                                                                </AutocompleteItem>
+                                                            }
+                                                        </AutocompleteRow>
+                                                    }
+                                                </div>
+                                            </AutocompleteGroup>
+                                        }
+                                    </AutocompleteList>
+                                </AutocompletePopup>
+                            </AutocompletePositioner>
+                        </AutocompletePortal>
+                    </AutocompleteRoot>
+                </div>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Virtualized">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-virtualized-input"
+                       class="text-sm font-medium text-gray-700">Search 10,000 items</label>
+                <AutocompleteRoot TValue="VirtualizedItem"
+                                  Items="@VirtualizedItems"
+                                  ItemToStringValue="@VirtualizedItemToString"
+                                  @bind-Value="virtualizedValue"
+                                  OpenOnInputClick
+                                  Virtualized>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-virtualized-input"
+                                           Placeholder="e.g. Item 0042"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No items found.</AutocompleteEmpty>
+                                @{
+                                    var virtualizedRenderItems = GetFilteredVirtualizedRenderItems(virtualizedValue);
+                                }
+                                <AutocompleteList ClassValue="@VirtualizedListClass"
+                                                  StyleValue="@VirtualizedListStyleValue(virtualizedRenderItems.Length)">
+                                    <Virtualize Items="@virtualizedRenderItems"
+                                                Context="entry"
+                                                ItemSize="32"
+                                                OverscanCount="20">
+                                        <AutocompleteItem TValue="VirtualizedItem"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass"
+                                                          aria-setsize="@virtualizedRenderItems.Length"
+                                                          aria-posinset="@(entry.Index + 1)">
+                                            @entry.Item.Name
+                                        </AutocompleteItem>
+                                    </Virtualize>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Events">
+        <div class="flex w-full flex-col items-center gap-3">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-events-input"
+                       class="text-sm font-medium text-gray-700">Search cities</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@CityItems"
+                                  DefaultValue="Tokyo"
+                                  OnValueChange="@HandleEventValueChange"
+                                  OnItemHighlighted="@HandleEventHighlightChange"
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-events-input"
+                                           Placeholder="e.g. Manila"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteClear ClassValue="@ClearClass"
+                                               aria-label="Clear selection">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-linecap="square"
+                                     stroke-linejoin="round"
+                                     style="display: block">
+                                    <path d="m4.5 4.5 7 7m-7 0 7-7" />
+                                </svg>
+                            </AutocompleteClear>
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No cities found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+            <div class="grid w-full max-w-sm gap-1 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                <p>Last value change: <span class="font-medium text-gray-900">@eventValueMessage</span></p>
+                <p>Highlighted item: <span class="font-medium text-gray-900">@eventHighlightMessage</span></p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Form integration">
+        <form class="flex w-full flex-col items-center gap-3"
+              method="get">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-form-input"
+                       class="text-sm font-medium text-gray-700">Required tag</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  DefaultValue="docs"
+                                  Name="tag"
+                                  Required
+                                  AutoHighlight="AutocompleteAutoHighlight.True"
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-form-input"
+                                           Placeholder="e.g. docs"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteClear ClassValue="@ClearClass"
+                                               aria-label="Clear selection">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-linecap="square"
+                                     stroke-linejoin="round"
+                                     style="display: block">
+                                    <path d="m4.5 4.5 7 7m-7 0 7-7" />
+                                </svg>
+                            </AutocompleteClear>
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                    <AutocompletePortal>
+                        <AutocompletePositioner SideOffset="4"
+                                                ClassValue="@PositionerClass"
+                                                StyleValue="@PositionerStyle">
+                            <AutocompletePopup ClassValue="@PopupClass"
+                                               StyleValue="@PopupStyle">
+                                <AutocompleteEmpty ClassValue="@EmptyClass">No tags found.</AutocompleteEmpty>
+                                <AutocompleteList ClassValue="@ListClass"
+                                                  StyleValue="@ListStyle">
+                                    <AutocompleteCollection TValue="string" Context="entry">
+                                        <AutocompleteItem TValue="string"
+                                                          Value="@entry.Item"
+                                                          Index="@entry.Index"
+                                                          ClassValue="@ItemClass">
+                                            @entry.Item
+                                        </AutocompleteItem>
+                                    </AutocompleteCollection>
+                                </AutocompleteList>
+                            </AutocompletePopup>
+                        </AutocompletePositioner>
+                    </AutocompletePortal>
+                </AutocompleteRoot>
+            </div>
+            <button type="submit"
+                    class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-gray-700">
+                Submit
+            </button>
+        </form>
+    </DemoSection>
+
+    <DemoSection Title="Disabled and read-only">
+        <div class="flex w-full flex-wrap justify-center gap-4">
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-disabled-input"
+                       class="text-sm font-medium text-gray-700">Disabled</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  DefaultValue="component: autocomplete"
+                                  Disabled>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-disabled-input"
+                                           Placeholder="Disabled"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                </AutocompleteRoot>
+            </div>
+
+            <div class="flex w-full max-w-sm flex-col gap-1">
+                <label for="autocomplete-readonly-input"
+                       class="text-sm font-medium text-gray-700">Read-only</label>
+                <AutocompleteRoot TValue="string"
+                                  Items="@TagItems"
+                                  DefaultValue="internal"
+                                  ReadOnly
+                                  OpenOnInputClick>
+                    <AutocompleteInputGroup ClassValue="@InputGroupClass">
+                        <AutocompleteInput Id="autocomplete-readonly-input"
+                                           Placeholder="Read-only"
+                                           ClassValue="@InputClass" />
+                        <div class="flex shrink-0 items-center gap-1 text-gray-500">
+                            <AutocompleteTrigger ClassValue="@TriggerClass"
+                                                 aria-label="Open popup">
+                                <svg width="16"
+                                     height="16"
+                                     viewBox="0 0 16 16"
+                                     fill="currentColor"
+                                     style="display: block">
+                                    <path d="M12 6H4l4 4.5z" />
+                                </svg>
+                            </AutocompleteTrigger>
+                        </div>
+                    </AutocompleteInputGroup>
+                </AutocompleteRoot>
+            </div>
+        </div>
+    </DemoSection>
+</ComponentShowcase>
+
+@code {
+    private const int VisibleResultLimit = 8;
+    private const int GridColumnCount = 5;
+    private const int VirtualizedItemSize = 32;
+    private const int VirtualizedListPadding = 8;
+
+    private static readonly char[] SearchWordSeparators = [' ', '-', '.', ',', ';', ':', '/', '\\', '(', ')'];
+
+    private static readonly IReadOnlyList<string> TagItems =
+    [
+        "feature",
+        "fix",
+        "bug",
+        "docs",
+        "internal",
+        "mobile",
+        "component: accordion",
+        "component: alert dialog",
+        "component: autocomplete",
+        "component: avatar",
+        "component: checkbox",
+        "component: checkbox group",
+        "component: collapsible",
+        "component: combobox",
+        "component: context menu",
+        "component: dialog",
+        "component: field",
+        "component: fieldset",
+        "component: filterable menu",
+        "component: form",
+        "component: input",
+        "component: menu",
+        "component: menubar",
+        "component: meter",
+        "component: navigation menu",
+        "component: number field",
+        "component: popover",
+        "component: preview card",
+        "component: progress",
+        "component: radio",
+        "component: scroll area",
+        "component: select",
+        "component: separator",
+        "component: slider",
+        "component: switch",
+        "component: tabs",
+        "component: toast",
+        "component: toggle",
+        "component: toggle group",
+        "component: toolbar",
+        "component: tooltip"
+    ];
+
+    private static readonly IReadOnlyList<string> TypeTagItems =
+    [
+        "feature",
+        "fix",
+        "bug",
+        "docs",
+        "internal",
+        "mobile"
+    ];
+
+    private static readonly IReadOnlyList<string> ComponentTagItems =
+    [
+        "component: accordion",
+        "component: alert dialog",
+        "component: autocomplete",
+        "component: avatar",
+        "component: checkbox",
+        "component: checkbox group",
+        "component: collapsible",
+        "component: combobox",
+        "component: context menu",
+        "component: dialog",
+        "component: field",
+        "component: fieldset",
+        "component: filterable menu",
+        "component: form",
+        "component: input",
+        "component: menu",
+        "component: menubar",
+        "component: meter",
+        "component: navigation menu",
+        "component: number field",
+        "component: popover",
+        "component: preview card",
+        "component: progress",
+        "component: radio",
+        "component: scroll area",
+        "component: select",
+        "component: separator",
+        "component: slider",
+        "component: switch",
+        "component: tabs",
+        "component: toast",
+        "component: toggle",
+        "component: toggle group",
+        "component: toolbar",
+        "component: tooltip"
+    ];
+
+    private static readonly IReadOnlyList<string> CityItems =
+    [
+        "Amsterdam",
+        "Berlin",
+        "Copenhagen",
+        "Dublin",
+        "Helsinki",
+        "Lisbon",
+        "Manila",
+        "Oslo",
+        "Seoul",
+        "Tokyo"
+    ];
+
+    private static readonly IReadOnlyList<DocsSearchItem> DocsSearchItems =
+    [
+        new("React Hooks Guide", "Learn how state, effects, and custom hooks compose reusable behavior.", "React"),
+        new("JavaScript Array Methods", "Map, filter, reduce, and foreach patterns for transforming data.", "JavaScript"),
+        new("CSS Flexbox Layout", "Responsive one-dimensional layout with wrapping and alignment controls.", "CSS"),
+        new("TypeScript Interfaces", "Structural types for object contracts and public API definitions.", "TypeScript"),
+        new("React Performance Optimization", "Memoization, rendering boundaries, and profiler-guided tuning.", "React"),
+        new("HTML Semantic Elements", "Landmarks and element choices that improve accessibility and search indexing.", "HTML"),
+        new("Node Express Server", "Build route handlers and middleware for REST APIs.", "Node"),
+        new("CSS Grid Layout", "Two-dimensional layout patterns for dense application screens.", "CSS"),
+        new("React Testing Library", "Test component behavior through accessible user interactions.", "React"),
+        new("Sass Guide", "Organize variables, mixins, and nested rules for maintainable styles.", "CSS")
+    ];
+
+    private static readonly IReadOnlyList<MovieItem> MovieItems =
+    [
+        new("1", "The Shawshank Redemption", 1994),
+        new("2", "The Godfather", 1972),
+        new("3", "The Dark Knight", 2008),
+        new("4", "The Godfather Part II", 1974),
+        new("5", "12 Angry Men", 1957),
+        new("6", "The Lord of the Rings: The Return of the King", 2003),
+        new("7", "Schindler's List", 1993),
+        new("8", "Pulp Fiction", 1994),
+        new("9", "The Lord of the Rings: The Fellowship of the Ring", 2001),
+        new("10", "The Good, the Bad and the Ugly", 1966),
+        new("11", "Forrest Gump", 1994),
+        new("12", "The Lord of the Rings: The Two Towers", 2002),
+        new("13", "Fight Club", 1999),
+        new("14", "Inception", 2010),
+        new("15", "Star Wars: Episode V - The Empire Strikes Back", 1980),
+        new("16", "The Matrix", 1999),
+        new("17", "Goodfellas", 1990),
+        new("18", "Interstellar", 2014),
+        new("19", "One Flew Over the Cuckoo's Nest", 1975),
+        new("20", "Se7en", 1995)
+    ];
+
+    private static readonly IReadOnlyList<CommandPaletteItem> CommandSuggestionItems =
+    [
+        new("linear", "Linear", "Application"),
+        new("figma", "Figma", "Application"),
+        new("slack", "Slack", "Application"),
+        new("youtube", "YouTube", "Application"),
+        new("raycast", "Raycast", "Application"),
+        new("notion", "Notion", "Application"),
+        new("github", "GitHub", "Application"),
+        new("jira", "Jira", "Application"),
+        new("google-calendar", "Google Calendar", "Application"),
+        new("google-chrome", "Google Chrome", "Application"),
+        new("apple-mail", "Apple Mail", "Application"),
+        new("terminal", "Terminal", "Application")
+    ];
+
+    private static readonly IReadOnlyList<CommandPaletteItem> CommandActionItems =
+    [
+        new("clipboard-history", "Clipboard History", "Command"),
+        new("import-extension", "Import Extension", "Command"),
+        new("create-snippet", "Create Snippet", "Command"),
+        new("system-preferences", "System Preferences", "Command"),
+        new("window-management", "Window Management", "Command"),
+        new("toggle-dark-mode", "Toggle Dark Mode", "Command"),
+        new("new-window", "New Window", "Command"),
+        new("new-tab", "New Tab", "Command"),
+        new("search-documentation", "Search Documentation", "Command"),
+        new("capture-screenshot", "Capture Screenshot", "Command"),
+        new("toggle-sidebar", "Toggle Sidebar", "Command"),
+        new("toggle-integrated-terminal", "Toggle Integrated Terminal", "Command"),
+        new("run-script", "Run Script", "Command")
+    ];
+
+    private static readonly IReadOnlyList<CommandPaletteItem> CommandPaletteItems =
+        CommandSuggestionItems.Concat(CommandActionItems).ToArray();
+
+    private static readonly IReadOnlyList<GridPickerGroup> GridPickerGroups =
+    [
+        new("frequent", "Frequently Used",
+        [
+            new("grinning", "😀", "Grinning"),
+            new("smile", "😄", "Smile"),
+            new("laugh", "😂", "Laugh"),
+            new("wink", "😉", "Wink"),
+            new("heart-eyes", "😍", "Heart eyes"),
+            new("thinking", "🤔", "Thinking"),
+            new("sunglasses", "😎", "Sunglasses"),
+            new("raise-hands", "🙌", "Raise hands"),
+            new("thumbs-up", "👍", "Thumbs up"),
+            new("fire", "🔥", "Fire")
+        ]),
+        new("objects", "Objects",
+        [
+            new("check", "✅", "Check"),
+            new("star", "⭐", "Star"),
+            new("idea", "💡", "Idea"),
+            new("pin", "📌", "Pin"),
+            new("clip", "📎", "Clip"),
+            new("lock", "🔒", "Lock"),
+            new("bell", "🔔", "Bell"),
+            new("settings", "⚙️", "Settings"),
+            new("compass", "🧭", "Compass"),
+            new("experiment", "🧪", "Experiment")
+        ])
+    ];
+
+    private static readonly IReadOnlyList<GridPickerItem> GridPickerItems =
+        GridPickerGroups.SelectMany(group => group.Items).ToArray();
+
+    private static readonly IReadOnlyList<VirtualizedItem> VirtualizedItems =
+        Enumerable.Range(1, 10_000)
+            .Select(index => new VirtualizedItem(index, $"Item {index:0000}"))
+            .ToArray();
+
+    private string basicValue = string.Empty;
+    private string groupedValue = string.Empty;
+    private string limitValue = string.Empty;
+    private string asyncSearchValue = string.Empty;
+    private IReadOnlyList<MovieItem> asyncSearchResults = [];
+    private bool asyncSearchPending;
+    private string? asyncSearchError;
+    private string? asyncSearchStatus;
+    private int asyncSearchVersion;
+    private string eventValueMessage = "None";
+    private string eventHighlightMessage = "None";
+    private bool commandPaletteOpen;
+    private AutocompleteInput? commandPaletteInput;
+    private int commandPaletteFocusRequest;
+    private int handledCommandPaletteFocusRequest;
+    private string commandPaletteValue = string.Empty;
+    private bool gridOpen;
+    private string gridTextValue = string.Empty;
+    private string gridSearchValue = string.Empty;
+    private string virtualizedValue = string.Empty;
+
+    private FocusTarget CommandPaletteInitialFocus =>
+        commandPaletteInput?.Element is { } element
+            ? new FocusTarget.Element(element)
+            : new FocusTarget.Default();
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (handledCommandPaletteFocusRequest == commandPaletteFocusRequest)
+        {
+            return;
+        }
+
+        var focusRequest = commandPaletteFocusRequest;
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            await Task.Delay(50);
+
+            if (!commandPaletteOpen || focusRequest != commandPaletteFocusRequest)
+            {
+                return;
+            }
+
+            if (commandPaletteInput?.Element is not { } element)
+            {
+                continue;
+            }
+
+            await element.FocusAsync(preventScroll: true);
+            handledCommandPaletteFocusRequest = focusRequest;
+            return;
+        }
+    }
+
+    private static string InputGroupClass(AutocompleteInputGroupState state)
+    {
+        return "flex w-full max-w-sm items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 shadow-sm transition data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 data-[popup-open]:border-indigo-500 data-[popup-open]:ring-2 data-[popup-open]:ring-indigo-500/20";
+    }
+
+    private static string InputClass(AutocompleteInputState state)
+    {
+        return "min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-gray-900 outline-none placeholder:text-gray-400 disabled:cursor-not-allowed";
+    }
+
+    private static string AsyncInputClass(AutocompleteInputState state)
+    {
+        return "h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-sm outline-none placeholder:text-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20";
+    }
+
+    private static string ClearClass(AutocompleteClearState state)
+    {
+        return "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 data-[empty]:hidden";
+    }
+
+    private static string TriggerClass(AutocompleteTriggerState state)
+    {
+        return "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-60 data-[popup-open]:bg-gray-100 data-[popup-open]:text-gray-900";
+    }
+
+    private static string PositionerClass(AutocompletePositionerState state)
+    {
+        return "z-50";
+    }
+
+    private static string PositionerStyle(AutocompletePositionerState state)
+    {
+        return "width:var(--anchor-width,20rem);max-width:var(--available-width,100vw);";
+    }
+
+    private static string PopupClass(AutocompletePopupState state)
+    {
+        return "rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg outline-none";
+    }
+
+    private static string PopupStyle(AutocompletePopupState state)
+    {
+        return "box-sizing:border-box;width:var(--anchor-width,20rem);max-width:var(--available-width,100vw);";
+    }
+
+    private static string EmptyClass(AutocompleteEmptyState state)
+    {
+        return "px-3 py-2 text-sm text-gray-500";
+    }
+
+    private static string ListClass(AutocompleteListState state)
+    {
+        return "space-y-1";
+    }
+
+    private static string ListStyle(AutocompleteListState state)
+    {
+        return "box-sizing:border-box;max-height:min(22.5rem,var(--available-height,22.5rem));overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:0.25rem;";
+    }
+
+    private static string GroupClass(AutocompleteGroupState state)
+    {
+        return "block pb-2";
+    }
+
+    private static string GroupLabelClass(AutocompleteGroupLabelState state)
+    {
+        return "px-3 py-2 text-sm font-medium text-gray-500";
+    }
+
+    private static string HighlightedItemTone(AutocompleteItemState state)
+    {
+        return state.Highlighted ? "bg-gray-100 text-gray-900" : "text-gray-700";
+    }
+
+    private static string ItemClass(AutocompleteItemState state)
+    {
+        return $"cursor-default rounded px-3 py-2 text-sm {HighlightedItemTone(state)} outline-none transition-colors hover:bg-gray-100 hover:text-gray-900 data-[selected]:font-medium data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+    }
+
+    private static string DocsSearchItemClass(AutocompleteItemState state)
+    {
+        return $"cursor-default rounded px-3 py-2 text-sm {HighlightedItemTone(state)} outline-none transition-colors hover:bg-gray-100 hover:text-gray-900 data-[selected]:font-medium data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+    }
+
+    private static string StatusClass(AutocompleteStatusState state)
+    {
+        return "px-3 py-2 text-sm text-gray-500";
+    }
+
+    private static string AsyncStatusClass(AutocompleteStatusState state)
+    {
+        return "block";
+    }
+
+    private static string AsyncMovieItemClass(AutocompleteItemState state)
+    {
+        return $"cursor-default rounded px-3 py-2 text-sm {HighlightedItemTone(state)} outline-none transition-colors hover:bg-gray-100 hover:text-gray-900 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+    }
+
+    private static string CommandPaletteTriggerClass(DialogTriggerState state)
+    {
+        return "inline-flex h-9 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/30";
+    }
+
+    private static string CommandPaletteBackdropClass(DialogBackdropState state)
+    {
+        return "fixed inset-0 z-40 bg-black/20 transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0";
+    }
+
+    private static string CommandPaletteViewportClass(DialogViewportState state)
+    {
+        return "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto";
+    }
+
+    private static string CommandPaletteViewportStyle(DialogViewportState state)
+    {
+        return "box-sizing:border-box;padding:5rem 1rem;";
+    }
+
+    private static string CommandPalettePopupClass(DialogPopupState state)
+    {
+        return "relative flex max-h-[min(36rem,calc(100dvh-4rem))] w-full max-w-lg flex-col overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-xl outline-none";
+    }
+
+    private static string CommandPaletteInputClass(AutocompleteInputState state)
+    {
+        return "h-11 w-full border-0 bg-white px-3 text-sm text-gray-900 outline-none placeholder:text-gray-400";
+    }
+
+    private static string CommandPaletteInputStyle(AutocompleteInputState state)
+    {
+        return "box-sizing:border-box;height:2.75rem;";
+    }
+
+    private static string CommandPaletteCloseClass(DialogCloseState state)
+    {
+        return "sr-only";
+    }
+
+    private static string CommandPaletteEmptyClass(AutocompleteEmptyState state)
+    {
+        return "flex min-h-28 items-center px-3 py-4 text-sm text-gray-500";
+    }
+
+    private static string CommandPaletteListClass(AutocompleteListState state)
+    {
+        return "py-1";
+    }
+
+    private static string CommandPaletteListStyle(AutocompleteListState state)
+    {
+        return "max-height:min(24rem,60dvh);overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:0.25rem;";
+    }
+
+    private static string CommandPaletteGroupClass(AutocompleteGroupState state)
+    {
+        return "block pb-1";
+    }
+
+    private static string CommandPaletteGroupLabelClass(AutocompleteGroupLabelState state)
+    {
+        return "px-3 py-2 text-xs font-medium text-gray-500";
+    }
+
+    private static string CommandPaletteItemClass(AutocompleteItemState state)
+    {
+        return $"grid min-h-9 cursor-default grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2 text-sm {HighlightedItemTone(state)} outline-none transition-colors hover:bg-gray-100 hover:text-gray-900 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+    }
+
+    private static string GridTriggerClass(AutocompleteTriggerState state)
+    {
+        return "inline-flex shrink-0 items-center justify-center border border-gray-300 bg-white text-sm text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 data-[popup-open]:border-indigo-500 data-[popup-open]:text-indigo-700";
+    }
+
+    private static string GridTriggerStyle(AutocompleteTriggerState state)
+    {
+        return "width:2.25rem;height:2.25rem;border-top-right-radius:0.375rem;border-bottom-right-radius:0.375rem;";
+    }
+
+    private static string GridPositionerStyle(AutocompletePositionerState state)
+    {
+        return "width:16rem;max-width:var(--available-width,100vw);";
+    }
+
+    private static string GridPopupClass(AutocompletePopupState state)
+    {
+        return "overflow-hidden rounded-md border border-gray-200 bg-white p-0 text-sm shadow-lg outline-none";
+    }
+
+    private static string GridPopupStyle(AutocompletePopupState state)
+    {
+        return "box-sizing:border-box;width:16rem;max-width:var(--available-width,100vw);";
+    }
+
+    private static string GridSearchInputClass(AutocompleteInputState state)
+    {
+        return "w-full border-0 bg-white px-3 text-sm text-gray-900 outline-none placeholder:text-gray-400";
+    }
+
+    private static string GridSearchInputStyle(AutocompleteInputState state)
+    {
+        return "height:2.25rem;border-bottom:1px solid rgb(229 231 235);";
+    }
+
+    private static string GridListClass(AutocompleteListState state)
+    {
+        return "py-1";
+    }
+
+    private static string GridListStyle(AutocompleteListState state)
+    {
+        return "box-sizing:border-box;max-height:min(calc(20.5rem - 2.25rem),calc(var(--available-height,22.5rem) - 2.25rem));overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:0.25rem;";
+    }
+
+    private static string GridRowClass(AutocompleteRowState state)
+    {
+        return "grid gap-1";
+    }
+
+    private static string GridRowStyle(AutocompleteRowState state)
+    {
+        return $"grid-template-columns:repeat({GridColumnCount},minmax(0,1fr));";
+    }
+
+    private static string GridItemClass(AutocompleteItemState state)
+    {
+        return $"flex cursor-default items-center justify-center rounded px-2 py-2 text-center {HighlightedItemTone(state)} outline-none transition-colors hover:bg-gray-100 hover:text-gray-900 data-[selected]:font-medium data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50";
+    }
+
+    private static string GridItemStyle(AutocompleteItemState state)
+    {
+        return "min-height:2.5rem;font-size:1.25rem;line-height:1;";
+    }
+
+    private static string VirtualizedListClass(AutocompleteListState state)
+    {
+        return "p-1";
+    }
+
+    private static Func<AutocompleteListState, string?> VirtualizedListStyleValue(int itemCount)
+    {
+        return _ => GetVirtualizedListStyle(itemCount);
+    }
+
+    private static string GetVirtualizedListStyle(int itemCount)
+    {
+        var height = itemCount == 0 ? 0 : itemCount * VirtualizedItemSize + VirtualizedListPadding;
+        return $"box-sizing:border-box;height:min(22.5rem,{height}px);max-height:var(--available-height,22.5rem);overflow-y:auto;overscroll-behavior:contain;scroll-padding-block:0.25rem;";
+    }
+
+    private static IReadOnlyList<string> GetFilteredTags(IReadOnlyList<string> source, string value)
+    {
+        var query = value.Trim();
+        if (query.Length == 0)
+        {
+            return source;
+        }
+
+        return source.Where(item => MatchesTag(item, query)).ToArray();
+    }
+
+    private static int GetHiddenResultCount(string value)
+    {
+        var matchCount = CountTagMatches(value);
+        return Math.Max(0, matchCount - VisibleResultLimit);
+    }
+
+    private static int CountTagMatches(string value)
+    {
+        var query = value.Trim();
+        return query.Length == 0
+            ? TagItems.Count
+            : TagItems.Count(item => MatchesTag(item, query));
+    }
+
+    private static bool MatchesTag(string item, string query)
+    {
+        return item.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static IReadOnlyList<CommandPaletteItem> GetFilteredCommandItems(IReadOnlyList<CommandPaletteItem> source, string value)
+    {
+        var query = value.Trim();
+        if (query.Length == 0)
+        {
+            return source;
+        }
+
+        return source.Where(item => MatchesCommandPaletteItem(item, query)).ToArray();
+    }
+
+    private static bool MatchesCommandPaletteItem(CommandPaletteItem item, string query)
+    {
+        return item.Label.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Kind.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static string? CommandPaletteItemToString(CommandPaletteItem? item)
+    {
+        return item?.Label;
+    }
+
+    private static IReadOnlyList<GridPickerGroup> GetFilteredGridGroups(string value)
+    {
+        var query = value.Trim();
+        if (query.Length == 0)
+        {
+            return GridPickerGroups;
+        }
+
+        return GridPickerGroups
+            .Select(group => group with
+            {
+                Items = group.Items
+                    .Where(item => MatchesGridPickerItem(item, query))
+                    .ToArray()
+            })
+            .Where(group => group.Items.Count > 0)
+            .ToArray();
+    }
+
+    private static bool MatchesGridPickerItem(GridPickerItem item, string query)
+    {
+        return item.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Symbol.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static IEnumerable<IReadOnlyList<GridPickerItem>> GetGridRows(IReadOnlyList<GridPickerItem> items)
+    {
+        for (var index = 0; index < items.Count; index += GridColumnCount)
+        {
+            yield return items.Skip(index).Take(GridColumnCount).ToArray();
+        }
+    }
+
+    private static string? GridPickerItemToString(GridPickerItem? item)
+    {
+        return item?.Name;
+    }
+
+    private static VirtualizedRenderItem[] GetFilteredVirtualizedRenderItems(string value)
+    {
+        var query = value.Trim();
+        var filteredItems = query.Length == 0
+            ? VirtualizedItems
+            : VirtualizedItems
+                .Where(item => item.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+                .ToArray();
+
+        return filteredItems
+            .Select((item, index) => new VirtualizedRenderItem(item, index))
+            .ToArray();
+    }
+
+    private static string? VirtualizedItemToString(VirtualizedItem? item)
+    {
+        return item?.Name;
+    }
+
+    private static string? MovieItemToString(MovieItem? item)
+    {
+        return item?.Title;
+    }
+
+    private static string? DocsSearchItemToString(DocsSearchItem? item)
+    {
+        return item?.Title;
+    }
+
+    private static bool DocsSearchFilter(DocsSearchItem item, string query, Func<DocsSearchItem, string?>? stringify)
+    {
+        var trimmed = query.Trim();
+        if (trimmed.Length == 0)
+        {
+            return true;
+        }
+
+        return trimmed
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .All(token =>
+                IsFuzzyMatch(item.Title, token) ||
+                IsFuzzyMatch(item.Description, token) ||
+                IsFuzzyMatch(item.Category, token));
+    }
+
+    private static bool IsFuzzyMatch(string value, string query)
+    {
+        if (value.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return true;
+        }
+
+        foreach (var word in value.Split(SearchWordSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IsSubsequenceMatch(word, query))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSubsequenceMatch(string value, string query)
+    {
+        if (value.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return true;
+        }
+
+        var queryIndex = 0;
+        foreach (var character in value)
+        {
+            if (char.ToUpperInvariant(character) == char.ToUpperInvariant(query[queryIndex]))
+            {
+                queryIndex++;
+                if (queryIndex == query.Length)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool MatchesMovieItem(MovieItem item, string query)
+    {
+        return item.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase) ||
+            item.Year.ToString(CultureInfo.InvariantCulture).Contains(query, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static string DisplayValue(string value)
+    {
+        return string.IsNullOrEmpty(value) ? "Empty" : value;
+    }
+
+    private async Task HandleAsyncSearchValueChange(AutocompleteValueChangeEventArgs args)
+    {
+        asyncSearchValue = args.Value;
+        asyncSearchError = null;
+
+        var query = args.Value.Trim();
+        var searchVersion = ++asyncSearchVersion;
+        if (query.Length == 0)
+        {
+            asyncSearchResults = [];
+            asyncSearchPending = false;
+            asyncSearchStatus = null;
+            return;
+        }
+
+        asyncSearchPending = true;
+        asyncSearchStatus = GetAsyncSearchStatus(query);
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(250);
+        if (searchVersion != asyncSearchVersion)
+        {
+            return;
+        }
+
+        asyncSearchPending = false;
+        if (query.Equals("will_error", StringComparison.CurrentCultureIgnoreCase))
+        {
+            asyncSearchResults = [];
+            asyncSearchError = "Failed to fetch movies. Please try again.";
+        }
+        else
+        {
+            asyncSearchResults = MovieItems.Where(item => MatchesMovieItem(item, query)).ToArray();
+        }
+
+        asyncSearchStatus = GetAsyncSearchStatus(query);
+    }
+
+    private string? GetAsyncSearchStatus(string query)
+    {
+        if (asyncSearchPending)
+        {
+            return "Searching...";
+        }
+
+        if (asyncSearchError is not null)
+        {
+            return asyncSearchError;
+        }
+
+        if (query.Length == 0)
+        {
+            return null;
+        }
+
+        if (asyncSearchResults.Count == 0)
+        {
+            return $"Movie or year \"{query}\" does not exist in the Top 100 IMDb movies";
+        }
+
+        return $"{asyncSearchResults.Count} result{(asyncSearchResults.Count == 1 ? string.Empty : "s")} found";
+    }
+
+    private void HandleCommandPaletteOpenChanged(bool open)
+    {
+        commandPaletteOpen = open;
+        if (!open)
+        {
+            commandPaletteValue = string.Empty;
+        }
+        else
+        {
+            commandPaletteFocusRequest++;
+        }
+    }
+
+    private void HandleCommandPaletteItemClick(MouseEventArgs args)
+    {
+        commandPaletteOpen = false;
+    }
+
+    private void HandleGridOpenChanged(bool open)
+    {
+        gridOpen = open;
+        if (!open)
+        {
+            gridSearchValue = string.Empty;
+        }
+    }
+
+    private void HandleGridOpenComplete(bool open)
+    {
+        if (!open)
+        {
+            gridSearchValue = string.Empty;
+        }
+    }
+
+    private void HandleGridSearchValueChange(AutocompleteValueChangeEventArgs args)
+    {
+        if (args.Reason != AutocompleteChangeReason.ItemPress)
+        {
+            gridSearchValue = args.Value;
+        }
+    }
+
+    private void HandleGridTextInput(ChangeEventArgs args)
+    {
+        gridTextValue = Convert.ToString(args.Value) ?? string.Empty;
+    }
+
+    private void HandleGridPickerItemClick(GridPickerItem item)
+    {
+        gridTextValue += item.Symbol;
+        gridSearchValue = string.Empty;
+        gridOpen = false;
+    }
+
+    private void HandleEventValueChange(AutocompleteValueChangeEventArgs args)
+    {
+        eventValueMessage = $"{args.Reason}: {DisplayValue(args.Value)}";
+    }
+
+    private void HandleEventHighlightChange(AutocompleteHighlightEventArgs<string> args)
+    {
+        eventHighlightMessage = args.Index < 0 ? "None" : $"{args.Value} ({args.Reason})";
+    }
+
+    private sealed record DocsSearchItem(string Title, string Description, string Category);
+
+    private sealed record MovieItem(string Id, string Title, int Year);
+
+    private sealed record CommandPaletteItem(string Value, string Label, string Kind);
+
+    private sealed record GridPickerGroup(string Value, string Label, IReadOnlyList<GridPickerItem> Items);
+
+    private sealed record GridPickerItem(string Value, string Symbol, string Name);
+
+    private sealed record VirtualizedItem(int Id, string Name);
+
+    private sealed record VirtualizedRenderItem(VirtualizedItem Item, int Index);
+}

@@ -330,9 +330,19 @@ function cleanupOutsideClick(rootState) {
     }
 }
 
-// Source: useDialogRoot.ts outsidePress guard — for modal dialogs, clicking the backdrop
-// element itself (not the popup) dismisses the dialog. Uses capture-phase 'click' event
-// ('intentional' mode in source) so that pointerdown alone does not dismiss.
+function isOutsideDialog(rootState, target) {
+    const popupElement = rootState.popupElement;
+    const triggerElement = rootState.triggerElement;
+
+    if (!popupElement) return false;
+
+    return !popupElement.contains(target) &&
+           !(triggerElement && triggerElement.contains(target));
+}
+
+// Source: useDialogRoot.ts outsidePress guard — for modal dialogs, a click whose target is
+// outside the popup dismisses the dialog. Uses capture-phase 'click' event ('intentional'
+// mode in source) so that pointerdown alone does not dismiss.
 function setupBackdropClickListener(rootState) {
     cleanupBackdropClick(rootState);
 
@@ -342,11 +352,8 @@ function setupBackdropClickListener(rootState) {
         if (!isTopmostDialog(rootState.rootId)) return;
 
         const target = e.composedPath ? e.composedPath()[0] : e.target;
-        const backdropElement = rootState.backdropElement;
 
-        if (!backdropElement) return;
-
-        if (target === backdropElement && rootState.dotNetRef) {
+        if (isOutsideDialog(rootState, target) && rootState.dotNetRef) {
             rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
         }
     };

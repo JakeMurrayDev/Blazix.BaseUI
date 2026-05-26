@@ -463,6 +463,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithOutsideAboveBackdrop(bool value)
+    {
+        queryParams["outsideAboveBackdrop"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithSide(string side)
     {
         queryParams["side"] = side;
@@ -995,6 +1001,37 @@ public sealed class TestPageUrlBuilder
     public TestPageUrlBuilder WithSelectName(string name)
     {
         queryParams["selectName"] = name;
+        return this;
+    }
+
+    // Autocomplete-specific parameters
+    public TestPageUrlBuilder WithAutocompleteDefaultValue(string value)
+    {
+        queryParams["defaultValue"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteMode(string value)
+    {
+        queryParams["mode"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteAutoHighlight(string value)
+    {
+        queryParams["autoHighlight"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteFilterDisabled(bool value)
+    {
+        queryParams["filterDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteInputInsidePopup(bool value)
+    {
+        queryParams["inputInsidePopup"] = value.ToString().ToLowerInvariant();
         return this;
     }
 

@@ -65,4 +65,6 @@ global using BlazorBaseUI.FloatingFocusManager;
 global using BlazorBaseUI.Tests.Contracts.FloatingFocusManager;
 global using BlazorBaseUI.FloatingDelayGroup;
 global using BlazorBaseUI.Tests.Contracts.FloatingDelayGroup;
+global using BlazorBaseUI.Autocomplete;
+global using BlazorBaseUI.Tests.Contracts.Autocomplete;
 global using BlazorBaseUI.Tests.Infrastructure;

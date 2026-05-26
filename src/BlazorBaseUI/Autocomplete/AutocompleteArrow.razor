@@ -1,0 +1,178 @@
+@implements IDisposable
+
+<RenderElement TState="AutocompleteArrowState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private AutocompleteArrowState state;
+    private RenderElement<AutocompleteArrowState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private IAutocompleteRootContext? subscribedRootContext;
+    private AutocompletePositionerContext? subscribedPositionerContext;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private AutocompletePositionerContext? PositionerContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteArrowState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteArrowState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteArrowState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        SyncRootSubscription();
+        SyncPositionerSubscription();
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        SyncRootSubscription();
+        SyncPositionerSubscription();
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (PositionerContext is not null && !Nullable.Equals(previousElement, Element))
+        {
+            previousElement = Element;
+            PositionerContext.SetArrowElement(Element);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribedRootContext is not null)
+        {
+            subscribedRootContext.StateChanged -= OnRootStateChanged;
+            subscribedRootContext = null;
+        }
+
+        if (subscribedPositionerContext is not null)
+        {
+            subscribedPositionerContext.StateChanged -= OnPositionerStateChanged;
+            subscribedPositionerContext = null;
+        }
+
+        PositionerContext?.SetArrowElement(null);
+    }
+
+    private void SyncRootSubscription()
+    {
+        if (ReferenceEquals(subscribedRootContext, RootContext))
+        {
+            return;
+        }
+
+        if (subscribedRootContext is not null)
+        {
+            subscribedRootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        subscribedRootContext = RootContext;
+        if (subscribedRootContext is not null)
+        {
+            subscribedRootContext.StateChanged += OnRootStateChanged;
+        }
+    }
+
+    private void SyncPositionerSubscription()
+    {
+        if (ReferenceEquals(subscribedPositionerContext, PositionerContext))
+        {
+            return;
+        }
+
+        if (subscribedPositionerContext is not null)
+        {
+            subscribedPositionerContext.StateChanged -= OnPositionerStateChanged;
+        }
+
+        subscribedPositionerContext = PositionerContext;
+        if (subscribedPositionerContext is not null)
+        {
+            subscribedPositionerContext.StateChanged += OnPositionerStateChanged;
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnPositionerStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var side = PositionerContext?.Side ?? RootContext?.PopupSide ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? RootContext?.PopupAlign ?? Align.Center;
+        var open = RootContext?.Mounted == true;
+        state = new AutocompleteArrowState(open, side, align, PositionerContext?.ArrowUncentered == true);
+
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["aria-hidden"] = "true",
+            ["data-side"] = side.ToDataAttributeString()!,
+            ["data-align"] = align.ToDataAttributeString()!,
+            ["data-open"] = open,
+            ["data-closed"] = !open
+        };
+
+        if (state.Uncentered)
+        {
+            componentAttributes["data-uncentered"] = true;
+        }
+    }
+}
