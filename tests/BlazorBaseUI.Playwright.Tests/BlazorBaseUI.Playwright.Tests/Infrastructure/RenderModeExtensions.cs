@@ -998,6 +998,31 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    // Autocomplete-specific parameters
+    public TestPageUrlBuilder WithAutocompleteDefaultValue(string value)
+    {
+        queryParams["defaultValue"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteMode(string value)
+    {
+        queryParams["mode"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteAutoHighlight(string value)
+    {
+        queryParams["autoHighlight"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithAutocompleteFilterDisabled(bool value)
+    {
+        queryParams["filterDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public string Build()
     {
         var sb = new StringBuilder();

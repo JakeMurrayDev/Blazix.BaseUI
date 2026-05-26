@@ -1,0 +1,22 @@
+@typeparam TValue
+@foreach (var item in ItemsToRender)
+{
+    @ChildContent(item)
+}
+
+@code {
+    private IReadOnlyList<AutocompleteCollectionItem<TValue>> ItemsToRender =>
+        TypedRootContext?.GetFlatFilteredItems()
+            .Select((item, index) => new AutocompleteCollectionItem<TValue>(item, index))
+            .ToList()
+        ?? [];
+
+    [CascadingParameter]
+    private AutocompleteRootContext<TValue>? TypedRootContext { get; set; }
+
+    /// <summary>
+    /// Renders a filtered item.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public RenderFragment<AutocompleteCollectionItem<TValue>> ChildContent { get; set; } = null!;
+}

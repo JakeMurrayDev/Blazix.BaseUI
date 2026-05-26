@@ -1,0 +1,117 @@
+@page "/tests/autocomplete/server"
+@using BlazorBaseUI.Autocomplete
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Autocomplete Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <AutocompleteRoot TValue="string"
+                      Items="fruits"
+                      DefaultValue="@DefaultValue"
+                      @bind-Value="inputValue"
+                      DefaultOpen="@DefaultOpen"
+                      @bind-Open="isOpen"
+                      Mode="@ResolvedMode"
+                      AutoHighlight="@ResolvedAutoHighlight"
+                      Disabled="@Disabled"
+                      ReadOnly="@ReadOnly"
+                      Required="@Required"
+                      FilterDisabled="@FilterDisabled"
+                      Name="fruit"
+                      OnValueChange="HandleValueChange"
+                      OnItemHighlighted="HandleItemHighlighted">
+        <AutocompleteInput data-testid="autocomplete-input" placeholder="Search fruit" />
+        <AutocompleteTrigger data-testid="autocomplete-trigger">Toggle</AutocompleteTrigger>
+        <AutocompletePositioner data-testid="autocomplete-positioner">
+            <AutocompletePopup data-testid="autocomplete-popup">
+                <AutocompleteEmpty data-testid="autocomplete-empty">No matches</AutocompleteEmpty>
+                <AutocompleteList data-testid="autocomplete-list">
+                    <AutocompleteCollection TValue="string" Context="entry">
+                        <AutocompleteItem TValue="string"
+                                          Value="@entry.Item"
+                                          Index="@entry.Index"
+                                          data-testid="@($"autocomplete-item-{entry.Item.ToLowerInvariant()}")">
+                            @entry.Item
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompleteRoot>
+
+    <div data-testid="state-display">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Value: <span data-testid="input-value">@inputValue</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Highlight: <span data-testid="highlighted-value">@highlightedValue</span></div>
+        <div>Highlight Reason: <span data-testid="highlight-reason">@highlightReason</span></div>
+    </div>
+
+    <button data-testid="outside-button">Outside Button</button>
+</div>
+
+@code {
+    private readonly IReadOnlyList<string> fruits = ["Apple", "Apricot", "Banana", "Cherry"];
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? Mode { get; set; }
+
+    [SupplyParameterFromQuery(Name = "autoHighlight")]
+    public string? AutoHighlight { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnly")]
+    public bool ReadOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "required")]
+    public bool Required { get; set; }
+
+    [SupplyParameterFromQuery(Name = "filterDisabled")]
+    public bool FilterDisabled { get; set; }
+
+    private string inputValue = "";
+    private bool isOpen;
+    private string lastReason = "";
+    private string highlightedValue = "";
+    private string highlightReason = "";
+
+    private AutocompleteMode ResolvedMode => Mode?.ToLowerInvariant() switch
+    {
+        "both" => AutocompleteMode.Both,
+        "inline" => AutocompleteMode.Inline,
+        "none" => AutocompleteMode.None,
+        _ => AutocompleteMode.List
+    };
+
+    private AutocompleteAutoHighlight ResolvedAutoHighlight => AutoHighlight?.ToLowerInvariant() switch
+    {
+        "always" => AutocompleteAutoHighlight.Always,
+        "true" => AutocompleteAutoHighlight.True,
+        _ => AutocompleteAutoHighlight.False
+    };
+
+    protected override void OnInitialized()
+    {
+        inputValue = DefaultValue ?? "";
+        isOpen = DefaultOpen;
+    }
+
+    private void HandleValueChange(AutocompleteValueChangeEventArgs args)
+    {
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleItemHighlighted(AutocompleteHighlightEventArgs<string> args)
+    {
+        highlightedValue = args.Value ?? "";
+        highlightReason = args.Reason.ToString();
+    }
+}

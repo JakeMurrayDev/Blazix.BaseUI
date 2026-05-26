@@ -1,0 +1,21 @@
+@if (ChildContent is not null)
+{
+    @ChildContent(CurrentValue)
+}
+else
+{
+    @CurrentValue
+}
+
+@code {
+    private string CurrentValue => RootContext?.GetInputValue() ?? string.Empty;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Defines content rendered with the current input value.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<string>? ChildContent { get; set; }
+}

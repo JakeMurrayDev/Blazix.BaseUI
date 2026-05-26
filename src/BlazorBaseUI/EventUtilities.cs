@@ -42,6 +42,11 @@ internal static class EventUtilities
         return InvokeEventAsync(additionalAttributes, "onmousemove", e);
     }
 
+    public static Task InvokeOnMouseDownAsync(IReadOnlyDictionary<string, object>? additionalAttributes, MouseEventArgs e)
+    {
+        return InvokeEventAsync(additionalAttributes, "onmousedown", e);
+    }
+
     public static Task InvokeOnFocusAsync(IReadOnlyDictionary<string, object>? additionalAttributes, FocusEventArgs e)
     {
         return InvokeEventAsync(additionalAttributes, "onfocus", e);
@@ -65,6 +70,11 @@ internal static class EventUtilities
     public static Task InvokeOnPointerMoveAsync(IReadOnlyDictionary<string, object>? additionalAttributes, PointerEventArgs e)
     {
         return InvokeEventAsync(additionalAttributes, "onpointermove", e);
+    }
+
+    public static Task InvokeOnPointerLeaveAsync(IReadOnlyDictionary<string, object>? additionalAttributes, PointerEventArgs e)
+    {
+        return InvokeEventAsync(additionalAttributes, "onpointerleave", e);
     }
 
     public static Task InvokeOnMouseUpAsync(IReadOnlyDictionary<string, object>? additionalAttributes, MouseEventArgs e)

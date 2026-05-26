@@ -1,0 +1,94 @@
+@implements IDisposable
+
+<RenderElement TState="AutocompleteBackdropState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null && RootContext.Mounted"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private AutocompleteBackdropState state;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteBackdropState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteBackdropState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteBackdropState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var open = RootContext?.Mounted == true;
+        state = new AutocompleteBackdropState(open, RootContext?.TransitionStatus ?? TransitionStatus.Undefined);
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["aria-hidden"] = "true",
+            ["data-open"] = open,
+            ["data-closed"] = !open
+        };
+
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(
+            componentAttributes,
+            RootContext?.TransitionStatus ?? TransitionStatus.Undefined);
+    }
+}
