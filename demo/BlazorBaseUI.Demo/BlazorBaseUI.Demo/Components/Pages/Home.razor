@@ -1,7 +1,108 @@
 ﻿@page "/"
+@using BlazorBaseUI.Button
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>BlazorBaseUI Demo</PageTitle>
 
-<h1>Hello, world!</h1>
+<section class="demo-home">
+    <div class="demo-home__hero">
+        <div class="demo-home__copy">
+            <span class="demo-kicker">Microsoft Fluent inspired demo</span>
+            <h1>BlazorBaseUI</h1>
+            <p>
+                Accessible, unstyled Base UI primitives ported to Blazor and presented in a token-driven
+                Fluent console for scanning behavior, states, and render modes.
+            </p>
+            <div class="demo-home__actions">
+                <Button class="demo-button demo-button--primary" @onclick="NavigateToButton">
+                    Explore components
+                </Button>
+                <Button class="demo-button" @onclick="NavigateToTabs">
+                    View navigation primitives
+                </Button>
+            </div>
+        </div>
 
-Welcome to your new app.
+        <div class="demo-home__preview" aria-label="Demo system summary">
+            <div class="demo-home__preview-bar">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <div class="demo-home__metric-grid">
+                <div>
+                    <strong>27</strong>
+                    <span>demo pages</span>
+                </div>
+                <div>
+                    <strong>2</strong>
+                    <span>render modes</span>
+                </div>
+                <div>
+                    <strong>AA</strong>
+                    <span>accessibility focus</span>
+                </div>
+            </div>
+            <div class="demo-home__mini-card">
+                <span>Component surface</span>
+                <strong>Button, Dialog, Select, Tabs</strong>
+            </div>
+            <div class="demo-home__mini-card">
+                <span>Theme contract</span>
+                <strong>Light and dark semantic tokens</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-home__stats" aria-label="Demo highlights">
+        <div>
+            <span>Architecture</span>
+            <strong>Blazor Web App</strong>
+            <p>Server and WebAssembly examples share the same component sections.</p>
+        </div>
+        <div>
+            <span>Styling</span>
+            <strong>Unstyled primitives</strong>
+            <p>The demo chrome supplies Fluent styling while components keep flexible APIs.</p>
+        </div>
+        <div>
+            <span>Verification</span>
+            <strong>Behavior first</strong>
+            <p>Examples surface keyboard, ARIA, form, controlled, and uncontrolled states.</p>
+        </div>
+    </div>
+
+    <div class="demo-home__catalog">
+        @CatalogGroup("Start here", new[] { ("Button", "button"), ("Checkbox", "checkbox"), ("Select", "select"), ("Tabs", "tabs") })
+        @CatalogGroup("Overlays", new[] { ("Dialog", "dialog"), ("Popover", "popover"), ("Tooltip", "tooltip"), ("Menu", "menu") })
+        @CatalogGroup("Forms", new[] { ("Field", "field"), ("Fieldset", "fieldset"), ("Form", "form"), ("Number Field", "number-field") })
+    </div>
+</section>
+
+@code {
+    [Inject]
+    private NavigationManager NavManager { get; set; } = default!;
+
+    private RenderFragment CatalogGroup(string title, IEnumerable<(string Name, string Href)> links) => __builder =>
+    {
+        <section class="demo-home__catalog-group">
+            <h2>@title</h2>
+            <div>
+                @foreach (var link in links)
+                {
+                    <a href="@link.Href">@link.Name</a>
+                }
+            </div>
+        </section>
+    };
+
+    private void NavigateToButton()
+    {
+        NavManager.NavigateTo("button");
+    }
+
+    private void NavigateToTabs()
+    {
+        NavManager.NavigateTo("tabs");
+    }
+}

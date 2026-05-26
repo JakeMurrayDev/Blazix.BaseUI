@@ -1,0 +1,79 @@
+@using BlazorBaseUI.Switch
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<label class="demo-theme-control">
+    <span>@ThemeLabel</span>
+    <SwitchRoot Checked="@isDarkTheme"
+                NativeButton="true"
+                OnCheckedChange="HandleThemeChangedAsync"
+                ClassValue="@(_ => "demo-theme-switch")"
+                aria-label="Toggle dark mode">
+        <SwitchThumb ClassValue="@(_ => "demo-theme-switch__thumb")" />
+    </SwitchRoot>
+</label>
+
+@code {
+    private const string JsModulePath = "./demo-theme.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool isDarkTheme;
+
+    private string ThemeLabel => isDarkTheme ? "Dark" : "Light";
+
+    public ThemeToggle()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var module = await moduleTask.Value;
+        var theme = await module.InvokeAsync<string>("getDemoTheme");
+        var nextIsDarkTheme = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+
+        await module.InvokeVoidAsync("setDemoTheme", nextIsDarkTheme ? "dark" : "light");
+
+        if (isDarkTheme == nextIsDarkTheme)
+        {
+            return;
+        }
+
+        isDarkTheme = nextIsDarkTheme;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task HandleThemeChangedAsync(SwitchCheckedChangeEventArgs args)
+    {
+        isDarkTheme = args.Checked;
+
+        var module = await moduleTask.Value;
+        await module.InvokeVoidAsync("setDemoTheme", ThemeLabel.ToLowerInvariant());
+    }
+}

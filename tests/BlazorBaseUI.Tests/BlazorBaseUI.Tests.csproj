@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BlazorBaseUI\BlazorBaseUI.csproj" />
+    <ProjectReference Include="..\..\demo\BlazorBaseUI.Demo\BlazorBaseUI.Demo.Client\BlazorBaseUI.Demo.Client.csproj" />
     <ProjectReference Include="..\BlazorBaseUI.Tests.Contracts\BlazorBaseUI.Tests.Contracts.csproj" />
   </ItemGroup>
 

@@ -1,37 +1,44 @@
-﻿@inherits LayoutComponentBase
-@inject NavigationManager NavManager
+@inherits LayoutComponentBase
 
-<div class="min-h-screen bg-gray-50 text-slate-900">
+<div class="demo-app-shell" data-theme="light" data-nav-open="false">
+    <div class="demo-mobile-scrim" data-demo-mobile-scrim></div>
 
-    @if (_mobileMenuOpen)
-    {
-        <div class="fixed inset-0 z-40 bg-gray-900/80 backdrop-blur-sm lg:hidden"
-             @onclick="CloseMobileMenu"></div>
-    }
-    <div class="fixed inset-y-0 z-50 flex w-72 flex-col transition-transform duration-300 ease-in-out lg:translate-x-0
-                @(_mobileMenuOpen ? "translate-x-0" : "-translate-x-full")">
+    <aside id="demo-nav-panel" class="demo-nav-panel" aria-label="Component catalog">
         <NavMenu />
-    </div>
-    <div class="flex flex-col transition-all duration-300 lg:pl-72">
-        <header class="sticky top-0 z-30 flex h-16 flex-shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
-            <button type="button"
-                    class="-m-2.5 p-2.5 text-gray-700 lg:hidden"
-                    @onclick="ToggleMobileMenu">
-                <span class="sr-only">Open sidebar</span>
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                </svg>
-            </button>
-            <div class="flex flex-1 gap-x-4 self-center lg:gap-x-6">
-                <h1 class="text-lg font-semibold text-gray-900">Component Library</h1>
+    </aside>
+
+    <div class="demo-app-frame">
+        <header class="demo-command-bar">
+            <div class="demo-command-bar__left">
+                <MobileNavToggle />
+
+                <a class="demo-brand" href="">
+                    <span class="demo-brand__mark" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                    <span class="demo-brand__text">
+                        <span>BlazorBaseUI</span>
+                        <span>Fluent demo console</span>
+                    </span>
+                </a>
             </div>
 
-            <div class="flex items-center gap-x-4 lg:gap-x-6">
-                <div class="text-sm leading-6 font-semibold text-gray-900">v0.0.1-Alpha</div>
+            <div class="demo-command-search" aria-hidden="true">
+                <span></span>
+                <span>Search components, props, examples</span>
+            </div>
+
+            <div class="demo-command-bar__right">
+                <span class="demo-version-chip">v0.0.1-alpha</span>
+                <ThemeToggle />
             </div>
         </header>
-        <main class="py-10">
-            <div class="px-4 sm:px-6 lg:px-8">
+
+        <main class="demo-main">
+            <div class="demo-main__inner">
                 @Body
             </div>
         </main>
@@ -41,27 +48,5 @@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+    <span class="dismiss">x</span>
 </div>
-
-
-@code {
-    private bool _mobileMenuOpen = false;
-
-    private void ToggleMobileMenu()
-    {
-        _mobileMenuOpen = !_mobileMenuOpen;
-    }
-
-    private void CloseMobileMenu()
-    {
-        _mobileMenuOpen = false;
-    }
-
-    // Automatically close mobile menu when navigating to a new page
-    protected override void OnInitialized()
-    {
-        NavManager.LocationChanged += (s, e) => CloseMobileMenu();
-    }
-}
-

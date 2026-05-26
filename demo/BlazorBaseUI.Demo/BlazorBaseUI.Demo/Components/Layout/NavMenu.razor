@@ -1,71 +1,99 @@
-﻿<div class="flex h-full flex-col bg-slate-900 text-white">
-    <div class="flex h-16 shrink-0 items-center border-b border-slate-800 px-6 text-xl font-bold tracking-wider">
-        Blazor Base-UI
+﻿<nav class="demo-nav" aria-label="BlazorBaseUI demo navigation">
+    <div class="demo-nav__header">
+        <span class="demo-nav__eyebrow">Catalog</span>
+        <strong>27 primitives</strong>
     </div>
-    <nav class="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-4">
-        <NavLink class="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-                 ActiveClass="bg-slate-800 text-white"
-                 href="" Match="NavLinkMatch.All">
-            Overview
-        </NavLink>
 
-        <div class="mt-6 mb-2 px-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
-            Components
+    <div class="demo-nav__scroll">
+        <div class="demo-nav__section">
+            <span class="demo-nav__section-label">Overview</span>
+            <NavLink class="demo-nav__link"
+                     ActiveClass="demo-nav__link--active"
+                     href=""
+                     Match="NavLinkMatch.All">
+                <span>Overview</span>
+            </NavLink>
         </div>
-        <div class="space-y-0.5">
-            @NavMenuLink("accordion", "Accordion")
-            @NavMenuLink("alert-dialog", "Alert Dialog")
-            @NavMenuLink("autocomplete", "Autocomplete")
-            @NavMenuLink("avatar", "Avatar")
-            @NavMenuLink("button", "Button")
-            @NavMenuLink("checkbox", "Checkbox")
-            @NavMenuLink("checkbox-group", "Checkbox Group")
-            @NavMenuLink("collapsible", "Collapsible")
-            @NavMenuLink("combobox", "Combobox")
-            @NavMenuLink("context-menu", "Context Menu")
-            @NavMenuLink("dialog", "Dialog")
-            @NavMenuLink("field", "Field")
-            @NavMenuLink("fieldset", "Fieldset")
-            @NavMenuLink("form", "Form")
-            @NavMenuLink("input", "Input")
-            @NavMenuLink("menu", "Menu")
-            @NavMenuLink("menubar", "Menubar")
-            @NavMenuLink("meter", "Meter")
-            @NavMenuLink("navigation-menu", "Navigation Menu")
-            @NavMenuLink("number-field", "Number Field")
-            @NavMenuLink("popover", "Popover")
-            @NavMenuLink("preview-card", "Preview Card")
-            @NavMenuLink("progress", "Progress")
-            @NavMenuLink("radio", "Radio")
-            @NavMenuLink("scroll-area", "Scroll Area")
-            @NavMenuLink("select", "Select")
-            @NavMenuLink("separator", "Separator")
-            @NavMenuLink("slider", "Slider")
-            @NavMenuLink("switch", "Switch")
-            @NavMenuLink("tabs", "Tabs")
-            @NavMenuLink("toast", "Toast")
-            @NavMenuLink("toggle", "Toggle")
-            @NavMenuLink("toggle-group", "Toggle Group")
-            @NavMenuLink("toolbar", "Toolbar")
-            @NavMenuLink("tooltip", "Tooltip")
-        </div>
-        <div class="mt-6 mb-2 px-2 text-xs font-semibold tracking-wider text-slate-500 uppercase">
-            Utils
-        </div>
-        <div class="space-y-0.5">
-            @NavMenuLink("direction-provider", "Direction Provider")
-        </div>
-        <div class="h-10"></div>
-    </nav>
-</div>
+
+        @NavSection("Inputs", new[]
+        {
+            ("autocomplete", "Autocomplete", true),
+            ("button", "Button", true),
+            ("checkbox", "Checkbox", true),
+            ("checkbox-group", "Checkbox Group", true),
+            ("field", "Field", true),
+            ("fieldset", "Fieldset", true),
+            ("form", "Form", true),
+            ("input", "Input", false),
+            ("number-field", "Number Field", true),
+            ("radio", "Radio", true),
+            ("select", "Select", true),
+            ("slider", "Slider", true),
+            ("switch", "Switch", true),
+            ("toggle", "Toggle", true),
+            ("toggle-group", "Toggle Group", true)
+        })
+
+        @NavSection("Overlays", new[]
+        {
+            ("alert-dialog", "Alert Dialog", true),
+            ("context-menu", "Context Menu", true),
+            ("dialog", "Dialog", true),
+            ("menu", "Menu", true),
+            ("menubar", "Menubar", true),
+            ("popover", "Popover", true),
+            ("preview-card", "Preview Card", true),
+            ("tooltip", "Tooltip", true)
+        })
+
+        @NavSection("Navigation", new[]
+        {
+            ("accordion", "Accordion", true),
+            ("collapsible", "Collapsible", true),
+            ("navigation-menu", "Navigation Menu", true),
+            ("tabs", "Tabs", true),
+            ("toolbar", "Toolbar", true)
+        })
+
+        @NavSection("Feedback", new[]
+        {
+            ("avatar", "Avatar", true),
+            ("meter", "Meter", true),
+            ("progress", "Progress", true),
+            ("separator", "Separator", true),
+            ("toast", "Toast", false)
+        })
+
+        @NavSection("Utilities", new[]
+        {
+            ("direction-provider", "Direction Provider", false),
+            ("scroll-area", "Scroll Area", false)
+        })
+    </div>
+</nav>
 
 @code {
-    private RenderFragment NavMenuLink(string href, string text) => __builder =>
+    private RenderFragment NavSection(string title, IEnumerable<(string Href, string Text, bool Enabled)> links) => __builder =>
     {
-        <NavLink class="group flex items-center rounded-md px-2 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
-                 ActiveClass="bg-slate-800 text-white"
-                 href="@href">
-            @text
-        </NavLink>
+        <div class="demo-nav__section">
+            <span class="demo-nav__section-label">@title</span>
+            @foreach (var link in links)
+            {
+                @if (link.Enabled)
+                {
+                    <NavLink class="demo-nav__link"
+                             ActiveClass="demo-nav__link--active"
+                             href="@link.Href">
+                        <span>@link.Text</span>
+                    </NavLink>
+                }
+                else
+                {
+                    <span class="demo-nav__link demo-nav__link--disabled" aria-disabled="true">
+                        <span>@link.Text</span>
+                    </span>
+                }
+            }
+        </div>
     };
 }
