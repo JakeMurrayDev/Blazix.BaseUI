@@ -112,12 +112,21 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        var currentListId = RootContext is null ? null : $"{RootContext.RootId}-list";
+
         if (subscribed && RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
         }
 
-        RootContext?.SetListElement(null);
+        if (RootContext is not null)
+        {
+            RootContext.SetListElement(null);
+            if (RootContext.ListId == currentListId)
+            {
+                RootContext.ListId = null;
+            }
+        }
 
         if (moduleTask?.IsValueCreated == true)
         {
@@ -136,7 +145,7 @@
     private void OnRootStateChanged()
     {
         BuildStateAndAttributes();
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildStateAndAttributes()

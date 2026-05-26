@@ -259,19 +259,27 @@
     {
         if (RootContext is null || state.Disabled || RootContext.ReadOnly || e.Button != 0)
         {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
             return;
         }
 
         await RootContext.SetOpenAsync(!RootContext.Mounted, AutocompleteChangeReason.TriggerPress);
+        await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
-        if (RootContext is not null && !state.Disabled && !RootContext.ReadOnly &&
-            (e.Key == "ArrowDown" || e.Key == "ArrowUp"))
+        if (RootContext is not null && !state.Disabled && !RootContext.ReadOnly)
         {
-            await RootContext.SetOpenAsync(true, AutocompleteChangeReason.ListNavigation);
-            await RootContext.HighlightRelativeAsync(e.Key == "ArrowDown" ? 1 : -1, AutocompleteHighlightReason.Keyboard);
+            if (e.Key == "ArrowDown" || e.Key == "ArrowUp")
+            {
+                await RootContext.SetOpenAsync(true, AutocompleteChangeReason.ListNavigation);
+                await RootContext.HighlightRelativeAsync(e.Key == "ArrowDown" ? 1 : -1, AutocompleteHighlightReason.Keyboard);
+            }
+            else if (IsActivationKey(e.Key))
+            {
+                await RootContext.SetOpenAsync(!RootContext.Mounted, AutocompleteChangeReason.TriggerPress);
+            }
         }
 
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
@@ -285,6 +293,11 @@
     private Task HandleBlurAsync(FocusEventArgs e)
     {
         return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private static bool IsActivationKey(string? key)
+    {
+        return key is "Enter" or " " or "Space" or "Spacebar";
     }
 
     private void ApplyPopupDataAttributes(Dictionary<string, object> attrs, bool open)

@@ -725,14 +725,17 @@
 
         var typedValue = CurrentTypedInputValue;
         if (typedValue.Length == 0 ||
-            value.Length <= typedValue.Length + 1 ||
-            !inlineInputValue.StartsWith(typedValue, StringComparison.CurrentCultureIgnoreCase) ||
-            !value.StartsWith(typedValue, StringComparison.CurrentCultureIgnoreCase))
+            !inlineInputValue.StartsWith(typedValue, StringComparison.CurrentCultureIgnoreCase))
         {
             return value;
         }
 
-        return value[typedValue.Length..];
+        if (value.StartsWith(inlineInputValue, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return string.Concat(typedValue, value.AsSpan(inlineInputValue.Length));
+        }
+
+        return value;
     }
 
     private async Task HighlightIndexInternalAsync(int index, AutocompleteHighlightReason reason)

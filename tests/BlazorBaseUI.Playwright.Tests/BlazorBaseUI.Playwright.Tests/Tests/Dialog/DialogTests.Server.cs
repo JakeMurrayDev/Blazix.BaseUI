@@ -1,5 +1,6 @@
 using BlazorBaseUI.Playwright.Tests.Fixtures;
 using BlazorBaseUI.Playwright.Tests.Infrastructure;
+using Microsoft.Playwright;
 
 namespace BlazorBaseUI.Playwright.Tests.Tests.Dialog;
 
@@ -25,9 +26,13 @@ public class DialogTestsServer : DialogTestsBase, IClassFixture<PlaywrightFixtur
             .WithOutsideAboveBackdrop(true));
 
         await OpenDialogAsync();
-        await WaitForDelayAsync(200);
 
         var outsideButton = GetByTestId("outside-button");
+        await Assertions.Expect(outsideButton).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(outsideButton).ToBeEnabledAsync(
+            new LocatorAssertionsToBeEnabledOptions { Timeout = 5000 * TimeoutMultiplier });
+
         await outsideButton.ClickAsync();
 
         await WaitForDialogClosedAsync();

@@ -63,7 +63,7 @@
     private void OnGroupChanged()
     {
         BuildComponentAttributes();
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()

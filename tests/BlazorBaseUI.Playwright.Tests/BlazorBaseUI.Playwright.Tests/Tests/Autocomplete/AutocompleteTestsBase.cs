@@ -27,6 +27,8 @@ public abstract class AutocompleteTestsBase : TestBase
     {
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false",
             new LocatorAssertionsToHaveTextOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(GetByTestId("autocomplete-popup")).ToBeHiddenAsync(
+            new LocatorAssertionsToBeHiddenOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     [Fact]
@@ -87,12 +89,38 @@ public abstract class AutocompleteTestsBase : TestBase
         await Assertions.Expect(GetByTestId("autocomplete-item-apple")).ToBeVisibleAsync();
         await Assertions.Expect(GetByTestId("autocomplete-item-apricot")).ToBeVisibleAsync();
 
-        await input.FillAsync("Ba");
+        await input.EvaluateAsync(
+            "element => { element.value = 'Ba'; element.dispatchEvent(new Event('input', { bubbles: true })); }");
 
         await Assertions.Expect(input).ToHaveValueAsync("Banana",
             new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
         await Assertions.Expect(Page.Locator("[role='option']")).ToHaveCountAsync(1);
         await Assertions.Expect(GetByTestId("autocomplete-item-banana")).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public virtual async Task BothModeInlineCompletionPreservesTypedPrefixWhenContinuing()
+    {
+        await NavigateAsync(CreateUrl("/tests/autocomplete")
+            .WithDefaultOpen(true)
+            .WithAutocompleteDefaultValue("Ap")
+            .WithAutocompleteMode("both")
+            .WithAutocompleteAutoHighlight("always"));
+        await WaitForAutocompleteOpenAsync();
+
+        var input = GetByTestId("autocomplete-input");
+        await Assertions.Expect(input).ToHaveValueAsync("Apple",
+            new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await input.FocusAsync();
+        await Page.Keyboard.TypeAsync("r");
+
+        await Assertions.Expect(GetByTestId("input-value")).ToHaveTextAsync("Apr",
+            new LocatorAssertionsToHaveTextOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(input).ToHaveValueAsync("Apricot",
+            new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(GetByTestId("autocomplete-item-apricot")).ToHaveAttributeAsync("data-highlighted", "",
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     [Fact]
@@ -182,6 +210,24 @@ public abstract class AutocompleteTestsBase : TestBase
         await Assertions.Expect(input).ToHaveValueAsync("Che",
             new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
         await Assertions.Expect(GetByTestId("autocomplete-item-cherry")).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public virtual async Task TriggerKeyboardActivationTogglesPopup()
+    {
+        await NavigateAsync(CreateUrl("/tests/autocomplete"));
+
+        var trigger = GetByTestId("autocomplete-trigger");
+        await trigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await WaitForAutocompleteOpenAsync();
+
+        await Page.Keyboard.PressAsync("Escape");
+        await WaitForAutocompleteClosedAsync();
+
+        await trigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Space");
+        await WaitForAutocompleteOpenAsync();
     }
 
     [Fact]

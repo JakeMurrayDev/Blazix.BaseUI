@@ -469,7 +469,7 @@ namespace BlazorBaseUI.Tests.Autocomplete;
     }
 
     [Fact]
-    public async Task BothMode_ShouldNormalizeMultiCharacterReplacementAfterInlinePrefix()
+    public async Task BothMode_ShouldPreserveTypedPrefixWhenReplacingInlineSuffix()
     {
         var cut = Render(CreateAutocomplete(
             defaultValue: "Ap",
@@ -481,8 +481,8 @@ namespace BlazorBaseUI.Tests.Autocomplete;
         await input.TriggerEventAsync("oninput", new ChangeEventArgs { Value = "ApBa" });
         input = cut.Find("input[role='combobox']");
 
-        input.GetAttribute("value").ShouldBe("Banana");
-        cut.FindAll("[role='option']").Select(i => i.TextContent).ShouldBe(["Banana"]);
+        input.GetAttribute("value").ShouldBe("ApBa");
+        cut.FindAll("[role='option']").ShouldBeEmpty();
     }
 
     [Fact]

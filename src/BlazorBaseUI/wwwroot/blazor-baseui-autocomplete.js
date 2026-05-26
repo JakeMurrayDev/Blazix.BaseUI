@@ -201,6 +201,7 @@ function attachKeyboardHandlers(root, element, key) {
 
     if (event.key === 'Escape' && root.isOpen) {
       event.preventDefault();
+      event.stopPropagation();
       root.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
     }
   };
@@ -214,13 +215,7 @@ function attachKeyboardHandlers(root, element, key) {
   };
 
   const onInput = () => {
-    const pending = element[pendingInlineSelectionKey];
-    if (!pending || element.value === pending.display || !element.value.startsWith(pending.typed)) {
-      return;
-    }
-
-    element.value = element.value.slice(pending.typed.length);
-    clearPendingInlineSelection(element);
+    consumePendingInlineSelection(element);
   };
 
   element.addEventListener('keydown', onKeyDown, true);
@@ -250,6 +245,23 @@ function clearPendingInlineSelection(element) {
   element[pendingInlineSelectionKey] = null;
 }
 
+function consumePendingInlineSelection(element) {
+  const pending = element[pendingInlineSelectionKey];
+  if (!pending || element.value === pending.display) {
+    return;
+  }
+
+  if (element.value.startsWith(pending.display)) {
+    element.value = pending.typed + element.value.slice(pending.display.length);
+    clearPendingInlineSelection(element);
+    return;
+  }
+
+  if (element.value.startsWith(pending.typed)) {
+    clearPendingInlineSelection(element);
+  }
+}
+
 function setPendingInlineSelection(element, typed, display) {
   clearPendingInlineSelection(element);
 
@@ -265,7 +277,7 @@ function setPendingInlineSelection(element, typed, display) {
     }
 
     try {
-      element.setSelectionRange(0, display.length);
+      element.setSelectionRange(typed.length, display.length);
     } catch {
       // Input types without text selection support can ignore inline completion selection.
     }
@@ -285,7 +297,7 @@ function attachTriggerHandlers(root, element) {
     return;
   }
 
-  const onMouseDown = (event) => {
+  const onPointerDown = (event) => {
     if (event.button !== 0) {
       return;
     }
@@ -305,11 +317,11 @@ function attachTriggerHandlers(root, element) {
     scheduleFocusOutClose(root);
   };
 
-  element.addEventListener('mousedown', onMouseDown);
+  element.addEventListener('pointerdown', onPointerDown);
   element.addEventListener('keydown', onKeyDown, true);
   element.addEventListener('focusout', onFocusOut);
   root.triggerCleanup = () => {
-    element.removeEventListener('mousedown', onMouseDown);
+    element.removeEventListener('pointerdown', onPointerDown);
     element.removeEventListener('keydown', onKeyDown, true);
     element.removeEventListener('focusout', onFocusOut);
   };
