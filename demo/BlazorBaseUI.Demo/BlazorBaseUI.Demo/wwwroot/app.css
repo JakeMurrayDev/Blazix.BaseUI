@@ -717,6 +717,18 @@ h1:focus {
     transform: translateY(1px);
 }
 
+.demo-button--primary:hover {
+    border-color: var(--demo-brand-hover);
+    background: var(--demo-brand-hover);
+    color: #fff;
+}
+
+.demo-button--primary:active {
+    border-color: var(--demo-brand-pressed);
+    background: var(--demo-brand-pressed);
+    color: #fff;
+}
+
 .demo-home__preview {
     display: grid;
     gap: 12px;

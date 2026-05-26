@@ -503,6 +503,7 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         cut.Find("[data-testid='payload']").TextContent.ShouldBe("1");
 
         var popupId = cut.Find("[data-testid='dialog-popup']").GetAttribute("id");
+        popupId.ShouldNotBeNullOrEmpty();
 
         cut.Find("[data-testid='trigger-2']").Click();
 

@@ -287,11 +287,16 @@ public class DialogTriggerTests : BunitContext, IDialogTriggerContract
 
         cut.Find("[data-testid='detached-trigger']").Click();
 
-        var trigger = cut.Find("[data-testid='detached-trigger']");
-        var popup = cut.Find("[data-testid='dialog-popup']");
+        cut.WaitForAssertion(() =>
+        {
+            var trigger = cut.Find("[data-testid='detached-trigger']");
+            var popup = cut.Find("[data-testid='dialog-popup']");
+            var popupId = popup.GetAttribute("id");
 
-        trigger.GetAttribute("aria-expanded").ShouldBe("true");
-        trigger.GetAttribute("aria-controls").ShouldBe(popup.GetAttribute("id"));
+            popupId.ShouldNotBeNullOrEmpty();
+            trigger.GetAttribute("aria-expanded").ShouldBe("true");
+            trigger.GetAttribute("aria-controls").ShouldBe(popupId);
+        });
 
         return Task.CompletedTask;
     }
