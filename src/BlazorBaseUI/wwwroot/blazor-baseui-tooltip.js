@@ -45,7 +45,7 @@ function initGlobalListeners() {
 // Hover Interaction Support
 // ============================================================================
 
-export async function initializeHoverInteraction(rootId, triggerElement, openDelay, closeDelay, disableHoverablePopup) {
+export async function initializeHoverInteraction(rootId, triggerId, triggerElement, openDelay, closeDelay, disableHoverablePopup) {
     let rootState = state.roots.get(rootId);
 
     // If root state doesn't exist yet, wait briefly for it to be initialized
@@ -57,19 +57,23 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
 
     // Store the trigger element if provided
     if (triggerElement) {
-        rootState.triggerElement = triggerElement;
+        rootState.triggerElements.set(triggerId, triggerElement);
+        if (!rootState.triggerElement || rootState.activeTriggerId === triggerId) {
+            rootState.triggerElement = triggerElement;
+        }
     }
 
-    if (!rootState.triggerElement) return;
+    if (!triggerElement) return;
 
     // Clean up existing hover interaction
-    if (rootState.hoverInteraction) {
-        rootState.hoverInteraction.cleanup();
+    const existing = rootState.hoverInteractions.get(triggerId);
+    if (existing) {
+        existing.cleanup();
     }
 
-    rootState.hoverInteraction = createHoverInteraction({
-        interactionId: `tooltip-hover-${rootId}`,
-        triggerElement: rootState.triggerElement,
+    const hoverInteraction = createHoverInteraction({
+        interactionId: `tooltip-hover-${rootId}-${triggerId}`,
+        triggerElement,
         floatingElement: rootState.popupElement,
         openDelay: openDelay || 0,
         closeDelay: closeDelay || 0,
@@ -78,28 +82,82 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
         useSafePolygon: !disableHoverablePopup,
         safePolygonOptions: { blockPointerEvents: false },
         onOpen: (reason) => {
-            if (rootState.dotNetRef && !rootState.isOpen) {
-                rootState.dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+            if (rootState.dotNetRef && (!rootState.isOpen || rootState.activeTriggerId !== triggerId)) {
+                rootState.activeTriggerId = triggerId;
+                rootState.triggerElement = triggerElement;
+                applyTriggerOpenAttributes(rootState);
+                rootState.dotNetRef.invokeMethodAsync('OnHoverOpen', triggerId).catch(() => { });
+                setTimeout(() => applyTriggerOpenAttributes(rootState), 0);
+                setTimeout(() => applyTriggerOpenAttributes(rootState), 50);
             }
         },
         onClose: (reason) => {
-            if (rootState.dotNetRef && rootState.isOpen) {
-                rootState.dotNetRef.invokeMethodAsync('OnHoverClose').catch(() => { });
+            if (rootState.dotNetRef && rootState.isOpen && (!rootState.activeTriggerId || rootState.activeTriggerId === triggerId)) {
+                rootState.dotNetRef.invokeMethodAsync('OnHoverClose', triggerId).catch(() => { });
             }
         }
     });
+
+    rootState.hoverInteractions.set(triggerId, hoverInteraction);
 }
 
-export function disposeHoverInteraction(rootId) {
-    disposeHoverInteractionOnRoot(state.roots, rootId);
+export function disposeHoverInteraction(rootId, triggerId = null) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    if (triggerId == null) {
+        for (const interaction of rootState.hoverInteractions.values()) {
+            interaction.cleanup();
+        }
+        rootState.hoverInteractions.clear();
+        disposeHoverInteractionOnRoot(state.roots, rootId);
+        return;
+    }
+
+    const interaction = rootState.hoverInteractions.get(triggerId);
+    if (interaction) {
+        interaction.cleanup();
+        rootState.hoverInteractions.delete(triggerId);
+    }
+    rootState.triggerElements.delete(triggerId);
 }
 
 export function updateHoverInteractionFloatingElement(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState?.popupElement) {
+        return;
+    }
+
+    for (const interaction of rootState.hoverInteractions.values()) {
+        interaction.setFloatingElement(rootState.popupElement);
+    }
     updateHoverInteractionFloatingOnRoot(state.roots, rootId);
 }
 
 export function setHoverInteractionOpen(rootId, isOpen) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) {
+        return;
+    }
+
+    if (!isOpen) {
+        for (const interaction of rootState.hoverInteractions.values()) {
+            interaction.setOpen(false);
+        }
+    } else {
+        rootState.hoverInteractions.get(rootState.activeTriggerId)?.setOpen(true);
+    }
     setHoverInteractionOpenOnRoot(state.roots, rootId, isOpen);
+}
+
+export function cancelPendingHoverOpen(rootId, triggerId) {
+    const rootState = state.roots.get(rootId);
+    rootState?.hoverInteractions.get(triggerId)?.cancelPendingOpen?.();
+}
+
+export function updateHoverInteractionDelays(rootId, triggerId, openDelay, closeDelay) {
+    const rootState = state.roots.get(rootId);
+    rootState?.hoverInteractions.get(triggerId)?.setDelays(openDelay || 0, closeDelay || 0);
 }
 
 // ============================================================================
@@ -132,6 +190,17 @@ function updateDismissInteraction(rootState) {
     });
 }
 
+function applyTriggerOpenAttributes(rootState) {
+    for (const [triggerId, triggerElement] of rootState.triggerElements) {
+        const currentTriggerElement = document.getElementById(triggerId) || triggerElement;
+        if (rootState.isOpen && rootState.activeTriggerId === triggerId) {
+            currentTriggerElement.setAttribute('data-popup-open', '');
+        } else {
+            currentTriggerElement.removeAttribute('data-popup-open');
+        }
+    }
+}
+
 // ============================================================================
 // Root Management
 // ============================================================================
@@ -143,10 +212,13 @@ export function initializeRoot(rootId, dotNetRef) {
         rootId,
         dotNetRef,
         isOpen: false,
+        activeTriggerId: null,
         triggerElement: null,
+        triggerElements: new Map(),
         positionerElement: null,
         popupElement: null,
         hoverInteraction: null,
+        hoverInteractions: new Map(),
         dismissInteraction: null,
         cursorTrackingCleanup: null,
         virtualAnchor: null,
@@ -158,6 +230,10 @@ export function disposeRoot(rootId) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         // Clean up hover interaction
+        for (const interaction of rootState.hoverInteractions.values()) {
+            interaction.cleanup();
+        }
+        rootState.hoverInteractions.clear();
         if (rootState.hoverInteraction) {
             rootState.hoverInteraction.cleanup();
         }
@@ -171,16 +247,28 @@ export function disposeRoot(rootId) {
     state.roots.delete(rootId);
 }
 
-export function setRootOpen(rootId, isOpen) {
+export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
 
+    if (activeTriggerId) {
+        rootState.activeTriggerId = activeTriggerId;
+        rootState.triggerElement = rootState.triggerElements.get(activeTriggerId) || rootState.triggerElement;
+    }
+
     rootState.isOpen = isOpen;
     rootState.pendingOpen = isOpen;
+    applyTriggerOpenAttributes(rootState);
 
     // Sync with hover interaction
-    if (rootState.hoverInteraction) {
-        rootState.hoverInteraction.setOpen(isOpen);
+    if (isOpen) {
+        rootState.hoverInteractions.get(rootState.activeTriggerId)?.setOpen(true);
+    } else {
+        for (const interaction of rootState.hoverInteractions.values()) {
+            interaction.setOpen(false);
+        }
+        rootState.activeTriggerId = null;
+        applyTriggerOpenAttributes(rootState);
     }
 
     // Update dismiss interaction based on open state
@@ -202,14 +290,29 @@ export function setRootOpen(rootId, isOpen) {
 // Element References
 // ============================================================================
 
-export function setTriggerElement(rootId, element) {
+export function setTriggerElement(rootId, triggerId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
+        rootState.activeTriggerId = triggerId;
         rootState.triggerElement = element;
+        rootState.triggerElements.set(triggerId, element);
+        applyTriggerOpenAttributes(rootState);
         if (rootState.isOpen) {
             updateDismissInteraction(rootState);
         }
     }
+}
+
+export function syncTriggerOpenAttributes(rootId, isOpen, activeTriggerId = null) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    rootState.isOpen = isOpen;
+    rootState.activeTriggerId = activeTriggerId;
+    if (activeTriggerId) {
+        rootState.triggerElement = rootState.triggerElements.get(activeTriggerId) || rootState.triggerElement;
+    }
+    applyTriggerOpenAttributes(rootState);
 }
 
 export function setPopupElement(rootId, element) {
@@ -217,6 +320,9 @@ export function setPopupElement(rootId, element) {
     if (rootState) {
         rootState.popupElement = element;
         // Update hover interaction with the new popup element
+        for (const interaction of rootState.hoverInteractions.values()) {
+            interaction.setFloatingElement(element);
+        }
         if (rootState.hoverInteraction && element) {
             rootState.hoverInteraction.setFloatingElement(element);
         }
@@ -375,4 +481,3 @@ export function disposeCursorTracking(rootId) {
     if (!rootState) return;
     disposeCursorTrackingInternal(rootState);
 }
-

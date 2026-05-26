@@ -1,4 +1,6 @@
 using BlazorBaseUI.Demo.Client.Shared;
+using BlazorBaseUI.Demo.Client.Shared.Sections;
+using BlazorBaseUI.Tooltip;
 
 namespace BlazorBaseUI.Tests.Demo;
 
@@ -8,6 +10,8 @@ public class DemoShellTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupTabsModule(JSInterop);
+        JsInteropSetup.SetupTooltipModule(JSInterop);
+        JsInteropSetup.SetupFloatingDelayGroupModule(JSInterop);
     }
 
     [Fact]
@@ -56,5 +60,39 @@ public class DemoShellTests : BunitContext
         cut.Find(".demo-section__preview").TextContent.ShouldContain("Save");
         cut.Find(".demo-disclosure").ShouldNotBeNull();
         cut.Find(".demo-section__code").TextContent.ShouldContain("<Button>Save</Button>");
+    }
+
+    [Fact]
+    public void TooltipSection_DefaultNotHoverableExampleDisablesHoverablePopup()
+    {
+        var cut = Render<TooltipSection>(parameters => parameters
+            .Add(p => p.IsWasmMode, false));
+
+        var defaultNotHoverableRoot = cut
+            .FindComponents<TooltipRoot>()
+            .First(root => root.Markup.Contains("Default (Not Hoverable)", StringComparison.Ordinal));
+        var hoverableRoot = cut
+            .FindComponents<TooltipRoot>()
+            .First(root => root.Markup.Contains("Hoverable Popup", StringComparison.Ordinal));
+
+        defaultNotHoverableRoot.Instance.DisableHoverablePopup.ShouldBeTrue();
+        hoverableRoot.Instance.DisableHoverablePopup.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TooltipSection_DoesNotRenderDuplicateElementIds()
+    {
+        var cut = Render<TooltipSection>(parameters => parameters
+            .Add(p => p.IsWasmMode, false));
+
+        var duplicateIds = cut.FindAll("[id]")
+            .Select(element => element.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .GroupBy(id => id)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToArray();
+
+        duplicateIds.ShouldBeEmpty();
     }
 }

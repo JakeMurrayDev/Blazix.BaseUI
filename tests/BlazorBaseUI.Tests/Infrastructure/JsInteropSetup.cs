@@ -152,6 +152,7 @@ public static class JsInteropSetup
         module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
         module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
         module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+        module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
         module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
         module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
         module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
@@ -171,20 +172,31 @@ public static class JsInteropSetup
     }
 
     private const string TooltipModule = "./_content/BlazorBaseUI/blazor-baseui-tooltip.js";
+    private const string TooltipMinModule = "./_content/BlazorBaseUI/blazor-baseui-tooltip.min.js";
 
     public static void SetupTooltipModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(TooltipModule);
-        module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
-        module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
-        module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
-        module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
-        module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
-        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
-        module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+        SetupTooltipModulePath(TooltipModule);
+        SetupTooltipModulePath(TooltipMinModule);
+
+        void SetupTooltipModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
+            module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("cancelPendingHoverOpen", _ => true).SetVoidResult();
+            module.SetupVoid("updateHoverInteractionDelays", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+            module.SetupVoid("setPositionerId", _ => true).SetVoidResult();
+        }
     }
 
     private const string FieldModule = "./_content/BlazorBaseUI/blazor-baseui-field.js";
@@ -388,6 +400,7 @@ public static class JsInteropSetup
     }
 
     private const string FloatingModule = "./_content/BlazorBaseUI/blazor-baseui-floating.js";
+    private const string FloatingMinModule = "./_content/BlazorBaseUI/blazor-baseui-floating.min.js";
 
     public static void SetupFocusGuardSafari(BunitJSInterop jsInterop)
     {
@@ -418,12 +431,21 @@ public static class JsInteropSetup
 
     public static void SetupFloatingDelayGroupModule(BunitJSInterop jsInterop, string groupId = "dg-1")
     {
-        var module = jsInterop.SetupModule(FloatingModule);
-        module.Setup<System.Text.Json.JsonElement>("createDelayGroup", _ => true)
-            .SetResult(System.Text.Json.JsonSerializer.SerializeToElement(new { groupId }));
-        module.SetupVoid("registerDelayGroupMember", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterDelayGroupMember", _ => true).SetVoidResult();
-        module.SetupVoid("disposeDelayGroup", _ => true).SetVoidResult();
+        SetupFloatingDelayGroupModulePath(FloatingModule, groupId);
+        SetupFloatingDelayGroupModulePath(FloatingMinModule, groupId);
+
+        void SetupFloatingDelayGroupModulePath(string path, string id)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.Setup<System.Text.Json.JsonElement>("createDelayGroup", _ => true)
+                .SetResult(System.Text.Json.JsonSerializer.SerializeToElement(new { groupId = id }));
+            module.SetupVoid("registerDelayGroupMember", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterDelayGroupMember", _ => true).SetVoidResult();
+            module.SetupVoid("notifyDelayGroupMemberOpened", _ => true).SetVoidResult();
+            module.SetupVoid("notifyDelayGroupMemberClosed", _ => true).SetVoidResult();
+            module.SetupVoid("updateDelayGroupOptions", _ => true).SetVoidResult();
+            module.SetupVoid("disposeDelayGroup", _ => true).SetVoidResult();
+        }
     }
 
     private const string SelectModule = "./_content/BlazorBaseUI/blazor-baseui-select.js";

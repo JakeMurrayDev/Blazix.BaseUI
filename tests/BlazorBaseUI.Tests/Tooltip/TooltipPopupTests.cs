@@ -121,6 +121,18 @@ public class TooltipPopupTests : BunitContext, ITooltipPopupContract
     }
 
     [Fact]
+    public Task HasFocusablePopupAttributes()
+    {
+        var cut = Render(CreatePopupInRoot());
+
+        var popup = cut.Find("[role='tooltip']");
+        popup.GetAttribute("tabindex").ShouldBe("-1");
+        popup.HasAttribute("data-base-ui-focusable").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasDataSideAttribute()
     {
         var cut = Render(CreatePopupInRoot());

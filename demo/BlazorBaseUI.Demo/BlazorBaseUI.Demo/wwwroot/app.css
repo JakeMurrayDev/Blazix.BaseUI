@@ -115,6 +115,36 @@ textarea {
     outline-offset: 2px;
 }
 
+.demo-tooltip-arrow {
+    display: block;
+    width: 20px;
+    height: 10px;
+    line-height: 0;
+}
+
+.demo-tooltip-arrow > svg {
+    display: block;
+}
+
+.demo-tooltip-arrow[data-side="bottom"] {
+    top: -9px;
+}
+
+.demo-tooltip-arrow[data-side="top"] {
+    bottom: -9px;
+    transform: rotate(180deg);
+}
+
+.demo-tooltip-arrow[data-side="left"] {
+    right: -14px;
+    transform: rotate(90deg);
+}
+
+.demo-tooltip-arrow[data-side="right"] {
+    left: -14px;
+    transform: rotate(-90deg);
+}
+
 h1:focus {
     outline: none;
 }

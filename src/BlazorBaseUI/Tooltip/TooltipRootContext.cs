@@ -9,6 +9,11 @@ namespace BlazorBaseUI.Tooltip;
 internal sealed class TooltipRootContext
 {
     /// <summary>
+    /// Occurs when root state changes and descendants should re-evaluate derived state.
+    /// </summary>
+    public event Action? StateChanged;
+
+    /// <summary>
     /// Gets or sets the unique identifier of the tooltip root.
     /// </summary>
     public string RootId { get; set; } = string.Empty;
@@ -57,6 +62,11 @@ internal sealed class TooltipRootContext
     /// Gets or sets a value indicating whether hovering over the popup is disabled.
     /// </summary>
     public bool DisableHoverablePopup { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the provider delay group currently opens descendants without delay.
+    /// </summary>
+    public bool IsDelayGroupInstantPhase { get; set; }
 
     /// <summary>
     /// Gets or sets the ID of the currently active trigger.
@@ -147,4 +157,12 @@ internal sealed class TooltipRootContext
     /// Gets or sets the delegate that returns the positioner element reference.
     /// </summary>
     public Func<ElementReference?> GetPositionerElement { get; set; } = () => null;
+
+    /// <summary>
+    /// Notifies subscribers that root state changed.
+    /// </summary>
+    public void NotifyStateChanged()
+    {
+        StateChanged?.Invoke();
+    }
 }

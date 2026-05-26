@@ -8,20 +8,28 @@ namespace BlazorBaseUI.Tests.FloatingDelayGroup;
 public class FloatingDelayGroupTests : BunitContext, IFloatingDelayGroupContract
 {
     private const string FloatingModule = "./_content/BlazorBaseUI/blazor-baseui-floating.js";
+    private const string FloatingMinModule = "./_content/BlazorBaseUI/blazor-baseui-floating.min.js";
     private readonly BunitJSModuleInterop module;
 
     public FloatingDelayGroupTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        module = JSInterop.SetupModule(FloatingModule);
-        module.Setup<JsonElement>("createDelayGroup", _ => true)
+        SetupModule(FloatingModule);
+        module = SetupModule(FloatingMinModule);
+    }
+
+    private BunitJSModuleInterop SetupModule(string path)
+    {
+        var jsModule = JSInterop.SetupModule(path);
+        jsModule.Setup<JsonElement>("createDelayGroup", _ => true)
             .SetResult(JsonSerializer.SerializeToElement(new { groupId = "dg-1" }));
-        module.SetupVoid("registerDelayGroupMember", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterDelayGroupMember", _ => true).SetVoidResult();
-        module.SetupVoid("notifyDelayGroupMemberOpened", _ => true).SetVoidResult();
-        module.SetupVoid("notifyDelayGroupMemberClosed", _ => true).SetVoidResult();
-        module.SetupVoid("updateDelayGroupOptions", _ => true).SetVoidResult();
-        module.SetupVoid("disposeDelayGroup", _ => true).SetVoidResult();
+        jsModule.SetupVoid("registerDelayGroupMember", _ => true).SetVoidResult();
+        jsModule.SetupVoid("unregisterDelayGroupMember", _ => true).SetVoidResult();
+        jsModule.SetupVoid("notifyDelayGroupMemberOpened", _ => true).SetVoidResult();
+        jsModule.SetupVoid("notifyDelayGroupMemberClosed", _ => true).SetVoidResult();
+        jsModule.SetupVoid("updateDelayGroupOptions", _ => true).SetVoidResult();
+        jsModule.SetupVoid("disposeDelayGroup", _ => true).SetVoidResult();
+        return jsModule;
     }
 
     private static RenderFragment CreateDelayGroup(
@@ -353,5 +361,31 @@ public class FloatingDelayGroupTests : BunitContext, IFloatingDelayGroupContract
         module.Invocations
             .Any(i => i.Identifier == "unregisterDelayGroupMember")
             .ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ContextCallbacksDoNotInvokeJsAfterDispose()
+    {
+        DelayGroupContext? captured = null;
+
+        Render(CreateDelayGroup(childContent: builder =>
+        {
+            builder.OpenComponent<CascadingValueCapture<DelayGroupContext>>(0);
+            builder.AddAttribute(1, "OnCaptured",
+                EventCallback.Factory.Create<DelayGroupContext?>(
+                    this, ctx => captured = ctx));
+            builder.CloseComponent();
+        }));
+
+        captured.ShouldNotBeNull();
+
+        Dispose();
+        var invocationCount = module.Invocations.Count;
+
+        await captured!.UnregisterMemberAsync("member-1");
+        await captured.NotifyMemberOpenedAsync("member-1");
+        await captured.NotifyMemberClosedAsync("member-1");
+
+        module.Invocations.Count.ShouldBe(invocationCount);
     }
 }

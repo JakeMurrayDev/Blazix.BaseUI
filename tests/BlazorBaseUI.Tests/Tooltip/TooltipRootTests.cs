@@ -161,6 +161,50 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
     }
 
     [Fact]
+    public Task OnOpenChangeIncludesTriggerId()
+    {
+        string? triggerId = null;
+
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<TooltipTrigger>(0);
+            builder.AddAttribute(1, "Id", "custom-trigger");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipPortal>(10);
+            builder.AddAttribute(11, "KeepMounted", true);
+            builder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(CreateTooltip(
+            defaultOpen: false,
+            onOpenChange: EventCallback.Factory.Create<TooltipOpenChangeEventArgs>(this, args =>
+            {
+                triggerId = args.TriggerId;
+            }),
+            customContent: content
+        ));
+
+        cut.Find("#custom-trigger").Focus();
+
+        triggerId.ShouldBe("custom-trigger");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task DoesNotCallOnOpenChangeWhenStateUnchanged()
     {
         var callCount = 0;
@@ -325,6 +369,112 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
         // Verify context is cascaded by checking the trigger has the correct class
         var trigger = cut.Find("button");
         trigger.GetAttribute("class").ShouldContain("open");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SwitchesActiveTriggerAndPayloadWhileAlreadyOpen()
+    {
+        RenderFragment<TooltipRootPayloadContext> content = payloadContext => builder =>
+        {
+            builder.OpenComponent<TooltipTrigger>(0);
+            builder.AddAttribute(1, "Id", "trigger-1");
+            builder.AddAttribute(2, "Payload", "one");
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 1")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipTrigger>(10);
+            builder.AddAttribute(11, "Id", "trigger-2");
+            builder.AddAttribute(12, "Payload", "two");
+            builder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 2")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipPortal>(20);
+            builder.AddAttribute(21, "KeepMounted", true);
+            builder.AddAttribute(22, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                    {
+                        popupBuilder.OpenElement(0, "span");
+                        popupBuilder.AddAttribute(1, "data-testid", "payload");
+                        popupBuilder.AddContent(2, payloadContext.Payload);
+                        popupBuilder.CloseElement();
+                    }));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<TooltipRoot>(0);
+            builder.AddAttribute(1, "ChildContentWithPayload", content);
+            builder.CloseComponent();
+        });
+
+        var trigger1 = cut.Find("#trigger-1");
+        var trigger2 = cut.Find("#trigger-2");
+
+        trigger1.Focus();
+        cut.Find("[data-testid='payload']").TextContent.ShouldBe("one");
+        trigger1.HasAttribute("data-popup-open").ShouldBeTrue();
+
+        trigger2.Focus();
+        cut.Find("[data-testid='payload']").TextContent.ShouldBe("two");
+        trigger1.HasAttribute("data-popup-open").ShouldBeFalse();
+        trigger2.HasAttribute("data-popup-open").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DisabledTriggerClosesActiveTooltip()
+    {
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<TooltipTrigger>(0);
+            builder.AddAttribute(1, "Id", "trigger-1");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 1")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipTrigger>(10);
+            builder.AddAttribute(11, "Id", "trigger-2");
+            builder.AddAttribute(12, "Disabled", true);
+            builder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 2")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipPortal>(20);
+            builder.AddAttribute(21, "KeepMounted", true);
+            builder.AddAttribute(22, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(CreateTooltip(customContent: content));
+
+        cut.Find("#trigger-1").Focus();
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        cut.Find("#trigger-2").Focus();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue();
+        cut.Find("#trigger-2").HasAttribute("data-popup-open").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

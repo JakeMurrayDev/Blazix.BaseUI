@@ -14,6 +14,7 @@
     private FloatingDelayGroupContext context = null!;
     private DotNetObjectReference<FloatingDelayGroup>? dotNetRef;
     private string? groupId;
+    private bool disposed;
     private int previousOpenDelayMs;
     private int previousCloseDelayMs;
     private int previousTimeoutMs;
@@ -67,13 +68,18 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !disposed)
         {
             try
             {
                 dotNetRef = DotNetObjectReference.Create(this);
 
                 var module = await moduleTask.Value;
+                if (disposed)
+                {
+                    return;
+                }
+
                 var result = await module.InvokeAsync<JsonElement>("createDelayGroup", new
                 {
                     delay = new { open = OpenDelayMs, close = CloseDelayMs },
@@ -87,7 +93,7 @@
                 previousCloseDelayMs = CloseDelayMs;
                 previousTimeoutMs = TimeoutMs;
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -97,7 +103,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (groupId is null) return;
+        if (disposed || groupId is null) return;
 
         var openDelayChanged = OpenDelayMs != previousOpenDelayMs;
         var closeDelayChanged = CloseDelayMs != previousCloseDelayMs;
@@ -115,6 +121,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
+
         if (groupId is not null && moduleTask.IsValueCreated)
         {
             try
@@ -122,7 +130,7 @@
                 var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("disposeDelayGroup", groupId);
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -137,7 +145,7 @@
                 var module = await moduleTask.Value;
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -150,12 +158,24 @@
     [JSInvokable]
     public void SetIsInstantPhase(bool value)
     {
+        if (disposed)
+        {
+            return;
+        }
+
+        if (context.IsInstantPhase == value)
+        {
+            return;
+        }
+
         context.IsInstantPhase = value;
+        context.NotifyStateChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private async Task UpdateDelayGroupOptionsAsync()
     {
-        if (groupId is null) return;
+        if (disposed || groupId is null) return;
 
         try
         {
@@ -166,7 +186,7 @@
                 timeoutMs = TimeoutMs
             });
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -176,7 +196,7 @@
         string interactionId,
         DotNetObjectReference<DelayGroupMemberCallback> closeMemberRef)
     {
-        if (groupId is null || dotNetRef is null) return;
+        if (disposed || groupId is null || dotNetRef is null) return;
 
         try
         {
@@ -187,7 +207,7 @@
                 closeMember = closeMemberRef
             });
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -195,14 +215,14 @@
 
     private async Task UnregisterMemberAsync(string interactionId)
     {
-        if (groupId is null) return;
+        if (disposed || groupId is null) return;
 
         try
         {
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterDelayGroupMember", groupId, interactionId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -210,14 +230,14 @@
 
     private async Task NotifyMemberOpenedAsync(string interactionId)
     {
-        if (groupId is null) return;
+        if (disposed || groupId is null) return;
 
         try
         {
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("notifyDelayGroupMemberOpened", groupId, interactionId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -225,16 +245,17 @@
 
     private async Task NotifyMemberClosedAsync(string interactionId)
     {
-        if (groupId is null) return;
+        if (disposed || groupId is null) return;
 
         try
         {
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("notifyDelayGroupMemberClosed", groupId, interactionId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
     }
+
 }

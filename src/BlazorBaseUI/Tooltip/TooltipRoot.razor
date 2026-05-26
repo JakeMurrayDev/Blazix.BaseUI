@@ -4,7 +4,7 @@
 @implements ITooltipHandleSubscriber
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context" IsFixed="true">
+<CascadingValue Value="context">
     @if (ChildContentWithPayload is not null)
     {
         @ChildContentWithPayload(new TooltipRootPayloadContext(payload))
@@ -37,8 +37,12 @@
     private TooltipRootContext context = null!;
     private DotNetObjectReference<TooltipRoot>? dotNetRef;
     private ITooltipHandle? subscribedHandle;
+    private FloatingDelayGroupContext? subscribedDelayGroupContext;
     private DelayGroupMemberCallback? delayGroupCallback;
     private DotNetObjectReference<DelayGroupMemberCallback>? delayGroupCallbackRef;
+    private bool syncTriggerAttributesAfterRender;
+    private bool syncRootOpenAfterRender;
+    private bool rootOpenToSyncAfterRender;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -173,9 +177,10 @@
             InstantType = instantType,
             TrackCursorAxis = TrackCursorAxis,
             DisableHoverablePopup = DisableHoverablePopup,
+            IsDelayGroupInstantPhase = DelayGroupContext?.IsInstantPhase == true,
             ActiveTriggerId = activeTriggerId,
             Payload = payload,
-            GetOpen = () => CurrentOpen,
+            GetOpen = () => state.Open,
             GetMounted = () => transition.IsMounted,
             GetPayload = () => payload,
             GetTriggerElement = GetTriggerElement,
@@ -186,7 +191,7 @@
             SetOpenAsync = SetOpenAsync,
             SetTriggerPayload = SetTriggerPayload,
             ForceUnmount = ForceUnmount,
-            GetTriggerElementById = id => triggerElements.TryGetValue(id, out var el) ? el : null,
+            GetTriggerElementById = GetTriggerElementById,
             GetPopupElement = () => popupElement,
             GetPositionerElement = () => positionerElement
         };
@@ -206,15 +211,10 @@
     protected override void OnParametersSet()
     {
         var currentOpen = CurrentOpen;
-        if (state.Open != currentOpen)
+        var parameterOpenChanged = state.Open != currentOpen;
+        if (parameterOpenChanged)
         {
-            state = new TooltipRootState(currentOpen);
-            if (currentOpen)
-            {
-                transition.BeginOpen();
-            }
-            context.Open = currentOpen;
-            context.Mounted = transition.IsMounted;
+            ApplyOpenParameterChange(currentOpen);
         }
 
         if (TriggerId is not null)
@@ -225,11 +225,16 @@
 
         TrySetImplicitActiveTrigger();
 
+        if (parameterOpenChanged)
+        {
+            CompleteOpenParameterChange(currentOpen);
+        }
+
         context.Disabled = Disabled;
 
-        if (Disabled && CurrentOpen)
+        if (Disabled && state.Open)
         {
-            _ = SetOpenAsync(false, TooltipOpenChangeReason.None, null);
+            _ = SetOpenAsync(false, TooltipOpenChangeReason.Disabled, null);
         }
 
         context.DisableHoverablePopup = DisableHoverablePopup;
@@ -249,6 +254,22 @@
             UnsubscribeFromHandle();
             SubscribeToHandle();
         }
+
+        if (!ReferenceEquals(DelayGroupContext, subscribedDelayGroupContext))
+        {
+            if (subscribedDelayGroupContext is not null)
+            {
+                subscribedDelayGroupContext.StateChanged -= HandleDelayGroupStateChanged;
+            }
+
+            subscribedDelayGroupContext = DelayGroupContext;
+            if (subscribedDelayGroupContext is not null)
+            {
+                subscribedDelayGroupContext.StateChanged += HandleDelayGroupStateChanged;
+            }
+        }
+
+        RefreshCascadingContext();
     }
 
     /// <inheritdoc />
@@ -260,6 +281,18 @@
             dotNetRef = DotNetObjectReference.Create(this);
             await InitializeJsAsync();
             await RegisterDelayGroupMemberAsync();
+        }
+
+        if (hasRendered && syncRootOpenAfterRender)
+        {
+            syncRootOpenAfterRender = false;
+            await SyncOpenStateToJsAsync(rootOpenToSyncAfterRender, true);
+        }
+
+        if (hasRendered && syncTriggerAttributesAfterRender)
+        {
+            syncTriggerAttributesAfterRender = false;
+            await SyncTriggerAttributesAsync();
         }
     }
 
@@ -276,18 +309,18 @@
     /// Handles a hover open event from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public async Task OnHoverOpen()
+    public async Task OnHoverOpen(string? triggerId)
     {
-        await SetOpenAsync(true, TooltipOpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(true, TooltipOpenChangeReason.TriggerHover, triggerId);
     }
 
     /// <summary>
     /// Handles a hover close event from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public async Task OnHoverClose()
+    public async Task OnHoverClose(string? triggerId)
     {
-        await SetOpenAsync(false, TooltipOpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(false, TooltipOpenChangeReason.TriggerHover, triggerId);
     }
 
     /// <summary>
@@ -308,6 +341,7 @@
         if (transition.HandleStartingStyleApplied())
         {
             context.TransitionStatus = transition.TransitionStatus;
+            RefreshCascadingContext();
             StateHasChanged();
         }
     }
@@ -344,6 +378,7 @@
         context.InstantType = instantType;
 
         _ = InvokeOpenChangeCompleteAsync(open);
+        RefreshCascadingContext();
         StateHasChanged();
     }
 
@@ -351,6 +386,12 @@
     public async ValueTask DisposeAsync()
     {
         UnsubscribeFromHandle();
+
+        if (subscribedDelayGroupContext is not null)
+        {
+            subscribedDelayGroupContext.StateChanged -= HandleDelayGroupStateChanged;
+            subscribedDelayGroupContext = null;
+        }
 
         if (DelayGroupContext is not null)
         {
@@ -388,9 +429,15 @@
     {
         triggerElements[triggerId] = element;
 
+        if (state.Open && activeTriggerId == triggerId)
+        {
+            payload = GetPayloadFromHandle(triggerId);
+            context.Payload = payload;
+        }
+
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
         {
-            _ = SetTriggerElementJsAsync(element.Value);
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
         }
     }
 
@@ -406,7 +453,7 @@
 
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
         {
-            _ = SetTriggerElementJsAsync(element.Value);
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
         }
     }
 
@@ -438,7 +485,10 @@
     /// <param name="triggerId">The ID of the trigger initiating the change, or <see langword="null"/>.</param>
     internal async Task SetOpenAsync(bool nextOpen, TooltipOpenChangeReason reason, string? triggerId)
     {
-        if (CurrentOpen == nextOpen)
+        var currentOpen = state.Open;
+        var activeTriggerChanged = nextOpen && triggerId is not null && triggerId != activeTriggerId;
+
+        if (currentOpen == nextOpen && !activeTriggerChanged)
         {
             return;
         }
@@ -448,7 +498,8 @@
             return;
         }
 
-        var args = new TooltipOpenChangeEventArgs(nextOpen, reason);
+        var triggerReference = triggerId is null ? null : GetTriggerElementById(triggerId);
+        var args = new TooltipOpenChangeEventArgs(nextOpen, reason, triggerId, triggerReference);
         await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
@@ -468,28 +519,18 @@
         {
             if (triggerId is not null)
             {
-                activeTriggerId = triggerId;
-                context.ActiveTriggerId = triggerId;
-
-                // Try to get payload from handle first, then from local storage
-                var handlePayload = GetPayloadFromHandle(triggerId);
-                if (handlePayload is not null)
-                {
-                    payload = handlePayload;
-                }
-                else if (triggerPayloads.TryGetValue(triggerId, out var triggerPayload))
-                {
-                    payload = triggerPayload;
-                }
-                context.Payload = payload;
+                SetActiveTrigger(triggerId);
             }
 
             instantType = reason == TooltipOpenChangeReason.TriggerFocus
                 ? TooltipInstantType.Focus
-                : (ProviderContext?.IsInInstantPhase() == true ? TooltipInstantType.Delay : TooltipInstantType.None);
-            transition.BeginOpen();
+                : (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true ? TooltipInstantType.Delay : TooltipInstantType.None);
+            if (!currentOpen || !transition.IsMounted)
+            {
+                transition.BeginOpen();
+            }
 
-            if (DelayGroupContext is not null)
+            if (!currentOpen && DelayGroupContext is not null)
             {
                 _ = DelayGroupContext.NotifyMemberOpenedAsync(rootId);
             }
@@ -501,9 +542,12 @@
                 TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.OutsidePress => TooltipInstantType.Dismiss,
                 _ => TooltipInstantType.None
             };
-            transition.BeginClose();
+            if (currentOpen)
+            {
+                transition.BeginClose();
+            }
 
-            if (DelayGroupContext is not null)
+            if (currentOpen && DelayGroupContext is not null)
             {
                 _ = DelayGroupContext.NotifyMemberClosedAsync(rootId);
             }
@@ -533,40 +577,19 @@
 
         SyncHandleState(nextOpen, activeTriggerId);
 
-        if (hasRendered)
+        if (currentOpen != nextOpen)
         {
-            try
-            {
-                var module = await ModuleTask.Value;
-
-                // Manage cursor tracking lifecycle
-                if (nextOpen && TrackCursorAxis != TrackCursorAxis.None)
-                {
-                    var axis = TrackCursorAxis switch
-                    {
-                        TrackCursorAxis.X => "x",
-                        TrackCursorAxis.Y => "y",
-                        TrackCursorAxis.Both => "both",
-                        _ => "none"
-                    };
-                    var virtualId = await module.InvokeAsync<string?>("initializeCursorTracking", rootId, axis);
-                    context.VirtualAnchorId = virtualId;
-                }
-                else if (!nextOpen)
-                {
-                    await module.InvokeVoidAsync("disposeCursorTracking", rootId);
-                    context.VirtualAnchorId = null;
-                }
-
-                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen);
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
+            await OpenChanged.InvokeAsync(nextOpen);
         }
 
-        await OpenChanged.InvokeAsync(nextOpen);
+        if (hasRendered)
+        {
+            await SyncOpenStateToJsAsync(nextOpen, currentOpen != nextOpen || activeTriggerChanged);
+        }
+
+        context.NotifyStateChanged();
+        RefreshCascadingContext();
+        syncTriggerAttributesAfterRender = true;
         StateHasChanged();
     }
 
@@ -583,7 +606,7 @@
 
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
         {
-            _ = SetTriggerElementJsAsync(element.Value);
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
         }
     }
 
@@ -596,7 +619,7 @@
         triggerElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
 
-        if (activeTriggerId == triggerId && CurrentOpen)
+        if (activeTriggerId == triggerId && state.Open)
         {
             activeTriggerId = null;
             context.ActiveTriggerId = null;
@@ -614,7 +637,7 @@
     {
         triggerPayloads[triggerId] = triggerPayload;
 
-        if (activeTriggerId == triggerId && CurrentOpen)
+        if (activeTriggerId == triggerId && state.Open)
         {
             payload = triggerPayload;
             context.Payload = payload;
@@ -682,12 +705,38 @@
         return triggerElements.Values.FirstOrDefault();
     }
 
+    private ElementReference? GetTriggerElementById(string triggerId)
+    {
+        if (triggerElements.TryGetValue(triggerId, out var element))
+        {
+            return element;
+        }
+
+        return GetTriggerElementFromHandle(triggerId);
+    }
+
     private async Task InitializeJsAsync()
     {
         try
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef);
+
+            var triggerElement = GetTriggerElement();
+            if (activeTriggerId is not null && triggerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);
+            }
+
+            if (popupElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value);
+            }
+
+            if (state.Open)
+            {
+                await module.InvokeVoidAsync("setRootOpen", rootId, true, activeTriggerId);
+            }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -715,17 +764,17 @@
                     await DispatchExceptionAsync(ex);
                 }
             });
-        });
+        }, HandleDelayGroupMemberInstantPhaseChanged);
         delayGroupCallbackRef = DotNetObjectReference.Create(delayGroupCallback);
         await DelayGroupContext.RegisterMemberAsync(rootId, delayGroupCallbackRef);
     }
 
-    private async Task SetTriggerElementJsAsync(ElementReference element)
+    private async Task SetTriggerElementJsAsync(string triggerId, ElementReference element)
     {
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("setTriggerElement", rootId, element);
+            await module.InvokeVoidAsync("setTriggerElement", rootId, triggerId, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -739,6 +788,132 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setPopupElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void ApplyOpenParameterChange(bool nextOpen)
+    {
+        var previousOpen = state.Open;
+
+        openChangeReason = TooltipOpenChangeReason.None;
+        context.OpenChangeReason = openChangeReason;
+        instantType = TooltipInstantType.None;
+        previousInstantType = null;
+
+        if (nextOpen)
+        {
+            if (!previousOpen || !transition.IsMounted)
+            {
+                transition.BeginOpen();
+            }
+
+            if (!previousOpen && DelayGroupContext is not null)
+            {
+                _ = DelayGroupContext.NotifyMemberOpenedAsync(rootId);
+            }
+        }
+        else
+        {
+            preventUnmountOnClose = false;
+
+            if (previousOpen)
+            {
+                transition.BeginClose();
+            }
+
+            if (previousOpen && DelayGroupContext is not null)
+            {
+                _ = DelayGroupContext.NotifyMemberClosedAsync(rootId);
+            }
+        }
+
+        state = new TooltipRootState(nextOpen);
+        context.Open = nextOpen;
+        context.InstantType = instantType;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
+    }
+
+    private void CompleteOpenParameterChange(bool nextOpen)
+    {
+        if (nextOpen && activeTriggerId is null)
+        {
+            payload = null;
+            context.Payload = null;
+        }
+
+        ApplyInstantPhaseOverride();
+        SyncHandleState(nextOpen, activeTriggerId);
+
+        if (hasRendered)
+        {
+            rootOpenToSyncAfterRender = nextOpen;
+            syncRootOpenAfterRender = true;
+            syncTriggerAttributesAfterRender = true;
+        }
+
+        context.NotifyStateChanged();
+    }
+
+    private async Task SyncOpenStateToJsAsync(bool nextOpen, bool syncRootOpen)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+
+            if (nextOpen && activeTriggerId is not null)
+            {
+                var triggerElement = GetTriggerElement();
+                if (triggerElement.HasValue)
+                {
+                    await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);
+                }
+            }
+
+            if (nextOpen && TrackCursorAxis != TrackCursorAxis.None)
+            {
+                var axis = TrackCursorAxis switch
+                {
+                    TrackCursorAxis.X => "x",
+                    TrackCursorAxis.Y => "y",
+                    TrackCursorAxis.Both => "both",
+                    _ => "none"
+                };
+                var virtualId = await module.InvokeAsync<string?>("initializeCursorTracking", rootId, axis);
+                context.VirtualAnchorId = virtualId;
+            }
+            else if (!nextOpen)
+            {
+                await module.InvokeVoidAsync("disposeCursorTracking", rootId);
+                context.VirtualAnchorId = null;
+            }
+
+            if (syncRootOpen)
+            {
+                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, activeTriggerId);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncTriggerAttributesAsync()
+    {
+        if (moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("syncTriggerOpenAttributes", rootId, state.Open, activeTriggerId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -767,25 +942,57 @@
         context.ActiveTriggerId = null;
         payload = null;
         context.Payload = null;
+        RefreshCascadingContext();
         _ = InvokeOpenChangeCompleteAsync(false);
         StateHasChanged();
     }
 
     private void TrySetImplicitActiveTrigger()
     {
-        if (CurrentOpen && activeTriggerId is null && triggerElements.Count == 1)
+        if (state.Open && activeTriggerId is null && triggerElements.Count == 1)
         {
             var entry = triggerElements.First();
-            activeTriggerId = entry.Key;
-            context.ActiveTriggerId = entry.Key;
+            SetActiveTrigger(entry.Key);
         }
+    }
+
+    private void SetActiveTrigger(string triggerId)
+    {
+        activeTriggerId = triggerId;
+        context.ActiveTriggerId = triggerId;
+
+        if (triggerPayloads.TryGetValue(triggerId, out var triggerPayload))
+        {
+            payload = triggerPayload;
+        }
+        else
+        {
+            payload = GetPayloadFromHandle(triggerId);
+        }
+
+        context.Payload = payload;
+    }
+
+    private void RefreshCascadingContext()
+    {
+        context.Open = state.Open;
+        context.Mounted = transition.IsMounted;
+        context.Disabled = Disabled;
+        context.OpenChangeReason = openChangeReason;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.InstantType = instantType;
+        context.TrackCursorAxis = TrackCursorAxis;
+        context.DisableHoverablePopup = DisableHoverablePopup;
+        context.IsDelayGroupInstantPhase = DelayGroupContext?.IsInstantPhase == true;
+        context.ActiveTriggerId = activeTriggerId;
+        context.Payload = payload;
     }
 
     private void ApplyInstantPhaseOverride()
     {
         var isEnding = transition.TransitionStatus == TransitionStatus.Ending;
         var isClosingBySibling = isEnding && openChangeReason == TooltipOpenChangeReason.None;
-        var isInInstantPhaseAndNotEnding = !isEnding && ProviderContext?.IsInInstantPhase() == true;
+        var isInInstantPhaseAndNotEnding = !isEnding && (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true);
 
         if (isClosingBySibling || isInInstantPhaseAndNotEnding)
         {
@@ -802,6 +1009,20 @@
             previousInstantType = null;
             context.InstantType = instantType;
         }
+    }
+
+    private void HandleDelayGroupStateChanged()
+    {
+        context.IsDelayGroupInstantPhase = DelayGroupContext?.IsInstantPhase == true;
+        context.NotifyStateChanged();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleDelayGroupMemberInstantPhaseChanged(bool value)
+    {
+        context.IsDelayGroupInstantPhase = value || DelayGroupContext?.IsInstantPhase == true;
+        context.NotifyStateChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private async Task InvokeOpenChangeCompleteAsync(bool open)

@@ -9,6 +9,11 @@ namespace BlazorBaseUI.FloatingDelayGroup;
 public sealed class FloatingDelayGroupContext
 {
     /// <summary>
+    /// Occurs when delay group state changes and descendants should re-evaluate derived delay state.
+    /// </summary>
+    public event Action? StateChanged;
+
+    /// <summary>
     /// Gets the unique identifier of the delay group.
     /// </summary>
     public string GroupId { get; set; } = string.Empty;
@@ -50,4 +55,12 @@ public sealed class FloatingDelayGroupContext
     /// Gets or sets the delegate that notifies the group when a member closes.
     /// </summary>
     public Func<string, Task> NotifyMemberClosedAsync { get; init; } = null!;
+
+    /// <summary>
+    /// Notifies subscribers that delay group state changed.
+    /// </summary>
+    public void NotifyStateChanged()
+    {
+        StateChanged?.Invoke();
+    }
 }

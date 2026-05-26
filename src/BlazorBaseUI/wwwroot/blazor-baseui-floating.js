@@ -1831,6 +1831,10 @@ export function createHoverInteraction(options) {
             currentCloseDelay = close ?? 0;
         },
 
+        cancelPendingOpen() {
+            openTimeout.clear();
+        },
+
         cleanup() {
             openTimeout.clear();
             closeTimeout.clear();
@@ -4093,6 +4097,23 @@ if (!window[DELAY_GROUP_KEY]) {
 }
 const delayGroupState = window[DELAY_GROUP_KEY];
 
+function setDelayGroupInstantPhase(group, value, notifyMembers = false) {
+    if (group.isInstantPhase === value) {
+        return;
+    }
+
+    group.isInstantPhase = value;
+    group.setIsInstantPhaseRef?.invokeMethodAsync('SetIsInstantPhase', value).catch(() => { });
+
+    if (!notifyMembers) {
+        return;
+    }
+
+    for (const member of group.members.values()) {
+        member.closeMember?.invokeMethodAsync('SetMemberInstantPhase', value).catch(() => { });
+    }
+}
+
 /**
  * Creates a delay group for coordinating open/close delays across
  * multiple floating elements (typically tooltips).
@@ -4163,29 +4184,25 @@ export function notifyDelayGroupMemberOpened(groupId, interactionId) {
     group.currentOpenId = interactionId;
 
     if (previousOpenId !== null && previousOpenId !== interactionId) {
-        group.isInstantPhase = true;
-
-        // Notify group-level context once
-        group.setIsInstantPhaseRef?.invokeMethodAsync('SetIsInstantPhase', true);
+        setDelayGroupInstantPhase(group, true, true);
 
         // Notify current member
         const currentMember = group.members.get(interactionId);
         if (currentMember) {
-            currentMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', true);
+            currentMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', true).catch(() => { });
         }
 
         // Notify and close previous member
         const prevMember = group.members.get(previousOpenId);
         if (prevMember) {
-            prevMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', true);
-            prevMember.closeMember?.invokeMethodAsync('CloseMember', 'delay-group');
+            prevMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', true).catch(() => { });
+            prevMember.closeMember?.invokeMethodAsync('CloseMember', 'delay-group').catch(() => { });
         }
     } else {
-        // No previous member open, or same member re-opened — not instant phase
-        group.isInstantPhase = false;
-
-        // Notify group-level context once
-        group.setIsInstantPhaseRef?.invokeMethodAsync('SetIsInstantPhase', false);
+        // Match React's delayRef behavior: while a member is open, the next
+        // member's open delay is zero even though the first member itself
+        // should not animate as an instant open.
+        setDelayGroupInstantPhase(group, true);
     }
 }
 
@@ -4204,10 +4221,12 @@ export function notifyDelayGroupMemberClosed(groupId, interactionId) {
     // Notify only the closing member
     const closingMember = group.members.get(interactionId);
     if (closingMember) {
-        closingMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', false);
+        closingMember.closeMember?.invokeMethodAsync('SetMemberInstantPhase', false).catch(() => { });
     }
 
     if (group.timeoutMs > 0) {
+        setDelayGroupInstantPhase(group, true);
+
         group.timeoutHandle = setTimeout(() => {
             // Guard: if another member opened during the timeout, skip the reset
             if (group.currentOpenId !== null) {
@@ -4215,13 +4234,11 @@ export function notifyDelayGroupMemberClosed(groupId, interactionId) {
                 return;
             }
 
-            group.isInstantPhase = false;
-            group.setIsInstantPhaseRef?.invokeMethodAsync('SetIsInstantPhase', false);
+            setDelayGroupInstantPhase(group, false, true);
             group.timeoutHandle = null;
         }, group.timeoutMs);
     } else {
-        group.isInstantPhase = false;
-        group.setIsInstantPhaseRef?.invokeMethodAsync('SetIsInstantPhase', false);
+        setDelayGroupInstantPhase(group, false, true);
     }
 }
 

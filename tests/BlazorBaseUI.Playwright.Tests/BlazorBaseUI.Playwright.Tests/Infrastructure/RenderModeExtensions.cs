@@ -66,6 +66,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithControlledExternal(bool value)
+    {
+        queryParams["controlledExternal"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithCustomPanelId(string? id)
     {
         if (!string.IsNullOrEmpty(id))
@@ -575,6 +581,36 @@ public sealed class TestPageUrlBuilder
     public TestPageUrlBuilder WithDisableHoverablePopup(bool value)
     {
         queryParams["disableHoverablePopup"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithFlexLayout(bool value)
+    {
+        queryParams["flexLayout"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithMultiTrigger(bool value)
+    {
+        queryParams["multiTrigger"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithProviderGroup(bool value)
+    {
+        queryParams["providerGroup"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithProviderTimeout(int timeoutMs)
+    {
+        queryParams["providerTimeout"] = timeoutMs.ToString();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithStyledArrow(bool value)
+    {
+        queryParams["styledArrow"] = value.ToString().ToLowerInvariant();
         return this;
     }
 

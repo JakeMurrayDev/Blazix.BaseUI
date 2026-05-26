@@ -3,6 +3,7 @@ using BlazorBaseUI.Tests.Infrastructure;
 using BlazorBaseUI.Tooltip;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlazorBaseUI.Tests.Tooltip;
 
@@ -145,12 +146,34 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
     }
 
     [Fact]
+    public Task HasBaseUiTooltipTriggerIdentifierWhenEnabled()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-base-ui-tooltip-trigger").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasDisabledAttributeWhenDisabled()
     {
         var cut = Render(CreateTriggerInRoot(triggerDisabled: true));
 
         var trigger = cut.Find("button");
         trigger.HasAttribute("data-trigger-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OmitsBaseUiTooltipTriggerIdentifierWhenDisabled()
+    {
+        var cut = Render(CreateTriggerInRoot(triggerDisabled: true));
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-base-ui-tooltip-trigger").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -192,6 +215,25 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("style")!.ShouldContain("color: blue");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ForwardsPointerDownHandlerAfterInternalHandling()
+    {
+        var invoked = false;
+        var cut = Render(CreateTriggerInRoot(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                ["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, _ => invoked = true)
+            }
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.PointerDown(new PointerEventArgs { PointerType = "mouse" });
+
+        invoked.ShouldBeTrue();
 
         return Task.CompletedTask;
     }

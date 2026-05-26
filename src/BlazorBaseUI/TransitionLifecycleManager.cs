@@ -85,6 +85,12 @@ internal sealed class TransitionLifecycleManager
     {
         TransitionStatus = restingState;
 
+        if (open)
+        {
+            IsMounted = true;
+            return false;
+        }
+
         if (!open && !preventUnmount)
         {
             IsMounted = false;

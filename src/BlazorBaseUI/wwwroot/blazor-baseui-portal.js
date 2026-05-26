@@ -26,6 +26,10 @@ export function restorePortal(id) {
     const content = document.getElementById(id);
     const originalParent = portalMap.get(id);
 
+    if (content) {
+        content.style.setProperty('display', 'none');
+    }
+
     if (content && originalParent) {
         originalParent.appendChild(content);
         portalMap.delete(id);
