@@ -1,0 +1,13 @@
+<CascadingValue TValue="DrawerProviderContext" Value="context">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly DrawerProviderContext context = new();
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -24,7 +24,13 @@ public enum DialogOpenChangeReason
     FocusOut,
 
     /// <summary>An imperative action was invoked.</summary>
-    ImperativeAction
+    ImperativeAction,
+
+    /// <summary>The popup was closed by a swipe gesture.</summary>
+    Swipe,
+
+    /// <summary>The platform close watcher requested closing.</summary>
+    CloseWatcher
 }
 
 /// <summary>

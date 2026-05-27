@@ -1,0 +1,178 @@
+@page "/tests/drawer/wasm"
+@using BlazorBaseUI.Drawer
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Drawer Test Page (WebAssembly)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <DrawerProvider>
+        <DrawerIndentBackground data-testid="drawer-indent-background" style="position: fixed; inset: 0; pointer-events: none;" />
+        <DrawerIndent data-testid="drawer-indent">
+            <button data-testid="outside-button" style="@OutsideButtonStyle">Outside Button</button>
+            <input data-testid="focusable-input" type="text" placeholder="Focusable input" />
+
+            <DrawerRoot
+                @bind-Open="isOpen"
+                SnapPoint="@activeSnapPoint"
+                SnapPointChanged="HandleSnapPointChanged"
+                SnapPoints="@ResolvedSnapPoints"
+                DefaultSnapPoint="@ResolvedDefaultSnapPoint"
+                SnapToSequentialPoints="@SnapToSequentialPoints"
+                SwipeDirection="@ResolvedSwipeDirection"
+                Modal="@(Modal ? DrawerModalMode.True : DrawerModalMode.False)"
+                DefaultOpen="@DefaultOpen"
+                OnOpenChange="HandleOpenChange"
+                OnSnapPointChange="HandleSnapPointChangeDetails">
+                <DrawerTrigger data-testid="drawer-trigger">
+                    Open Drawer
+                </DrawerTrigger>
+                <DrawerSwipeArea
+                    data-testid="drawer-swipe-area"
+                    Disabled="@SwipeAreaDisabled"
+                    style="position: fixed; left: 0; right: 0; bottom: 0; height: 96px; z-index: 30;" />
+                <DrawerPortal KeepMounted="@KeepMounted">
+                    @if (ShowBackdrop)
+                    {
+                        <DrawerBackdrop data-testid="drawer-backdrop" style="position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, calc(.48 * (1 - var(--drawer-swipe-progress, 0))));" />
+                    }
+                    <DrawerViewport data-testid="drawer-viewport" style="position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; pointer-events: none;">
+                        @RenderPopup()
+                    </DrawerViewport>
+                </DrawerPortal>
+            </DrawerRoot>
+        </DrawerIndent>
+    </DrawerProvider>
+
+    <div data-testid="state-display">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Snap Point: <span data-testid="snap-point">@FormatSnapPoint(activeSnapPoint)</span></div>
+        <div>Snap Count: <span data-testid="snap-change-count">@snapChangeCount</span></div>
+    </div>
+</div>
+
+@code {
+    private RenderFragment RenderPopup() => @<DrawerPopup
+        data-testid="drawer-popup"
+        InitialFocus="@(UseInitialFocus ? closeButtonFocusTarget : null)"
+        style="@PopupStyle">
+        <DrawerTitle data-testid="drawer-title">Drawer Title</DrawerTitle>
+        <DrawerDescription data-testid="drawer-description">Drawer description.</DrawerDescription>
+        <DrawerContent data-testid="drawer-content">
+            <p>Drawer Content</p>
+            <input data-testid="drawer-input" />
+            @if (ShowNestedDrawer)
+            {
+                <DrawerRoot @bind-Open="nestedIsOpen" Modal="DrawerModalMode.False">
+                    <DrawerTrigger data-testid="nested-drawer-trigger">Open Nested</DrawerTrigger>
+                    <DrawerPortal>
+                        <DrawerViewport data-testid="nested-drawer-viewport" style="position: fixed; inset: 0; z-index: 70; display: flex; align-items: flex-end; pointer-events: none;">
+                            <DrawerPopup data-testid="nested-drawer-popup" style="width: 100%; min-height: 240px; background: white; border: 1px solid #999; padding: 20px; pointer-events: auto;">
+                                <DrawerTitle>Nested Drawer</DrawerTitle>
+                                <DrawerClose data-testid="nested-drawer-close">Close Nested</DrawerClose>
+                            </DrawerPopup>
+                        </DrawerViewport>
+                    </DrawerPortal>
+                </DrawerRoot>
+            }
+        </DrawerContent>
+        <DrawerClose @ref="closeButtonComponent" data-testid="drawer-close">Close</DrawerClose>
+    </DrawerPopup>;
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modal")]
+    public bool? ModalParam { get; set; }
+
+    private bool Modal => ModalParam ?? true;
+
+    [SupplyParameterFromQuery(Name = "keepMounted")]
+    public bool KeepMounted { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showBackdrop")]
+    public bool? ShowBackdropParam { get; set; }
+
+    private bool ShowBackdrop => ShowBackdropParam ?? true;
+
+    [SupplyParameterFromQuery(Name = "outsideAboveBackdrop")]
+    public bool OutsideAboveBackdrop { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useInitialFocus")]
+    public bool UseInitialFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showNestedDialog")]
+    public bool ShowNestedDrawer { get; set; }
+
+    [SupplyParameterFromQuery(Name = "snapPoints")]
+    public bool UseSnapPoints { get; set; }
+
+    [SupplyParameterFromQuery(Name = "snapToSequentialPoints")]
+    public bool SnapToSequentialPoints { get; set; }
+
+    [SupplyParameterFromQuery(Name = "swipeAreaDisabled")]
+    public bool SwipeAreaDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "swipeDirection")]
+    public string? SwipeDirection { get; set; }
+
+    private bool isOpen;
+    private bool nestedIsOpen;
+    private int changeCount;
+    private int snapChangeCount;
+    private string lastReason = "";
+    private DrawerSnapPoint? activeSnapPoint;
+    private DrawerClose? closeButtonComponent;
+    private ElementReference? closeButtonRef => closeButtonComponent?.Element;
+
+    private FocusTarget? closeButtonFocusTarget => new FocusTarget.Callback(_ => closeButtonRef);
+
+    private string PopupStyle => UseSnapPoints
+        ? "width: 100%; height: 80vh; max-height: 92vh; overflow: auto; pointer-events: auto; background: white; border: 1px solid #999; padding: 20px; transform: translate3d(var(--drawer-swipe-movement-x, 0), calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)), 0); transition: transform calc(220ms * var(--drawer-swipe-strength, 1)) ease;"
+        : "width: 100%; min-height: 320px; max-height: 92vh; overflow: auto; pointer-events: auto; background: white; border: 1px solid #999; padding: 20px; transform: translate3d(var(--drawer-swipe-movement-x, 0), calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)), 0); transition: transform calc(220ms * var(--drawer-swipe-strength, 1)) ease;";
+
+    private string OutsideButtonStyle => OutsideAboveBackdrop
+        ? "position: fixed; top: 0; right: 0; z-index: 80;"
+        : "margin: 24px 0;";
+
+    private IReadOnlyList<DrawerSnapPoint>? ResolvedSnapPoints => UseSnapPoints ? [0.35, 0.75, 1] : null;
+
+    private DrawerSnapPoint? ResolvedDefaultSnapPoint => UseSnapPoints ? 0.35 : null;
+
+    private DrawerSwipeDirection ResolvedSwipeDirection => SwipeDirection switch
+    {
+        "up" => DrawerSwipeDirection.Up,
+        "left" => DrawerSwipeDirection.Left,
+        "right" => DrawerSwipeDirection.Right,
+        _ => DrawerSwipeDirection.Down
+    };
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+        activeSnapPoint = ResolvedDefaultSnapPoint;
+    }
+
+    private void HandleOpenChange(DrawerOpenChangeEventArgs args)
+    {
+        changeCount++;
+        lastReason = args.Reason.ToString();
+    }
+
+    private Task HandleSnapPointChanged(DrawerSnapPoint? snapPoint)
+    {
+        activeSnapPoint = snapPoint;
+        return Task.CompletedTask;
+    }
+
+    private void HandleSnapPointChangeDetails(DrawerSnapPointChangeEventArgs args)
+    {
+        snapChangeCount++;
+    }
+
+    private static string FormatSnapPoint(DrawerSnapPoint? snapPoint)
+    {
+        return snapPoint?.ToString() ?? "null";
+    }
+}

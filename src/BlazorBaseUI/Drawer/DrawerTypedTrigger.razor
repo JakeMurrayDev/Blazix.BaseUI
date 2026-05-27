@@ -1,0 +1,458 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using BlazorBaseUI.Dialog
+@typeparam TPayload
+
+@implements IAsyncDisposable
+@implements IComponentHandleSubscriberBase<DialogOpenChangeReason>
+
+<RenderElement TState="DrawerTriggerState"
+               Tag="button"
+               Enabled="RootContext is not null || HasHandle"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-button.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton;
+    private string triggerId = null!;
+    private string lastPointerType = string.Empty;
+    private DrawerTriggerState state;
+    private DrawerHandle<TPayload>? registeredHandle;
+    private RenderElement<DrawerTriggerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+
+    private bool HasHandle => Handle is not null;
+
+    private bool HasRootContext => RootContext is not null;
+
+    private bool NeedsJsInterop => !NativeButton || Disabled;
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
+
+    [CascadingParameter]
+    private DialogRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerTriggerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Determines whether the trigger button is disabled.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders a native <c>button</c> element when replacing it via <see cref="Render"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger element.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets a handle to associate this trigger with a detached drawer.
+    /// </summary>
+    [Parameter]
+    public DrawerHandle<TPayload>? Handle { get; set; }
+
+    /// <summary>
+    /// Gets or sets a payload to pass to the drawer when it is opened.
+    /// </summary>
+    [Parameter]
+    public TPayload? Payload { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerTriggerState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerTriggerState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public DrawerTypedTrigger()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null && Handle is null)
+        {
+            throw new InvalidOperationException("DrawerTrigger must be used within a DrawerRoot or with a Handle.");
+        }
+
+        triggerId = Id ?? Guid.NewGuid().ToIdString();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var triggerIdChanged = false;
+        if (Id is not null && Id != triggerId)
+        {
+            UnregisterFromCurrentStore(triggerId);
+            triggerId = Id;
+            triggerIdChanged = true;
+        }
+
+        if (Handle != registeredHandle)
+        {
+            if (!triggerIdChanged)
+            {
+                UnregisterFromCurrentStore(triggerId);
+            }
+
+            registeredHandle = Handle;
+            if (Handle is not null)
+            {
+                Handle.Subscribe(this);
+                Handle.RegisterTrigger(triggerId, Element, Payload);
+            }
+            else
+            {
+                RootContext?.RegisterTriggerElement(triggerId, Element);
+            }
+        }
+        else if (HasHandle)
+        {
+            if (triggerIdChanged)
+            {
+                Handle!.RegisterTrigger(triggerId, Element, Payload);
+            }
+            else
+            {
+                Handle!.UpdateTriggerPayload(triggerId, Payload);
+            }
+        }
+        else if (triggerIdChanged)
+        {
+            RootContext?.RegisterTriggerElement(triggerId, Element);
+        }
+
+        var open = IsOpenedByThisTrigger();
+        state = new DrawerTriggerState(Disabled, open);
+        BuildComponentAttributes();
+
+        if (!HasHandle)
+        {
+            RootContext?.SetTriggerPayload(triggerId, Payload);
+        }
+
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        var stateChanged = Disabled != previousDisabled || NativeButton != previousNativeButton;
+        if (!stateChanged)
+        {
+            return;
+        }
+
+        var previousNeedsJs = !previousNativeButton || previousDisabled;
+        var currentNeedsJs = NeedsJsInterop;
+        previousDisabled = Disabled;
+        previousNativeButton = NativeButton;
+
+        if (currentNeedsJs)
+        {
+            _ = SyncJsAsync(dispose: false);
+        }
+        else if (previousNeedsJs)
+        {
+            _ = SyncJsAsync(dispose: true);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+
+            if (HasHandle)
+            {
+                Handle!.Subscribe(this);
+                Handle.RegisterTrigger(triggerId, Element, Payload);
+                registeredHandle = Handle;
+            }
+            else
+            {
+                RootContext?.RegisterTriggerElement(triggerId, Element);
+            }
+
+            if (NeedsJsInterop)
+            {
+                await SyncJsAsync(dispose: false);
+            }
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            OnElementChanged();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        UnregisterFromCurrentStore(triggerId);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerUnregistered(string triggerId)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnOpenChangeRequested(
+        bool open,
+        DialogOpenChangeReason reason,
+        string? triggerId,
+        string? interactionType)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnStateChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            state = new DrawerTriggerState(Disabled, IsOpenedByThisTrigger());
+            BuildComponentAttributes();
+            StateHasChanged();
+        });
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
+        }
+
+        attrs["aria-haspopup"] = "dialog";
+
+        var open = IsOpenedByThisTrigger();
+        attrs["aria-expanded"] = open ? "true" : "false";
+        attrs["id"] = triggerId;
+
+        if (open && RootContext?.PopupId is not null)
+        {
+            attrs["aria-controls"] = RootContext.PopupId;
+        }
+        else if (open && Handle?.PopupId is not null)
+        {
+            attrs["aria-controls"] = Handle.PopupId;
+        }
+
+        attrs["data-popup-open"] = open;
+        attrs["data-disabled"] = Disabled;
+        attrs["data-blazor-base-ui-click-trigger"] = true;
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private void OnElementChanged()
+    {
+        if (HasHandle)
+        {
+            Handle!.UpdateTriggerElement(triggerId, Element);
+        }
+        else
+        {
+            RootContext?.RegisterTriggerElement(triggerId, Element);
+        }
+    }
+
+    private void UnregisterFromCurrentStore(string id)
+    {
+        if (registeredHandle is not null)
+        {
+            registeredHandle.UnregisterTrigger(id);
+            registeredHandle.Unsubscribe(this);
+        }
+        else
+        {
+            RootContext?.UnregisterTriggerElement(id);
+        }
+    }
+
+    private bool IsOpenedByThisTrigger()
+    {
+        if (HasHandle)
+        {
+            var isOpen = Handle!.IsOpen;
+            if (!isOpen)
+            {
+                return false;
+            }
+
+            var activeId = Handle.ActiveTriggerId;
+            return activeId == triggerId || (activeId is null && isOpen);
+        }
+
+        if (RootContext is null || !RootContext.GetOpen())
+        {
+            return false;
+        }
+
+        var activeTriggerId = RootContext.ActiveTriggerId;
+        return activeTriggerId == triggerId || (activeTriggerId is null && RootContext.GetOpen());
+    }
+
+    private Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        if (!Disabled)
+        {
+            lastPointerType = e.PointerType ?? string.Empty;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (Disabled || (!HasRootContext && !HasHandle))
+        {
+            return;
+        }
+
+        var nextOpen = !IsOpenedByThisTrigger();
+        string? interactionType = null;
+        if (nextOpen)
+        {
+            interactionType = e.Detail == 0 ? "keyboard" : lastPointerType;
+            lastPointerType = string.Empty;
+        }
+
+        await RequestOpenAsync(nextOpen, DialogOpenChangeReason.TriggerPress, interactionType);
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private Task RequestOpenAsync(bool open, DialogOpenChangeReason reason, string? interactionType = null)
+    {
+        if (HasHandle)
+        {
+            if (open)
+            {
+                Handle!.RequestOpen(triggerId, reason, interactionType);
+            }
+            else
+            {
+                Handle!.RequestClose(reason);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        if (RootContext is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (interactionType is not null)
+        {
+            RootContext.SetInteractionType(interactionType);
+        }
+
+        return open
+            ? RootContext.SetOpenWithTriggerIdAsync(triggerId, Payload, reason)
+            : RootContext.SetOpenAsync(false, reason);
+    }
+
+    private async Task SyncJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("sync", Element.Value, Disabled, false, NativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+}

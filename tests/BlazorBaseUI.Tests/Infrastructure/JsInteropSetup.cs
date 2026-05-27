@@ -245,6 +245,35 @@ public static class JsInteropSetup
         module.SetupVoid("disposePopup", _ => true).SetVoidResult();
     }
 
+    private const string DrawerModule = "./_content/BlazorBaseUI/blazor-baseui-drawer.js";
+    private const string DrawerMinModule = "./_content/BlazorBaseUI/blazor-baseui-drawer.min.js";
+
+    public static void SetupDrawerModule(BunitJSInterop jsInterop)
+    {
+        SetupDrawerModulePath(DrawerModule);
+        SetupDrawerModulePath(DrawerMinModule);
+
+        void SetupDrawerModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRootReporter", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRootReporter", _ => true).SetVoidResult();
+            module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("initializePopup", _ => true).SetVoidResult();
+            module.SetupVoid("updatePopup", _ => true).SetVoidResult();
+            module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+            module.SetupVoid("setBackdropElement", _ => true).SetVoidResult();
+            module.SetupVoid("initializeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("updateViewport", _ => true).SetVoidResult();
+            module.SetupVoid("disposeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("initializeSwipeArea", _ => true).SetVoidResult();
+            module.SetupVoid("updateSwipeArea", _ => true).SetVoidResult();
+            module.SetupVoid("disposeSwipeArea", _ => true).SetVoidResult();
+            module.SetupVoid("initializeIndent", _ => true).SetVoidResult();
+            module.SetupVoid("disposeIndent", _ => true).SetVoidResult();
+        }
+    }
+
     private const string ButtonModule = "./_content/BlazorBaseUI/blazor-baseui-button.js";
 
     public static void SetupButtonModule(BunitJSInterop jsInterop)

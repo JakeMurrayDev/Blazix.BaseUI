@@ -308,6 +308,10 @@ function setupOutsideClickListener(rootState) {
         const clickedOnTrigger = triggerElement && triggerElement.contains(target);
 
         if (!clickedInsidePopup && !clickedOnTrigger && rootState.dotNetRef) {
+            if (consumeDrawerOutsidePressSuppression(rootState, target)) {
+                return;
+            }
+
             suppressNextFocusOut(rootState);
             rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
         }
@@ -367,6 +371,10 @@ function setupBackdropClickListener(rootState) {
         const target = e.composedPath ? e.composedPath()[0] : e.target;
 
         if (isOutsideDialog(rootState, target) && rootState.dotNetRef) {
+            if (consumeDrawerOutsidePressSuppression(rootState, target)) {
+                return;
+            }
+
             e.preventDefault();
             e.stopPropagation();
             if (typeof e.stopImmediatePropagation === 'function') {
@@ -392,6 +400,30 @@ function cleanupBackdropClick(rootState) {
         rootState.backdropClickCleanup();
         rootState.backdropClickCleanup = null;
     }
+}
+
+function consumeDrawerOutsidePressSuppression(rootState, target) {
+    const now = performance.now();
+    const popupUntil = rootState.popupElement?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
+    const backdropUntil = rootState.backdropElement?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
+    const targetUntil = target?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
+    const until = Math.max(popupUntil || 0, backdropUntil || 0, targetUntil || 0);
+
+    if (until <= now) {
+        return false;
+    }
+
+    if (rootState.popupElement) {
+        rootState.popupElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+    }
+    if (rootState.backdropElement) {
+        rootState.backdropElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+    }
+    if (target) {
+        target.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+    }
+
+    return true;
 }
 
 
@@ -449,9 +481,9 @@ export function setInitialFocusElement(rootId, mode, element) {
         rootState.initialFocusMode = mode || null;
         rootState.initialFocusElement = element;
 
-        // If popup is already open and mode is 'element', focus now
-        if (rootState.isOpen && mode === 'element' && element) {
-            element.focus();
+        // If popup is open or currently opening and mode is 'element', focus now.
+        if ((rootState.isOpen || rootState.pendingOpen) && mode === 'element' && element) {
+            requestAnimationFrame(() => element.focus());
         }
     }
 }

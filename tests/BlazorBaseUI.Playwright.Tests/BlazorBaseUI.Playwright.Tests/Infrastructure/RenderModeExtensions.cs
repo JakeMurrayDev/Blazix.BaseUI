@@ -730,6 +730,31 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    // Drawer-specific parameters
+    public TestPageUrlBuilder WithSnapPoints(bool value)
+    {
+        queryParams["snapPoints"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithSnapToSequentialPoints(bool value)
+    {
+        queryParams["snapToSequentialPoints"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithSwipeDirection(string value)
+    {
+        queryParams["swipeDirection"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithSwipeAreaDisabled(bool value)
+    {
+        queryParams["swipeAreaDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     // RadioGroup-specific parameters
     public TestPageUrlBuilder WithRadioDefaultValue(string value)
     {

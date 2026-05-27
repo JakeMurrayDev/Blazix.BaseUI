@@ -1,0 +1,27 @@
+@using BlazorBaseUI.Dialog
+
+<DialogPortal KeepMounted="KeepMounted" Container="@Container">
+    @ChildContent
+</DialogPortal>
+
+@code {
+    /// <summary>
+    /// Determines whether the portal contents should remain mounted in the DOM when the drawer is closed.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Gets or sets a CSS selector for the container to render the portal into.
+    /// Defaults to <c>"body"</c>.
+    /// </summary>
+    [Parameter]
+    public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,110 @@
+@implements IDisposable
+
+<RenderElement TState="DrawerIndentBackgroundState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private DrawerIndentBackgroundState state;
+    private RenderElement<DrawerIndentBackgroundState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private DrawerProviderContext? ProviderContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerIndentBackgroundState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerIndentBackgroundState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerIndentBackgroundState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (ProviderContext is not null)
+        {
+            ProviderContext.StateChanged += OnProviderStateChanged;
+        }
+
+        state = new DrawerIndentBackgroundState(ProviderContext?.Active ?? false);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = new DrawerIndentBackgroundState(ProviderContext?.Active ?? false);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (ProviderContext is not null)
+        {
+            ProviderContext.StateChanged -= OnProviderStateChanged;
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (ProviderContext?.Active == true)
+        {
+            attrs["data-active"] = true;
+        }
+        else
+        {
+            attrs["data-inactive"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void OnProviderStateChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            state = new DrawerIndentBackgroundState(ProviderContext?.Active ?? false);
+            BuildComponentAttributes();
+            StateHasChanged();
+        });
+    }
+}

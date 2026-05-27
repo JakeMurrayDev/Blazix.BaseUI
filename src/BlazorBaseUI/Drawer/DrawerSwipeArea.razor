@@ -1,0 +1,297 @@
+@using Microsoft.JSInterop
+@using BlazorBaseUI.Dialog
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="DrawerSwipeAreaState"
+               Tag="div"
+               Enabled="Context is not null && DrawerContext is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="computedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/BlazorBaseUI/blazor-baseui-drawer.min.js";
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<DrawerSwipeArea>? dotNetRef;
+    private bool hasRendered;
+    private bool swipeActive;
+    private string swipeAreaId = null!;
+    private DrawerSwipeAreaState state;
+    private RenderElement<DrawerSwipeAreaState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<DrawerSwipeAreaState, string>? computedStyleValue;
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
+
+    private DrawerSwipeDirection ResolvedSwipeDirection => SwipeDirection ?? DrawerContext?.SwipeDirection.Opposite() ?? DrawerSwipeDirection.Up;
+
+    private bool Enabled => !Disabled && (!(Context?.Open ?? false) || swipeActive);
+
+    [CascadingParameter]
+    private DialogRootContext? Context { get; set; }
+
+    [CascadingParameter]
+    private DrawerRootContext? DrawerContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerSwipeAreaState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the swipe area is disabled.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the direction that opens the drawer.
+    /// Defaults to the opposite of <see cref="DrawerRoot.SwipeDirection"/>.
+    /// </summary>
+    [Parameter]
+    public DrawerSwipeDirection? SwipeDirection { get; set; }
+
+    /// <summary>
+    /// Gets or sets the element ID.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerSwipeAreaState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerSwipeAreaState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Context is null)
+        {
+            throw new InvalidOperationException("DrawerSwipeArea must be used within a DrawerRoot.");
+        }
+
+        if (DrawerContext is null)
+        {
+            throw new InvalidOperationException("DrawerSwipeArea must be used within a DrawerRoot.");
+        }
+
+        swipeAreaId = Id ?? Guid.NewGuid().ToIdString();
+        state = new DrawerSwipeAreaState(Context.Open, swipeActive, ResolvedSwipeDirection, Disabled);
+        BuildComponentAttributes();
+        UpdateComputedStyleValue();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Id is not null && Id != swipeAreaId)
+        {
+            Context?.UnregisterTriggerElement(swipeAreaId);
+            swipeAreaId = Id;
+        }
+
+        state = new DrawerSwipeAreaState(Context?.Open ?? false, swipeActive, ResolvedSwipeDirection, Disabled);
+        BuildComponentAttributes();
+        UpdateComputedStyleValue();
+
+        if (hasRendered)
+        {
+            _ = UpdateSwipeAreaJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            Context?.RegisterTriggerElement(swipeAreaId, currentElement);
+
+            if (currentElement.HasValue && Context is not null)
+            {
+                await InitializeSwipeAreaJsAsync(currentElement.Value);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        Context?.UnregisterTriggerElement(swipeAreaId);
+
+        if (moduleTask?.IsValueCreated == true && hasRendered && Context is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeSwipeArea", Context.RootId, swipeAreaId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Opens the drawer from a swipe gesture.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSwipeOpen()
+    {
+        if (Disabled || Context is null)
+        {
+            return;
+        }
+
+        await Context.SetOpenWithTriggerIdAsync(swipeAreaId, null, DialogOpenChangeReason.Swipe);
+    }
+
+    /// <summary>
+    /// Updates swiping state from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnSwipingChanged(bool swiping)
+    {
+        swipeActive = swiping;
+        state = new DrawerSwipeAreaState(Context?.Open ?? false, swipeActive, ResolvedSwipeDirection, Disabled);
+        BuildComponentAttributes();
+        UpdateComputedStyleValue();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = swipeAreaId,
+            ["role"] = "presentation",
+            ["aria-hidden"] = "true",
+            ["data-open"] = Context?.Open ?? false,
+            ["data-closed"] = !(Context?.Open ?? false),
+            ["data-swipe-direction"] = ResolvedSwipeDirection.ToDataAttributeString()
+        };
+
+        if (Disabled)
+        {
+            attrs["data-disabled"] = true;
+        }
+
+        if (swipeActive)
+        {
+            attrs["data-swiping"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void UpdateComputedStyleValue()
+    {
+        computedStyleValue = s =>
+        {
+            var touchAction = ResolvedSwipeDirection is DrawerSwipeDirection.Left or DrawerSwipeDirection.Right
+                ? "touch-action: pan-y;"
+                : "touch-action: pan-x;";
+            var pointerEvents = Enabled ? string.Empty : " pointer-events: none;";
+            var baseStyle = $"{touchAction}{pointerEvents}";
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? baseStyle : $"{baseStyle} {userStyle}";
+        };
+    }
+
+    private async Task InitializeSwipeAreaJsAsync(ElementReference element)
+    {
+        if (Context is null || dotNetRef is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync(
+                "initializeSwipeArea",
+                Context.RootId,
+                swipeAreaId,
+                element,
+                dotNetRef,
+                ResolvedSwipeDirection.ToDataAttributeString(),
+                Disabled);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task UpdateSwipeAreaJsAsync()
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync(
+                "updateSwipeArea",
+                Context.RootId,
+                swipeAreaId,
+                ResolvedSwipeDirection.ToDataAttributeString(),
+                Disabled,
+                Enabled);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+}
