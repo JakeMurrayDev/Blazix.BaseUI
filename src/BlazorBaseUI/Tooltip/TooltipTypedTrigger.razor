@@ -273,11 +273,13 @@
 
         if (IsDisabled)
         {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
             attrs["data-trigger-disabled"] = "";
         }
 
         if (!IsDisabled)
         {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
             attrs[TooltipTriggerIdentifier] = "";
         }
 
@@ -293,6 +295,7 @@
 
         if (open)
         {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
             attrs["data-popup-open"] = "";
         }
 
@@ -361,12 +364,17 @@
     {
         _ = InvokeAsync(async () =>
         {
-            if (UseJsHover && hoverInitialized && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+            try
             {
-                await UpdateHoverInteractionDelaysAsync();
+                if (UseJsHover && hoverInitialized && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+                {
+                    await UpdateHoverInteractionDelaysAsync();
+                }
             }
-
-            StateHasChanged();
+            finally
+            {
+                StateHasChanged();
+            }
         });
     }
 

@@ -91,7 +91,7 @@ internal sealed class TransitionLifecycleManager
             return false;
         }
 
-        if (!open && !preventUnmount)
+        if (!preventUnmount)
         {
             IsMounted = false;
             return true;

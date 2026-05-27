@@ -90,7 +90,7 @@
         attrs["role"] = "tooltip";
         attrs["id"] = RootContext?.PopupId ?? string.Empty;
         attrs["tabindex"] = -1;
-        // lint-ignore:RULE-05 React Base UI parity requires this exact attribute name.
+        // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity requires this exact empty marker attribute.
         attrs["data-base-ui-focusable"] = "";
 
         var side = PositionerContext?.Side ?? Side.Top;

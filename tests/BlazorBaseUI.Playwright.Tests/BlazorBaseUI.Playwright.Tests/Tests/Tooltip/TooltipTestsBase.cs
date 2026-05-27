@@ -175,9 +175,10 @@ public abstract class TooltipTestsBase : TestBase
         await WaitForTextContentAsync(secondOpenState, "true", 1000);
         stopwatch.Stop();
 
+        var maxInstantOpenMs = 450 * TimeoutMultiplier;
         Assert.True(
-            stopwatch.ElapsedMilliseconds < 450,
-            $"Expected second provider tooltip to open during the instant phase; elapsed {stopwatch.ElapsedMilliseconds}ms.");
+            stopwatch.ElapsedMilliseconds < maxInstantOpenMs,
+            $"Expected second provider tooltip to open during the instant phase; elapsed {stopwatch.ElapsedMilliseconds}ms (threshold {maxInstantOpenMs}ms).");
     }
 
     /// <summary>

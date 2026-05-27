@@ -43,6 +43,8 @@
     private bool syncTriggerAttributesAfterRender;
     private bool syncRootOpenAfterRender;
     private bool rootOpenToSyncAfterRender;
+    private bool syncDelayGroupAfterRender;
+    private bool delayGroupOpenToSyncAfterRender;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -287,6 +289,12 @@
         {
             syncRootOpenAfterRender = false;
             await SyncOpenStateToJsAsync(rootOpenToSyncAfterRender, true);
+        }
+
+        if (hasRendered && syncDelayGroupAfterRender)
+        {
+            syncDelayGroupAfterRender = false;
+            await SyncDelayGroupOpenStateAsync(delayGroupOpenToSyncAfterRender);
         }
 
         if (hasRendered && syncTriggerAttributesAfterRender)
@@ -813,7 +821,7 @@
 
             if (!previousOpen && DelayGroupContext is not null)
             {
-                _ = DelayGroupContext.NotifyMemberOpenedAsync(rootId);
+                QueueDelayGroupOpenStateSync(true);
             }
         }
         else
@@ -827,7 +835,7 @@
 
             if (previousOpen && DelayGroupContext is not null)
             {
-                _ = DelayGroupContext.NotifyMemberClosedAsync(rootId);
+                QueueDelayGroupOpenStateSync(false);
             }
         }
 
@@ -900,6 +908,23 @@
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncDelayGroupOpenStateAsync(bool nextOpen)
+    {
+        if (DelayGroupContext is null)
+        {
+            return;
+        }
+
+        if (nextOpen)
+        {
+            await DelayGroupContext.NotifyMemberOpenedAsync(rootId);
+        }
+        else
+        {
+            await DelayGroupContext.NotifyMemberClosedAsync(rootId);
         }
     }
 
@@ -1016,6 +1041,12 @@
         context.IsDelayGroupInstantPhase = DelayGroupContext?.IsInstantPhase == true;
         context.NotifyStateChanged();
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void QueueDelayGroupOpenStateSync(bool nextOpen)
+    {
+        delayGroupOpenToSyncAfterRender = nextOpen;
+        syncDelayGroupAfterRender = true;
     }
 
     private void HandleDelayGroupMemberInstantPhaseChanged(bool value)
