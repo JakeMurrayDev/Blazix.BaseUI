@@ -23,6 +23,8 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hoverInitialized;
+    private string? hoverRootId;
+    private Task hoverRebindTask = Task.CompletedTask;
     private bool hasRendered;
     private string triggerId = null!;
     private TooltipHandle<TPayload>? registeredHandle;
@@ -173,7 +175,7 @@
 
             if (hoverInitialized)
             {
-                _ = RebindHoverInteractionAsync(previousTriggerId);
+                QueueHoverRebind(previousTriggerId, triggerId);
             }
         }
 
@@ -684,9 +686,12 @@
         }
     }
 
-    private async Task InitializeHoverInteractionAsync()
+    private async Task InitializeHoverInteractionAsync(string? interactionTriggerId = null)
     {
-        if (RootContext is null || !Element.HasValue)
+        var rootContext = RootContext;
+        var id = interactionTriggerId ?? triggerId;
+        var element = Element;
+        if (rootContext is null || !element.HasValue || string.IsNullOrEmpty(id))
         {
             return;
         }
@@ -696,9 +701,10 @@
             var module = await ModuleTask.Value;
             var effectiveDelay = GetEffectiveDelay();
             var effectiveCloseDelay = GetEffectiveCloseDelay();
-            var disableHoverablePopup = RootContext.DisableHoverablePopup || RootContext.TrackCursorAxis == TrackCursorAxis.Both;
-            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, triggerId, Element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
+            var disableHoverablePopup = rootContext.DisableHoverablePopup || rootContext.TrackCursorAxis == TrackCursorAxis.Both;
+            await module.InvokeVoidAsync("initializeHoverInteraction", rootContext.RootId, id, element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
             hoverInitialized = true;
+            hoverRootId = rootContext.RootId;
             lastEffectiveDelay = effectiveDelay;
             lastEffectiveCloseDelay = effectiveCloseDelay;
         }
@@ -711,10 +717,11 @@
     private async Task DisposeHoverInteractionAsync(string? interactionTriggerId = null)
     {
         var id = interactionTriggerId ?? triggerId;
+        var rootId = hoverRootId;
         if (!hoverInitialized ||
             !hasRendered ||
             moduleTask?.IsValueCreated != true ||
-            RootContext is null ||
+            string.IsNullOrEmpty(rootId) ||
             string.IsNullOrEmpty(id))
         {
             ResetHoverInteractionState();
@@ -724,7 +731,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("disposeHoverInteraction", RootContext.RootId, id);
+            await module.InvokeVoidAsync("disposeHoverInteraction", rootId, id);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
@@ -734,19 +741,34 @@
         ResetHoverInteractionState();
     }
 
-    private async Task RebindHoverInteractionAsync(string previousTriggerId)
+    private void QueueHoverRebind(string previousTriggerId, string desiredTriggerId)
     {
-        await DisposeHoverInteractionAsync(previousTriggerId);
+        var previousTask = hoverRebindTask;
+        hoverRebindTask = RebindHoverInteractionAsync(previousTask, previousTriggerId, desiredTriggerId);
+    }
 
-        if (UseJsHover && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+    private async Task RebindHoverInteractionAsync(Task previousTask, string previousTriggerId, string desiredTriggerId)
+    {
+        try
         {
-            await InitializeHoverInteractionAsync();
+            await previousTask;
+            await DisposeHoverInteractionAsync(previousTriggerId);
+
+            if (UseJsHover && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+            {
+                await InitializeHoverInteractionAsync(desiredTriggerId);
+            }
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
         }
     }
 
     private void ResetHoverInteractionState()
     {
         hoverInitialized = false;
+        hoverRootId = null;
         lastEffectiveDelay = -1;
         lastEffectiveCloseDelay = -1;
     }

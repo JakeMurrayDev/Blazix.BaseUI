@@ -161,6 +161,36 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
     }
 
     [Fact]
+    public async Task DelayGroupSyncDispatchesUnexpectedNotificationExceptions()
+    {
+        var expected = new InvalidOperationException("delay group failed");
+        var delayGroupContext = new FloatingDelayGroupContext
+        {
+            HasProvider = true,
+            GetDelay = () => (0, 0),
+            RegisterMemberAsync = (_, _) => Task.CompletedTask,
+            UnregisterMemberAsync = _ => Task.CompletedTask,
+            NotifyMemberOpenedAsync = _ => Task.FromException(expected),
+            NotifyMemberClosedAsync = _ => Task.CompletedTask
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<CascadingValue<FloatingDelayGroupContext>>(0);
+            builder.AddAttribute(1, "Value", delayGroupContext);
+            builder.AddAttribute(2, "ChildContent", CreateTooltip());
+            builder.CloseComponent();
+        });
+
+        var root = cut.FindComponent<TooltipRoot>().Instance;
+
+        await InvokeSyncDelayGroupOpenStateAsync(root, true);
+
+        var dispatched = await Renderer.UnhandledException.WaitAsync(TimeSpan.FromMilliseconds(500));
+        dispatched.ShouldBeSameAs(expected);
+    }
+
+    [Fact]
     public Task OnOpenChangeIncludesTriggerId()
     {
         string? triggerId = null;
@@ -202,6 +232,22 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
         triggerId.ShouldBe("custom-trigger");
 
         return Task.CompletedTask;
+    }
+
+    private static async Task InvokeSyncDelayGroupOpenStateAsync(TooltipRoot root, bool nextOpen)
+    {
+        var method = typeof(TooltipRoot).GetMethod(
+            "SyncDelayGroupOpenStateAsync",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        method.ShouldNotBeNull();
+
+        if (method.Invoke(root, [nextOpen]) is not Task task)
+        {
+            throw new InvalidOperationException("SyncDelayGroupOpenStateAsync did not return a task.");
+        }
+
+        await task;
     }
 
     [Fact]

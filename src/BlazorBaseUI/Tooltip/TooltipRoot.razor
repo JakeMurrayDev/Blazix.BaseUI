@@ -929,9 +929,13 @@
                 await DelayGroupContext.NotifyMemberClosedAsync(rootId);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is JSDisconnectedException or OperationCanceledException)
         {
             _ = ex;
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
         }
     }
 
