@@ -1,4 +1,5 @@
 using BlazorBaseUI.Field;
+using BlazorBaseUI.Form;
 using BlazorBaseUI.Tests.Contracts.Field;
 using BlazorBaseUI.Tests.Infrastructure;
 using Bunit;
@@ -23,7 +24,7 @@ public class FieldErrorTests : BunitContext, IFieldErrorContract
     private RenderFragment CreateFieldWithError(
         bool? invalid = null,
         bool? match = null,
-        RenderFragment<RenderProps<FieldRootState>>? errorRender = null)
+        RenderFragment<RenderProps<FieldErrorState>>? errorRender = null)
     {
         return builder =>
         {
@@ -109,6 +110,81 @@ public class FieldErrorTests : BunitContext, IFieldErrorContract
         var error = cut.Find("[data-testid='field-error']");
         error.ShouldNotBeNull();
         error.TextContent.ShouldContain("Error message");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SpecificMatchDoesNotRenderForFormErrorOnly()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Errors", new Dictionary<string, string[]>
+            {
+                ["username"] = ["Username is reserved"]
+            });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<FieldRoot>(0);
+                    innerBuilder.AddAttribute(1, "Name", "username");
+                    innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<FieldControl<string>>(0);
+                        fieldBuilder.CloseComponent();
+
+                        fieldBuilder.OpenComponent<FieldError>(10);
+                        fieldBuilder.AddAttribute(11, "MatchValidity", "valueMissing");
+                        fieldBuilder.AddAttribute(12, "data-testid", "specific-error");
+                        fieldBuilder.CloseComponent();
+
+                        fieldBuilder.OpenComponent<FieldError>(20);
+                        fieldBuilder.AddAttribute(21, "data-testid", "default-error");
+                        fieldBuilder.CloseComponent();
+                    }));
+                    innerBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        cut.FindAll("[data-testid='specific-error']").ShouldBeEmpty();
+        cut.Find("[data-testid='default-error']").TextContent.ShouldBe("Username is reserved");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersMultipleFormErrorsAsList()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Errors", new Dictionary<string, string[]>
+            {
+                ["username"] = ["Username is reserved", "Username is too short"]
+            });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<FieldRoot>(0);
+                    innerBuilder.AddAttribute(1, "Name", "username");
+                    innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<FieldControl<string>>(0);
+                        fieldBuilder.CloseComponent();
+
+                        fieldBuilder.OpenComponent<FieldError>(10);
+                        fieldBuilder.AddAttribute(11, "data-testid", "field-error");
+                        fieldBuilder.CloseComponent();
+                    }));
+                    innerBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        var items = cut.FindAll("[data-testid='field-error'] li");
+        items.Count.ShouldBe(2);
+        items[0].TextContent.ShouldBe("Username is reserved");
+        items[1].TextContent.ShouldBe("Username is too short");
         return Task.CompletedTask;
     }
 }

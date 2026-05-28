@@ -1,277 +1,304 @@
-﻿@using BlazorBaseUI.Field
+@using BlazorBaseUI.Field
 @using BlazorBaseUI.Form
+@using BlazorBaseUI.Utilities
+
 <ComponentShowcase ComponentName="Field"
                    Description="A component that provides labeling and validation for form controls."
                    BaseRoute="/field"
                    IsWasmMode="IsWasmMode">
     <DemoSection Title="Disabled State"
-                 Description="Should add data-disabled to all components">
-        <FieldRoot Disabled="true"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Disabled ? "bg-gray-100" : ""))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                Disabled Label
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Disabled ? "bg-gray-200 cursor-not-allowed" : ""))"
+                 Description="Disabled state propagates to label, control, description, and data-disabled attributes.">
+        <FieldRoot Disabled="true" ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Disabled Label</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
                           placeholder="Disabled input" />
-            <FieldDescription ClassValue="@(s => "text-sm " + (s.Disabled ? "text-gray-400" : "text-gray-500"))">
-                This field is disabled
+            <FieldDescription ClassValue="FieldDescriptionClass">
+                This field is disabled.
             </FieldDescription>
         </FieldRoot>
     </DemoSection>
 
-    <DemoSection Title="Touched State"
-                 Description="Focus and blur to see data-touched applied">
-        <FieldRoot ClassValue="@(s => "p-4 border rounded " + (s.Touched ? "border-blue-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Touched ? "text-blue-600" : "text-gray-700"))">
-                Touch me (focus then blur)
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Touched ? "border-blue-500" : "border-gray-300"))" />
-            <FieldDescription ClassValue="@(s => "text-sm " + (s.Touched ? "text-blue-500" : "text-gray-500"))">
-                Focus then blur to touch
-            </FieldDescription>
-        </FieldRoot>
-    </DemoSection>
+    <DemoSection Title="State Data Attributes"
+                 Description="Focused, touched, dirty, and filled states are visible through the state object and data attributes.">
+        <div class="demo-grid demo-grid--2">
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Focus and blur</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Focus me" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    data-focused appears during focus. data-touched appears after blur.
+                </FieldDescription>
+                <FieldStateDisplay>
+                    <div class="demo-state-panel">
+                        <div class="demo-state-row"><span>focused</span><strong>@context.Focused</strong></div>
+                        <div class="demo-state-row"><span>touched</span><strong>@context.Touched</strong></div>
+                    </div>
+                </FieldStateDisplay>
+            </FieldRoot>
 
-    <DemoSection Title="Dirty State"
-                 Description="Type something to see data-dirty applied, clear to remove">
-        <FieldRoot ClassValue="@(s => "p-4 border rounded " + (s.Dirty ? "border-yellow-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Dirty ? "text-yellow-600" : "text-gray-700"))">
-                Make me dirty
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Dirty ? "border-yellow-500 bg-yellow-50" : "border-gray-300"))" />
-            <FieldDescription ClassValue="@(s => "text-sm " + (s.Dirty ? "text-yellow-600" : "text-gray-500"))">
-                Type to make dirty, clear to clean
-            </FieldDescription>
-        </FieldRoot>
-    </DemoSection>
-
-    <DemoSection Title="Filled State"
-                 Description="Type something to see data-filled applied">
-        <FieldRoot ClassValue="@(s => "p-4 border rounded " + (s.Filled ? "border-green-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Filled ? "text-green-600" : "text-gray-700"))">
-                Fill me
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Filled ? "border-green-500 bg-green-50" : "border-gray-300"))" />
-            <FieldDescription ClassValue="@(s => "text-sm " + (s.Filled ? "text-green-600" : "text-gray-500"))">
-                Type to fill, clear to empty
-            </FieldDescription>
-        </FieldRoot>
-    </DemoSection>
-
-    <DemoSection Title="Focused State"
-                 Description="Click to focus and see data-focused applied">
-        <FieldRoot ClassValue="@(s => "p-4 border rounded " + (s.Focused ? "border-purple-500 ring-2 ring-purple-200" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Focused ? "text-purple-600" : "text-gray-700"))">
-                Focus me
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Focused ? "border-purple-500 outline-none" : "border-gray-300"))" />
-            <FieldDescription ClassValue="@(s => "text-sm " + (s.Focused ? "text-purple-600" : "text-gray-500"))">
-                Click input to focus
-            </FieldDescription>
-        </FieldRoot>
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Dirty and filled</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Type, then clear" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    Dirty resets when the value returns to its initial value.
+                </FieldDescription>
+                <FieldStateDisplay>
+                    <div class="demo-state-panel">
+                        <div class="demo-state-row"><span>dirty</span><strong>@context.Dirty</strong></div>
+                        <div class="demo-state-row"><span>filled</span><strong>@context.Filled</strong></div>
+                    </div>
+                </FieldStateDisplay>
+            </FieldRoot>
+        </div>
     </DemoSection>
 
     <DemoSection Title="Controlled Dirty/Touched Props"
-                 Description="External control of dirty and touched state">
-        <div class="mb-2 flex gap-4">
-            <label class="flex items-center gap-2">
-                <input type="checkbox" @bind="controlledDirty" class="rounded" />
-                <span class="text-sm">Dirty</span>
-            </label>
-            <label class="flex items-center gap-2">
-                <input type="checkbox" @bind="controlledTouched" class="rounded" />
-                <span class="text-sm">Touched</span>
-            </label>
+                 Description="External DirtyState and TouchedState values override internal state.">
+        <div class="demo-panel">
+            <div class="demo-inline">
+                <label class="demo-option-row">
+                    <input type="checkbox" @bind="controlledDirty" class="demo-checkbox-native" />
+                    <span>Dirty</span>
+                </label>
+                <label class="demo-option-row">
+                    <input type="checkbox" @bind="controlledTouched" class="demo-checkbox-native" />
+                    <span>Touched</span>
+                </label>
+            </div>
+            <FieldRoot DirtyState="@controlledDirty"
+                       TouchedState="@controlledTouched"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Controlled Field</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    Dirty: @controlledDirty, Touched: @controlledTouched
+                </FieldDescription>
+            </FieldRoot>
         </div>
-        <FieldRoot DirtyState="@controlledDirty"
-                   TouchedState="@controlledTouched"
-                   ClassValue="@(s => "p-4 border rounded " + GetStateClasses(s))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium text-gray-700")">
-                Controlled Field
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 border-gray-300")" />
-            <FieldDescription ClassValue="@(s => "text-sm text-gray-500")">
-                Dirty: @controlledDirty, Touched: @controlledTouched
-            </FieldDescription>
-        </FieldRoot>
     </DemoSection>
 
     <DemoSection Title="Label Association"
-                 Description="Label should have for attribute matching control id">
-        <FieldRoot ClassValue="@(_ => "p-4 border rounded border-gray-300")">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700 cursor-pointer")">
-                Click this label to focus the input
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(_ => "mt-1 block w-full rounded border p-2 border-gray-300")" />
-        </FieldRoot>
+                 Description="Native and non-native labels should both focus the control.">
+        <div class="demo-grid demo-grid--2">
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="ClickableLabelClass">
+                    Native label focuses the input
+                </FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass" />
+            </FieldRoot>
+
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel Render="RenderLabelAsSpan"
+                            NativeLabel="@false"
+                            ClassValue="ClickableLabelClass">
+                    Span label focuses the input
+                </FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Focus via span" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    NativeLabel=false keeps click-to-focus behavior without rendering a label element.
+                </FieldDescription>
+            </FieldRoot>
+        </div>
     </DemoSection>
 
     <DemoSection Title="Aria Describedby"
-                 Description="Control should have aria-describedby referencing description and error">
-        <FieldRoot Invalid="true" ClassValue="@(_ => "p-4 border rounded border-red-300")">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                Field with Description and Error
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(_ => "mt-1 block w-full rounded border p-2 border-red-300")" />
-            <FieldDescription ClassValue="@(_ => "text-sm text-gray-500")">
-                This is a helpful description
+                 Description="The control should reference descriptions, errors, and caller-provided aria-describedby ids.">
+        <FieldRoot Invalid="true" ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Field with description and error</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
+                          aria-describedby="external-help-id" />
+            <FieldDescription ClassValue="FieldDescriptionClass">
+                This is a helpful description.
             </FieldDescription>
-            <FieldError Match="true" ClassValue="@(_ => "text-sm text-red-600")">
-                This is an error message
+            <p id="external-help-id" class="demo-description">
+                This external paragraph id should remain in aria-describedby.
+            </p>
+            <FieldError Match="true" ClassValue="FieldErrorClass">
+                This is an error message.
             </FieldError>
         </FieldRoot>
     </DemoSection>
 
-    <DemoSection Title="Validation Mode: OnBlur"
-                 Description="Type less than 3 characters and blur to see validation">
-        <FieldRoot ValidationMode="ValidationMode.OnBlur"
-                   Validate="ValidateMinLength"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Valid == false ? "border-red-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Valid == false ? "text-red-600" : "text-gray-700"))">
-                Minimum 3 characters
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : "border-gray-300"))" />
-            <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-        </FieldRoot>
-    </DemoSection>
+    <DemoSection Title="Validation Modes"
+                 Description="Compare OnBlur, OnChange, and debounced OnChange validation.">
+        <div class="demo-grid demo-grid--3">
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">OnBlur</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
 
-    <DemoSection Title="Validation Mode: OnChange"
-                 Description="Validation runs on every keystroke">
-        <FieldRoot ValidationMode="ValidationMode.OnChange"
-                   Validate="ValidateMinLength"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Valid == false ? "border-red-500" : s.Valid == true ? "border-green-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Valid == false ? "text-red-600" : s.Valid == true ? "text-green-600" : "text-gray-700"))">
-                Minimum 3 characters (live validation)
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : s.Valid == true ? "border-green-500" : "border-gray-300"))" />
-            <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-        </FieldRoot>
-    </DemoSection>
+            <FieldRoot ValidationMode="ValidationMode.OnChange"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">OnChange</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
 
-    <DemoSection Title="Debounced Validation (500ms)"
-                 Description="Type quickly - validation is debounced">
-        <FieldRoot ValidationMode="ValidationMode.OnChange"
-                   ValidationDebounceTime="500"
-                   Validate="ValidateMinLength"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Valid == false ? "border-red-500" : s.Valid == true ? "border-green-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                Debounced (500ms) - Minimum 3 characters
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test") ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : s.Valid == true ? "border-green-500" : "border-gray-300"))" />
-            <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-        </FieldRoot>
+            <FieldRoot ValidationMode="ValidationMode.OnChange"
+                       ValidationDebounceTime="500"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Debounced 500ms</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+        </div>
     </DemoSection>
 
     <DemoSection Title="FieldValidity Render Prop"
-                 Description="Access validity data directly">
+                 Description="Validity state, the first error, and all errors are exposed to consumers.">
         <FieldRoot ValidationMode="ValidationMode.OnChange"
                    Validate="ValidateEmail"
-                   ClassValue="@(_ => "p-4 border rounded border-gray-300")">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                Email Address
-            </FieldLabel>
-            <FieldControl TValue="string" DefaultValue=@("Test")
+                   ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Email Address</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
                           type="email"
                           placeholder="test@example.com"
-                          ClassValue="@(_ => "mt-1 block w-full rounded border p-2 border-gray-300")" />
-            <div class="mt-2 rounded bg-gray-100 p-2 font-mono text-xs">
+                          ClassValue="FieldControlClass" />
+            <div class="demo-state-panel">
                 <FieldValidity>
-                    <div>Valid: @(context.State.Valid?.ToString() ?? "null")</div>
-                    <div>Error: @(string.IsNullOrEmpty(context.Error) ? "(none)" : context.Error)</div>
-                    <div>Errors: [@string.Join(", ", context.Errors)]</div>
+                    <div class="demo-state-row"><span>valid</span><strong>@(context.State.Valid?.ToString() ?? "null")</strong></div>
+                    <div class="demo-state-row"><span>error</span><strong>@(string.IsNullOrEmpty(context.Error) ? "(none)" : context.Error)</strong></div>
+                    <div>errors: [@string.Join(", ", context.Errors)]</div>
                 </FieldValidity>
             </div>
         </FieldRoot>
     </DemoSection>
 
     <DemoSection Title="Multiple Errors"
-                 Description="Validation returns multiple error messages">
+                 Description="A custom validator can return more than one error message.">
         <FieldRoot ValidationMode="ValidationMode.OnChange"
                    Validate="ValidateMultiple"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Valid == false ? "border-red-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                Password (min 8 chars, uppercase, number)
-            </FieldLabel>
+                   ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Password</FieldLabel>
             <FieldControl TValue="string"
-                          DefaultValue=@("Test")
-                          ClassValue="@(_ => "mt-1 block w-full rounded border p-2 border-gray-300")"
-                          type="password" />
-            <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
+                          placeholder="8 chars, uppercase, number" />
+            <FieldError ClassValue="FieldErrorClass" />
         </FieldRoot>
     </DemoSection>
 
-    <DemoSection Title="ActionsRef (Imperative Validation)"
-                 Description="Validate field programmatically via ActionsRef">
-        <FieldRoot Name="username"
-                   Validate="ValidateRequired"
-                   ActionsRef="@(actions => fieldActions = actions)"
-                   ClassValue="@(s => "p-4 border rounded " + (s.Valid == false ? "border-red-500" : "border-gray-300"))">
-            <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                Username (required)
-            </FieldLabel>
-            <FieldControl TValue="string"
-                          ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : "border-gray-300"))"
-                          placeholder="Leave empty and click validate" />
-            <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-        </FieldRoot>
-        <button type="button"
-                @onclick="ValidateFieldImperatively"
-                class="mt-2 rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-            Validate Field
-        </button>
+    <DemoSection Title="ActionsRef"
+                 Description="Imperative validation should update field state and error output.">
+        <div class="demo-panel">
+            <FieldRoot Name="username"
+                       Validate="ValidateRequired"
+                       ActionsRef="@(actions => fieldActions = actions)"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Username</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Leave empty and validate" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+            <button type="button"
+                    @onclick="ValidateFieldImperatively"
+                    class="demo-button demo-button--primary">
+                Validate Field
+            </button>
+        </div>
     </DemoSection>
 
-    <DemoSection Title="NativeLabel (Click to Focus)"
-                 Description="Non-label element with NativeLabel=false focuses control on click">
-        <FieldRoot ClassValue="@(_ => "p-4 border rounded border-gray-300")">
-            <FieldLabel Render="RenderLabelAsSpan"
-                        NativeLabel="@false"
-                        ClassValue="@(_ => "block text-sm font-medium text-gray-700 cursor-pointer hover:text-blue-600")">
-                Click this span to focus the input (NativeLabel=false)
-            </FieldLabel>
-            <FieldControl TValue="string"
-                          ClassValue="@(_ => "mt-1 block w-full rounded border p-2 border-gray-300")"
-                          placeholder="Focus me via the span above" />
-            <FieldDescription ClassValue="@(_ => "text-sm text-gray-500 mt-1")">
-                The label is rendered as a span but clicking it focuses the control
-            </FieldDescription>
-        </FieldRoot>
+    <DemoSection Title="Native Constraint Validity"
+                 Description="Native validity matches should render independently for valueMissing, typeMismatch, and patternMismatch.">
+        <div class="demo-grid demo-grid--3">
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Required</FieldLabel>
+                <FieldControl TValue="string"
+                              required="true"
+                              ClassValue="FieldControlClass"
+                              placeholder="Required value" />
+                <FieldError MatchValidity="valueMissing" ClassValue="FieldErrorClass">
+                    Value is required.
+                </FieldError>
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Email type</FieldLabel>
+                <FieldControl TValue="string"
+                              type="email"
+                              ClassValue="FieldControlClass"
+                              placeholder="not-an-email" />
+                <FieldError MatchValidity="typeMismatch" ClassValue="FieldErrorClass">
+                    Enter a valid email address.
+                </FieldError>
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Pattern</FieldLabel>
+                <FieldControl TValue="string"
+                              pattern="[A-Z]{3}"
+                              ClassValue="FieldControlClass"
+                              placeholder="ABC" />
+                <FieldError MatchValidity="patternMismatch" ClassValue="FieldErrorClass">
+                    Use exactly three uppercase letters.
+                </FieldError>
+            </FieldRoot>
+        </div>
     </DemoSection>
 
-    <DemoSection Title="ValueMissing Suppression (Pristine Fields)"
-                 Description="Required fields don't show valueMissing error until dirty">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div class="rounded border p-4">
-                <h4 class="mb-2 font-medium">Pristine: Focus, then blur (no error)</h4>
+    <DemoSection Title="ValueMissing Suppression"
+                 Description="Required valueMissing should stay suppressed for pristine fields and show after a dirty empty value.">
+        <div class="demo-grid demo-grid--2">
+            <div class="demo-scenario-card">
+                <h4>Pristine blur</h4>
                 <FieldRoot ValidationMode="ValidationMode.OnBlur"
-                           ClassValue="@(s => "p-3 border rounded " + (s.Valid == false ? "border-red-500" : "border-gray-300"))">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                        Required Field
-                    </FieldLabel>
+                           ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Required field</FieldLabel>
                     <FieldControl TValue="string"
                                   required="true"
-                                  ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : "border-gray-300"))"
-                                  placeholder="Focus then blur without typing" />
-                    <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-                    <FieldDescription ClassValue="@(_ => "text-xs text-gray-500 mt-1")">
-                        No error shown because field was not "dirtied"
+                                  ClassValue="FieldControlClass"
+                                  placeholder="Focus then blur" />
+                    <FieldError ClassValue="FieldErrorClass" />
+                    <FieldDescription ClassValue="FieldDescriptionClass">
+                        No error should show before the value changes.
                     </FieldDescription>
                 </FieldRoot>
             </div>
-            <div class="rounded border p-4">
-                <h4 class="mb-2 font-medium">Dirty: Type, clear, then blur (shows error)</h4>
+
+            <div class="demo-scenario-card">
+                <h4>Dirty empty blur</h4>
                 <FieldRoot ValidationMode="ValidationMode.OnBlur"
-                           ClassValue="@(s => "p-3 border rounded " + (s.Valid == false ? "border-red-500" : "border-gray-300"))">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                        Required Field
-                    </FieldLabel>
+                           ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Required field</FieldLabel>
                     <FieldControl TValue="string"
                                   required="true"
-                                  ClassValue="@(s => "mt-1 block w-full rounded border p-2 " + (s.Valid == false ? "border-red-500" : "border-gray-300"))"
-                                  placeholder="Type something, delete it, then blur" />
-                    <FieldError ClassValue="@(_ => "text-sm text-red-600 mt-1")" />
-                    <FieldDescription ClassValue="@(_ => "text-xs text-gray-500 mt-1")">
-                        Error shows because field was "dirtied" (value changed)
+                                  ClassValue="FieldControlClass"
+                                  placeholder="Type, clear, then blur" />
+                    <FieldError ClassValue="FieldErrorClass" />
+                    <FieldDescription ClassValue="FieldDescriptionClass">
+                        The error should appear after the field becomes dirty.
                     </FieldDescription>
                 </FieldRoot>
             </div>
@@ -284,8 +311,23 @@
     private bool controlledTouched;
     private FieldRootActions? fieldActions;
 
+    private RenderFragment<RenderProps<FieldRootState>> RenderLabelAsSpan =>
+        ctx => RenderUtilities.CreateElement("span", ctx);
+
     [Parameter]
     public bool IsWasmMode { get; set; }
+
+    private static string FieldRootClass(FieldRootState state) => "demo-field";
+
+    private static string FieldControlClass(FieldRootState state) => "demo-control";
+
+    private static string FieldLabelClass(FieldRootState state) => "demo-label";
+
+    private static string ClickableLabelClass(FieldRootState state) => "demo-label demo-label--clickable";
+
+    private static string FieldDescriptionClass(FieldRootState state) => "demo-description";
+
+    private static string FieldErrorClass(FieldErrorState state) => "demo-error";
 
     private async Task ValidateFieldImperatively()
     {
@@ -295,20 +337,12 @@
         }
     }
 
-    private string GetStateClasses(FieldRootState s)
-    {
-        var classes = new List<string>();
-        if (s.Dirty) classes.Add("border-yellow-500");
-        if (s.Touched) classes.Add("bg-blue-50");
-        if (!classes.Any()) classes.Add("border-gray-300");
-        return string.Join(' ', classes);
-    }
-
     private Task<string[]?> ValidateRequired(object? value)
     {
         var str = value?.ToString() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(str))
             return Task.FromResult<string[]?>(["This field is required"]);
+
         return Task.FromResult<string[]?>(null);
     }
 
@@ -317,6 +351,7 @@
         var str = value?.ToString() ?? string.Empty;
         if (string.IsNullOrEmpty(str) || str.Length < 3)
             return Task.FromResult<string[]?>(["Must be at least 3 characters"]);
+
         return Task.FromResult<string[]?>(null);
     }
 
@@ -325,8 +360,10 @@
         var str = value?.ToString() ?? string.Empty;
         if (string.IsNullOrEmpty(str))
             return Task.FromResult<string[]?>(null);
+
         if (!str.Contains('@'))
             return Task.FromResult<string[]?>(["Invalid email format"]);
+
         return Task.FromResult<string[]?>(null);
     }
 
@@ -346,7 +383,4 @@
 
         return Task.FromResult<string[]?>(errors.Count > 0 ? errors.ToArray() : null);
     }
-
-    private RenderFragment<RenderProps<FieldRootState>> RenderLabelAsSpan =>
-        ctx => RenderUtilities.CreateElement("span", ctx);
 }

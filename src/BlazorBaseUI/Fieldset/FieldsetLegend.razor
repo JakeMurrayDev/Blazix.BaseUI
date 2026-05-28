@@ -94,7 +94,8 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["id"] = resolvedId;
-        attrs["data-disabled"] = disabled;
+        if (disabled)
+            attrs["data-disabled"] = string.Empty;
 
         componentAttributes = attrs;
     }

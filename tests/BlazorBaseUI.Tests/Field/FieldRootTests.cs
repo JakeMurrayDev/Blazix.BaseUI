@@ -157,6 +157,22 @@ public class FieldRootTests : BunitContext, IFieldRootContract
     }
 
     [Fact]
+    public Task DoesNotRenderFalseStateDataAttributes()
+    {
+        var cut = Render(CreateFieldRoot());
+        var root = cut.Find("div");
+
+        root.HasAttribute("data-disabled").ShouldBeFalse();
+        root.HasAttribute("data-valid").ShouldBeFalse();
+        root.HasAttribute("data-invalid").ShouldBeFalse();
+        root.HasAttribute("data-touched").ShouldBeFalse();
+        root.HasAttribute("data-dirty").ShouldBeFalse();
+        root.HasAttribute("data-filled").ShouldBeFalse();
+        root.HasAttribute("data-focused").ShouldBeFalse();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task TouchedStateControlsTouchedState()
     {
         var cut = Render(CreateFieldRoot(touchedState: true));

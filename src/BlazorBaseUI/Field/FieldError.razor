@@ -5,28 +5,35 @@
 @implements IFieldStateSubscriber
 @implements IDisposable
 
-<RenderElement TState="FieldRootState"
-               Tag="div"
-               State="state"
-               Render="Render"
-               Enabled="shouldRender"
-               ClassValue="ClassValue"
-               StyleValue="StyleValue"
-               ComponentAttributes="componentAttributes"
-               ChildContent="resolvedChildContent"
-               @attributes="AdditionalAttributes"
-               @ref="renderElementReference" />
+@if (mounted)
+{
+    <RenderElement TState="FieldErrorState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference">
+        @RenderErrorContent()
+    </RenderElement>
+}
 
 @code {
     private string? defaultId;
-    private bool wasRendered;
-    private bool shouldRender;
-    private FieldRootState state;
-    private RenderElement<FieldRootState>? renderElementReference;
+    private bool rendered;
+    private bool mounted;
+    private bool messageIdRegistered;
+    private string? registeredMessageId;
+    private FieldTransitionStatus? transitionStatus;
+    private FieldRootState fieldState;
+    private FieldErrorState state;
+    private RenderElement<FieldErrorState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-    private RenderFragment? resolvedChildContent;
+    private string[] lastRenderedErrors = [];
 
-    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+    private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
 
     private string? FieldName => FieldContext?.Name;
 
@@ -65,19 +72,19 @@
     /// with a different tag, or compose it with another component.
     /// </summary>
     [Parameter]
-    public RenderFragment<RenderProps<FieldRootState>>? Render { get; set; }
+    public RenderFragment<RenderProps<FieldErrorState>>? Render { get; set; }
 
     /// <summary>
     /// Gets or sets a function that returns a CSS class based on the component's state.
     /// </summary>
     [Parameter]
-    public Func<FieldRootState, string>? ClassValue { get; set; }
+    public Func<FieldErrorState, string>? ClassValue { get; set; }
 
     /// <summary>
     /// Gets or sets a function that returns a CSS style based on the component's state.
     /// </summary>
     [Parameter]
-    public Func<FieldRootState, string>? StyleValue { get; set; }
+    public Func<FieldErrorState, string>? StyleValue { get; set; }
 
     /// <summary>
     /// Defines the child components of this instance.
@@ -100,120 +107,131 @@
     protected override void OnInitialized()
     {
         FieldContext?.Subscribe(this);
-
-        state = State;
-        shouldRender = ShouldRenderError();
-        BuildComponentAttributes();
-        BuildResolvedChildContent();
+        UpdateRenderState(ShouldRenderError(), initialRender: true);
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        state = State;
-        shouldRender = ShouldRenderError();
-
-        if (shouldRender != wasRendered)
-        {
-            if (shouldRender)
-                LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, true);
-            else
-                LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, false);
-
-            wasRendered = shouldRender;
-        }
-
-        BuildComponentAttributes();
-        BuildResolvedChildContent();
+        UpdateRenderState(ShouldRenderError(), initialRender: false);
     }
 
-    private void BuildComponentAttributes()
+    /// <inheritdoc />
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
-        var attrs = new Dictionary<string, object>();
-
-        attrs["id"] = ResolvedId;
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
-
-        componentAttributes = attrs;
-    }
-
-    private void BuildResolvedChildContent()
-    {
-        if (ChildContent is not null)
+        if (transitionStatus == FieldTransitionStatus.Starting)
         {
-            resolvedChildContent = ChildContent;
-            return;
+            transitionStatus = null;
+            RebuildState();
+            StateHasChanged();
+        }
+        else if (transitionStatus == FieldTransitionStatus.Ending)
+        {
+            mounted = false;
+            transitionStatus = null;
+            RebuildState();
+            StateHasChanged();
         }
 
-        var errorContent = GetErrorContent();
-
-        resolvedChildContent = builder =>
-        {
-            if (errorContent.formError is not null)
-            {
-                builder.AddContent(0, errorContent.formError);
-            }
-            else if (errorContent.validityErrors.Length > 1)
-            {
-                builder.OpenElement(1, "ul");
-                foreach (var error in errorContent.validityErrors)
-                {
-                    builder.OpenElement(2, "li");
-                    builder.AddContent(3, error);
-                    builder.CloseElement();
-                }
-                builder.CloseElement();
-            }
-            else if (!string.IsNullOrEmpty(errorContent.validityError))
-            {
-                builder.AddContent(4, errorContent.validityError);
-            }
-        };
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
         FieldContext?.Unsubscribe(this);
-        if (wasRendered)
-            LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, false);
+        SetMessageIdRegistered(false);
     }
 
     /// <inheritdoc />
     void IFieldStateSubscriber.NotifyStateChanged()
     {
-        state = State;
-        shouldRender = ShouldRenderError();
+        UpdateRenderState(ShouldRenderError(), initialRender: false);
+        _ = InvokeAsync(StateHasChanged);
+    }
 
-        if (shouldRender != wasRendered)
+    private void UpdateRenderState(bool nextRendered, bool initialRender)
+    {
+        fieldState = FieldState;
+
+        if (nextRendered)
         {
-            if (shouldRender)
-                LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, true);
-            else
-                LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, false);
-
-            wasRendered = shouldRender;
+            lastRenderedErrors = GetCurrentErrorMessages();
         }
 
+        if (initialRender)
+        {
+            rendered = nextRendered;
+            mounted = nextRendered;
+        }
+        else if (nextRendered && !rendered)
+        {
+            mounted = true;
+            transitionStatus = FieldTransitionStatus.Starting;
+        }
+        else if (!nextRendered && rendered)
+        {
+            transitionStatus = FieldTransitionStatus.Ending;
+        }
+
+        rendered = nextRendered;
+        SetMessageIdRegistered(rendered);
+        RebuildState();
+    }
+
+    private void RebuildState()
+    {
+        state = FieldErrorState.FromFieldState(fieldState, transitionStatus);
         BuildComponentAttributes();
-        BuildResolvedChildContent();
-        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = ResolvedId
+        };
+
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, fieldState);
+
+        if (transitionStatus == FieldTransitionStatus.Starting)
+            attrs["data-starting-style"] = string.Empty;
+        else if (transitionStatus == FieldTransitionStatus.Ending)
+            attrs["data-ending-style"] = string.Empty;
+
+        componentAttributes = attrs;
+    }
+
+    private void SetMessageIdRegistered(bool register)
+    {
+        var currentId = ResolvedId;
+        if (messageIdRegistered && registeredMessageId != currentId)
+        {
+            if (registeredMessageId is not null)
+                LabelableContext?.UpdateMessageIds.Invoke(registeredMessageId, false);
+
+            registeredMessageId = null;
+            messageIdRegistered = false;
+        }
+
+        if (messageIdRegistered == register)
+            return;
+
+        LabelableContext?.UpdateMessageIds.Invoke(currentId, register);
+        registeredMessageId = register ? currentId : null;
+        messageIdRegistered = register;
     }
 
     private bool ShouldRenderError()
     {
-        var formError = GetFormError();
-        if (formError is not null || Match == true)
+        if (Match == true)
             return true;
 
         if (MatchValidity is not null)
             return MatchValidityState(MatchValidity);
+
+        if (HasFormError())
+            return true;
 
         var validityData = FieldContext?.ValidityData ?? FieldValidityData.Default;
         return validityData.State.Valid == false;
@@ -238,16 +256,18 @@
         };
     }
 
-    private string? GetFormError()
+    private bool HasFormError() => GetFormErrors().Length > 0;
+
+    private string[] GetFormErrors()
     {
         if (FieldName is null)
-            return null;
+            return [];
 
         if (FormContext is not null)
         {
             var formErrors = FormContext.GetErrors(FieldName);
             if (formErrors.Length > 0)
-                return formErrors[0];
+                return formErrors;
         }
 
         if (EditContext is not null)
@@ -255,16 +275,51 @@
             var fieldIdentifier = EditContext.Field(FieldName);
             var editContextErrors = EditContext.GetValidationMessages(fieldIdentifier).ToArray();
             if (editContextErrors.Length > 0)
-                return editContextErrors[0];
+                return editContextErrors;
         }
 
-        return null;
+        return [];
     }
 
-    private (string? formError, string[] validityErrors, string? validityError) GetErrorContent()
+    private string[] GetCurrentErrorMessages()
     {
-        var formError = GetFormError();
         var validityData = FieldContext?.ValidityData ?? FieldValidityData.Default;
-        return (formError, validityData.Errors, validityData.Error);
+        var formErrors = GetFormErrors();
+        var hasSpecificMatch = MatchValidity is not null;
+
+        if (!hasSpecificMatch && formErrors.Length > 0)
+            return formErrors;
+
+        if (validityData.Errors.Length > 1)
+            return validityData.Errors;
+
+        return string.IsNullOrEmpty(validityData.Error) ? [] : [validityData.Error];
     }
+
+    private RenderFragment RenderErrorContent() => builder =>
+    {
+        if (ChildContent is not null)
+        {
+            builder.AddContent(0, ChildContent);
+            return;
+        }
+
+        var errors = rendered ? GetCurrentErrorMessages() : lastRenderedErrors;
+
+        if (errors.Length > 1)
+        {
+            builder.OpenElement(1, "ul");
+            for (var i = 0; i < errors.Length; i++)
+            {
+                builder.OpenElement(2, "li");
+                builder.AddContent(3, errors[i]);
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        else if (errors.Length == 1)
+        {
+            builder.AddContent(4, errors[0]);
+        }
+    };
 }

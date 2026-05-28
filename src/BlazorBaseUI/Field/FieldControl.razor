@@ -21,6 +21,8 @@
                ClassValue="ComputedClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
+               UpdatesAttributeName="value"
+               UpdatesAttributeEventName="oninput"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
@@ -31,20 +33,26 @@
 
     private Lazy<Task<IJSObjectReference>> moduleTask = null!;
 
+    private readonly string fieldControlSource = Guid.NewGuid().ToIdString();
+
     private string? defaultId;
     private string resolvedControlId = null!;
+    private string? registeredControlId;
+    private string? registeredName;
+    private bool fieldControlRegistered;
     private bool hasRendered;
+    private TValue? currentInputValue;
     private FieldRootState state;
     private RenderElement<FieldRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
-    private string ResolvedName => Name ?? FieldContext?.Name ?? NameAttributeValue;
+    private string? ResolvedName => FieldContext?.Name ?? Name ?? NameAttributeValue;
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
     private string ResolvedControlIdValue => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
-    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+    private FieldRootState State => (FieldContext?.State ?? FieldRootState.Default) with { Disabled = ResolvedDisabled };
 
     private Func<FieldRootState, string> ComputedClassValue => state =>
     {
@@ -73,6 +81,12 @@
     /// </summary>
     [Parameter]
     public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the control should receive focus when the page loads.
+    /// </summary>
+    [Parameter]
+    public bool AutoFocus { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -108,12 +122,14 @@
         LabelableContext?.SetControlId(resolvedControlId);
 
         var initialValue = IsControlled ? Value : DefaultValue;
+        currentInputValue = initialValue;
         FieldContext?.Validation.SetInitialValue(initialValue);
 
         if (initialValue is not null && !IsEmpty(initialValue))
             FieldContext?.SetFilled(true);
 
         FieldContext?.RegisterFocusHandler(FocusAsync);
+        RegisterFieldControl();
         FieldContext?.Subscribe(this);
 
         state = State;
@@ -130,7 +146,9 @@
             LabelableContext?.SetControlId(resolvedControlId);
         }
 
+        currentInputValue = CurrentValue;
         state = State;
+        RegisterFieldControl();
         BuildComponentAttributes();
     }
 
@@ -140,6 +158,7 @@
         if (firstRender)
         {
             hasRendered = true;
+            await SyncAutoFocusStateAsync();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -150,17 +169,26 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["id"] = resolvedControlId;
-        attrs["name"] = ResolvedName;
+        if (!string.IsNullOrEmpty(ResolvedName))
+            attrs["name"] = ResolvedName;
 
         if (ResolvedDisabled)
             attrs["disabled"] = true;
 
+        if (AutoFocus)
+            attrs["autofocus"] = true;
+
         attrs["value"] = CurrentValueAsString ?? EmptyValue;
 
-        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+        if (!string.IsNullOrEmpty(LabelableContext?.LabelId) &&
+            !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby"))
+        {
             attrs["aria-labelledby"] = LabelableContext.LabelId;
+        }
 
-        var ariaDescribedBy = LabelableContext?.GetAriaDescribedBy();
+        var ariaDescribedBy = AttributeUtilities.CombineIdRefs(
+            AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+            LabelableContext?.GetAriaDescribedBy());
         if (!string.IsNullOrEmpty(ariaDescribedBy))
             attrs["aria-describedby"] = ariaDescribedBy;
 
@@ -172,13 +200,7 @@
         attrs["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInput);
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDown);
 
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
 
         componentAttributes = attrs;
     }
@@ -187,6 +209,9 @@
     public async ValueTask DisposeAsync()
     {
         LabelableContext?.SetControlId(null);
+        if (fieldControlRegistered)
+            FieldContext?.RegisterFieldControl(fieldControlSource, null);
+
         FieldContext?.Unsubscribe(this);
 
         if (moduleTask.IsValueCreated && Element.HasValue)
@@ -202,6 +227,33 @@
             }
         }
     }
+
+    private void RegisterFieldControl()
+    {
+        if (FieldContext is null)
+            return;
+
+        var registrationName = string.IsNullOrEmpty(ResolvedName) ? null : ResolvedName;
+        if (fieldControlRegistered && registeredControlId == resolvedControlId && registeredName == registrationName)
+            return;
+
+        FieldContext.RegisterFieldControl(
+            fieldControlSource,
+            new FieldControlRegistration(
+                Id: resolvedControlId,
+                Name: registrationName,
+                GetValue: GetRegisteredValue,
+                ValidateAsync: ValidateRegisteredValueAsync,
+                FocusAsync: FocusAsync));
+
+        fieldControlRegistered = true;
+        registeredControlId = resolvedControlId;
+        registeredName = registrationName;
+    }
+
+    private object? GetRegisteredValue() => currentInputValue;
+
+    private Task ValidateRegisteredValueAsync() => CommitFieldValidationAsync(currentInputValue);
 
     /// <summary>
     /// Programmatically moves focus to the control element.
@@ -299,7 +351,7 @@
 
         if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
         {
-            await (FieldContext?.Validation.CommitAsync(CurrentValue) ?? Task.CompletedTask);
+            await CommitFieldValidationAsync(currentInputValue);
         }
 
         await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
@@ -310,20 +362,24 @@
         var stringValue = e.Value?.ToString() ?? string.Empty;
 
         CurrentValueAsString = stringValue;
+        currentInputValue = GetInputValue(stringValue);
 
         FormContext?.ClearErrors(ResolvedName);
 
         var initialValue = FieldContext?.ValidityData.InitialValue;
-        var isDirty = !EqualityComparer<TValue>.Default.Equals(CurrentValue, (TValue?)initialValue);
+        var isDirty = !EqualityComparer<TValue>.Default.Equals(currentInputValue, (TValue?)initialValue);
         FieldContext?.SetDirty(isDirty);
-        FieldContext?.SetFilled(!IsEmpty(CurrentValue));
+        FieldContext?.SetFilled(!IsEmpty(currentInputValue));
 
-        if (FieldContext?.ShouldValidateOnChange() == true)
+        var shouldValidateOnChange = FieldContext?.ShouldValidateOnChange() == true;
+
+        if (shouldValidateOnChange && FieldContext?.ValidationDebounceTime > 0 && stringValue.Length > 0)
         {
-            if (FieldContext.ValidationDebounceTime > 0)
-                FieldContext.Validation.CommitDebounced(CurrentValue);
-            else
-                await FieldContext.Validation.CommitAsync(CurrentValue);
+            FieldContext.Validation.CommitDebounced(currentInputValue, CommitDebouncedValueAsync);
+        }
+        else
+        {
+            await CommitFieldValidationAsync(currentInputValue, revalidateOnly: !shouldValidateOnChange);
         }
     }
 
@@ -332,7 +388,7 @@
         if (e.Key == "Enter")
         {
             FieldContext?.SetTouched(true);
-            await (FieldContext?.Validation.CommitAsync(CurrentValue) ?? Task.CompletedTask);
+            await CommitFieldValidationAsync(currentInputValue);
         }
 
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
@@ -346,5 +402,107 @@
             string s => string.IsNullOrEmpty(s),
             _ => false
         };
+    }
+
+    private TValue? GetInputValue(string? value)
+    {
+        return TryParseValueFromString(value, out var parsedValue, out _)
+            ? parsedValue
+            : CurrentValue;
+    }
+
+    private Task CommitDebouncedValueAsync(object? value) =>
+        CommitFieldValidationAsync(value);
+
+    private async Task CommitFieldValidationAsync(object? value, bool revalidateOnly = false)
+    {
+        if (FieldContext is null)
+            return;
+
+        var nativeValidity = await GetNativeValidityAsync();
+
+        await FieldContext.Validation.CommitAsync(
+            value,
+            revalidateOnly,
+            nativeValidity,
+            SetCustomValidityAsync,
+            GetNativeValidityAsync);
+    }
+
+    private async Task<FieldNativeValiditySnapshot?> GetNativeValidityAsync()
+    {
+        if (!hasRendered || !Element.HasValue)
+            return null;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var validityState = await module.InvokeAsync<FieldValidityState?>("getValidityState", Element.Value);
+            var validationMessage = await module.InvokeAsync<string>("getValidationMessage", Element.Value);
+            if (validityState is null)
+            {
+                var isValid = await module.InvokeAsync<bool>("checkValidity", Element.Value);
+                if (isValid)
+                    return null;
+
+                return new FieldNativeValiditySnapshot(
+                    CreateFallbackNativeValidityState(),
+                    validationMessage);
+            }
+
+            return new FieldNativeValiditySnapshot(validityState, validationMessage);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+            return null;
+        }
+    }
+
+    private FieldValidityState CreateFallbackNativeValidityState()
+    {
+        var valueMissing =
+            AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "required") &&
+            IsEmpty(currentInputValue);
+
+        return FieldValidityState.Default with
+        {
+            Valid = false,
+            ValueMissing = valueMissing
+        };
+    }
+
+    private async Task SetCustomValidityAsync(string message)
+    {
+        if (!hasRendered || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("setCustomValidity", Element.Value, message);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncAutoFocusStateAsync()
+    {
+        if (!AutoFocus || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var isActive = await module.InvokeAsync<bool>("isActiveElement", Element.Value);
+            if (isActive)
+                FieldContext?.SetFocused(true);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 }

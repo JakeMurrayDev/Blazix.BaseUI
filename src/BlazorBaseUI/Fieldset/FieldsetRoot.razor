@@ -95,8 +95,8 @@
             attrs["aria-labelledby"] = legendId;
         }
 
-        attrs["disabled"] = Disabled;
-        attrs["data-disabled"] = Disabled;
+        if (Disabled)
+            attrs["data-disabled"] = string.Empty;
 
         componentAttributes = attrs;
     }

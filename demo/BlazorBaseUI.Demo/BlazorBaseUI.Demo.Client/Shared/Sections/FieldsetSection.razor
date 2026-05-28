@@ -6,6 +6,7 @@
 @using BlazorBaseUI.Radio
 @using BlazorBaseUI.RadioGroup
 @using BlazorBaseUI.Switch
+@using BlazorBaseUI.Utilities
 @using BlazorBaseUI.Demo.Client.Shared.Icons
 
 <ComponentShowcase ComponentName="Fieldset"
@@ -14,106 +15,92 @@
                    IsWasmMode="IsWasmMode">
 
     <DemoSection Title="Basic Fieldset"
-                 Description="A fieldset with a legend that automatically associates via aria-labelledby">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-gray-300 p-4")">
-            <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-gray-900")">
+                 Description="A fieldset with a legend that automatically associates via aria-labelledby.">
+        <FieldsetRoot ClassValue="FieldsetRootClass">
+            <FieldsetLegend ClassValue="FieldsetLegendClass">
                 Personal Information
             </FieldsetLegend>
-            <div class="mt-4 space-y-4">
-                <FieldRoot ClassValue="@(_ => "")">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                        First Name
-                    </FieldLabel>
+            <div class="demo-grid demo-grid--2">
+                <FieldRoot ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">First Name</FieldLabel>
                     <FieldControl TValue="string"
                                   DefaultValue="@string.Empty"
-                                  ClassValue="@(_ => "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2")" />
+                                  ClassValue="FieldControlClass" />
                 </FieldRoot>
-                <FieldRoot ClassValue="@(_ => "")">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-gray-700")">
-                        Last Name
-                    </FieldLabel>
+                <FieldRoot ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Last Name</FieldLabel>
                     <FieldControl TValue="string"
                                   DefaultValue="@string.Empty"
-                                  ClassValue="@(_ => "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2")" />
+                                  ClassValue="FieldControlClass" />
                 </FieldRoot>
             </div>
         </FieldsetRoot>
     </DemoSection>
 
     <DemoSection Title="Aria-labelledby Association"
-                 Description="The fieldset automatically gets aria-labelledby pointing to the legend's id. Inspect the DOM to verify.">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-blue-300 bg-blue-50 p-4")">
-            <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-blue-900")">
-                Contact Details (inspect aria-labelledby)
+                 Description="The generated legend id is applied to the fieldset aria-labelledby attribute.">
+        <FieldsetRoot ClassValue="FieldsetAccentClass">
+            <FieldsetLegend ClassValue="FieldsetLegendClass">
+                Contact Details
             </FieldsetLegend>
-            <div class="mt-4 space-y-4">
-                <FieldRoot ClassValue="@(_ => "")">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-blue-700")">
-                        Email
-                    </FieldLabel>
+            <div class="demo-grid demo-grid--2">
+                <FieldRoot ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Email</FieldLabel>
                     <FieldControl TValue="string"
                                   DefaultValue="@string.Empty"
                                   type="email"
-                                  ClassValue="@(_ => "mt-1 block w-full rounded-md border border-blue-300 px-3 py-2")" />
+                                  ClassValue="FieldControlClass" />
                 </FieldRoot>
-                <FieldRoot ClassValue="@(_ => "")">
-                    <FieldLabel ClassValue="@(_ => "block text-sm font-medium text-blue-700")">
-                        Phone
-                    </FieldLabel>
+                <FieldRoot ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Phone</FieldLabel>
                     <FieldControl TValue="string"
                                   DefaultValue="@string.Empty"
                                   type="tel"
-                                  ClassValue="@(_ => "mt-1 block w-full rounded-md border border-blue-300 px-3 py-2")" />
+                                  ClassValue="FieldControlClass" />
                 </FieldRoot>
             </div>
         </FieldsetRoot>
     </DemoSection>
 
     <DemoSection Title="Custom ID on Legend"
-                 Description="When a custom id is provided on the legend, aria-labelledby uses that id">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-purple-300 bg-purple-50 p-4")">
-            <FieldsetLegend id="custom-legend-id" ClassValue="@(_ => "text-sm font-semibold text-purple-900")">
-                Custom Legend ID (id="custom-legend-id")
+                 Description="When a custom id is provided on the legend, aria-labelledby uses that id.">
+        <FieldsetRoot ClassValue="FieldsetAccentClass">
+            <FieldsetLegend id="custom-legend-id" ClassValue="FieldsetLegendClass">
+                Custom Legend ID
             </FieldsetLegend>
-            <p class="mt-4 text-sm text-purple-700">
-                The fieldset should have aria-labelledby="custom-legend-id"
-            </p>
+            <div class="demo-state-panel">
+                <div class="demo-state-row"><span>expected aria-labelledby</span><strong>custom-legend-id</strong></div>
+            </div>
         </FieldsetRoot>
     </DemoSection>
 
     <DemoSection Title="Disabled State"
-                 Description="When disabled, both fieldset and legend receive data-disabled attribute">
-        <div class="flex flex-col gap-4">
-            <div class="flex items-center gap-3">
+                 Description="Disabled state applies to the fieldset, legend, and child fields.">
+        <div class="demo-panel">
+            <label class="demo-option-row">
                 <SwitchRoot Checked="@isDisabled"
                             CheckedChanged="@(v => isDisabled = v)"
-                            ClassValue="@(s => SwitchRootClass(s))">
-                    <SwitchThumb ClassValue="@(s => SwitchThumbClass(s))" />
+                            ClassValue="SwitchRootClass">
+                    <SwitchThumb ClassValue="SwitchThumbClass" />
                 </SwitchRoot>
-                <span class="text-sm font-medium text-gray-700">Disabled</span>
-            </div>
-            <FieldsetRoot Disabled="@isDisabled"
-                          ClassValue="@(s => "rounded-lg border p-4 transition-colors " + (s.Disabled ? "border-gray-200 bg-gray-100" : "border-gray-300 bg-white"))">
-                <FieldsetLegend ClassValue="@(s => "text-sm font-semibold transition-colors " + (s.Disabled ? "text-gray-400" : "text-gray-900"))">
+                <span>Disabled</span>
+            </label>
+            <FieldsetRoot Disabled="@isDisabled" ClassValue="FieldsetRootClass">
+                <FieldsetLegend ClassValue="FieldsetLegendClass">
                     Account Settings
                 </FieldsetLegend>
-                <div class="mt-4 space-y-4">
-                    <FieldRoot Disabled="@isDisabled" ClassValue="@(_ => "")">
-                        <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                            Username
-                        </FieldLabel>
+                <div class="demo-grid demo-grid--2">
+                    <FieldRoot Disabled="@isDisabled" ClassValue="FieldRootClass">
+                        <FieldLabel ClassValue="FieldLabelClass">Username</FieldLabel>
                         <FieldControl TValue="string"
                                       DefaultValue="@string.Empty"
-                                      ClassValue="@(s => "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 " + (s.Disabled ? "cursor-not-allowed bg-gray-200" : ""))" />
+                                      ClassValue="FieldControlClass" />
                     </FieldRoot>
-                    <FieldRoot Disabled="@isDisabled" ClassValue="@(_ => "")">
-                        <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                            Password
-                        </FieldLabel>
+                    <FieldRoot Disabled="@isDisabled" ClassValue="FieldRootClass">
+                        <FieldLabel ClassValue="FieldLabelClass">Access Key</FieldLabel>
                         <FieldControl TValue="string"
                                       DefaultValue="@string.Empty"
-                                      type="password"
-                                      ClassValue="@(s => "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 " + (s.Disabled ? "cursor-not-allowed bg-gray-200" : ""))" />
+                                      ClassValue="FieldControlClass" />
                     </FieldRoot>
                 </div>
             </FieldsetRoot>
@@ -121,278 +108,355 @@
     </DemoSection>
 
     <DemoSection Title="State-Based Styling"
-                 Description="Use ClassValue and StyleValue functions to apply styles based on component state">
-        <div class="flex flex-col gap-4">
-            <div class="flex items-center gap-3">
+                 Description="ClassValue and StyleValue receive disabled state and can style the root and legend.">
+        <div class="demo-panel">
+            <label class="demo-option-row">
                 <SwitchRoot Checked="@styledDisabled"
                             CheckedChanged="@(v => styledDisabled = v)"
-                            ClassValue="@(s => SwitchRootClass(s))">
-                    <SwitchThumb ClassValue="@(s => SwitchThumbClass(s))" />
+                            ClassValue="SwitchRootClass">
+                    <SwitchThumb ClassValue="SwitchThumbClass" />
                 </SwitchRoot>
-                <span class="text-sm font-medium text-gray-700">Toggle Disabled</span>
-            </div>
+                <span>Toggle Disabled</span>
+            </label>
             <FieldsetRoot Disabled="@styledDisabled"
-                          ClassValue="@(s => "rounded-lg border-2 p-4 transition-all duration-300 " + (s.Disabled ? "border-red-300 bg-red-50" : "border-green-300 bg-green-50"))"
-                          StyleValue="@(s => s.Disabled ? "opacity: 0.7;" : "opacity: 1;")">
-                <FieldsetLegend ClassValue="@(s => "px-2 text-sm font-bold " + (s.Disabled ? "text-red-700" : "text-green-700"))"
+                          ClassValue="StyledFieldsetClass"
+                          StyleValue="@(s => s.Disabled ? "opacity: 0.72;" : "opacity: 1;")">
+                <FieldsetLegend ClassValue="StyledLegendClass"
                                 StyleValue="@(s => s.Disabled ? "text-decoration: line-through;" : "")">
                     @(styledDisabled ? "Disabled Section" : "Enabled Section")
                 </FieldsetLegend>
-                <div class="mt-4">
-                    <p class="text-sm text-gray-600">
-                        Current state: <strong>@(styledDisabled ? "Disabled" : "Enabled")</strong>
-                    </p>
-                    <p class="mt-2 text-xs text-gray-500">
-                        data-disabled attribute: @(styledDisabled ? "present" : "absent")
-                    </p>
+                <div class="demo-state-panel">
+                    <div class="demo-state-row"><span>disabled</span><strong>@styledDisabled</strong></div>
+                    <div class="demo-state-row"><span>data-disabled</span><strong>@(styledDisabled ? "present" : "absent")</strong></div>
                 </div>
             </FieldsetRoot>
         </div>
     </DemoSection>
 
-    <DemoSection Title="Custom Element (Render Parameter)"
-                 Description="Render the fieldset root as a different HTML element using the Render parameter">
+    <DemoSection Title="Custom Element"
+                 Description="Render can replace fieldset and legend elements while preserving state attributes.">
         <FieldsetRoot Render="RenderAsDiv"
-                      ClassValue="@(_ => "rounded-lg border border-orange-300 bg-orange-50 p-4")">
-            <FieldsetLegend Render="RenderLegendAsH3" ClassValue="@(_ => "text-lg font-bold text-orange-900")">
+                      ClassValue="FieldsetWarningClass">
+            <FieldsetLegend Render="RenderLegendAsH3" ClassValue="FieldsetLegendClass">
                 Rendered as div/h3
             </FieldsetLegend>
-            <p class="mt-4 text-sm text-orange-700">
-                This fieldset is rendered as a &lt;div&gt; and the legend as an &lt;h3&gt;.
-                Useful for semantic flexibility while keeping the component structure.
+            <p class="demo-description">
+                The root is rendered as a div and the legend as an h3.
             </p>
         </FieldsetRoot>
     </DemoSection>
 
     <DemoSection Title="Nested Fieldsets"
-                 Description="Fieldsets can be nested for complex form organization">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-gray-300 p-4")">
-            <FieldsetLegend ClassValue="@(_ => "text-base font-bold text-gray-900")">
+                 Description="Nested fieldsets keep independent legend associations and state.">
+        <FieldsetRoot ClassValue="FieldsetRootClass">
+            <FieldsetLegend ClassValue="FieldsetLegendClass">
                 Shipping Information
             </FieldsetLegend>
-            <div class="mt-4 space-y-4">
-                <FieldsetRoot ClassValue="@(_ => "rounded-md border border-gray-200 bg-gray-50 p-3")">
-                    <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-gray-700")">
+            <div class="demo-stack">
+                <FieldsetRoot ClassValue="NestedFieldsetClass">
+                    <FieldsetLegend ClassValue="FieldsetLegendClass">
                         Address
                     </FieldsetLegend>
-                    <div class="mt-3 space-y-3">
-                        <FieldRoot ClassValue="@(_ => "")">
+                    <div class="demo-grid demo-grid--2">
+                        <FieldRoot ClassValue="FieldRootClass">
                             <FieldControl TValue="string"
                                           DefaultValue="@string.Empty"
                                           placeholder="Street"
-                                          ClassValue="@(_ => "block w-full rounded border border-gray-300 px-3 py-2 text-sm")" />
+                                          ClassValue="FieldControlClass" />
                         </FieldRoot>
-                        <div class="flex gap-3">
-                            <FieldRoot ClassValue="@(_ => "flex-1")">
+                        <div class="demo-grid demo-grid--2">
+                            <FieldRoot ClassValue="FieldRootClass">
                                 <FieldControl TValue="string"
                                               DefaultValue="@string.Empty"
                                               placeholder="City"
-                                              ClassValue="@(_ => "block w-full rounded border border-gray-300 px-3 py-2 text-sm")" />
+                                              ClassValue="FieldControlClass" />
                             </FieldRoot>
-                            <FieldRoot ClassValue="@(_ => "w-24")">
+                            <FieldRoot ClassValue="FieldRootClass">
                                 <FieldControl TValue="string"
                                               DefaultValue="@string.Empty"
                                               placeholder="ZIP"
-                                              ClassValue="@(_ => "block w-full rounded border border-gray-300 px-3 py-2 text-sm")" />
+                                              ClassValue="FieldControlClass" />
                             </FieldRoot>
                         </div>
                     </div>
                 </FieldsetRoot>
 
-                <FieldsetRoot ClassValue="@(_ => "rounded-md border border-gray-200 bg-gray-50 p-3")">
-                    <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-gray-700")">
+                <FieldsetRoot ClassValue="NestedFieldsetClass">
+                    <FieldsetLegend ClassValue="FieldsetLegendClass">
                         Delivery Options
                     </FieldsetLegend>
-                    <div class="mt-3">
-                        <RadioGroup TValue="string"
-                                    @bind-Value="deliveryOption"
-                                    DefaultValue="@("standard")"
-                                    ClassValue="@(_ => "outline-none")">
-                            <div class="space-y-2">
-                                <label class="flex cursor-pointer items-center gap-2">
-                                    <RadioRoot TValue="string"
-                                               Value="@("standard")"
-                                               ClassValue="@(s => RadioRootClass(s))">
-                                        <RadioIndicator ClassValue="@(s => RadioIndicatorClass(s))">
-                                            <span class="block h-2 w-2 rounded-full bg-white"></span>
-                                        </RadioIndicator>
-                                    </RadioRoot>
-                                    <span class="text-sm text-gray-700">Standard (5-7 days)</span>
-                                </label>
-                                <label class="flex cursor-pointer items-center gap-2">
-                                    <RadioRoot TValue="string"
-                                               Value="@("express")"
-                                               ClassValue="@(s => RadioRootClass(s))">
-                                        <RadioIndicator ClassValue="@(s => RadioIndicatorClass(s))">
-                                            <span class="block h-2 w-2 rounded-full bg-white"></span>
-                                        </RadioIndicator>
-                                    </RadioRoot>
-                                    <span class="text-sm text-gray-700">Express (2-3 days)</span>
-                                </label>
-                                <label class="flex cursor-pointer items-center gap-2">
-                                    <RadioRoot TValue="string"
-                                               Value="@("overnight")"
-                                               ClassValue="@(s => RadioRootClass(s))">
-                                        <RadioIndicator ClassValue="@(s => RadioIndicatorClass(s))">
-                                            <span class="block h-2 w-2 rounded-full bg-white"></span>
-                                        </RadioIndicator>
-                                    </RadioRoot>
-                                    <span class="text-sm text-gray-700">Overnight</span>
-                                </label>
-                            </div>
-                        </RadioGroup>
-                    </div>
+                    <RadioGroup TValue="string"
+                                @bind-Value="deliveryOption"
+                                DefaultValue="@("standard")"
+                                ClassValue="@(_ => "demo-stack")">
+                        <label class="demo-option-row">
+                            <RadioRoot TValue="string"
+                                       Value="@("standard")"
+                                       ClassValue="RadioRootClass">
+                                <RadioIndicator ClassValue="RadioIndicatorClass">
+                                    <span class="demo-radio-dot"></span>
+                                </RadioIndicator>
+                            </RadioRoot>
+                            <span>Standard (5-7 days)</span>
+                        </label>
+                        <label class="demo-option-row">
+                            <RadioRoot TValue="string"
+                                       Value="@("express")"
+                                       ClassValue="RadioRootClass">
+                                <RadioIndicator ClassValue="RadioIndicatorClass">
+                                    <span class="demo-radio-dot"></span>
+                                </RadioIndicator>
+                            </RadioRoot>
+                            <span>Express (2-3 days)</span>
+                        </label>
+                        <label class="demo-option-row">
+                            <RadioRoot TValue="string"
+                                       Value="@("overnight")"
+                                       ClassValue="RadioRootClass">
+                                <RadioIndicator ClassValue="RadioIndicatorClass">
+                                    <span class="demo-radio-dot"></span>
+                                </RadioIndicator>
+                            </RadioRoot>
+                            <span>Overnight</span>
+                        </label>
+                    </RadioGroup>
                 </FieldsetRoot>
             </div>
         </FieldsetRoot>
     </DemoSection>
 
     <DemoSection Title="Form Integration with Validation"
-                 Description="Fieldset works with Field components for complete form validation">
-        <Form Model="@(new object())" OnFormSubmit="@HandleSubmit">
-            <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-gray-300 p-4")">
-                <FieldsetLegend ClassValue="@(_ => "text-base font-bold text-gray-900")">
-                    Create Account
-                </FieldsetLegend>
-                <div class="mt-4 space-y-4">
-                    <FieldRoot ValidationMode="ValidationMode.OnBlur"
-                               Validate="ValidateEmail"
-                               ClassValue="@(s => s.Valid == false ? "has-error" : "")">
-                        <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Valid == false ? "text-red-600" : "text-gray-700"))">
-                            Email
-                        </FieldLabel>
-                        <FieldControl TValue="string"
-                                      @bind-Value="formEmail"
-                                      type="email"
-                                      ClassValue="@(s => "mt-1 block w-full rounded-md border px-3 py-2 focus:ring-1 " + (s.Valid == false ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"))" />
-                        <FieldError ClassValue="@(_ => "mt-1 text-sm text-red-600")" />
-                    </FieldRoot>
-
-                    <FieldRoot ValidationMode="ValidationMode.OnBlur"
-                               Validate="ValidatePassword"
-                               ClassValue="@(s => s.Valid == false ? "has-error" : "")">
-                        <FieldLabel ClassValue="@(s => "block text-sm font-medium " + (s.Valid == false ? "text-red-600" : "text-gray-700"))">
-                            Password
-                        </FieldLabel>
-                        <FieldControl TValue="string"
-                                      @bind-Value="formPassword"
-                                      type="password"
-                                      ClassValue="@(s => "mt-1 block w-full rounded-md border px-3 py-2 focus:ring-1 " + (s.Valid == false ? "border-red-500 focus:border-red-500 focus:ring-red-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"))" />
-                        <FieldDescription ClassValue="@(_ => "mt-1 text-xs text-gray-500")">
-                            Minimum 8 characters
-                        </FieldDescription>
-                        <FieldError ClassValue="@(_ => "mt-1 text-sm text-red-600")" />
-                    </FieldRoot>
-
-                    <FieldsetRoot Disabled="@(!agreeToTerms)"
-                                  ClassValue="@(s => "rounded-md border p-3 " + (s.Disabled ? "border-gray-200 bg-gray-50" : "border-gray-300"))">
-                        <FieldsetLegend ClassValue="@(s => "text-sm font-semibold " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                            Preferences (agree to terms first)
-                        </FieldsetLegend>
-                        <div class="mt-3 space-y-2">
-                            <FieldRoot Name="newsletters" Disabled="@(!agreeToTerms)">
-                                <div class="flex items-center gap-2">
-                                    <CheckboxRoot DefaultChecked="false"
-                                                  ClassValue="@(s => CheckboxRootClass(s))">
-                                        <CheckboxIndicator ClassValue="@(s => CheckboxIndicatorClass(s))">
-                                            <CheckIcon />
-                                        </CheckboxIndicator>
-                                    </CheckboxRoot>
-                                    <FieldLabel ClassValue="@(s => "cursor-pointer text-sm " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                                        Send me newsletters
-                                    </FieldLabel>
-                                </div>
-                            </FieldRoot>
-                            <FieldRoot Name="twoFactor" Disabled="@(!agreeToTerms)">
-                                <div class="flex items-center gap-2">
-                                    <CheckboxRoot DefaultChecked="false"
-                                                  ClassValue="@(s => CheckboxRootClass(s))">
-                                        <CheckboxIndicator ClassValue="@(s => CheckboxIndicatorClass(s))">
-                                            <CheckIcon />
-                                        </CheckboxIndicator>
-                                    </CheckboxRoot>
-                                    <FieldLabel ClassValue="@(s => "cursor-pointer text-sm " + (s.Disabled ? "text-gray-400" : "text-gray-700"))">
-                                        Enable two-factor authentication
-                                    </FieldLabel>
-                                </div>
-                            </FieldRoot>
-                        </div>
-                    </FieldsetRoot>
-
-                    <FieldRoot Name="terms">
-                        <div class="flex items-center gap-2">
-                            <CheckboxRoot Checked="@agreeToTerms"
-                                          CheckedChanged="@(v => agreeToTerms = v)"
-                                          ClassValue="@(s => CheckboxRootClass(s))">
-                                <CheckboxIndicator ClassValue="@(s => CheckboxIndicatorClass(s))">
-                                    <CheckIcon />
-                                </CheckboxIndicator>
-                            </CheckboxRoot>
-                            <FieldLabel ClassValue="@(_ => "cursor-pointer text-sm text-gray-700")">
-                                I agree to the terms and conditions
-                            </FieldLabel>
-                        </div>
-                    </FieldRoot>
-
-                    <Button ClassValue="@(_ => "w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none")">
+                 Description="Fieldset composes with Field components, checkbox controls, and Form submission.">
+        <div class="demo-panel demo-panel--wide">
+            <Form Model="@formIntegrationModel"
+                  OnFormSubmit="@HandleSubmit"
+                  ClassValue="@(_ => "demo-stack")">
+                <FieldsetRoot ClassValue="FieldsetRootClass">
+                    <FieldsetLegend ClassValue="FieldsetLegendClass">
                         Create Account
-                    </Button>
-                </div>
-            </FieldsetRoot>
+                    </FieldsetLegend>
+                    <div class="demo-stack">
+                        <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                                   Validate="ValidateEmail"
+                                   ClassValue="FieldRootClass">
+                            <FieldLabel ClassValue="FieldLabelClass">Email</FieldLabel>
+                            <FieldControl TValue="string"
+                                          @bind-Value="formEmail"
+                                          type="email"
+                                          autocomplete="username"
+                                          ClassValue="FieldControlClass" />
+                            <FieldError ClassValue="FieldErrorClass" />
+                        </FieldRoot>
+
+                        <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                                   Validate="ValidatePassword"
+                                   ClassValue="FieldRootClass">
+                            <FieldLabel ClassValue="FieldLabelClass">Password</FieldLabel>
+                            <FieldControl TValue="string"
+                                          @bind-Value="formPassword"
+                                          type="password"
+                                          autocomplete="new-password"
+                                          ClassValue="FieldControlClass" />
+                            <FieldDescription ClassValue="FieldDescriptionClass">
+                                Minimum 8 characters.
+                            </FieldDescription>
+                            <FieldError ClassValue="FieldErrorClass" />
+                        </FieldRoot>
+
+                        <FieldsetRoot Disabled="@(!agreeToTerms)"
+                                      ClassValue="NestedFieldsetClass">
+                            <FieldsetLegend ClassValue="FieldsetLegendClass">
+                                Preferences
+                            </FieldsetLegend>
+                            <div class="demo-stack">
+                                <FieldRoot Name="newsletters" Disabled="@(!agreeToTerms)">
+                                    <div class="demo-option-row">
+                                        <CheckboxRoot DefaultChecked="false"
+                                                      ClassValue="CheckboxRootClass">
+                                            <CheckboxIndicator ClassValue="CheckboxIndicatorClass">
+                                                <CheckIcon />
+                                            </CheckboxIndicator>
+                                        </CheckboxRoot>
+                                        <FieldLabel ClassValue="FieldLabelClass">
+                                            Send me newsletters
+                                        </FieldLabel>
+                                    </div>
+                                </FieldRoot>
+                                <FieldRoot Name="twoFactor" Disabled="@(!agreeToTerms)">
+                                    <div class="demo-option-row">
+                                        <CheckboxRoot DefaultChecked="false"
+                                                      ClassValue="CheckboxRootClass">
+                                            <CheckboxIndicator ClassValue="CheckboxIndicatorClass">
+                                                <CheckIcon />
+                                            </CheckboxIndicator>
+                                        </CheckboxRoot>
+                                        <FieldLabel ClassValue="FieldLabelClass">
+                                            Enable two-factor authentication
+                                        </FieldLabel>
+                                    </div>
+                                </FieldRoot>
+                            </div>
+                        </FieldsetRoot>
+
+                        <FieldRoot Name="terms">
+                            <div class="demo-option-row">
+                                <CheckboxRoot Checked="@agreeToTerms"
+                                              CheckedChanged="@(v => agreeToTerms = v)"
+                                              ClassValue="CheckboxRootClass">
+                                    <CheckboxIndicator ClassValue="CheckboxIndicatorClass">
+                                        <CheckIcon />
+                                    </CheckboxIndicator>
+                                </CheckboxRoot>
+                                <FieldLabel ClassValue="FieldLabelClass">
+                                    I agree to the terms and conditions
+                                </FieldLabel>
+                            </div>
+                        </FieldRoot>
+
+                        <Button ClassValue="@(_ => "demo-button demo-button--primary demo-button--full")">
+                            Create Account
+                        </Button>
+                    </div>
+                </FieldsetRoot>
+            </Form>
             @if (formSubmitted)
             {
-                <div class="mt-4 rounded-md bg-green-50 p-3 text-sm text-green-700">
+                <div class="demo-result demo-result--success">
                     Form submitted with email: @formEmail
                 </div>
             }
-        </Form>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Propagation Matrix"
+                 Description="Nested disabled fieldsets, field roots, and selection controls should stay synchronized.">
+        <div class="demo-panel">
+            <label class="demo-option-row">
+                <SwitchRoot Checked="@matrixDisabled"
+                            CheckedChanged="@(v => matrixDisabled = v)"
+                            ClassValue="SwitchRootClass">
+                    <SwitchThumb ClassValue="SwitchThumbClass" />
+                </SwitchRoot>
+                <span>Disable matrix</span>
+            </label>
+            <FieldsetRoot Disabled="@matrixDisabled" ClassValue="FieldsetRootClass">
+                <FieldsetLegend ClassValue="FieldsetLegendClass">
+                    Notification Settings
+                </FieldsetLegend>
+                <div class="demo-grid demo-grid--2">
+                    <FieldRoot Disabled="@matrixDisabled" ClassValue="FieldRootClass">
+                        <FieldLabel ClassValue="FieldLabelClass">Email address</FieldLabel>
+                        <FieldControl TValue="string"
+                                      DefaultValue="@string.Empty"
+                                      type="email"
+                                      ClassValue="FieldControlClass" />
+                    </FieldRoot>
+                    <FieldRoot Name="digest" Disabled="@matrixDisabled">
+                        <div class="demo-option-row">
+                            <CheckboxRoot Disabled="@matrixDisabled"
+                                          DefaultChecked="true"
+                                          ClassValue="CheckboxRootClass">
+                                <CheckboxIndicator ClassValue="CheckboxIndicatorClass">
+                                    <CheckIcon />
+                                </CheckboxIndicator>
+                            </CheckboxRoot>
+                            <FieldLabel ClassValue="FieldLabelClass">
+                                Weekly digest
+                            </FieldLabel>
+                        </div>
+                    </FieldRoot>
+                </div>
+            </FieldsetRoot>
+        </div>
     </DemoSection>
 
     <DemoSection Title="Without Legend"
-                 Description="Fieldset can be used without a legend (though not recommended for accessibility)">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-amber-300 bg-amber-50 p-4")">
-            <p class="text-sm text-amber-700">
-                This fieldset has no legend. While valid HTML, it's recommended to always include a legend for accessibility.
+                 Description="A fieldset can render without a legend, while the demo makes the missing label visually explicit.">
+        <FieldsetRoot ClassValue="FieldsetWarningClass">
+            <p class="demo-description">
+                This fieldset has no legend. Prefer a legend for accessible grouping.
             </p>
-            <div class="mt-4">
-                <FieldRoot ClassValue="@(_ => "")">
-                    <FieldControl TValue="string"
-                                  DefaultValue="@string.Empty"
-                                  placeholder="Some input"
-                                  ClassValue="@(_ => "block w-full rounded border border-amber-300 px-3 py-2 text-sm")" />
-                </FieldRoot>
-            </div>
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldControl TValue="string"
+                              DefaultValue="@string.Empty"
+                              placeholder="Some input"
+                              ClassValue="FieldControlClass" />
+            </FieldRoot>
         </FieldsetRoot>
     </DemoSection>
 
-    <DemoSection Title="Multiple Legends (Edge Case)"
-                 Description="Only the last rendered legend will be associated with aria-labelledby">
-        <FieldsetRoot ClassValue="@(_ => "rounded-lg border border-teal-300 bg-teal-50 p-4")">
-            <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-teal-700")">
-                First Legend (will be replaced)
+    <DemoSection Title="Multiple Legends"
+                 Description="Only the last rendered legend is associated with aria-labelledby.">
+        <FieldsetRoot ClassValue="FieldsetAccentClass">
+            <FieldsetLegend ClassValue="FieldsetLegendClass">
+                First Legend
             </FieldsetLegend>
-            <FieldsetLegend ClassValue="@(_ => "text-sm font-semibold text-teal-900")">
-                Second Legend (aria-labelledby points here)
+            <FieldsetLegend ClassValue="FieldsetLegendClass">
+                Second Legend
             </FieldsetLegend>
-            <p class="mt-4 text-sm text-teal-600">
+            <p class="demo-description">
                 In practice, only use one legend per fieldset.
             </p>
         </FieldsetRoot>
     </DemoSection>
-
 </ComponentShowcase>
 
 @code {
     private bool isDisabled;
     private bool styledDisabled;
     private bool agreeToTerms;
+    private bool matrixDisabled;
     private string formEmail = "";
     private string formPassword = "";
     private bool formSubmitted;
     private string? deliveryOption = "standard";
+    private readonly object formIntegrationModel = new();
+
+    private RenderFragment<RenderProps<FieldsetRootState>> RenderAsDiv =>
+        ctx => RenderUtilities.CreateElement("div", ctx);
+
+    private RenderFragment<RenderProps<FieldsetLegendState>> RenderLegendAsH3 =>
+        ctx => RenderUtilities.CreateElement("h3", ctx);
 
     [Parameter]
     public bool IsWasmMode { get; set; }
+
+    private static string FieldRootClass(FieldRootState state) => "demo-field";
+
+    private static string FieldControlClass(FieldRootState state) => "demo-control";
+
+    private static string FieldLabelClass(FieldRootState state) => "demo-label";
+
+    private static string FieldDescriptionClass(FieldRootState state) => "demo-description";
+
+    private static string FieldErrorClass(FieldErrorState state) => "demo-error";
+
+    private static string FieldsetRootClass(FieldsetRootState state) => "demo-fieldset";
+
+    private static string FieldsetAccentClass(FieldsetRootState state) => "demo-fieldset demo-fieldset--accent";
+
+    private static string FieldsetWarningClass(FieldsetRootState state) => "demo-fieldset demo-fieldset--warning";
+
+    private static string NestedFieldsetClass(FieldsetRootState state) => "demo-fieldset";
+
+    private static string StyledFieldsetClass(FieldsetRootState state) =>
+        state.Disabled ? "demo-fieldset demo-fieldset--warning" : "demo-fieldset demo-fieldset--accent";
+
+    private static string FieldsetLegendClass(FieldsetLegendState state) => "demo-legend";
+
+    private static string StyledLegendClass(FieldsetLegendState state) => "demo-legend";
+
+    private static string SwitchRootClass(SwitchRootState state) => "demo-switch";
+
+    private static string SwitchThumbClass(SwitchRootState state) => "demo-switch__thumb";
+
+    private static string CheckboxRootClass(CheckboxRootState state) => "demo-checkbox-control";
+
+    private static string CheckboxIndicatorClass(CheckboxIndicatorState state) => "demo-checkbox-indicator";
+
+    private static string RadioRootClass(RadioRootState state) => "demo-radio-control";
+
+    private static string RadioIndicatorClass(RadioIndicatorState state) => "demo-radio-indicator";
 
     private void HandleSubmit(FormSubmitEventArgs e)
     {
@@ -404,8 +468,10 @@
         var str = value?.ToString() ?? string.Empty;
         if (string.IsNullOrEmpty(str))
             return Task.FromResult<string[]?>(["Email is required"]);
+
         if (!str.Contains('@'))
             return Task.FromResult<string[]?>(["Invalid email format"]);
+
         return Task.FromResult<string[]?>(null);
     }
 
@@ -414,68 +480,10 @@
         var str = value?.ToString() ?? string.Empty;
         if (string.IsNullOrEmpty(str))
             return Task.FromResult<string[]?>(["Password is required"]);
+
         if (str.Length < 8)
             return Task.FromResult<string[]?>(["Password must be at least 8 characters"]);
+
         return Task.FromResult<string[]?>(null);
     }
-
-    private static string SwitchRootClass(SwitchRootState state)
-    {
-        var baseClass = "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2";
-        if (state.Disabled)
-            return $"{baseClass} cursor-not-allowed opacity-50 bg-gray-200";
-        if (state.Checked)
-            return $"{baseClass} bg-blue-600";
-        return $"{baseClass} bg-gray-200";
-    }
-
-    private static string SwitchThumbClass(SwitchRootState state)
-    {
-        var baseClass = "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform";
-        if (state.Checked)
-            return $"{baseClass} translate-x-5";
-        return $"{baseClass} translate-x-0";
-    }
-
-    private static string CheckboxRootClass(CheckboxRootState state)
-    {
-        var baseClass = "relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-all outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1";
-        if (state.Disabled)
-            return $"{baseClass} border-gray-200 bg-gray-100 cursor-not-allowed opacity-50";
-        if (state.Valid == false)
-            return $"{baseClass} border-red-500 bg-red-50";
-        if (state.Checked)
-            return $"{baseClass} border-blue-600 bg-blue-600";
-        return $"{baseClass} border-gray-300 bg-white hover:border-gray-400";
-    }
-
-    private static string CheckboxIndicatorClass(CheckboxIndicatorState state)
-    {
-        return "flex items-center justify-center text-white";
-    }
-
-    private static string RadioRootClass(RadioRootState state)
-    {
-        var baseClass = "relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all outline-none";
-        if (state.Disabled)
-            return $"{baseClass} border-gray-200 bg-gray-100 cursor-not-allowed opacity-50";
-        if (state.Valid == false)
-            return $"{baseClass} border-red-500 bg-white";
-        if (state.Checked)
-            return $"{baseClass} border-blue-600 bg-blue-600";
-        if (state.Focused)
-            return $"{baseClass} border-blue-400 bg-white ring-2 ring-blue-200";
-        return $"{baseClass} border-gray-300 bg-white hover:border-gray-400";
-    }
-
-    private static string RadioIndicatorClass(RadioIndicatorState state)
-    {
-        return "flex items-center justify-center";
-    }
-
-    private RenderFragment<RenderProps<FieldsetRootState>> RenderAsDiv =>
-        ctx => RenderUtilities.CreateElement("div", ctx);
-
-    private RenderFragment<RenderProps<FieldsetLegendState>> RenderLegendAsH3 =>
-        ctx => RenderUtilities.CreateElement("h3", ctx);
 }

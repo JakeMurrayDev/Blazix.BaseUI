@@ -5,7 +5,7 @@ public interface IFormContract
     Task RendersAsFormByDefault();
     Task RendersWithCustomRender();
     Task SetsNoValidateByDefault();
-    Task NoValidateIsAlwaysPresent();
+    Task NoValidateCanBeDisabled();
     Task MarksControlInvalidWhenErrorsProvided();
     Task DoesNotMarkControlInvalidWhenNoErrors();
 }

@@ -117,7 +117,7 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && NativeLabel)
+        if (firstRender)
         {
             try
             {
@@ -125,7 +125,7 @@
 
                 if (renderElementReference?.Element is { } element)
                 {
-                    await module.InvokeVoidAsync("addLabelMouseDownListener", element);
+                    await module.InvokeVoidAsync("addLabelMouseDownListener", element, !NativeLabel);
                 }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -143,7 +143,8 @@
 
         if (NativeLabel)
         {
-            if (!string.IsNullOrEmpty(LabelableContext?.ControlId))
+            if (!string.IsNullOrEmpty(LabelableContext?.ControlId) &&
+                !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "for"))
             {
                 attrs["for"] = LabelableContext.ControlId;
             }
@@ -153,13 +154,7 @@
             attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClick);
         }
 
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
 
         componentAttributes = attrs;
     }
@@ -170,7 +165,7 @@
         LabelableContext?.SetLabelId(null);
         FieldContext?.Unsubscribe(this);
 
-        if (NativeLabel && moduleTask.IsValueCreated && renderElementReference?.Element is { } element)
+        if (moduleTask.IsValueCreated && renderElementReference?.Element is { } element)
         {
             try
             {

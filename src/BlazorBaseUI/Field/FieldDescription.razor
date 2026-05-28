@@ -16,6 +16,7 @@
 
 @code {
     private string? defaultId;
+    private string? registeredId;
     private FieldRootState state;
     private RenderElement<FieldRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -69,7 +70,8 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, true);
+        registeredId = ResolvedId;
+        LabelableContext?.UpdateMessageIds.Invoke(registeredId, true);
         FieldContext?.Subscribe(this);
 
         state = State;
@@ -79,6 +81,16 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        var nextId = ResolvedId;
+        if (registeredId != nextId)
+        {
+            if (registeredId is not null)
+                LabelableContext?.UpdateMessageIds.Invoke(registeredId, false);
+
+            registeredId = nextId;
+            LabelableContext?.UpdateMessageIds.Invoke(registeredId, true);
+        }
+
         state = State;
         BuildComponentAttributes();
     }
@@ -87,14 +99,8 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["id"] = ResolvedId;
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
+        attrs["id"] = registeredId ?? ResolvedId;
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
 
         componentAttributes = attrs;
     }
@@ -103,7 +109,8 @@
     public void Dispose()
     {
         FieldContext?.Unsubscribe(this);
-        LabelableContext?.UpdateMessageIds.Invoke(ResolvedId, false);
+        if (registeredId is not null)
+            LabelableContext?.UpdateMessageIds.Invoke(registeredId, false);
     }
 
     /// <inheritdoc />
