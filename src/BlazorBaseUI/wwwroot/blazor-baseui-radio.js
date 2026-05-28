@@ -6,7 +6,7 @@ if (!window[GROUP_STATE_KEY]) {
 }
 const groupState = window[GROUP_STATE_KEY];
 
-export function initialize(element, inputElement, disabled, readOnly) {
+export function initialize(element, inputElement, disabled, readOnly, nativeButton) {
     if (!element) {
         return;
     }
@@ -15,6 +15,7 @@ export function initialize(element, inputElement, disabled, readOnly) {
         inputElement,
         disabled,
         readOnly,
+        nativeButton,
         keydownHandler: null
     };
 
@@ -32,7 +33,7 @@ export function initialize(element, inputElement, disabled, readOnly) {
         }
         
         // Space key should also prevent default (page scroll)
-        if (e.key === ' ') {
+        if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
         }
     };
@@ -41,7 +42,7 @@ export function initialize(element, inputElement, disabled, readOnly) {
     element[STATE_KEY] = state;
 }
 
-export function updateState(element, inputElement, disabled, readOnly) {
+export function updateState(element, inputElement, disabled, readOnly, nativeButton) {
     if (!element) {
         return;
     }
@@ -50,6 +51,7 @@ export function updateState(element, inputElement, disabled, readOnly) {
     if (state) {
         state.disabled = disabled;
         state.readOnly = readOnly;
+        state.nativeButton = nativeButton;
         state.inputElement = inputElement;
     }
 }
@@ -88,12 +90,24 @@ export function initializeGroup(element, dotNetRef) {
         keydownCaptureHandler: null
     };
 
-    state.keydownCaptureHandler = (e) => {
+    state.keydownCaptureHandler = async (e) => {
         const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
         if (arrowKeys.includes(e.key)) {
             e.preventDefault();
-            dotNetRef.invokeMethodAsync('OnArrowKeyPressed');
+
+            const currentElement = getRadioFromEventTarget(element, e.target);
+            if (!currentElement || isRadioDisabled(currentElement)) {
+                return;
+            }
+
+            await dotNetRef.invokeMethodAsync('OnArrowKeyPressed');
+
+            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                await navigateToPrevious(element, currentElement);
+            } else {
+                await navigateToNext(element, currentElement);
+            }
         }
 
         if (e.key === ' ') {
@@ -119,7 +133,7 @@ export function disposeGroup(element) {
     }
 }
 
-export function registerRadio(groupElement, radioElement, value) {
+export function registerRadio(groupElement, radioElement, value, isNullValue, serializedValue) {
     if (!groupElement || !radioElement) {
         return;
     }
@@ -132,12 +146,14 @@ export function registerRadio(groupElement, radioElement, value) {
     for (const item of state.items) {
         if (item.element === radioElement) {
             item.value = value;
+            item.isNullValue = isNullValue;
+            item.serializedValue = serializedValue;
             updateTabIndexes(groupElement);
             return;
         }
     }
 
-    state.items.add({ element: radioElement, value });
+    state.items.add({ element: radioElement, value, isNullValue, serializedValue });
     updateTabIndexes(groupElement);
 }
 
@@ -205,6 +221,23 @@ function isRadioDisabled(radioElement) {
     return radioElement.hasAttribute('data-disabled');
 }
 
+function isRadioReadOnly(radioElement) {
+    return radioElement.hasAttribute('data-readonly');
+}
+
+function getRadioFromEventTarget(groupElement, target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+
+    const radioElement = target.closest('[data-radio-item]');
+    if (!radioElement || !groupElement.contains(radioElement)) {
+        return null;
+    }
+
+    return radioElement;
+}
+
 export async function navigateToPrevious(groupElement, currentElement) {
     const state = groupState.get(groupElement);
     if (!state) {
@@ -220,7 +253,9 @@ export async function navigateToPrevious(groupElement, currentElement) {
     for (let i = currentIndex - 1; i >= 0; i--) {
         if (!isRadioDisabled(items[i].element)) {
             items[i].element.focus({ preventScroll: true });
-            await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value);
+            if (!isRadioReadOnly(items[i].element)) {
+                await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value, items[i].isNullValue === true, items[i].serializedValue);
+            }
             return true;
         }
     }
@@ -228,7 +263,9 @@ export async function navigateToPrevious(groupElement, currentElement) {
     for (let i = items.length - 1; i > currentIndex; i--) {
         if (!isRadioDisabled(items[i].element)) {
             items[i].element.focus({ preventScroll: true });
-            await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value);
+            if (!isRadioReadOnly(items[i].element)) {
+                await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value, items[i].isNullValue === true, items[i].serializedValue);
+            }
             return true;
         }
     }
@@ -251,7 +288,9 @@ export async function navigateToNext(groupElement, currentElement) {
     for (let i = currentIndex + 1; i < items.length; i++) {
         if (!isRadioDisabled(items[i].element)) {
             items[i].element.focus({ preventScroll: true });
-            await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value);
+            if (!isRadioReadOnly(items[i].element)) {
+                await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value, items[i].isNullValue === true, items[i].serializedValue);
+            }
             return true;
         }
     }
@@ -259,7 +298,9 @@ export async function navigateToNext(groupElement, currentElement) {
     for (let i = 0; i < currentIndex; i++) {
         if (!isRadioDisabled(items[i].element)) {
             items[i].element.focus({ preventScroll: true });
-            await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value);
+            if (!isRadioReadOnly(items[i].element)) {
+                await state.dotNetRef.invokeMethodAsync('OnNavigateToRadio', items[i].value, items[i].isNullValue === true, items[i].serializedValue);
+            }
             return true;
         }
     }

@@ -1,4 +1,9 @@
+using BlazorBaseUI.Field;
+using BlazorBaseUI.Form;
 using BlazorBaseUI.RadioGroup;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BlazorBaseUI.Tests.Radio;
 
@@ -7,7 +12,11 @@ public class RadioRootTests : BunitContext, IRadioRootContract
     public RadioRootTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        JsInteropSetup.SetupFieldModule(JSInterop);
+        JsInteropSetup.SetupLabelModule(JSInterop);
         JsInteropSetup.SetupRadioModule(JSInterop);
+        Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
+        Services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
     }
 
     private RenderFragment CreateRadioRoot(
@@ -15,6 +24,7 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         bool disabled = false,
         bool readOnly = false,
         bool required = false,
+        bool nativeButton = false,
         string? name = null,
         Func<RadioRootState, string>? classValue = null,
         Func<RadioRootState, string>? styleValue = null,
@@ -38,6 +48,8 @@ public class RadioRootTests : BunitContext, IRadioRootContract
                     groupBuilder.AddAttribute(attrIndex++, "ReadOnly", true);
                 if (required)
                     groupBuilder.AddAttribute(attrIndex++, "Required", true);
+                if (nativeButton)
+                    groupBuilder.AddAttribute(attrIndex++, "NativeButton", true);
                 if (name is not null)
                     groupBuilder.AddAttribute(attrIndex++, "Name", name);
                 if (classValue is not null)
@@ -354,6 +366,18 @@ public class RadioRootTests : BunitContext, IRadioRootContract
     }
 
     [Fact]
+    public Task HasAriaDisabledWhenDisabled()
+    {
+        var cut = Render(CreateRadioRoot(disabled: true));
+
+        var radio = cut.Find("[role='radio']");
+        radio.GetAttribute("aria-disabled").ShouldBe("true");
+        radio.HasAttribute("disabled").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task DoesNotHaveDataDisabledByDefault()
     {
         var cut = Render(CreateRadioRoot());
@@ -457,6 +481,22 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task StandaloneEmptyValueIsChecked()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioRoot<string>>(0);
+            builder.AddAttribute(1, "Value", string.Empty);
+            builder.CloseComponent();
+        });
+
+        var radio = cut.Find("[role='radio']");
+        radio.GetAttribute("aria-checked").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
     // Name and hidden input tests
     [Fact]
     public Task RendersHiddenRadioInput()
@@ -466,6 +506,131 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         var input = cut.Find("input[type='radio']");
         input.ShouldNotBeNull();
         input.GetAttribute("aria-hidden").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExplicitIdAssociatesHiddenInputNotNonNativeRoot()
+    {
+        var cut = Render(CreateRadioRoot(
+            additionalAttributes: new Dictionary<string, object> { { "id", "radio-input" } }
+        ));
+
+        var radio = cut.Find("[role='radio']");
+        var input = cut.Find("input[type='radio']");
+
+        radio.GetAttribute("id").ShouldNotBe("radio-input");
+        input.GetAttribute("id").ShouldBe("radio-input");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExplicitIdLookupIsCaseInsensitive()
+    {
+        var cut = Render(CreateRadioRoot(
+            additionalAttributes: new Dictionary<string, object> { { "ID", "radio-input" } }
+        ));
+
+        var radio = cut.Find("[role='radio']");
+        var input = cut.Find("input[type='radio']");
+
+        radio.GetAttribute("id").ShouldNotBe("radio-input");
+        input.GetAttribute("id").ShouldBe("radio-input");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task CombinesCaseInsensitiveAriaDescribedByWithFieldDescriptions()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<RadioRoot<string>>(0);
+                fieldBuilder.AddAttribute(1, "Value", string.Empty);
+                fieldBuilder.AddAttribute(2, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "ARIA-DESCRIBEDBY", "external-description" },
+                        { "data-testid", "radio" }
+                    });
+                fieldBuilder.CloseComponent();
+
+                fieldBuilder.OpenComponent<FieldDescription>(10);
+                fieldBuilder.AddAttribute(11, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "id", "field-description" } });
+                fieldBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(descriptionBuilder =>
+                    descriptionBuilder.AddContent(0, "Field description")));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            var radio = cut.Find("[data-testid='radio']");
+            var describedBy = radio.GetAttribute("aria-describedby");
+
+            describedBy.ShouldNotBeNull();
+            describedBy.ShouldContain("external-description");
+            describedBy.ShouldContain("field-description");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task StandaloneBlurValidationDoesNotBlockBlurEvent()
+    {
+        var validationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var validationBlocker = new TaskCompletionSource<string[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ValidationMode", ValidationMode.OnBlur);
+            builder.AddAttribute(2, "Validate", (Func<object?, Task<string[]?>>)(_ =>
+            {
+                validationStarted.TrySetResult();
+                return validationBlocker.Task;
+            }));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<RadioRoot<string>>(0);
+                fieldBuilder.AddAttribute(1, "Value", string.Empty);
+                fieldBuilder.AddAttribute(2, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio" } });
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var blurTask = cut.Find("[data-testid='radio']").TriggerEventAsync("onblur", new FocusEventArgs());
+
+        await validationStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        await blurTask.WaitAsync(TimeSpan.FromMilliseconds(250));
+
+        validationBlocker.SetResult(null);
+    }
+
+    [Fact]
+    public Task NativeButtonUsesExplicitIdOnRootAndOmitsHiddenInputId()
+    {
+        var cut = Render(CreateRadioRoot(
+            nativeButton: true,
+            additionalAttributes: new Dictionary<string, object> { { "id", "myRadio" } }
+        ));
+
+        var radio = cut.Find("[role='radio']");
+        var input = cut.Find("input[type='radio']");
+
+        radio.TagName.ShouldBe("BUTTON");
+        radio.GetAttribute("id").ShouldBe("myRadio");
+        input.HasAttribute("id").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -518,6 +683,80 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         input.GetAttribute("value").ShouldBe("radio-value");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NullValueSerializesToEmptyInputValue()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioGroup<string?>>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                groupBuilder.OpenComponent<RadioRoot<string?>>(0);
+                groupBuilder.AddAttribute(1, "Value", (string?)null);
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var input = cut.Find("input[type='radio']");
+        input.GetAttribute("value").ShouldBe(string.Empty);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NonJsonValueUsesStringFallbackForHiddenInputValue()
+    {
+        var value = new CyclicRadioValue();
+        value.Self = value;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioRoot<CyclicRadioValue>>(0);
+            builder.AddAttribute(1, "Value", value);
+            builder.CloseComponent();
+        });
+
+        var input = cut.Find("input[type='radio']");
+        input.GetAttribute("value").ShouldBe("cyclic-radio-value");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task GroupNavigationUsesRegisteredValueInsteadOfSerializedFormFallback()
+    {
+        var value = new CyclicRadioValue();
+        value.Self = value;
+        CyclicRadioValue? changedValue = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioGroup<CyclicRadioValue>>(0);
+            builder.AddAttribute(1, "OnValueChange",
+                EventCallback.Factory.Create<RadioGroupValueChangeEventArgs<CyclicRadioValue>>(this, args =>
+                {
+                    changedValue = args.Value;
+                }));
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                groupBuilder.OpenComponent<RadioRoot<CyclicRadioValue>>(0);
+                groupBuilder.AddAttribute(1, "Value", value);
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var group = cut.FindComponent<RadioGroup<CyclicRadioValue>>();
+        var registerInvocation = JSInterop.Invocations.Last(invocation => invocation.Identifier == "registerRadio");
+        var navigationKey = registerInvocation.Arguments[2]?.ToString();
+
+        navigationKey.ShouldNotBeNullOrEmpty();
+        await cut.InvokeAsync(() => group.Instance.OnNavigateToRadio(navigationKey, false));
+
+        changedValue.ShouldBeSameAs(value);
     }
 
     // Style hooks (data attributes) tests
@@ -788,6 +1027,13 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         radioC.GetAttribute("tabindex").ShouldBe("-1");
 
         return Task.CompletedTask;
+    }
+
+    private sealed class CyclicRadioValue
+    {
+        public CyclicRadioValue? Self { get; set; }
+
+        public override string ToString() => "cyclic-radio-value";
     }
 
 }

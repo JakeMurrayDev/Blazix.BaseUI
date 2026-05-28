@@ -24,11 +24,12 @@ public interface IRadioIndicatorContract
     Task HasDataDisabledWhenDisabled();
     Task HasDataReadonlyWhenReadOnly();
     Task HasDataRequiredWhenRequired();
-    Task TransitionStatusAttributes();
+    Task InitiallyCheckedIndicatorDoesNotUseStartingStyle();
+    Task IgnoresStaleExitTransitionWhenCheckedAgain();
 
     // Context
     Task ReceivesStateFromContext();
-    Task HandlesNullContext();
+    Task ThrowsWithoutRadioRootContext();
 
     // State
     Task ClassValueReceivesCorrectState();

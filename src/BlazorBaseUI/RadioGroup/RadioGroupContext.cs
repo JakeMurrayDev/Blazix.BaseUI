@@ -30,6 +30,11 @@ internal interface IRadioGroupContext<TValue>
     string? Name { get; }
 
     /// <summary>
+    /// Gets the form that owns the child radio inputs.
+    /// </summary>
+    string? Form { get; }
+
+    /// <summary>
     /// Gets the field validation instance associated with this group.
     /// </summary>
     FieldValidation? Validation { get; }
@@ -48,7 +53,20 @@ internal interface IRadioGroupContext<TValue>
     /// Sets the selected value in the radio group.
     /// </summary>
     /// <param name="value">The value to select.</param>
-    Task SetCheckedValueAsync(TValue value);
+    Task SetCheckedValueAsync(TValue? value);
+
+    /// <summary>
+    /// Registers the typed value represented by a child radio.
+    /// </summary>
+    /// <param name="key">The stable key used by JavaScript keyboard navigation.</param>
+    /// <param name="value">The typed radio value.</param>
+    void RegisterRadioValue(string key, TValue? value);
+
+    /// <summary>
+    /// Unregisters a child radio value.
+    /// </summary>
+    /// <param name="key">The stable key used by JavaScript keyboard navigation.</param>
+    void UnregisterRadioValue(string key);
 }
 
 /// <summary>
@@ -78,6 +96,11 @@ internal sealed class RadioGroupContext<TValue> : IRadioGroupContext<TValue>
     public string? Name { get; set; }
 
     /// <summary>
+    /// Gets or sets the form that owns the child radio inputs.
+    /// </summary>
+    public string? Form { get; set; }
+
+    /// <summary>
     /// Gets or sets the field validation instance associated with this group.
     /// </summary>
     public FieldValidation? Validation { get; set; }
@@ -90,12 +113,22 @@ internal sealed class RadioGroupContext<TValue> : IRadioGroupContext<TValue>
     /// <summary>
     /// Gets or sets the callback that sets the selected value.
     /// </summary>
-    public Func<TValue, Task> SetCheckedValueFunc { get; set; } = null!;
+    public Func<TValue?, Task> SetCheckedValueFunc { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the callback that returns the group's root element reference.
     /// </summary>
     public Func<ElementReference?> GetGroupElementFunc { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the callback that registers a typed radio value.
+    /// </summary>
+    public Action<string, TValue?> RegisterRadioValueFunc { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the callback that unregisters a typed radio value.
+    /// </summary>
+    public Action<string> UnregisterRadioValueFunc { get; set; } = null!;
 
     /// <inheritdoc />
     public TValue? CheckedValue => GetCheckedValueFunc();
@@ -104,5 +137,11 @@ internal sealed class RadioGroupContext<TValue> : IRadioGroupContext<TValue>
     public ElementReference? GroupElement => GetGroupElementFunc();
 
     /// <inheritdoc />
-    public Task SetCheckedValueAsync(TValue value) => SetCheckedValueFunc(value);
+    public Task SetCheckedValueAsync(TValue? value) => SetCheckedValueFunc(value);
+
+    /// <inheritdoc />
+    public void RegisterRadioValue(string key, TValue? value) => RegisterRadioValueFunc(key, value);
+
+    /// <inheritdoc />
+    public void UnregisterRadioValue(string key) => UnregisterRadioValueFunc(key);
 }

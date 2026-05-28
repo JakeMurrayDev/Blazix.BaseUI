@@ -17,6 +17,7 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
         bool readOnly = false,
         bool required = false,
         string? name = null,
+        string? form = null,
         Action<RadioGroupValueChangeEventArgs<string>>? onValueChange = null,
         Func<RadioGroupState, string>? classValue = null,
         Func<RadioGroupState, string>? styleValue = null,
@@ -41,6 +42,8 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
                 builder.AddAttribute(attrIndex++, "Required", true);
             if (name is not null)
                 builder.AddAttribute(attrIndex++, "Name", name);
+            if (form is not null)
+                builder.AddAttribute(attrIndex++, "Form", form);
             if (onValueChange is not null)
                 builder.AddAttribute(attrIndex++, "OnValueChange", EventCallback.Factory.Create(this, onValueChange));
             if (classValue is not null)
@@ -65,6 +68,7 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
         bool readOnly = false,
         bool required = false,
         string? name = null,
+        string? form = null,
         Action<RadioGroupValueChangeEventArgs<string>>? onValueChange = null,
         EventCallback<string?>? valueChanged = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
@@ -87,6 +91,8 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
                 builder.AddAttribute(attrIndex++, "Required", true);
             if (name is not null)
                 builder.AddAttribute(attrIndex++, "Name", name);
+            if (form is not null)
+                builder.AddAttribute(attrIndex++, "Form", form);
             if (onValueChange is not null)
                 builder.AddAttribute(attrIndex++, "OnValueChange", EventCallback.Factory.Create(this, onValueChange));
             if (valueChanged.HasValue)
@@ -208,6 +214,23 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
     }
 
     [Fact]
+    public Task AdditionalAttributesCanOverrideBuiltInRole()
+    {
+        var cut = Render(CreateRadioGroup(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "data-testid", "group" },
+                { "role", "switch" }
+            }
+        ));
+
+        var group = cut.Find("[data-testid='group']");
+        group.GetAttribute("role").ShouldBe("switch");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task AppliesClassValue()
     {
         var cut = Render(CreateRadioGroup(
@@ -276,6 +299,22 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
             value: "b",
             valueChanged: EventCallback.Factory.Create<string?>(this, _ => { })
         ));
+
+        var radioA = cut.Find("[data-testid='radio-a']");
+        var radioB = cut.Find("[data-testid='radio-b']");
+        var radioC = cut.Find("[data-testid='radio-c']");
+
+        radioA.GetAttribute("aria-checked").ShouldBe("false");
+        radioB.GetAttribute("aria-checked").ShouldBe("true");
+        radioC.GetAttribute("aria-checked").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ValueParameterControlsSelectionWithoutValueChanged()
+    {
+        var cut = Render(CreateRadioGroupWithRadios(value: "b"));
 
         var radioA = cut.Find("[data-testid='radio-a']");
         var radioB = cut.Find("[data-testid='radio-b']");
@@ -651,32 +690,29 @@ public class RadioGroupTests : BunitContext, IRadioGroupContract
 
     // Hidden input tests
     [Fact]
-    public Task RendersHiddenRadioInput()
+    public Task DoesNotRenderGroupLevelHiddenRadioInput()
     {
         var cut = Render(CreateRadioGroup(
             additionalAttributes: new Dictionary<string, object> { { "data-testid", "group" } }
         ));
 
-        // The group renders its own hidden input
-        var groupInput = cut.Find("[data-testid='group'] ~ input[type='radio']") ??
-                         cut.FindAll("input[type='radio']").FirstOrDefault();
-        groupInput.ShouldNotBeNull();
-        groupInput!.GetAttribute("aria-hidden").ShouldBe("true");
+        cut.FindAll("input[type='radio']").Count.ShouldBe(0);
 
         return Task.CompletedTask;
     }
 
     [Fact]
-    public Task HiddenInputHasNameWhenValueSelected()
+    public Task FormPropPassesToEachRadioInput()
     {
         var cut = Render(CreateRadioGroupWithRadios(
             defaultValue: "a",
-            name: "my-radio"
+            name: "my-radio",
+            form: "external-form"
         ));
 
-        // Find the group-level hidden input (has name attribute)
-        var inputs = cut.FindAll("input[type='radio'][name='my-radio']");
-        inputs.Count.ShouldBeGreaterThan(0);
+        var inputs = cut.FindAll("input[type='radio']");
+        inputs.Count.ShouldBe(3);
+        inputs.ShouldAllBe(input => input.GetAttribute("form") == "external-form");
 
         return Task.CompletedTask;
     }

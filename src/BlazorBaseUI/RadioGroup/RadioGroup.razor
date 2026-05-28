@@ -1,4 +1,3 @@
-@using System.Text.Json
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 @using BlazorBaseUI.Field
@@ -26,29 +25,16 @@
                    @ref="renderElementReference" />
 </CascadingValue>
 
-<input type="radio"
-       id="@groupId"
-       tabindex="-1"
-       aria-hidden="true"
-       style="position:absolute;pointer-events:none;opacity:0;margin:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
-       name="@ResolvedName"
-       value="@(SerializeValue(CurrentValue) ?? string.Empty)"
-       checked="@(CurrentValue is not null)"
-       disabled="@ResolvedDisabled"
-       required="@Required"
-       readonly="@ReadOnly"
-       @onchange="HandleHiddenInputChange"
-       @onfocus="HandleHiddenInputFocus" />
-
 @code {
     private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-radio.min.js";
 
+    private readonly Dictionary<string, TValue?> radioValues = new();
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private DotNetObjectReference<RadioGroup<TValue>>? dotNetRef;
     private bool hasRendered;
+    private bool hasValueParameter;
     private string? defaultId;
-    private string groupId = null!;
     private TValue? internalValue;
     private TValue? previousValue;
     private RadioGroupContext<TValue>? groupContext;
@@ -60,6 +46,7 @@
     private bool contextReadOnly;
     private bool contextRequired;
     private string? contextName;
+    private string? contextForm;
     private FieldValidation? contextValidation;
 
     private Func<Task> cachedValueChangedCallback = default!;
@@ -120,6 +107,12 @@
     public string? Name { get; set; }
 
     /// <summary>
+    /// Gets or sets the form that owns the radio inputs when the group is rendered outside the form.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
+
+    /// <summary>
     /// Gets or sets the callback invoked when the value changes, for two-way binding.
     /// </summary>
     [Parameter]
@@ -167,7 +160,7 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
-    private bool IsControlled => ValueChanged.HasDelegate;
+    private bool IsControlled => hasValueParameter;
 
     private TValue? CurrentValue => IsControlled ? Value : internalValue;
 
@@ -186,11 +179,19 @@
     }
 
     /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        hasValueParameter = parameters.TryGetValue<TValue?>(nameof(Value), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
     protected override void OnInitialized()
     {
-        groupId = ResolvedId;
-
-        internalValue = DefaultValue;
+        if (!IsControlled)
+        {
+            internalValue = DefaultValue;
+        }
 
         var initialValue = CurrentValue;
         FieldContext?.Validation.SetInitialValue(initialValue);
@@ -202,6 +203,7 @@
         }
 
         FieldContext?.SetFilled(initialValue is not null);
+        FieldContext?.RegisterFocusHandlerFunc(FocusFirstRadioAsync);
         FieldContext?.SubscribeFunc(this);
 
         previousValue = CurrentValue;
@@ -210,6 +212,7 @@
         contextReadOnly = ReadOnly;
         contextRequired = Required;
         contextName = ResolvedName;
+        contextForm = Form;
         contextValidation = FieldContext?.Validation;
 
         groupContext = CreateContext();
@@ -263,6 +266,7 @@
             contextReadOnly != ReadOnly ||
             contextRequired != Required ||
             contextName != ResolvedName ||
+            contextForm != Form ||
             !ReferenceEquals(contextValidation, FieldContext?.Validation);
 
         if (needsContextUpdate)
@@ -271,6 +275,7 @@
             contextReadOnly = ReadOnly;
             contextRequired = Required;
             contextName = ResolvedName;
+            contextForm = Form;
             contextValidation = FieldContext?.Validation;
 
             if (groupContext is null)
@@ -283,6 +288,7 @@
                 groupContext.ReadOnly = contextReadOnly;
                 groupContext.Required = contextRequired;
                 groupContext.Name = contextName;
+                groupContext.Form = contextForm;
                 groupContext.Validation = contextValidation;
             }
         }
@@ -337,32 +343,41 @@
         ReadOnly = ReadOnly,
         Required = Required,
         Name = ResolvedName,
+        Form = Form,
         Validation = FieldContext?.Validation,
         GetCheckedValueFunc = () => CurrentValue,
         SetCheckedValueFunc = SetValueInternalAsync,
-        GetGroupElementFunc = () => Element
+        GetGroupElementFunc = () => Element,
+        RegisterRadioValueFunc = RegisterRadioValue,
+        UnregisterRadioValueFunc = UnregisterRadioValue
     };
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["role"] = "radiogroup";
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "role"))
+            attrs["role"] = "radiogroup";
 
-        if (Required)
+        if (Required && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-required"))
             attrs["aria-required"] = "true";
 
-        if (ResolvedDisabled)
+        if (ResolvedDisabled && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-disabled"))
             attrs["aria-disabled"] = "true";
 
-        if (ReadOnly)
+        if (ReadOnly && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-readonly"))
             attrs["aria-readonly"] = "true";
 
         var labelledBy = LabelableContext?.LabelId ?? FieldsetContext?.LegendId;
-        if (!string.IsNullOrEmpty(labelledBy))
+        if (!string.IsNullOrEmpty(labelledBy) &&
+            !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby"))
+        {
             attrs["aria-labelledby"] = labelledBy;
+        }
 
-        var describedBy = LabelableContext?.GetAriaDescribedBy();
+        var describedBy = AttributeUtilities.CombineIdRefs(
+            AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+            LabelableContext?.GetAriaDescribedBy());
         if (!string.IsNullOrEmpty(describedBy))
             attrs["aria-describedby"] = describedBy;
 
@@ -403,7 +418,7 @@
     /// Invoked from JavaScript when arrow key navigation selects a radio button value.
     /// </summary>
     [JSInvokable]
-    public async Task OnNavigateToRadio(string serializedValue)
+    public async Task OnNavigateToRadio(string? valueKey, bool isNullValue, string? serializedValue = null)
     {
         if (ResolvedDisabled || ReadOnly)
         {
@@ -411,19 +426,24 @@
         }
 
         TValue? value;
-        if (typeof(TValue) == typeof(string))
-        {
-            value = (TValue)(object)serializedValue;
-        }
-        else
-        {
-            value = JsonSerializer.Deserialize<TValue>(serializedValue);
-        }
 
-        if (value is not null)
+        if (valueKey is not null && radioValues.TryGetValue(valueKey, out value))
         {
             await SetValueInternalAsync(value);
+            return;
         }
+
+        if (isNullValue)
+        {
+            await SetValueInternalAsync(default);
+            return;
+        }
+
+        if (typeof(TValue) != typeof(string))
+            return;
+
+        value = (TValue)(object)(serializedValue ?? string.Empty);
+        await SetValueInternalAsync(value);
     }
 
     private Task HandleFocus(FocusEventArgs e)
@@ -475,29 +495,7 @@
         FieldContext?.SetFocused(true);
     }
 
-    private void HandleHiddenInputChange(ChangeEventArgs e)
-    {
-        if (ResolvedDisabled || ReadOnly)
-            return;
-
-        FieldContext?.SetTouched(true);
-
-        var currentValue = CurrentValue;
-        var initialValue = FieldContext?.ValidityData.InitialValue;
-        var isDirty = initialValue is TValue initial
-            ? !EqualityComparer<TValue>.Default.Equals(currentValue, initial)
-            : currentValue is not null;
-
-        FieldContext?.SetDirty(isDirty);
-        FieldContext?.SetFilled(currentValue is not null);
-    }
-
-    private void HandleHiddenInputFocus(FocusEventArgs e)
-    {
-        _ = FocusFirstRadioAsync();
-    }
-
-    private async Task FocusFirstRadioAsync()
+    private async ValueTask FocusFirstRadioAsync()
     {
         if (!hasRendered || !Element.HasValue)
         {
@@ -519,7 +517,7 @@
         }
     }
 
-    private async Task SetValueInternalAsync(TValue value)
+    private async Task SetValueInternalAsync(TValue? value)
     {
         var eventArgs = new RadioGroupValueChangeEventArgs<TValue>(value);
 
@@ -572,14 +570,7 @@
         }
     }
 
-    private static string? SerializeValue(TValue? value)
-    {
-        if (value is null)
-            return null;
+    private void RegisterRadioValue(string key, TValue? value) => radioValues[key] = value;
 
-        if (value is string str)
-            return str;
-
-        return JsonSerializer.Serialize(value);
-    }
+    private void UnregisterRadioValue(string key) => radioValues.Remove(key);
 }

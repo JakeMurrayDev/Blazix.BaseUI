@@ -1,4 +1,6 @@
-@implements IDisposable
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <RenderElement TState="RadioIndicatorState"
                Tag="span"
@@ -13,13 +15,19 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string AnimationsModulePath = "./_content/BlazorBaseUI/blazor-baseui-animations.min.js";
+
     private bool isMounted;
-    private bool previousRendered;
+    private bool hasRendered;
+    private bool hasInitialized;
+    private bool startTransitionPending;
+    private bool endTransitionPending;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
-    private CancellationTokenSource? transitionCts;
     private RenderElement<RadioIndicatorState>? renderElementReference;
     private RadioIndicatorState state = new(false, false, false, false, null, false, false, false, false, TransitionStatus.Undefined);
     private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>> moduleTask = default!;
+    private DotNetObjectReference<RadioIndicator>? dotNetRef;
 
     private bool Rendered => RadioContext?.Checked == true;
 
@@ -71,30 +79,103 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", AnimationsModulePath).AsTask());
+        dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        if (RadioContext is null)
+        {
+            throw new InvalidOperationException(
+                "Base UI: RadioRootContext is missing. Radio parts must be placed within <Radio.Root>.");
+        }
+
         UpdateTransitionStatus();
 
-        state = new RadioIndicatorState(
-            RadioContext?.Checked ?? false,
-            RadioContext?.Disabled ?? false,
-            RadioContext?.ReadOnly ?? false,
-            RadioContext?.Required ?? false,
-            RadioContext?.State.Valid,
-            RadioContext?.State.Touched ?? false,
-            RadioContext?.State.Dirty ?? false,
-            RadioContext?.State.Filled ?? false,
-            RadioContext?.State.Focused ?? false,
-            transitionStatus);
+        UpdateStateFromContext();
 
+        hasInitialized = true;
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        transitionCts?.Cancel();
-        transitionCts?.Dispose();
+        if (firstRender)
+        {
+            hasRendered = true;
+        }
+
+        if (startTransitionPending)
+        {
+            startTransitionPending = false;
+            await StartEntryTransitionAsync();
+        }
+
+        if (endTransitionPending)
+        {
+            endTransitionPending = false;
+            await StartExitTransitionAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Called from JavaScript after the starting-style frame has been applied.
+    /// </summary>
+    [JSInvokable]
+    public void OnTransitionStarted()
+    {
+        transitionStatus = TransitionStatus.Undefined;
+        UpdateStateFromContext();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Called from JavaScript after exit animations and transitions complete.
+    /// </summary>
+    [JSInvokable]
+    public void OnTransitionEnded()
+    {
+        if (Rendered)
+        {
+            endTransitionPending = false;
+            transitionStatus = TransitionStatus.Undefined;
+            UpdateStateFromContext();
+            BuildComponentAttributes();
+            _ = InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        isMounted = false;
+        transitionStatus = TransitionStatus.Undefined;
+        UpdateStateFromContext();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()
@@ -117,94 +198,92 @@
         componentAttributes = attrs;
     }
 
+    private void UpdateStateFromContext()
+    {
+        if (RadioContext is null)
+            return;
+
+        state = new RadioIndicatorState(
+            RadioContext.Checked,
+            RadioContext.Disabled,
+            RadioContext.ReadOnly,
+            RadioContext.Required,
+            RadioContext.State.Valid,
+            RadioContext.State.Touched,
+            RadioContext.State.Dirty,
+            RadioContext.State.Filled,
+            RadioContext.State.Focused,
+            transitionStatus);
+    }
+
     private void UpdateTransitionStatus()
     {
-        var wasRendered = previousRendered;
+        var wasRendered = isMounted;
         var isRendered = Rendered;
-        previousRendered = isRendered;
 
         if (isRendered && !wasRendered)
         {
             isMounted = true;
-            transitionStatus = TransitionStatus.Starting;
-            ScheduleTransitionEnd();
+
+            if (hasRendered || hasInitialized)
+            {
+                transitionStatus = TransitionStatus.Starting;
+                startTransitionPending = true;
+            }
         }
         else if (!isRendered && wasRendered)
         {
-            transitionStatus = TransitionStatus.Ending;
-            ScheduleUnmount();
+            if (hasRendered)
+            {
+                transitionStatus = TransitionStatus.Ending;
+                endTransitionPending = true;
+            }
+            else
+            {
+                isMounted = false;
+                transitionStatus = TransitionStatus.Undefined;
+            }
+        }
+        else if (isRendered)
+        {
+            endTransitionPending = false;
+
+            if (transitionStatus == TransitionStatus.Ending)
+            {
+                transitionStatus = TransitionStatus.Undefined;
+            }
         }
     }
 
-    private void ScheduleTransitionEnd()
+    private async Task StartEntryTransitionAsync()
     {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = TransitionEndAsync(token);
-    }
-
-    private async Task TransitionEndAsync(CancellationToken token)
-    {
-        await Task.Yield();
-        if (token.IsCancellationRequested)
+        if (!Element.HasValue || dotNetRef is null)
             return;
 
-        transitionStatus = TransitionStatus.Undefined;
-
-        state = new RadioIndicatorState(
-            RadioContext?.Checked ?? false,
-            RadioContext?.Disabled ?? false,
-            RadioContext?.ReadOnly ?? false,
-            RadioContext?.Required ?? false,
-            RadioContext?.State.Valid,
-            RadioContext?.State.Touched ?? false,
-            RadioContext?.State.Dirty ?? false,
-            RadioContext?.State.Filled ?? false,
-            RadioContext?.State.Focused ?? false,
-            transitionStatus);
-
-        BuildComponentAttributes();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private void ScheduleUnmount()
-    {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = UnmountAsync(token);
-    }
-
-    private async Task UnmountAsync(CancellationToken token)
-    {
         try
         {
-            await Task.Delay(150, token);
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("applyStartingStyle", Element.Value, dotNetRef);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
-            return;
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
 
-        isMounted = false;
-        transitionStatus = TransitionStatus.Undefined;
+    private async Task StartExitTransitionAsync()
+    {
+        if (!Element.HasValue || dotNetRef is null)
+            return;
 
-        state = new RadioIndicatorState(
-            RadioContext?.Checked ?? false,
-            RadioContext?.Disabled ?? false,
-            RadioContext?.ReadOnly ?? false,
-            RadioContext?.Required ?? false,
-            RadioContext?.State.Valid,
-            RadioContext?.State.Touched ?? false,
-            RadioContext?.State.Dirty ?? false,
-            RadioContext?.State.Filled ?? false,
-            RadioContext?.State.Focused ?? false,
-            transitionStatus);
-
-        BuildComponentAttributes();
-        await InvokeAsync(StateHasChanged);
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("waitForExitTransition", Element.Value, dotNetRef);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 }

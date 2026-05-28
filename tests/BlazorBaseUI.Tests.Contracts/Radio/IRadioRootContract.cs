@@ -22,6 +22,7 @@ public interface IRadioRootContract
 
     // Disabled
     Task HasDataDisabledWhenDisabled();
+    Task HasAriaDisabledWhenDisabled();
     Task DoesNotHaveDataDisabledByDefault();
     Task DoesNotChangeStateWhenClickedDisabled();
 
@@ -33,13 +34,22 @@ public interface IRadioRootContract
     // Value prop
     Task DoesNotForwardValuePropToRoot();
     Task AllowsNullValue();
+    Task StandaloneEmptyValueIsChecked();
 
     // Name and hidden input
     Task RendersHiddenRadioInput();
     Task HiddenInputHasCorrectAttributes();
     Task InputHasId();
+    Task ExplicitIdAssociatesHiddenInputNotNonNativeRoot();
+    Task ExplicitIdLookupIsCaseInsensitive();
+    Task CombinesCaseInsensitiveAriaDescribedByWithFieldDescriptions();
+    Task StandaloneBlurValidationDoesNotBlockBlurEvent();
+    Task NativeButtonUsesExplicitIdOnRootAndOmitsHiddenInputId();
     Task SetsNameOnInputOnly();
     Task SetsValueOnHiddenInput();
+    Task NullValueSerializesToEmptyInputValue();
+    Task NonJsonValueUsesStringFallbackForHiddenInputValue();
+    Task GroupNavigationUsesRegisteredValueInsteadOfSerializedFormFallback();
 
     // Style hooks (data attributes)
     Task HasDataCheckedWhenChecked();

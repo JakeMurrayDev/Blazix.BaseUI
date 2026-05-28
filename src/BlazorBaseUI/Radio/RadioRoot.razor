@@ -12,28 +12,46 @@
 @inject IJSRuntime JSRuntime
 
 <CascadingValue Value="context" IsFixed="true">
-    <RenderElement TState="RadioRootState"
-                   Tag="span"
-                   State="state"
-                   Render="Render"
-                   ClassValue="ClassValue"
-                   StyleValue="StyleValue"
-                   ComponentAttributes="componentAttributes"
-                   ChildContent="ChildContent"
-                   @attributes="AdditionalAttributes"
-                   @ref="renderElementReference" />
+    @if (NativeButton)
+    {
+        <RenderElement TState="RadioRootState"
+                       Tag="button"
+                       State="state"
+                       Render="Render"
+                       ClassValue="ClassValue"
+                       StyleValue="StyleValue"
+                       ComponentAttributes="nativeButtonAttributes"
+                       ChildContent="ChildContent"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+    }
+    else
+    {
+        <RenderElement TState="RadioRootState"
+                       Tag="span"
+                       State="state"
+                       Render="Render"
+                       ClassValue="ClassValue"
+                       StyleValue="StyleValue"
+                       ComponentAttributes="componentAttributes"
+                       ChildContent="ChildContent"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+    }
 </CascadingValue>
 
 <input type="radio"
-       id="@inputId"
+       id="@(NativeButton ? null : inputId)"
        tabindex="-1"
        aria-hidden="true"
        style="position:absolute;pointer-events:none;opacity:0;margin:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
        checked="@CurrentChecked"
        disabled="@ResolvedDisabled"
        required="@ResolvedRequired"
+       readonly="@ResolvedReadOnly"
+       form="@ResolvedForm"
        name="@ResolvedName"
-       value="@SerializeValue(Value)"
+       value="@SerializeFormValue(Value)"
        @onchange="HandleInputChangeAsync"
        @onfocus="HandleInputFocusAsync"
        @ref="inputElement" />
@@ -47,6 +65,7 @@
     private bool previousDisabled;
     private bool previousReadOnly;
     private bool previousChecked;
+    private bool previousNativeButton;
     private string? defaultId;
     private string resolvedControlId = null!;
     private string radioId = null!;
@@ -56,6 +75,7 @@
     private RadioRootState state = RadioRootState.Default;
     private RadioRootContext context = null!;
     private Dictionary<string, object> componentAttributes = new();
+    private Dictionary<string, object> nativeButtonAttributes = new();
 
     private bool IsInGroup => GroupContext is not null;
 
@@ -66,7 +86,7 @@
             if (GroupContext is not null)
                 return EqualityComparer<TValue>.Default.Equals(GroupContext.CheckedValue, Value);
 
-            return false;
+            return Value is string { Length: 0 };
         }
     }
 
@@ -85,6 +105,8 @@
         (GroupContext?.Required ?? false);
 
     private string? ResolvedName => Name ?? GroupContext?.Name ?? FieldContext?.Name;
+
+    private string? ResolvedForm => GroupContext?.Form;
 
     private string ResolvedControlId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
@@ -130,6 +152,14 @@
     public bool Required { get; set; }
 
     /// <summary>
+    /// Determines whether the component renders a native <c>&lt;button&gt;</c> element when replacing it
+    /// via the <see cref="Render"/> prop.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
+
+    /// <summary>
     /// Gets or sets the name that identifies the field when a form is submitted.
     /// </summary>
     [Parameter]
@@ -170,6 +200,11 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    /// <summary>
+    /// Gets the <see cref="ElementReference"/> to the hidden radio input element.
+    /// </summary>
+    public ElementReference InputElement => inputElement;
+
     public RadioRoot()
     {
         moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
@@ -181,7 +216,7 @@
     {
         radioId = Guid.NewGuid().ToIdString();
         resolvedControlId = ResolvedControlId;
-        inputId = $"{resolvedControlId}-input";
+        inputId = resolvedControlId;
 
         LabelableContext?.SetControlId(resolvedControlId);
 
@@ -191,6 +226,7 @@
         previousDisabled = ResolvedDisabled;
         previousReadOnly = ResolvedReadOnly;
         previousChecked = CurrentChecked;
+        previousNativeButton = NativeButton;
 
         state = RadioRootState.FromFieldState(
             FieldState,
@@ -218,7 +254,7 @@
         if (newResolvedId != resolvedControlId)
         {
             resolvedControlId = newResolvedId;
-            inputId = $"{resolvedControlId}-input";
+            inputId = resolvedControlId;
             LabelableContext?.SetControlId(resolvedControlId);
         }
 
@@ -226,9 +262,16 @@
         var currentReadOnly = ResolvedReadOnly;
         var currentChecked = CurrentChecked;
 
+        if (IsInGroup)
+        {
+            GroupContext!.RegisterRadioValue(radioId, Value);
+        }
+
         if (hasRendered && Element.HasValue)
         {
-            if (currentDisabled != previousDisabled || currentReadOnly != previousReadOnly)
+            if (currentDisabled != previousDisabled ||
+                currentReadOnly != previousReadOnly ||
+                NativeButton != previousNativeButton)
             {
                 _ = UpdateJsStateAsync();
             }
@@ -237,6 +280,7 @@
         previousDisabled = currentDisabled;
         previousReadOnly = currentReadOnly;
         previousChecked = currentChecked;
+        previousNativeButton = NativeButton;
 
         state = RadioRootState.FromFieldState(
             FieldState,
@@ -261,8 +305,9 @@
         {
             hasRendered = true;
             await InitializeJsAsync();
-            await RegisterWithGroupAsync();
         }
+
+        await RegisterWithGroupAsync();
     }
 
     /// <inheritdoc />
@@ -270,6 +315,7 @@
     {
         LabelableContext?.SetControlId(null);
         FieldContext?.UnsubscribeFunc(this);
+        GroupContext?.UnregisterRadioValue(radioId);
 
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
@@ -330,13 +376,9 @@
 
     private void BuildComponentAttributes()
     {
-        var attrs = new Dictionary<string, object>();
-        var resolvedRootId = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => radioId);
+        var attrs = CreateBaseRootAttributes();
 
-        attrs["id"] = resolvedRootId;
-        attrs["role"] = "radio";
-        attrs["aria-checked"] = CurrentChecked ? "true" : "false";
-
+        attrs["id"] = radioId;
         if (IsInGroup)
         {
             var isActiveItem = CurrentChecked || GroupContext!.CheckedValue is null;
@@ -348,20 +390,48 @@
             attrs["tabindex"] = ResolvedDisabled ? -1 : 0;
         }
 
-        if (ResolvedReadOnly)
+        componentAttributes = attrs;
+
+        var buttonAttrs = CreateBaseRootAttributes();
+        buttonAttrs["id"] = resolvedControlId;
+        buttonAttrs["type"] = "button";
+
+        if (ResolvedDisabled)
+            buttonAttrs["disabled"] = true;
+
+        nativeButtonAttributes = buttonAttrs;
+    }
+
+    private Dictionary<string, object> CreateBaseRootAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "radio",
+            ["aria-checked"] = CurrentChecked ? "true" : "false"
+        };
+
+        if (ResolvedDisabled && !NativeButton)
+            attrs["aria-disabled"] = "true";
+
+        if (ResolvedReadOnly && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-readonly"))
             attrs["aria-readonly"] = "true";
 
-        if (ResolvedRequired)
+        if (ResolvedRequired && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-required"))
             attrs["aria-required"] = "true";
 
-        if (LabelableContext?.LabelId is not null)
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby") &&
+            LabelableContext?.LabelId is not null)
+        {
             attrs["aria-labelledby"] = LabelableContext.LabelId;
+        }
 
-        var describedBy = LabelableContext?.GetAriaDescribedBy();
+        var describedBy = AttributeUtilities.CombineIdRefs(
+            AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+            LabelableContext?.GetAriaDescribedBy());
         if (!string.IsNullOrEmpty(describedBy))
             attrs["aria-describedby"] = describedBy;
 
-        if (state.Valid == false)
+        if (state.Valid == false && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-invalid"))
             attrs["aria-invalid"] = "true";
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
@@ -381,7 +451,7 @@
         attrs["data-filled"] = state.Filled;
         attrs["data-focused"] = state.Focused;
 
-        componentAttributes = attrs;
+        return attrs;
     }
 
     private async Task RegisterWithGroupAsync()
@@ -392,8 +462,13 @@
         try
         {
             var module = await moduleTask.Value;
-            var serializedValue = SerializeValue(Value);
-            await module.InvokeVoidAsync("registerRadio", GroupContext.GroupElement.Value, Element.Value, serializedValue);
+            await module.InvokeVoidAsync(
+                "registerRadio",
+                GroupContext.GroupElement.Value,
+                Element.Value,
+                radioId,
+                Value is null,
+                SerializeFormValue(Value));
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -425,7 +500,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ResolvedReadOnly);
+            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ResolvedReadOnly, NativeButton);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -441,7 +516,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("updateState", Element.Value, inputElement, ResolvedDisabled, ResolvedReadOnly);
+            await module.InvokeVoidAsync("updateState", Element.Value, inputElement, ResolvedDisabled, ResolvedReadOnly, NativeButton);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -454,7 +529,9 @@
         if (ResolvedDisabled)
             return Task.CompletedTask;
 
-        FieldContext?.SetFocused(true);
+        if (!IsInGroup)
+            FieldContext?.SetFocused(true);
+
         return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
     }
 
@@ -463,14 +540,15 @@
         if (ResolvedDisabled)
             return;
 
-        FieldContext?.SetTouched(true);
-        FieldContext?.SetFocused(false);
-
-        if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
+        if (!IsInGroup)
         {
-            var validation = GroupContext?.Validation ?? FieldContext?.Validation;
-            var valueToValidate = GroupContext is not null ? (object?)GroupContext.CheckedValue : CurrentChecked;
-            await (validation?.CommitAsync(valueToValidate) ?? Task.CompletedTask);
+            FieldContext?.SetTouched(true);
+            FieldContext?.SetFocused(false);
+
+            if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
+            {
+                _ = FieldContext?.Validation.CommitAsync(CurrentChecked);
+            }
         }
 
         await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
@@ -492,32 +570,6 @@
             await SelectRadioAsync();
             await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
             return;
-        }
-
-        if (!IsInGroup || !GroupContext!.GroupElement.HasValue || !Element.HasValue)
-        {
-            await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        try
-        {
-            var module = await moduleTask.Value;
-            switch (e.Key)
-            {
-                case "ArrowUp":
-                case "ArrowLeft":
-                    await module.InvokeVoidAsync("navigateToPrevious", GroupContext.GroupElement.Value, Element.Value);
-                    break;
-                case "ArrowDown":
-                case "ArrowRight":
-                    await module.InvokeVoidAsync("navigateToNext", GroupContext.GroupElement.Value, Element.Value);
-                    break;
-            }
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
 
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
@@ -556,14 +608,21 @@
         }
     }
 
-    private static string? SerializeValue(TValue? value)
+    private static string SerializeFormValue(TValue? value)
     {
         if (value is null)
-            return null;
+            return string.Empty;
 
         if (value is string str)
             return str;
 
-        return JsonSerializer.Serialize(value);
+        try
+        {
+            return JsonSerializer.Serialize(value);
+        }
+        catch
+        {
+            return value.ToString() ?? string.Empty;
+        }
     }
 }

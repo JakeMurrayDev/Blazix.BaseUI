@@ -354,19 +354,61 @@ public class RadioIndicatorTests : BunitContext, IRadioIndicatorContract
     }
 
     [Fact]
-    public Task TransitionStatusAttributes()
+    public Task InitiallyCheckedIndicatorDoesNotUseStartingStyle()
     {
-        // When indicator first appears (checked), it should have data-starting-style
         var cut = Render(CreateIndicatorWithContext(
             checked_: true,
             additionalAttributes: new Dictionary<string, object> { { "data-testid", "indicator" } }
         ));
 
         var indicator = cut.Find("[data-testid='indicator']");
-        // The starting style attribute is set during the initial transition
-        indicator.HasAttribute("data-starting-style").ShouldBeTrue();
+        indicator.HasAttribute("data-starting-style").ShouldBeFalse();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task IgnoresStaleExitTransitionWhenCheckedAgain()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioGroup<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", "a");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                groupBuilder.OpenComponent<RadioRoot<string>>(0);
+                groupBuilder.AddAttribute(1, "Value", "a");
+                groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+                {
+                    innerBuilder.OpenComponent<RadioIndicator>(0);
+                    innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                        (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "indicator-a" } });
+                    innerBuilder.CloseComponent();
+                }));
+                groupBuilder.CloseComponent();
+
+                groupBuilder.OpenComponent<RadioRoot<string>>(10);
+                groupBuilder.AddAttribute(11, "Value", "b");
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var inputs = cut.FindAll("input[type='radio']");
+
+        await inputs[1].TriggerEventAsync("onchange", new ChangeEventArgs { Value = "b" });
+        cut.Find("[data-testid='indicator-a']").HasAttribute("data-ending-style").ShouldBeTrue();
+
+        inputs = cut.FindAll("input[type='radio']");
+        await inputs[0].TriggerEventAsync("onchange", new ChangeEventArgs { Value = "a" });
+
+        var indicator = cut.FindComponent<RadioIndicator>();
+        await cut.InvokeAsync(indicator.Instance.OnTransitionEnded);
+
+        inputs = cut.FindAll("input[type='radio']");
+        await inputs[1].TriggerEventAsync("onchange", new ChangeEventArgs { Value = "b" });
+
+        cut.Find("[data-testid='indicator-a']").HasAttribute("data-ending-style").ShouldBeTrue();
     }
 
     // Context tests
@@ -393,19 +435,18 @@ public class RadioIndicatorTests : BunitContext, IRadioIndicatorContract
     }
 
     [Fact]
-    public Task HandlesNullContext()
+    public Task ThrowsWithoutRadioRootContext()
     {
-        // RadioIndicator without RadioRootContext should not render (Rendered = false, KeepMounted = false)
-        var cut = Render(builder =>
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
         {
             builder.OpenComponent<RadioIndicator>(0);
             builder.AddAttribute(1, "AdditionalAttributes",
                 (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "indicator" } });
             builder.CloseComponent();
-        });
+        }));
 
-        var indicators = cut.FindAll("[data-testid='indicator']");
-        indicators.Count.ShouldBe(0);
+        exception.Message.ShouldBe(
+            "Base UI: RadioRootContext is missing. Radio parts must be placed within <Radio.Root>.");
 
         return Task.CompletedTask;
     }

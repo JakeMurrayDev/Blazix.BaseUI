@@ -250,6 +250,20 @@ public abstract class RadioGroupTestsBase : TestBase
         await Assertions.Expect(radioC).ToHaveAttributeAsync("data-disabled", "");
     }
 
+    /// <summary>
+    /// Tests that disabled group propagates aria-disabled to all radio roots.
+    /// </summary>
+    [Fact]
+    public virtual async Task DisabledGroup_PropagatesAriaDisabled()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithDisabled(true));
+
+        await Assertions.Expect(GetRadio("a")).ToHaveAttributeAsync("aria-disabled", "true");
+        await Assertions.Expect(GetRadio("b")).ToHaveAttributeAsync("aria-disabled", "true");
+        await Assertions.Expect(GetRadio("c")).ToHaveAttributeAsync("aria-disabled", "true");
+    }
+
     #endregion
 
     #region ReadOnly Tests
@@ -268,6 +282,59 @@ public abstract class RadioGroupTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await WaitForRadioStateAsync("a", false);
+    }
+
+    /// <summary>
+    /// Tests that keyboard navigation may focus a read-only radio but does not select it.
+    /// </summary>
+    [Fact]
+    public virtual async Task ArrowNavigation_FocusesReadOnlyRadioWithoutSelecting()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithRadioDefaultValue("a")
+            .WithRadioReadOnlyB(true));
+
+        await WaitForRadioStateAsync("a", true);
+        await WaitForDelayAsync(500);
+
+        var radioA = GetRadio("a");
+        var radioB = GetRadio("b");
+        var radioC = GetRadio("c");
+        await Assertions.Expect(radioB).ToHaveAttributeAsync("data-readonly", "");
+        await Assertions.Expect(radioA).ToHaveAttributeAsync(
+            "tabindex",
+            "0",
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(radioC).ToHaveAttributeAsync(
+            "tabindex",
+            "-1",
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        var focusedReadOnlyTarget = false;
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await radioA.PressAsync("ArrowDown");
+
+            try
+            {
+                await Assertions.Expect(radioB).ToBeFocusedAsync(
+                    new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+                focusedReadOnlyTarget = true;
+                break;
+            }
+            catch
+            {
+                if (attempt < 3)
+                {
+                    await WaitForDelayAsync(500);
+                }
+            }
+        }
+
+        Assert.True(focusedReadOnlyTarget, "Expected read-only radio-b to receive focus after ArrowDown.");
+        await WaitForRadioStateAsync("a", true);
+        await WaitForRadioStateAsync("b", false);
+        await Assertions.Expect(GetByTestId("change-count")).ToHaveTextAsync("0");
     }
 
     #endregion
@@ -339,6 +406,26 @@ public abstract class RadioGroupTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that native FormData sees exactly one selected radio value and no group-level input.
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeFormData_IncludesOnlySelectedRadioInput()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithShowForm(true)
+            .WithRadioName("choice")
+            .WithRadioDefaultValue("b"));
+
+        var inputCount = await Page.EvaluateAsync<int>(
+            "() => document.querySelectorAll('form input[type=\"radio\"][name=\"choice\"]').length");
+        var values = await Page.EvaluateAsync<string[]>(
+            "() => Array.from(new FormData(document.querySelector('form')).getAll('choice')).map(String)");
+
+        Assert.Equal(3, inputCount);
+        Assert.Equal(["b"], values);
+    }
+
+    /// <summary>
     /// Tests that form submission with no value submits nothing.
     /// </summary>
     [Fact]
@@ -355,6 +442,22 @@ public abstract class RadioGroupTestsBase : TestBase
         var formData = GetByTestId("form-data");
         var text = await formData.TextContentAsync();
         Assert.True(string.IsNullOrEmpty(text));
+    }
+
+    /// <summary>
+    /// Tests that native FormData has no value when no radio is selected.
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeFormData_HasNoValueWhenNoneSelected()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithShowForm(true)
+            .WithRadioName("choice"));
+
+        var values = await Page.EvaluateAsync<string[]>(
+            "() => Array.from(new FormData(document.querySelector('form')).getAll('choice')).map(String)");
+
+        Assert.Empty(values);
     }
 
     #endregion
@@ -429,6 +532,28 @@ public abstract class RadioGroupTestsBase : TestBase
         await Assertions.Expect(radioA).ToHaveAttributeAsync("role", "radio");
         await Assertions.Expect(radioB).ToHaveAttributeAsync("role", "radio");
         await Assertions.Expect(radioC).ToHaveAttributeAsync("role", "radio");
+    }
+
+    /// <summary>
+    /// Tests that NativeButton renders a button radio root and keeps the hidden input separate.
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeButton_RendersButtonRootAndSelects()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithRadioNativeButton(true));
+
+        var radioA = GetRadio("a");
+        var tagName = await radioA.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+        var hiddenInputId = await Page.EvaluateAsync<string?>(
+            "() => document.querySelector('input[type=\"radio\"][value=\"a\"]')?.getAttribute('id')");
+
+        Assert.Equal("button", tagName);
+        await Assertions.Expect(radioA).ToHaveAttributeAsync("id", "radio-a-control");
+        Assert.Null(hiddenInputId);
+
+        await radioA.ClickAsync();
+        await WaitForRadioStateAsync("a", true);
     }
 
     #endregion

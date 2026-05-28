@@ -6,6 +6,7 @@ public interface IRadioGroupContract
     Task RendersAsDivByDefault();
     Task RendersWithCustomRender();
     Task ForwardsAdditionalAttributes();
+    Task AdditionalAttributesCanOverrideBuiltInRole();
     Task AppliesClassValue();
     Task AppliesStyleValue();
     Task CombinesClassFromBothSources();
@@ -13,6 +14,7 @@ public interface IRadioGroupContract
 
     // Value control
     Task ControlledValue_SetsCheckedRadio();
+    Task ValueParameterControlsSelectionWithoutValueChanged();
     Task UncontrolledValue_UsesDefaultValue();
     Task UncontrolledValue_UpdatesOnRadioClick();
 
@@ -49,9 +51,9 @@ public interface IRadioGroupContract
     Task DoesNotForwardValuePropToElement();
     Task SetsTabindexZeroOnSelectedRadioOnly();
 
-    // Hidden input
-    Task RendersHiddenRadioInput();
-    Task HiddenInputHasNameWhenValueSelected();
+    // Hidden input and form ownership
+    Task DoesNotRenderGroupLevelHiddenRadioInput();
+    Task FormPropPassesToEachRadioInput();
 
     // Context
     Task CascadesContextToChildren();
