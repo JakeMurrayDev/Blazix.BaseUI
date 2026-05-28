@@ -8,6 +8,8 @@ namespace BlazorBaseUI.Tests.Drawer;
 
 public class DrawerTests : BunitContext
 {
+    private const string ButtonMinModule = "./_content/BlazorBaseUI/blazor-baseui-button.min.js";
+
     public DrawerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -241,6 +243,71 @@ public class DrawerTests : BunitContext
     }
 
     [Fact]
+    public Task InvalidSwipeDirectionDoesNotFallBackToDownAttribute()
+    {
+        var cut = Render(CreateDrawer(
+            defaultOpen: true,
+            swipeDirection: (DrawerSwipeDirection)99));
+
+        var popup = cut.Find("[data-testid='popup']");
+        popup.HasAttribute("data-swipe-direction").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task PopupInitializesInteropWhenElementAppearsAfterFirstRender()
+    {
+        var cut = Render<DelayedPopupElementHost>(parameters => parameters
+            .Add(component => component.RenderPopupElement, false));
+
+        JSInterop.Invocations
+            .Count(invocation => invocation.Identifier == "initializePopup")
+            .ShouldBe(0);
+
+        cut.Render(parameters => parameters
+            .Add(component => component.RenderPopupElement, true));
+
+        cut.WaitForAssertion(() =>
+        {
+            JSInterop.Invocations
+                .Count(invocation => invocation.Identifier == "initializePopup")
+                .ShouldBeGreaterThanOrEqualTo(2);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SwipeAreaReinitializesJsWhenIdChanges()
+    {
+        var cut = Render<SwipeAreaIdHost>(parameters => parameters
+            .Add(component => component.SwipeAreaId, "swipe-area-one"));
+
+        cut.WaitForAssertion(() =>
+        {
+            JSInterop.Invocations.Any(invocation =>
+                invocation.Identifier == "initializeSwipeArea" &&
+                Equals(invocation.Arguments[1], "swipe-area-one")).ShouldBeTrue();
+        });
+
+        cut.Render(parameters => parameters
+            .Add(component => component.SwipeAreaId, "swipe-area-two"));
+
+        cut.WaitForAssertion(() =>
+        {
+            JSInterop.Invocations.Any(invocation =>
+                invocation.Identifier == "disposeSwipeArea" &&
+                Equals(invocation.Arguments[1], "swipe-area-one")).ShouldBeTrue();
+            JSInterop.Invocations.Any(invocation =>
+                invocation.Identifier == "initializeSwipeArea" &&
+                Equals(invocation.Arguments[1], "swipe-area-two")).ShouldBeTrue();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task SnapPointOneMarksPopupExpanded()
     {
         var cut = Render(CreateDrawer(
@@ -430,6 +497,114 @@ public class DrawerTests : BunitContext
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public async Task CloseDisposeAsyncCleansUpButtonInteropAfterElementUnmounts()
+    {
+        var module = JSInterop.SetupModule(ButtonMinModule);
+        module.SetupVoid("sync", _ => true).SetVoidResult();
+        var cut = Render(CreateDrawer(
+            defaultOpen: true,
+            popupContent: builder =>
+            {
+                builder.OpenComponent<DrawerClose>(0);
+                builder.AddAttribute(1, "NativeButton", false);
+                builder.AddAttribute(2, "data-testid", "close");
+                builder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Close")));
+                builder.CloseComponent();
+            }));
+
+        var close = cut.FindComponent<DrawerClose>();
+        cut.WaitForAssertion(() =>
+        {
+            module.Invocations.Any(invocation => invocation.Identifier == "sync").ShouldBeTrue();
+        });
+        var syncCountBeforeDispose = module.Invocations.Count(invocation => invocation.Identifier == "sync");
+
+        ClearRenderElementReference(close.Instance);
+        close.Instance.Element.HasValue.ShouldBeFalse();
+
+        await close.InvokeAsync(async () => await close.Instance.DisposeAsync());
+
+        module.Invocations
+            .Skip(syncCountBeforeDispose)
+            .Any(invocation => invocation.Identifier == "sync" && Equals(invocation.Arguments[4], true))
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task IndentDisposeAsyncCleansUpCapturedElementAfterElementUnmounts()
+    {
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<DrawerProvider>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(providerBuilder =>
+            {
+                providerBuilder.OpenComponent<DrawerIndent>(0);
+                providerBuilder.AddAttribute(1, "data-testid", "indent");
+                providerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+        var indent = cut.FindComponent<DrawerIndent>();
+        cut.WaitForAssertion(() =>
+        {
+            JSInterop.Invocations.Any(invocation => invocation.Identifier == "initializeIndent").ShouldBeTrue();
+        });
+
+        ClearRenderElementReference(indent.Instance);
+        indent.Instance.Element.HasValue.ShouldBeFalse();
+
+        await indent.InvokeAsync(async () => await indent.Instance.DisposeAsync());
+
+        JSInterop.Invocations.Any(invocation => invocation.Identifier == "disposeIndent").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task TypedTriggerDisposeAsyncCleansUpButtonInteropAfterElementUnmounts()
+    {
+        var module = JSInterop.SetupModule(ButtonMinModule);
+        module.SetupVoid("sync", _ => true).SetVoidResult();
+        var handle = DrawerHandleFactory.CreateHandle<string>();
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<DrawerTypedTrigger<string>>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "NativeButton", false);
+            builder.AddAttribute(3, "data-testid", "trigger");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Open")));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+        var trigger = cut.FindComponent<DrawerTypedTrigger<string>>();
+        cut.WaitForAssertion(() =>
+        {
+            module.Invocations.Any(invocation => invocation.Identifier == "sync").ShouldBeTrue();
+        });
+        var syncCountBeforeDispose = module.Invocations.Count(invocation => invocation.Identifier == "sync");
+
+        ClearRenderElementReference(trigger.Instance);
+        trigger.Instance.Element.HasValue.ShouldBeFalse();
+
+        await trigger.InvokeAsync(async () => await trigger.Instance.DisposeAsync());
+
+        module.Invocations
+            .Skip(syncCountBeforeDispose)
+            .Any(invocation => invocation.Identifier == "sync" && Equals(invocation.Arguments[4], true))
+            .ShouldBeTrue();
+    }
+
+    private static void ClearRenderElementReference<TComponent>(TComponent component)
+    {
+        var field = typeof(TComponent).GetField(
+            "renderElementReference",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        field.ShouldNotBeNull();
+        field.SetValue(component, null);
+    }
+
     private static void RenderPopup(
         RenderTreeBuilder builder,
         RenderFragment<RenderProps<DrawerPopupState>>? popupRender,
@@ -489,5 +664,74 @@ public class DrawerTests : BunitContext
             nestedBuilder.CloseComponent();
         }));
         builder.CloseComponent();
+    }
+
+    private sealed class DelayedPopupElementHost : ComponentBase
+    {
+        [Parameter]
+        public bool RenderPopupElement { get; set; }
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<DrawerRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<DrawerRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<DrawerPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<DrawerViewport>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(viewportBuilder =>
+                    {
+                        viewportBuilder.OpenComponent<DrawerPopup>(0);
+                        viewportBuilder.AddAttribute(1, "data-testid", "popup");
+                        viewportBuilder.AddAttribute(2, "Render", RenderPopup);
+                        viewportBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<DrawerTitle>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Title")));
+                            popupBuilder.CloseComponent();
+                        }));
+                        viewportBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }
+
+        private RenderFragment<RenderProps<DrawerPopupState>> RenderPopup => props => builder =>
+        {
+            if (!RenderPopupElement)
+            {
+                return;
+            }
+
+            builder.OpenElement(0, "div");
+            builder.AddMultipleAttributes(1, props.Attributes);
+            builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
+            builder.AddContent(3, props.ChildContent);
+            builder.CloseElement();
+        };
+    }
+
+    private sealed class SwipeAreaIdHost : ComponentBase
+    {
+        [Parameter]
+        public string SwipeAreaId { get; set; } = string.Empty;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<DrawerRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment<DrawerRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<DrawerSwipeArea>(0);
+                innerBuilder.AddAttribute(1, "Id", SwipeAreaId);
+                innerBuilder.AddAttribute(2, "data-testid", "swipe-area");
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }
     }
 }

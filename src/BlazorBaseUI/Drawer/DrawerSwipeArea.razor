@@ -30,6 +30,7 @@
     private Dictionary<string, object> componentAttributes = new();
     private Func<DrawerSwipeAreaState, string>? computedStyleValue;
     private ElementReference? previousElement;
+    private string? previousSwipeAreaIdPendingDispose;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
@@ -123,14 +124,16 @@
         if (Id is not null && Id != swipeAreaId)
         {
             Context?.UnregisterTriggerElement(swipeAreaId);
+            previousSwipeAreaIdPendingDispose = swipeAreaId;
             swipeAreaId = Id;
+            previousElement = null;
         }
 
         state = new DrawerSwipeAreaState(Context?.Open ?? false, swipeActive, ResolvedSwipeDirection, Disabled);
         BuildComponentAttributes();
         UpdateComputedStyleValue();
 
-        if (hasRendered)
+        if (hasRendered && previousSwipeAreaIdPendingDispose is null)
         {
             _ = UpdateSwipeAreaJsAsync();
         }
@@ -143,6 +146,12 @@
         {
             hasRendered = true;
             dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (previousSwipeAreaIdPendingDispose is { } previousSwipeAreaId)
+        {
+            await DisposeSwipeAreaByIdAsync(previousSwipeAreaId);
+            previousSwipeAreaIdPendingDispose = null;
         }
 
         var currentElement = Element;
@@ -167,9 +176,21 @@
         {
             try
             {
-                var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposeSwipeArea", Context.RootId, swipeAreaId);
-                await module.DisposeAsync();
+                try
+                {
+                    if (previousSwipeAreaIdPendingDispose is { } previousSwipeAreaId)
+                    {
+                        await DisposeSwipeAreaByIdAsync(previousSwipeAreaId);
+                        previousSwipeAreaIdPendingDispose = null;
+                    }
+
+                    await DisposeSwipeAreaByIdAsync(swipeAreaId);
+                }
+                finally
+                {
+                    var module = await ModuleTask.Value;
+                    await module.DisposeAsync();
+                }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
@@ -215,9 +236,14 @@
             ["role"] = "presentation",
             ["aria-hidden"] = "true",
             ["data-open"] = Context?.Open ?? false,
-            ["data-closed"] = !(Context?.Open ?? false),
-            ["data-swipe-direction"] = ResolvedSwipeDirection.ToDataAttributeString()
+            ["data-closed"] = !(Context?.Open ?? false)
         };
+
+        var swipeDirection = ResolvedSwipeDirection.ToDataAttributeString();
+        if (swipeDirection is not null)
+        {
+            attrs["data-swipe-direction"] = swipeDirection;
+        }
 
         if (Disabled)
         {
@@ -288,6 +314,24 @@
                 ResolvedSwipeDirection.ToDataAttributeString(),
                 Disabled,
                 Enabled);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task DisposeSwipeAreaByIdAsync(string areaId)
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("disposeSwipeArea", Context.RootId, areaId);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

@@ -712,6 +712,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithShowNestedDrawer(bool value)
+    {
+        queryParams["showNestedDrawer"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithShowViewport(bool value)
     {
         queryParams["showViewport"] = value.ToString().ToLowerInvariant();

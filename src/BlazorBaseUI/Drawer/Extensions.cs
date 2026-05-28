@@ -37,12 +37,13 @@ internal static class Extensions
         _ => DialogOpenChangeReason.None
     };
 
-    public static string ToDataAttributeString(this DrawerSwipeDirection direction) => direction switch
+    public static string? ToDataAttributeString(this DrawerSwipeDirection direction) => direction switch
     {
         DrawerSwipeDirection.Up => "up",
         DrawerSwipeDirection.Left => "left",
         DrawerSwipeDirection.Right => "right",
-        _ => "down"
+        DrawerSwipeDirection.Down => "down",
+        _ => null
     };
 
     public static DrawerSwipeDirection Opposite(this DrawerSwipeDirection direction) => direction switch

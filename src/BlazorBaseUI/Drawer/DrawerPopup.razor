@@ -37,6 +37,7 @@
     private readonly string popupId = Guid.NewGuid().ToIdString();
     private bool hasRendered;
     private bool shouldRender;
+    private bool popupInitialized;
     private DrawerPopupState state;
     private RenderElement<DrawerPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -176,40 +177,25 @@
         }
 
         var currentElement = Element;
-        if (!Nullable.Equals(previousElement, currentElement))
+        var elementChanged = !Nullable.Equals(previousElement, currentElement);
+        if (elementChanged)
         {
+            if (popupInitialized)
+            {
+                await DisposePopupJsRegistrationsAsync();
+                popupInitialized = false;
+            }
+
             previousElement = currentElement;
             Context?.SetPopupElement(currentElement);
         }
 
-        if (firstRender && Element.HasValue && Context is not null)
+        if (!currentElement.HasValue || Context is null || popupInitialized)
         {
-            var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
-            var (finalMode, finalElement) = ResolveFocusTarget(FinalFocus);
-
-            try
-            {
-                var dialogModule = await DialogModuleTask.Value;
-                await dialogModule.InvokeVoidAsync(
-                    "initializePopup",
-                    Context.RootId,
-                    Element.Value,
-                    Context.Modal.ToDataAttributeString(),
-                    initialMode,
-                    initialElement,
-                    finalMode,
-                    finalElement);
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex;
-            }
-
-            await InitializeDrawerPopupJsAsync(Element.Value);
-            await ApplyDeferredInitialFocusAsync(initialMode);
-            previousInitialFocus = InitialFocus;
-            previousFinalFocus = FinalFocus;
+            return;
         }
+
+        await InitializePopupJsRegistrationsAsync(currentElement.Value);
     }
 
     /// <inheritdoc />
@@ -218,33 +204,7 @@
         UnsubscribeViewportContext();
         DrawerContext?.NotifyParentFrontmostHeight?.Invoke(0);
 
-        if (drawerModuleTask?.IsValueCreated == true && hasRendered && Element.HasValue && Context is not null)
-        {
-            try
-            {
-                var module = await DrawerModuleTask.Value;
-                await module.InvokeVoidAsync("disposePopup", Context.RootId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex;
-            }
-        }
-
-        if (dialogModuleTask?.IsValueCreated == true && hasRendered && Element.HasValue && Context is not null)
-        {
-            try
-            {
-                var module = await DialogModuleTask.Value;
-                await module.InvokeVoidAsync("disposePopup", Context.RootId);
-                await module.DisposeAsync();
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex;
-            }
-        }
+        await DisposePopupJsRegistrationsAsync(disposeModules: true);
 
         Context?.SetPopupId(null);
         dotNetRef?.Dispose();
@@ -257,6 +217,97 @@
     public void OnPopupHeightChanged(int height)
     {
         DrawerContext?.OnPopupHeightChange(height);
+    }
+
+    private async Task InitializePopupJsRegistrationsAsync(ElementReference element)
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
+        var (finalMode, finalElement) = ResolveFocusTarget(FinalFocus);
+
+        try
+        {
+            var dialogModule = await DialogModuleTask.Value;
+            await dialogModule.InvokeVoidAsync(
+                "initializePopup",
+                Context.RootId,
+                element,
+                Context.Modal.ToDataAttributeString(),
+                initialMode,
+                initialElement,
+                finalMode,
+                finalElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+
+        await InitializeDrawerPopupJsAsync(element);
+        await ApplyDeferredInitialFocusAsync(initialMode);
+        previousInitialFocus = InitialFocus;
+        previousFinalFocus = FinalFocus;
+        popupInitialized = true;
+    }
+
+    private async Task DisposePopupJsRegistrationsAsync(bool disposeModules = false)
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        if (drawerModuleTask?.IsValueCreated == true && hasRendered)
+        {
+            try
+            {
+                var module = await DrawerModuleTask.Value;
+                try
+                {
+                    await module.InvokeVoidAsync("disposePopup", Context.RootId);
+                }
+                finally
+                {
+                    if (disposeModules)
+                    {
+                        await module.DisposeAsync();
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        if (dialogModuleTask?.IsValueCreated == true && hasRendered)
+        {
+            try
+            {
+                var module = await DialogModuleTask.Value;
+                try
+                {
+                    await module.InvokeVoidAsync("disposePopup", Context.RootId);
+                }
+                finally
+                {
+                    if (disposeModules)
+                    {
+                        await module.DisposeAsync();
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        popupInitialized = false;
     }
 
     private void UpdateShouldRender()
@@ -306,9 +357,14 @@
             ["tabindex"] = "-1",
             ["data-blazor-base-ui-focusable"] = true,
             ["data-open"] = Context.Open,
-            ["data-closed"] = !Context.Open,
-            ["data-swipe-direction"] = DrawerContext.SwipeDirection.ToDataAttributeString()
+            ["data-closed"] = !Context.Open
         };
+
+        var swipeDirection = DrawerContext.SwipeDirection.ToDataAttributeString();
+        if (swipeDirection is not null)
+        {
+            attrs["data-swipe-direction"] = swipeDirection;
+        }
 
         if (Context.Modal != DialogModalMode.False)
         {

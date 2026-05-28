@@ -25,6 +25,7 @@
     private Dictionary<string, object> componentAttributes = new();
     private Func<DrawerIndentState, string>? computedStyleValue;
     private ElementReference? previousElement;
+    private ElementReference? elementForDisposal;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
@@ -97,6 +98,7 @@
             previousElement = currentElement;
             if (currentElement.HasValue)
             {
+                elementForDisposal = currentElement;
                 await InitializeIndentJsAsync(currentElement.Value);
             }
         }
@@ -114,13 +116,22 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && Element.HasValue)
+        if (moduleTask?.IsValueCreated == true)
         {
             try
             {
                 var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("disposeIndent", Element.Value);
-                await module.DisposeAsync();
+                try
+                {
+                    if (elementForDisposal.HasValue)
+                    {
+                        await module.InvokeVoidAsync("disposeIndent", elementForDisposal.Value);
+                    }
+                }
+                finally
+                {
+                    await module.DisposeAsync();
+                }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

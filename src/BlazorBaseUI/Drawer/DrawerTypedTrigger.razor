@@ -33,6 +33,7 @@
     private RenderElement<DrawerTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
+    private ElementReference? elementForDisposal;
 
     private bool HasHandle => Handle is not null;
 
@@ -236,6 +237,11 @@
         }
 
         var currentElement = Element;
+        if (currentElement.HasValue)
+        {
+            elementForDisposal = currentElement;
+        }
+
         if (!Nullable.Equals(previousElement, currentElement))
         {
             previousElement = currentElement;
@@ -248,13 +254,22 @@
     {
         UnregisterFromCurrentStore(triggerId);
 
-        if (moduleTask.IsValueCreated && Element.HasValue)
+        if (moduleTask.IsValueCreated)
         {
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
-                await module.DisposeAsync();
+                try
+                {
+                    if (elementForDisposal.HasValue)
+                    {
+                        await module.InvokeVoidAsync("sync", elementForDisposal.Value, false, false, false, true);
+                    }
+                }
+                finally
+                {
+                    await module.DisposeAsync();
+                }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

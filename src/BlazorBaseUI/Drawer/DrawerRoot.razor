@@ -374,6 +374,7 @@
 
         nestedSwipeProgress = nextProgress;
         context.NestedSwipeProgress = nestedSwipeProgress;
+        // Nested swipe progress is high-frequency; descendants consume the context notification without forcing a root rerender per frame.
         context.NotifyStateChanged();
     }
 }
