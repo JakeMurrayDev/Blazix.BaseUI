@@ -165,13 +165,22 @@
         LabelableContext?.SetLabelId(null);
         FieldContext?.Unsubscribe(this);
 
-        if (moduleTask.IsValueCreated && renderElementReference?.Element is { } element)
+        if (moduleTask.IsValueCreated)
         {
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("removeLabelMouseDownListener", element);
-                await module.DisposeAsync();
+                try
+                {
+                    if (renderElementReference?.Element is { } element)
+                    {
+                        await module.InvokeVoidAsync("removeLabelMouseDownListener", element);
+                    }
+                }
+                finally
+                {
+                    await module.DisposeAsync();
+                }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

@@ -106,6 +106,9 @@ public sealed class FieldValidation : IDisposable
                 nextNativeValidity,
                 setCustomValidityAsync);
 
+            if (!IsCurrentCommit(currentCommitId))
+                return;
+
             if (revalidatedData is not null)
             {
                 setValidityData(revalidatedData);
@@ -145,18 +148,32 @@ public sealed class FieldValidation : IDisposable
                 };
 
                 if (setCustomValidityAsync is not null)
+                {
                     await setCustomValidityAsync(string.Join('\n', customErrors));
+
+                    if (!IsCurrentCommit(currentCommitId))
+                        return;
+                }
             }
             else if (isValidatingOnChange)
             {
                 if (setCustomValidityAsync is not null)
+                {
                     await setCustomValidityAsync(string.Empty);
+
+                    if (!IsCurrentCommit(currentCommitId))
+                        return;
+                }
 
                 nextState = nextState with { CustomError = false };
 
                 if (getNativeValidityAsync is not null)
                 {
                     var refreshedNativeValidity = await getNativeValidityAsync();
+
+                    if (!IsCurrentCommit(currentCommitId))
+                        return;
+
                     if (refreshedNativeValidity is not null)
                     {
                         nextState = refreshedNativeValidity.State;
@@ -205,6 +222,9 @@ public sealed class FieldValidation : IDisposable
             Error = defaultValidationMessage ?? result.FirstOrDefault() ?? string.Empty,
             Value = value
         };
+
+        if (!IsCurrentCommit(currentCommitId))
+            return;
 
         setValidityData(nextData);
         requestStateChange();
@@ -315,6 +335,11 @@ public sealed class FieldValidation : IDisposable
                state.TooShort ||
                state.TypeMismatch ||
                state.ValueMissing;
+    }
+
+    private bool IsCurrentCommit(int commitId)
+    {
+        return commitId == Volatile.Read(ref validationCommitId);
     }
 
     private void OnDebounceElapsed(object? state)
