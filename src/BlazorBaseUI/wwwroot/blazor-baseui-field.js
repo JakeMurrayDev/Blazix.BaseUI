@@ -74,6 +74,10 @@ export function focusElement(element) {
     }
 }
 
+export function isActiveElement(element) {
+    return Boolean(element && element.ownerDocument && element.ownerDocument.activeElement === element);
+}
+
 export function getValue(element) {
     if (!element) {
         return null;

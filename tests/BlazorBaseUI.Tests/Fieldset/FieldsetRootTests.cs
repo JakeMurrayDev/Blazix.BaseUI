@@ -13,16 +13,18 @@ public class FieldsetRootTests : BunitContext, IFieldsetRootContract
     }
 
     private RenderFragment CreateFieldset(
+        bool disabled = false,
         RenderFragment? childContent = null,
         RenderFragment<RenderProps<FieldsetRootState>>? render = null)
     {
         return builder =>
         {
             builder.OpenComponent<FieldsetRoot>(0);
-            builder.AddAttribute(1, "ChildContent", childContent ?? ((RenderFragment)(b => b.AddContent(0, "Fieldset content"))));
+            builder.AddAttribute(1, "Disabled", disabled);
+            builder.AddAttribute(2, "ChildContent", childContent ?? ((RenderFragment)(b => b.AddContent(0, "Fieldset content"))));
 
             if (render is not null)
-                builder.AddAttribute(2, "Render", render);
+                builder.AddAttribute(3, "Render", render);
 
             builder.CloseComponent();
         };
@@ -54,6 +56,17 @@ public class FieldsetRootTests : BunitContext, IFieldsetRootContract
         var section = cut.Find("section");
         section.ShouldNotBeNull();
 
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DisabledAddsStateHookWithoutNativeDisabledAttribute()
+    {
+        var cut = Render(CreateFieldset(disabled: true));
+        var fieldset = cut.Find("fieldset");
+
+        fieldset.HasAttribute("data-disabled").ShouldBeTrue();
+        fieldset.HasAttribute("disabled").ShouldBeFalse();
         return Task.CompletedTask;
     }
 }

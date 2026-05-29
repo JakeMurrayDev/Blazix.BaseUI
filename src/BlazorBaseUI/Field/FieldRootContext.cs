@@ -54,6 +54,9 @@ internal interface IFieldRootContext
     /// <summary>Gets the validation logic for the field.</summary>
     FieldValidation Validation { get; }
 
+    /// <summary>Registers a form control with the field.</summary>
+    void RegisterFieldControl(string source, FieldControlRegistration? registration);
+
     /// <summary>Sets the validity data for the field.</summary>
     void SetValidityData(FieldValidityData data);
 
@@ -93,6 +96,7 @@ internal sealed class FieldRootContext : IFieldRootContext
     private Action<bool>? setFilledCallback;
     private Action<bool>? setFocusedCallback;
     private Func<bool>? shouldValidateOnChangeCallback;
+    private Action<string, FieldControlRegistration?>? registerFieldControlCallback;
     private Action<Func<ValueTask>>? registerFocusHandlerCallback;
     private Action<IFieldStateSubscriber>? subscribeCallback;
     private Action<IFieldStateSubscriber>? unsubscribeCallback;
@@ -119,6 +123,7 @@ internal sealed class FieldRootContext : IFieldRootContext
         Action<bool> setFilled,
         Action<bool> setFocused,
         Func<bool> shouldValidateOnChange,
+        Action<string, FieldControlRegistration?> registerFieldControl,
         Action<Func<ValueTask>> registerFocusHandler,
         Action<IFieldStateSubscriber> subscribe,
         Action<IFieldStateSubscriber> unsubscribe,
@@ -130,6 +135,7 @@ internal sealed class FieldRootContext : IFieldRootContext
         setFilledCallback = setFilled;
         setFocusedCallback = setFocused;
         shouldValidateOnChangeCallback = shouldValidateOnChange;
+        registerFieldControlCallback = registerFieldControl;
         registerFocusHandlerCallback = registerFocusHandler;
         subscribeCallback = subscribe;
         unsubscribeCallback = unsubscribe;
@@ -161,6 +167,9 @@ internal sealed class FieldRootContext : IFieldRootContext
         ValidationDebounceTime = validationDebounceTime;
         State = state;
     }
+
+    public void RegisterFieldControl(string source, FieldControlRegistration? registration) =>
+        registerFieldControlCallback?.Invoke(source, registration);
 
     public void SetValidityData(FieldValidityData data) => setValidityDataCallback?.Invoke(data);
     public void SetTouched(bool value) => setTouchedCallback?.Invoke(value);

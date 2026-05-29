@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 
 namespace BlazorBaseUI.Tests.Field;
 
@@ -87,5 +88,30 @@ public class FieldLabelTests : BunitContext, IFieldLabelContract
         controlId.ShouldNotBeNullOrEmpty();
         forValue.ShouldBe(controlId);
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DisposeAsyncDisposesImportedModuleWhenElementReferenceIsUnavailable()
+    {
+        var label = new FieldLabel();
+        var module = new TrackingJsObjectReference();
+        var moduleTask = new Lazy<Task<IJSObjectReference>>(() => Task.FromResult<IJSObjectReference>(module));
+        await moduleTask.Value;
+
+        SetPrivateField(label, "moduleTask", moduleTask);
+
+        await label.DisposeAsync();
+
+        module.Disposed.ShouldBeTrue();
+    }
+
+    private static void SetPrivateField<TValue>(object instance, string fieldName, TValue value)
+    {
+        var field = instance.GetType().GetField(
+            fieldName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        field.ShouldNotBeNull();
+        field.SetValue(instance, value);
     }
 }

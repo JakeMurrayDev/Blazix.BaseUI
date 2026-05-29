@@ -23,6 +23,9 @@
         case "validation-onblur":
             @RenderValidationOnBlur()
             break;
+        case "native-required":
+            @RenderNativeRequired()
+            break;
         case "style-hooks":
             @RenderStyleHooks()
             break;
@@ -137,6 +140,15 @@
         </FieldRoot>
         <button type="submit" data-testid="submit-button">Submit</button>
         <input data-testid="other-input" type="text" placeholder="Other" />
+    </Form>;
+
+    private RenderFragment RenderNativeRequired() => @<Form Model="model" ValidationMode="ValidationMode.OnSubmit" OnInvalidSubmit="HandleInvalidSubmit">
+        <FieldRoot Name="name" data-testid="field-root">
+            <FieldLabel data-testid="field-label">Name</FieldLabel>
+            <FieldControl @bind-Value="model.Name" required data-testid="field-control" />
+            <FieldError data-testid="field-error" />
+        </FieldRoot>
+        <button type="submit" data-testid="submit-button">Submit</button>
     </Form>;
 
     private RenderFragment RenderStyleHooks() => @<Form Model="model" ValidationMode="@ResolvedValidationMode">

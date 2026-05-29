@@ -88,4 +88,32 @@ public class FieldDescriptionTests : BunitContext, IFieldDescriptionContract
         ariaDescribedBy.ShouldContain(descriptionId);
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public Task PreservesExternalAriaDescribedByOnControl()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<FieldControl<string>>(0);
+                fieldBuilder.AddAttribute(1, "aria-describedby", "external-description");
+                fieldBuilder.AddAttribute(2, "data-testid", "field-control");
+                fieldBuilder.CloseComponent();
+
+                fieldBuilder.OpenComponent<FieldDescription>(10);
+                fieldBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Help text")));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var control = cut.Find("input[data-testid='field-control']");
+        var description = cut.Find("p");
+
+        control.GetAttribute("aria-describedby")
+            .ShouldBe($"external-description {description.GetAttribute("id")}");
+        return Task.CompletedTask;
+    }
 }

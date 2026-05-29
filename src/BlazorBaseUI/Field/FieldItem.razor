@@ -32,7 +32,7 @@
 
     private bool ResolvedDisabled => (FieldContext?.Disabled ?? false) || Disabled;
 
-    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+    private FieldRootState State => (FieldContext?.State ?? FieldRootState.Default) with { Disabled = ResolvedDisabled };
 
     private bool HasParentCheckbox => CheckboxGroupContext?.AllValues is not null;
 
@@ -128,13 +128,7 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
 
         componentAttributes = attrs;
     }

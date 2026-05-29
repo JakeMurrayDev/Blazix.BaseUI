@@ -67,6 +67,25 @@ else
     public IReadOnlyDictionary<string, object>? ComponentAttributes { get; set; }
 
     /// <summary>
+    /// Prevents the browser's default form submission behavior when handling submit events.
+    /// </summary>
+    [Parameter]
+    public bool PreventDefaultOnSubmit { get; set; }
+
+    /// <summary>
+    /// Gets or sets the attribute name that receives event-dispatched updates.
+    /// Used by controlled form controls so Blazor does not revert user input while events are processing.
+    /// </summary>
+    [Parameter]
+    public string? UpdatesAttributeName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the event attribute associated with <see cref="UpdatesAttributeName"/>.
+    /// </summary>
+    [Parameter]
+    public string? UpdatesAttributeEventName { get; set; }
+
+    /// <summary>
     /// Defines the child components of this instance.
     /// </summary>
     [Parameter]
@@ -86,11 +105,24 @@ else
     private RenderFragment RenderDefaultElement => (RenderTreeBuilder builder) =>
     {
         var attrs = BuildMergedAttributes();
+        object? updatesAttributeEvent = null;
+        if (!string.IsNullOrEmpty(UpdatesAttributeName) &&
+            !string.IsNullOrEmpty(UpdatesAttributeEventName))
+        {
+            attrs.Remove(UpdatesAttributeEventName, out updatesAttributeEvent);
+        }
 
         builder.OpenElement(0, Tag);
         builder.AddMultipleAttributes(1, attrs);
-        builder.AddElementReferenceCapture(2, e => Element = e);
-        builder.AddContent(3, ChildContent);
+        if (updatesAttributeEvent is not null)
+        {
+            builder.AddAttribute(2, UpdatesAttributeEventName!, updatesAttributeEvent);
+            builder.SetUpdatesAttributeName(UpdatesAttributeName!);
+        }
+        if (PreventDefaultOnSubmit)
+            builder.AddEventPreventDefaultAttribute(3, "onsubmit", true);
+        builder.AddElementReferenceCapture(4, e => Element = e);
+        builder.AddContent(5, ChildContent);
         builder.CloseElement();
     };
 

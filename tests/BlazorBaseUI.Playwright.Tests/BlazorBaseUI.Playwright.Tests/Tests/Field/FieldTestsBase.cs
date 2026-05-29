@@ -35,17 +35,14 @@ public abstract class FieldTestsBase : TestBase
     }
 
     /// <summary>
-    /// Replaces existing text in a Blazor input by selecting all then typing new text.
-    /// A delay between selecting all and typing avoids race conditions on Blazor Server
-    /// where the selection may not complete before the first keystroke arrives.
+    /// Replaces existing text in a Blazor input and explicitly dispatches input
+    /// so Blazor Server and WASM both process the value change.
     /// </summary>
     private async Task BlazorFillAsync(ILocator control, string text)
     {
-        await control.ClickAsync();
-        await Page.Keyboard.PressAsync("Control+a");
-        await WaitForDelayAsync(100);
-        await control.PressSequentiallyAsync(text);
-        await WaitForDelayAsync(100);
+        await control.FillAsync(text);
+        await control.DispatchEventAsync("input");
+        await WaitForDelayAsync(200);
     }
 
     // FR4: validate runs after native validations
@@ -249,6 +246,32 @@ public abstract class FieldTestsBase : TestBase
 
             var fieldRoot = GetByTestId("field-root");
             await Assertions.Expect(fieldRoot).ToHaveAttributeAsync("data-invalid", "");
+        });
+    }
+
+    // FR11a: native required validity participates in submit validation
+    [Fact]
+    public virtual async Task NativeRequiredValidatesOnSubmit()
+    {
+        await RunTestAsync(async () =>
+        {
+            var url = CreateUrl("/tests/field")
+                .WithTestScenario("native-required")
+                .Build();
+            await NavigateAsync(url);
+
+            var submitButton = GetByTestId("submit-button");
+            await submitButton.ClickAsync();
+            await WaitForDelayAsync(300);
+
+            var control = GetByTestId("field-control");
+            await Assertions.Expect(control).ToHaveAttributeAsync("aria-invalid", "true");
+
+            var fieldRoot = GetByTestId("field-root");
+            await Assertions.Expect(fieldRoot).ToHaveAttributeAsync("data-invalid", "");
+
+            var fieldError = GetByTestId("field-error");
+            await Assertions.Expect(fieldError).ToBeVisibleAsync();
         });
     }
 
