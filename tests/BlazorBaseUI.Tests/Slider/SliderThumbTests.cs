@@ -491,6 +491,80 @@ public class SliderThumbTests : BunitContext, ISliderThumbContract
     }
 
     [Fact]
+    public Task RangeInputsUseSameNameAttribute()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValues", new[] { 20.0, 80.0 });
+            builder.AddAttribute(2, "Name", "price");
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.AddAttribute(1, "Index", 0);
+                    controlBuilder.CloseComponent();
+                    controlBuilder.OpenComponent<SliderThumb>(2);
+                    controlBuilder.AddAttribute(3, "Index", 1);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var inputs = cut.FindAll("input[type='range']");
+        inputs[0].GetAttribute("name").ShouldBe("price");
+        inputs[1].GetAttribute("name").ShouldBe("price");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RangeThumbsCanResolveImplicitIndices()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValues", new[] { 20.0, 80.0 });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
+                    {
+                        { "data-testid", "implicit-thumb-0" }
+                    });
+                    controlBuilder.CloseComponent();
+                    controlBuilder.OpenComponent<SliderThumb>(2);
+                    controlBuilder.AddAttribute(3, "AdditionalAttributes", new Dictionary<string, object>
+                    {
+                        { "data-testid", "implicit-thumb-1" }
+                    });
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var thumb0 = cut.Find("[data-testid='implicit-thumb-0']");
+        var thumb1 = cut.Find("[data-testid='implicit-thumb-1']");
+        var inputs = cut.FindAll("input[type='range']");
+
+        thumb0.GetAttribute("data-index").ShouldBe("0");
+        thumb1.GetAttribute("data-index").ShouldBe("1");
+        inputs[0].GetAttribute("aria-valuenow").ShouldBe("20");
+        inputs[1].GetAttribute("aria-valuenow").ShouldBe("80");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task ClassValueReceivesThumbState()
     {
         SliderThumbState? capturedState = null;
@@ -567,6 +641,15 @@ public class SliderThumbTests : BunitContext, ISliderThumbContract
         var thumb = cut.Find("[data-testid='slider-thumb-0']");
         var style = thumb.GetAttribute("style") ?? "";
         style.ShouldNotContain("z-index");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RoundValueToStepUsesJavaScriptHalfUpRoundingAndPrecision()
+    {
+        SliderUtilities.RoundValueToStep(0.5, 1, 0).ShouldBe(1);
+        SliderUtilities.RoundValueToStep(0.35, 0.1, 0.25).ShouldBe(0.35);
 
         return Task.CompletedTask;
     }

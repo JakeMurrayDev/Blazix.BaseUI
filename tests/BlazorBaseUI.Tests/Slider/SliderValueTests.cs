@@ -249,6 +249,42 @@ public class SliderValueTests : BunitContext, ISliderValueContract
     }
 
     [Fact]
+    public Task FormatOptionsCanDisableGrouping()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 1000.5);
+            builder.AddAttribute(2, "Max", 2000.0);
+            builder.AddAttribute(3, "Locale", "en-US");
+            builder.AddAttribute(4, "Format", new NumberFormatOptions(MaximumFractionDigits: 1, UseGrouping: false));
+            builder.AddAttribute(5, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderValue>(0);
+                innerBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
+                {
+                    { "data-testid", "slider-value" }
+                });
+                innerBuilder.CloseComponent();
+                innerBuilder.OpenComponent<SliderControl>(2);
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var value = cut.Find("[data-testid='slider-value']");
+        value.TextContent.ShouldContain("1000.5");
+        value.TextContent.ShouldNotContain("1,000.5");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task ChildContentReceivesFormattedAndRawValues()
     {
         string[]? capturedFormattedValues = null;

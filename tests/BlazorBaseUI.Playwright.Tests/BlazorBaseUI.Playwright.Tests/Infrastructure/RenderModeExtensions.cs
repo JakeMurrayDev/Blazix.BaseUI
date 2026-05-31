@@ -321,9 +321,9 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
-    public TestPageUrlBuilder WithMinStepsBetweenValues(int value)
+    public TestPageUrlBuilder WithMinStepsBetweenValues(double value)
     {
-        queryParams["minStepsBetweenValues"] = value.ToString();
+        queryParams["minStepsBetweenValues"] = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         return this;
     }
 

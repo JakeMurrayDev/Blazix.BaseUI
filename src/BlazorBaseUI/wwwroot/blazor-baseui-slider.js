@@ -277,7 +277,7 @@ function findClosestThumbByPosition(thumbElements, clientX, clientY, orientation
         const fingerPos = vertical ? clientY : clientX;
         const distance = Math.abs(fingerPos - midpoint);
 
-        if (distance < minDistance) {
+        if (distance <= minDistance) {
             minDistance = distance;
             closestIndex = i;
         }
@@ -383,9 +383,10 @@ function updateThumbPositions(elementState, config) {
             thumb.style.transform = 'translate(-50%, 50%)';
             thumb.style.position = 'absolute';
         } else {
+            const translateX = config.direction === 'rtl' ? '50%' : '-50%';
             thumb.style.top = '50%';
             thumb.style.insetInlineStart = `${percent}%`;
-            thumb.style.transform = 'translate(-50%, -50%)';
+            thumb.style.transform = `translate(${translateX}, -50%)`;
             thumb.style.position = 'absolute';
         }
     }
@@ -395,7 +396,7 @@ function updateIndicatorPosition(elementState, config) {
     const indicator = elementState.indicatorElement;
     if (!indicator || !elementState.latestValues) return;
 
-    if (config.thumbAlignment === 'edge') {
+    if (isInsetAlignment(config.thumbAlignment)) {
         updateIndicatorInsetPosition(elementState, config);
     } else {
         updateIndicatorCenteredPosition(elementState, config);
@@ -507,7 +508,7 @@ function calculateFingerValueInternal(controlElement, clientX, clientY, config, 
     const styles = getComputedStyle(controlElement);
     const vertical = config.orientation === 'vertical';
     const direction = config.direction || 'ltr';
-    const insetOffset = config.thumbAlignment === 'edge' ? config.insetOffset || 0 : 0;
+    const insetOffset = isInsetAlignment(config.thumbAlignment) ? config.insetOffset || 0 : 0;
 
     const paddingStart = vertical
         ? (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.borderTopWidth) || 0)
@@ -536,9 +537,7 @@ function calculateFingerValueInternal(controlElement, clientX, clientY, config, 
     const valueRescaled = Math.max(0, Math.min(1, (valueSize - insetOffset) / controlSize));
     let newValue = (config.max - config.min) * valueRescaled + config.min;
 
-    if (config.step > 0) {
-        newValue = Math.round((newValue - config.min) / config.step) * config.step + config.min;
-    }
+    newValue = roundValueToStep(newValue, config.step, config.min);
 
     newValue = Math.max(config.min, Math.min(config.max, newValue));
 
@@ -731,6 +730,34 @@ function round12(value) {
     return Math.round(value * 1e12) / 1e12;
 }
 
+function isInsetAlignment(thumbAlignment) {
+    return thumbAlignment !== 'center';
+}
+
+function getDecimalPrecision(num) {
+    if (num === 0) {
+        return 0;
+    }
+
+    if (Math.abs(num) < 1) {
+        const parts = num.toExponential().split('e-');
+        const matissaDecimalPart = parts[0].split('.')[1];
+        return (matissaDecimalPart ? matissaDecimalPart.length : 0) + parseInt(parts[1], 10);
+    }
+
+    const decimalPart = num.toString().split('.')[1];
+    return decimalPart ? decimalPart.length : 0;
+}
+
+function roundValueToStep(value, step, min) {
+    if (step <= 0) {
+        return value;
+    }
+
+    const nearest = Math.round((value - min) / step) * step + min;
+    return Number(nearest.toFixed(Math.max(getDecimalPrecision(step), getDecimalPrecision(min))));
+}
+
 export function getThumbRect(thumbElement) {
     if (!thumbElement) return null;
 
@@ -874,7 +901,8 @@ export function registerThumbInput(inputElement, dotNetRef) {
 
     const thumbState = {
         dotNetRef,
-        restoringFocusVisible: false
+        restoringFocusVisible: false,
+        keyInvocation: Promise.resolve()
     };
 
     function handleKeyDown(e) {
@@ -898,7 +926,11 @@ export function registerThumbInput(inputElement, dotNetRef) {
             thumbState.restoringFocusVisible = false;
         }
 
-        thumbState.dotNetRef.invokeMethodAsync('HandleKeyFromJs', e.key, e.shiftKey);
+        thumbState.keyInvocation = thumbState.keyInvocation
+            .catch(() => {
+                // Circuit disconnects and disposed object references are expected during navigation.
+            })
+            .then(() => thumbState.dotNetRef.invokeMethodAsync('HandleKeyFromJs', e.key, e.shiftKey));
     }
 
     function handleBlur(e) {

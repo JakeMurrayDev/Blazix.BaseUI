@@ -251,6 +251,36 @@ public class SliderIndicatorTests : BunitContext, ISliderIndicatorContract
     }
 
     [Fact]
+    public Task EdgeClientOnlyUsesInsetPositioningStyle()
+    {
+        var cut = Render(CreateSliderWithIndicator(
+            defaultValue: 50,
+            thumbAlignment: ThumbAlignment.EdgeClientOnly));
+
+        var indicator = cut.Find("[data-testid='slider-indicator']");
+        var style = indicator.GetAttribute("style") ?? "";
+
+        style.ShouldContain("--start-position:");
+        style.ShouldContain("visibility: hidden");
+        style.ShouldContain("width: var(--start-position)");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task EdgeAlignmentAddsBaseUiIndicatorPrehydrationAttribute()
+    {
+        var cut = Render(CreateSliderWithIndicator(
+            defaultValue: 50,
+            thumbAlignment: ThumbAlignment.Edge));
+
+        var indicator = cut.Find("[data-testid='slider-indicator']");
+        indicator.HasAttribute("data-base-ui-slider-indicator").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasInsetPositioningStyleForRangeValue()
     {
         var cut = Render(CreateSliderWithIndicator(

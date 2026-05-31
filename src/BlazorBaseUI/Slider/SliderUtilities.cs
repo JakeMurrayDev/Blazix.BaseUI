@@ -19,8 +19,19 @@ internal static class SliderUtilities
         if (step == 0)
             return value;
 
-        var nearest = Math.Round((value - min) / step) * step + min;
-        return Math.Round(nearest * 1e12) / 1e12;
+        var nearest = JsRound((value - min) / step) * step + min;
+        var precision = Math.Max(GetDecimalPrecision(step), GetDecimalPrecision(min));
+        return Math.Round(nearest, precision, MidpointRounding.AwayFromZero);
+    }
+
+    public static double GetNewValue(double thumbValue, double increment, int direction, double min, double max)
+    {
+        var value = direction == 1 ? thumbValue + increment : thumbValue - increment;
+        var precision = Math.Max(
+            GetDecimalPrecision(thumbValue),
+            Math.Max(GetDecimalPrecision(increment), GetDecimalPrecision(min)));
+        var roundedValue = Math.Round(value, precision, MidpointRounding.AwayFromZero);
+        return Clamp(roundedValue, min, max);
     }
 
     public static double[] GetSliderValue(
@@ -53,7 +64,7 @@ internal static class SliderUtilities
         return result;
     }
 
-    public static bool ValidateMinimumDistance(double[] values, double step, int minStepsBetweenValues)
+    public static bool ValidateMinimumDistance(double[] values, double step, double minStepsBetweenValues)
     {
         if (values.Length < 2)
             return true;
@@ -80,7 +91,7 @@ internal static class SliderUtilities
         double min,
         double max,
         double step,
-        int minStepsBetweenValues)
+        double minStepsBetweenValues)
     {
         var activeValues = currentValues ?? values;
         var baselineValues = initialValues ?? values;
@@ -117,6 +128,106 @@ internal static class SliderUtilities
         }
     }
 
+    public static double[] GetPushedThumbValues(
+        double[] values,
+        int index,
+        double nextValue,
+        double min,
+        double max,
+        double step,
+        double minStepsBetweenValues,
+        double[]? initialValues)
+    {
+        if (values.Length == 0)
+        {
+            return [];
+        }
+
+        if (index < 0 || index >= values.Length)
+        {
+            return [..values];
+        }
+
+        double[] result = [..values];
+        var minDistance = step * minStepsBetweenValues;
+        var lastIndex = result.Length - 1;
+        var baseInitialValues = initialValues ?? values;
+
+        var indexMin = min + index * minDistance;
+        var indexMax = max - (lastIndex - index) * minDistance;
+        result[index] = Clamp(nextValue, indexMin, indexMax);
+
+        for (var i = index + 1; i <= lastIndex; i++)
+        {
+            var minAllowed = result[i - 1] + minDistance;
+            var maxAllowed = max - (lastIndex - i) * minDistance;
+            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
+            var candidate = Math.Max(result[i], minAllowed);
+
+            if (initialValue < candidate)
+            {
+                candidate = Math.Max(initialValue, minAllowed);
+            }
+
+            result[i] = Clamp(candidate, minAllowed, maxAllowed);
+        }
+
+        for (var i = index - 1; i >= 0; i--)
+        {
+            var maxAllowed = result[i + 1] - minDistance;
+            var minAllowed = min + i * minDistance;
+            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
+            var candidate = Math.Min(result[i], maxAllowed);
+
+            if (initialValue > candidate)
+            {
+                candidate = Math.Min(initialValue, maxAllowed);
+            }
+
+            result[i] = Clamp(candidate, minAllowed, maxAllowed);
+        }
+
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Math.Round(result[i] * 1e12) / 1e12;
+        }
+
+        return result;
+    }
+
+    public static string FormatNumber(double value, string? locale, NumberFormatOptions? options)
+    {
+        var culture = string.IsNullOrEmpty(locale)
+            ? (CultureInfo)CultureInfo.CurrentCulture.Clone()
+            : (CultureInfo)CultureInfo.GetCultureInfo(locale).Clone();
+        var numberFormat = (NumberFormatInfo)culture.NumberFormat.Clone();
+        culture.NumberFormat = numberFormat;
+
+        if (options is null)
+        {
+            return FormatDecimal(value, culture, new NumberFormatOptions());
+        }
+
+        if (!string.IsNullOrEmpty(options.Currency))
+        {
+            numberFormat.CurrencySymbol = ResolveCurrencySymbol(options.Currency, culture);
+        }
+
+        if (options.UseGrouping == false)
+        {
+            numberFormat.NumberGroupSizes = [0];
+            numberFormat.CurrencyGroupSizes = [0];
+            numberFormat.PercentGroupSizes = [0];
+        }
+
+        return options.Style?.ToLowerInvariant() switch
+        {
+            "currency" => value.ToString($"C{ResolveFractionDigits(options, numberFormat.CurrencyDecimalDigits)}", culture),
+            "percent" => value.ToString($"P{ResolveFractionDigits(options, numberFormat.PercentDecimalDigits)}", culture),
+            _ => FormatDecimal(value, culture, options)
+        };
+    }
+
     private static ResolveThumbCollisionResult ResolveSwapCollision(
         double[] activeValues,
         double[] baselineValues,
@@ -125,7 +236,7 @@ internal static class SliderUtilities
         double min,
         double max,
         double step,
-        int minStepsBetweenValues,
+        double minStepsBetweenValues,
         double minValueDifference)
     {
         if (pressedIndex < 0 || pressedIndex >= activeValues.Length)
@@ -234,97 +345,212 @@ internal static class SliderUtilities
         return new ResolveThumbCollisionResult(candidateValues, pressedIndex, false);
     }
 
-    public static double[] GetPushedThumbValues(
-        double[] values,
-        int index,
-        double nextValue,
-        double min,
-        double max,
-        double step,
-        int minStepsBetweenValues,
-        double[]? initialValues)
+    private static int GetDecimalPrecision(double value)
     {
-        if (values.Length == 0)
+        if (value == 0)
+            return 0;
+
+        var text = Math.Abs(value).ToString("G", CultureInfo.InvariantCulture);
+        var exponentIndex = text.IndexOf('E');
+        if (exponentIndex < 0)
         {
-            return [];
+            exponentIndex = text.IndexOf('e');
         }
 
-        if (index < 0 || index >= values.Length)
+        if (exponentIndex >= 0)
         {
-            return [..values];
+            var mantissa = text[..exponentIndex];
+            var exponent = int.Parse(text[(exponentIndex + 1)..], CultureInfo.InvariantCulture);
+            var mantissaDecimalIndex = mantissa.IndexOf('.');
+            var mantissaDecimalPlaces = mantissaDecimalIndex >= 0 ? mantissa.Length - mantissaDecimalIndex - 1 : 0;
+            return exponent < 0 ? mantissaDecimalPlaces - exponent : Math.Max(0, mantissaDecimalPlaces - exponent);
         }
 
-        double[] result = [..values];
-        var minDistance = step * minStepsBetweenValues;
-        var lastIndex = result.Length - 1;
-        var baseInitialValues = initialValues ?? values;
-
-        var indexMin = min + index * minDistance;
-        var indexMax = max - (lastIndex - index) * minDistance;
-        result[index] = Clamp(nextValue, indexMin, indexMax);
-
-        for (var i = index + 1; i <= lastIndex; i++)
-        {
-            var minAllowed = result[i - 1] + minDistance;
-            var maxAllowed = max - (lastIndex - i) * minDistance;
-            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
-            var candidate = Math.Max(result[i], minAllowed);
-
-            if (initialValue < candidate)
-            {
-                candidate = Math.Max(initialValue, minAllowed);
-            }
-
-            result[i] = Clamp(candidate, minAllowed, maxAllowed);
-        }
-
-        for (var i = index - 1; i >= 0; i--)
-        {
-            var maxAllowed = result[i + 1] - minDistance;
-            var minAllowed = min + i * minDistance;
-            var initialValue = i < baseInitialValues.Length ? baseInitialValues[i] : result[i];
-            var candidate = Math.Min(result[i], maxAllowed);
-
-            if (initialValue > candidate)
-            {
-                candidate = Math.Min(initialValue, maxAllowed);
-            }
-
-            result[i] = Clamp(candidate, minAllowed, maxAllowed);
-        }
-
-        for (var i = 0; i < result.Length; i++)
-        {
-            result[i] = Math.Round(result[i] * 1e12) / 1e12;
-        }
-
-        return result;
+        var decimalIndex = text.IndexOf('.');
+        return decimalIndex < 0 ? 0 : text.Length - decimalIndex - 1;
     }
 
-    public static string FormatNumber(double value, string? locale, NumberFormatOptions? options)
+    private static double JsRound(double value) => Math.Floor(value + 0.5);
+
+    private static int ResolveFractionDigits(NumberFormatOptions options, int defaultDigits)
     {
-        if (options is null)
-        {
-            return value.ToString(CultureInfo.InvariantCulture);
-        }
-
-        var culture = string.IsNullOrEmpty(locale)
-            ? CultureInfo.CurrentCulture
-            : CultureInfo.GetCultureInfo(locale);
-
-        var format = options.Style switch
-        {
-            "percent" => "P",
-            "currency" => "C",
-            _ => "N"
-        };
-
         if (options.MaximumFractionDigits.HasValue)
         {
-            format += options.MaximumFractionDigits.Value;
+            return options.MaximumFractionDigits.Value;
         }
 
-        return value.ToString(format, culture);
+        if (options.MinimumFractionDigits.HasValue)
+        {
+            return options.MinimumFractionDigits.Value;
+        }
+
+        return defaultDigits;
+    }
+
+    private static string FormatDecimal(double value, CultureInfo culture, NumberFormatOptions options)
+    {
+        if (HasSignificantDigitOptions(options))
+        {
+            return FormatSignificantDecimal(value, culture, options);
+        }
+
+        var minimumFractionDigits = Math.Max(0, options.MinimumFractionDigits ?? 0);
+        var maximumFractionDigits = Math.Max(minimumFractionDigits, options.MaximumFractionDigits ?? Math.Max(3, minimumFractionDigits));
+        var minimumIntegerDigits = Math.Max(1, options.MinimumIntegerDigits ?? 1);
+        var integerPattern = new string('0', minimumIntegerDigits);
+
+        if (options.UseGrouping != false)
+        {
+            integerPattern = "#," + integerPattern;
+        }
+
+        var fractionPattern = maximumFractionDigits == 0
+            ? string.Empty
+            : "." + new string('0', minimumFractionDigits) + new string('#', maximumFractionDigits - minimumFractionDigits);
+
+        return value.ToString(integerPattern + fractionPattern, culture);
+    }
+
+    private static bool HasSignificantDigitOptions(NumberFormatOptions options) =>
+        options.MinimumSignificantDigits.HasValue || options.MaximumSignificantDigits.HasValue;
+
+    private static string FormatSignificantDecimal(double value, CultureInfo culture, NumberFormatOptions options)
+    {
+        var minimumSignificantDigits = Math.Clamp(options.MinimumSignificantDigits ?? 1, 1, 21);
+        var maximumSignificantDigits = Math.Clamp(options.MaximumSignificantDigits ?? 21, minimumSignificantDigits, 21);
+
+        if (value == 0)
+        {
+            var zeroFractionDigits = options.MinimumSignificantDigits.HasValue
+                ? minimumSignificantDigits - 1
+                : 0;
+            return 0m.ToString($"N{zeroFractionDigits}", culture);
+        }
+
+        var decimalValue = decimal.Parse(
+            value.ToString("G", CultureInfo.InvariantCulture),
+            NumberStyles.Float,
+            CultureInfo.InvariantCulture);
+        var roundedValue = RoundToSignificantDigits(decimalValue, maximumSignificantDigits);
+        var invariantValue = ToInvariantSignificantString(
+            roundedValue,
+            minimumSignificantDigits,
+            maximumSignificantDigits);
+        var fractionDigits = CountFractionDigits(invariantValue);
+        var parsedValue = decimal.Parse(invariantValue, NumberStyles.Number, CultureInfo.InvariantCulture);
+        var minimumIntegerDigits = Math.Max(1, options.MinimumIntegerDigits ?? 1);
+        var integerPattern = new string('0', minimumIntegerDigits);
+
+        if (options.UseGrouping != false)
+        {
+            integerPattern = "#," + integerPattern;
+        }
+
+        var fractionPattern = fractionDigits == 0
+            ? string.Empty
+            : "." + new string('0', fractionDigits);
+
+        return parsedValue.ToString(integerPattern + fractionPattern, culture);
+    }
+
+    private static decimal RoundToSignificantDigits(decimal value, int digits)
+    {
+        if (value == 0)
+        {
+            return 0;
+        }
+
+        var scale = (decimal)Math.Pow(
+            10,
+            Math.Floor(Math.Log10((double)Math.Abs(value))) - digits + 1);
+
+        return Math.Round(value / scale, 0, MidpointRounding.AwayFromZero) * scale;
+    }
+
+    private static string ToInvariantSignificantString(decimal value, int minimumSignificantDigits, int maximumSignificantDigits)
+    {
+        var absoluteValue = Math.Abs(value);
+        var exponent = absoluteValue == 0
+            ? 0
+            : (int)Math.Floor(Math.Log10((double)absoluteValue));
+        var fractionDigits = exponent >= 0
+            ? Math.Max(0, maximumSignificantDigits - exponent - 1)
+            : -exponent - 1 + maximumSignificantDigits;
+        var text = value.ToString($"F{fractionDigits}", CultureInfo.InvariantCulture);
+
+        while (text.Contains('.') && text.EndsWith('0') && CountSignificantDigits(text[..^1]) >= minimumSignificantDigits)
+        {
+            text = text[..^1];
+        }
+
+        if (text.EndsWith('.'))
+        {
+            text = text[..^1];
+        }
+
+        return text;
+    }
+
+    private static int CountFractionDigits(string value)
+    {
+        var decimalIndex = value.IndexOf('.');
+        return decimalIndex < 0 ? 0 : value.Length - decimalIndex - 1;
+    }
+
+    private static int CountSignificantDigits(string value)
+    {
+        var count = 0;
+        var hasSeenNonZeroDigit = false;
+
+        foreach (var character in value)
+        {
+            if (!char.IsDigit(character))
+            {
+                continue;
+            }
+
+            if (character == '0' && !hasSeenNonZeroDigit)
+            {
+                continue;
+            }
+
+            hasSeenNonZeroDigit = true;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static string ResolveCurrencySymbol(string currency, CultureInfo culture)
+    {
+        try
+        {
+            var region = new RegionInfo(culture.Name);
+            if (string.Equals(region.ISOCurrencySymbol, currency, StringComparison.OrdinalIgnoreCase))
+            {
+                return region.CurrencySymbol;
+            }
+        }
+        catch (ArgumentException)
+        {
+        }
+
+        foreach (var specificCulture in CultureInfo.GetCultures(CultureTypes.SpecificCultures))
+        {
+            try
+            {
+                var region = new RegionInfo(specificCulture.Name);
+                if (string.Equals(region.ISOCurrencySymbol, currency, StringComparison.OrdinalIgnoreCase))
+                {
+                    return region.CurrencySymbol;
+                }
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
+        return currency;
     }
 }
 

@@ -425,26 +425,6 @@
         </div>
     </DemoSection>
 
-    <DemoSection Title="Cancelable OnValueChange"
-                 Description="OnValueChange can be canceled to prevent value updates.">
-        <div class="w-full max-w-md space-y-4">
-            <SliderRoot DefaultValue="50"
-                        OnValueChange="@HandleCancelableValueChange"
-                        ClassValue="@(state => SliderRootClass(state))">
-                <SliderControl ClassValue="@(state => SliderControlClass(state))">
-                    <SliderTrack ClassValue="@(state => SliderTrackClass(state))">
-                        <SliderIndicator ClassValue="@(state => SliderIndicatorClass(state))" />
-                        <SliderThumb ClassValue="@(state => SliderThumbClass(state))" />
-                    </SliderTrack>
-                </SliderControl>
-            </SliderRoot>
-            <label class="flex items-center gap-2">
-                <input type="checkbox" @bind="preventValueChange" class="rounded" />
-                <span class="text-sm text-gray-700">Prevent values above 75</span>
-            </label>
-        </div>
-    </DemoSection>
-
     <DemoSection Title="Field Integration"
                  Description="Slider integrates with FieldRoot for labels and descriptions.">
         <div class="w-full max-w-md space-y-6">
@@ -758,7 +738,6 @@
     private int valueChangeCount;
     private int valueCommitCount;
     private double? lastCommittedValue;
-    private bool preventValueChange;
     private object formModel = new();
     private string? lastFormSubmission;
     private Dictionary<string, string[]> externalErrors = new();
@@ -772,14 +751,6 @@
     {
         valueCommitCount++;
         lastCommittedValue = e.Value;
-    }
-
-    private void HandleCancelableValueChange(SliderValueChangeEventArgs<double> e)
-    {
-        if (preventValueChange && e.Value > 75)
-        {
-            e.Cancel();
-        }
     }
 
     private void HandleFormSubmit(FormSubmitEventArgs e)

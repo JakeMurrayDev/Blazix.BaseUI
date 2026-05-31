@@ -171,4 +171,35 @@ public class SliderControlTests : BunitContext, ISliderControlContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task EdgeAlignmentAddsBaseUiControlPrehydrationAttribute()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "ThumbAlignment", ThumbAlignment.Edge);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
+                {
+                    { "data-testid", "slider-control" }
+                });
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var control = cut.Find("[data-testid='slider-control']");
+        control.HasAttribute("data-base-ui-slider-control").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
 }

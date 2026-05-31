@@ -1,3 +1,5 @@
+using BlazorBaseUI.Field;
+
 namespace BlazorBaseUI.Tests.Slider;
 
 public class SliderRootTests : BunitContext, ISliderRootContract
@@ -244,6 +246,39 @@ public class SliderRootTests : BunitContext, ISliderRootContract
 
         var root = cut.Find("[role='group']");
         root.HasAttribute("data-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExplicitAriaLabelledByOverridesGeneratedLabelId()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "AdditionalAttributes", new Dictionary<string, object>
+            {
+                { "aria-labelledby", "external-slider-label" }
+            });
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderLabel>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(labelBuilder => labelBuilder.AddContent(0, "Volume")));
+                innerBuilder.CloseComponent();
+                innerBuilder.OpenComponent<SliderControl>(2);
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var root = cut.Find("[role='group']");
+        root.GetAttribute("aria-labelledby").ShouldBe("external-slider-label");
 
         return Task.CompletedTask;
     }
@@ -568,6 +603,67 @@ public class SliderRootTests : BunitContext, ISliderRootContract
 
         var input = cut.Find("input[type='range']");
         input.GetAttribute("name").ShouldBe("volume");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FieldNameOverridesSliderName()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "Name", "field-slider");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SliderRoot>(0);
+                fieldBuilder.AddAttribute(1, "DefaultValue", 50.0);
+                fieldBuilder.AddAttribute(2, "Name", "slider-prop");
+                fieldBuilder.AddAttribute(3, "ChildContent", CreateChildContent());
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var input = cut.Find("input[type='range']");
+        input.GetAttribute("name").ShouldBe("field-slider");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SetsFormAttributeOnInputs()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "Form", "external-slider-form");
+            builder.AddAttribute(3, "ChildContent", CreateChildContent());
+            builder.CloseComponent();
+        });
+
+        var input = cut.Find("input[type='range']");
+        input.GetAttribute("form").ShouldBe("external-slider-form");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsFractionalMinStepsBetweenValues()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValues", new[] { 0.0, 1.0 });
+            builder.AddAttribute(2, "Step", 1.0);
+            builder.AddAttribute(3, "MinStepsBetweenValues", 0.4);
+            builder.AddAttribute(4, "ChildContent", CreateChildContent(thumbCount: 2));
+            builder.CloseComponent();
+        });
+
+        var root = cut.Find("[role='group']");
+        root.ShouldNotBeNull();
 
         return Task.CompletedTask;
     }

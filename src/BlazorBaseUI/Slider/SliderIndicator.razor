@@ -95,6 +95,12 @@
         var attrs = new Dictionary<string, object>();
         var orientationStr = state.Orientation.ToDataAttributeString() ?? "horizontal";
 
+        if (Context?.ThumbAlignment == ThumbAlignment.Edge)
+        {
+            // lint-ignore:RULE-05 - Required for parity with Base UI's prehydration selector.
+            attrs["data-base-ui-slider-indicator"] = true;
+        }
+
         attrs["data-dragging"] = state.Dragging;
         attrs["data-orientation"] = orientationStr;
         attrs["data-disabled"] = state.Disabled;

@@ -99,25 +99,32 @@ public static class JsInteropSetup
     }
 
     private const string SliderModule = "./_content/BlazorBaseUI/blazor-baseui-slider.js";
+    private const string SliderMinModule = "./_content/BlazorBaseUI/blazor-baseui-slider.min.js";
 
     public static void SetupSliderModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(SliderModule);
-        module.SetupVoid("initialize", _ => true).SetVoidResult();
-        module.SetupVoid("dispose", _ => true).SetVoidResult();
-        module.SetupVoid("startDrag", _ => true).SetVoidResult();
-        module.SetupVoid("stopDrag", _ => true).SetVoidResult();
-        module.SetupVoid("setPointerCapture", _ => true).SetVoidResult();
-        module.SetupVoid("focusThumbInput", _ => true).SetVoidResult();
-        module.SetupVoid("registerPointerGuard", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterPointerGuard", _ => true).SetVoidResult();
-        module.SetupVoid("blurActiveElement", _ => true).SetVoidResult();
-        module.Setup<object?>("getThumbRect", _ => true).SetResult(null);
-        module.SetupVoid("syncInsetPositions", _ => true).SetVoidResult();
-        module.SetupVoid("observeInsetResize", _ => true).SetVoidResult();
-        module.SetupVoid("unobserveInsetResize", _ => true).SetVoidResult();
-        module.SetupVoid("registerThumbInput", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterThumbInput", _ => true).SetVoidResult();
+        SetupSliderModulePath(SliderModule);
+        SetupSliderModulePath(SliderMinModule);
+
+        void SetupSliderModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initialize", _ => true).SetVoidResult();
+            module.SetupVoid("dispose", _ => true).SetVoidResult();
+            module.SetupVoid("startDrag", _ => true).SetVoidResult();
+            module.SetupVoid("stopDrag", _ => true).SetVoidResult();
+            module.SetupVoid("setPointerCapture", _ => true).SetVoidResult();
+            module.SetupVoid("focusThumbInput", _ => true).SetVoidResult();
+            module.SetupVoid("registerPointerGuard", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterPointerGuard", _ => true).SetVoidResult();
+            module.SetupVoid("blurActiveElement", _ => true).SetVoidResult();
+            module.Setup<object?>("getThumbRect", _ => true).SetResult(null);
+            module.SetupVoid("syncInsetPositions", _ => true).SetVoidResult();
+            module.SetupVoid("observeInsetResize", _ => true).SetVoidResult();
+            module.SetupVoid("unobserveInsetResize", _ => true).SetVoidResult();
+            module.SetupVoid("registerThumbInput", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterThumbInput", _ => true).SetVoidResult();
+        }
     }
 
     private const string SwitchModule = "./_content/BlazorBaseUI/blazor-baseui-switch.js";

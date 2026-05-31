@@ -13,4 +13,4 @@ internal sealed record StartDragResult(int ThumbIndex, double[] Values, bool Pre
 /// <summary>
 /// Configuration passed to JavaScript for managing slider drag interactions.
 /// </summary>
-internal sealed record SliderDragConfig(double Min, double Max, double Step, int MinStepsBetweenValues, string Orientation, string Direction, string CollisionBehavior, string ThumbAlignment, double[] Values, bool Disabled, bool ReadOnly, double InsetOffset, bool NotifyOnMove);
+internal sealed record SliderDragConfig(double Min, double Max, double Step, double MinStepsBetweenValues, string Orientation, string Direction, string CollisionBehavior, string ThumbAlignment, double[] Values, bool Disabled, bool ReadOnly, double InsetOffset, bool NotifyOnMove);

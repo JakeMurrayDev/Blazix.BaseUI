@@ -17,7 +17,8 @@ internal sealed class SliderRootContext
     public double LargeStep { get; set; } = 10;
     public double Max { get; set; } = 100;
     public double Min { get; set; }
-    public int MinStepsBetweenValues { get; set; }
+    public double MinStepsBetweenValues { get; set; }
+    public string? Form { get; set; }
     public string? Name { get; set; }
     public Orientation Orientation { get; set; } = Orientation.Horizontal;
     public double Step { get; set; } = 1;
@@ -39,7 +40,10 @@ internal sealed class SliderRootContext
     public Action<double[], SliderChangeReason, int> SetValue { get; set; } = null!;
     public Action<double[]> SetValueSilent { get; set; } = null!;
     public Action<double[], SliderChangeReason> CommitValue { get; set; } = null!;
-    public Action<double, int, SliderChangeReason> HandleInputChange { get; set; } = null!;
+    public Func<double, int, SliderChangeReason, Task> HandleInputChange { get; set; } = null!;
+    public Func<object, int> RegisterImplicitThumbIndex { get; set; } = _ => 0;
+    public Action<object> UnregisterImplicitThumbIndex { get; set; } = _ => { };
+    public Func<object, int> GetImplicitThumbIndex { get; set; } = _ => 0;
     public Action<int, ThumbMetadata> RegisterThumb { get; set; } = null!;
     public Action<int> UnregisterThumb { get; set; } = null!;
     public Func<int, ThumbMetadata?> GetThumbMetadata { get; set; } = null!;
@@ -49,6 +53,8 @@ internal sealed class SliderRootContext
     public Func<ElementReference?> GetIndicatorElement { get; set; } = null!;
     public Action RegisterRealtimeSubscriber { get; set; } = null!;
     public Action UnregisterRealtimeSubscriber { get; set; } = null!;
+    public Action<Action> RegisterValueSubscriber { get; set; } = _ => { };
+    public Action<Action> UnregisterValueSubscriber { get; set; } = _ => { };
 }
 
 /// <summary>

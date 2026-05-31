@@ -23,6 +23,8 @@
     private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-slider.min.js";
     private const double Epsilon = 1e-10;
 
+    private readonly List<object> implicitThumbIndexRegistry = [];
+    private readonly HashSet<Action> valueSubscriberRegistry = [];
     private readonly Dictionary<int, ThumbMetadata> thumbRegistry = [];
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
@@ -121,7 +123,7 @@
     /// Defaults to <c>0</c>.
     /// </summary>
     [Parameter]
-    public int MinStepsBetweenValues { get; set; }
+    public double MinStepsBetweenValues { get; set; }
 
     /// <summary>
     /// Gets or sets the orientation of the slider.
@@ -156,6 +158,12 @@
     /// </summary>
     [Parameter]
     public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the form that owns the slider inputs when rendered outside the form.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
 
     /// <summary>
     /// Gets or sets how thumbs behave when they collide during pointer interactions.
@@ -270,7 +278,7 @@
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
-    private string? ResolvedName => Name ?? FieldContext?.Name;
+    private string? ResolvedName => FieldContext?.Name ?? Name;
 
     private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
@@ -305,6 +313,9 @@
             SetValueSilent = SetValueSilent,
             CommitValue = CommitValue,
             HandleInputChange = HandleInputChange,
+            RegisterImplicitThumbIndex = RegisterImplicitThumbIndex,
+            UnregisterImplicitThumbIndex = UnregisterImplicitThumbIndex,
+            GetImplicitThumbIndex = GetImplicitThumbIndex,
             RegisterThumb = RegisterThumb,
             UnregisterThumb = UnregisterThumb,
             GetThumbMetadata = GetThumbMetadata,
@@ -314,6 +325,8 @@
             GetIndicatorElement = GetIndicatorElement,
             RegisterRealtimeSubscriber = RegisterRealtimeSubscriber,
             UnregisterRealtimeSubscriber = UnregisterRealtimeSubscriber,
+            RegisterValueSubscriber = RegisterValueSubscriber,
+            UnregisterValueSubscriber = UnregisterValueSubscriber,
             SetLabelId = SetLocalLabelId
         };
 
@@ -334,12 +347,15 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        var valuesChanged = false;
+
         if (IsControlled)
         {
             var newValues = GetControlledValues();
             if (!ValuesEqual(newValues, currentValues))
             {
                 currentValues = newValues;
+                valuesChanged = true;
             }
         }
 
@@ -347,6 +363,7 @@
         {
             previousValues = [.. currentValues];
             HandleValuesChanged();
+            valuesChanged = true;
         }
 
         System.Diagnostics.Debug.Assert(Min < Max, "Slider 'Max' must be greater than 'Min'.");
@@ -366,6 +383,11 @@
         state = CurrentState;
         UpdateContext();
         BuildComponentAttributes();
+
+        if (valuesChanged)
+        {
+            NotifyValueSubscribers();
+        }
     }
 
     /// <inheritdoc />
@@ -465,6 +487,7 @@
         context.Max = Max;
         context.Min = Min;
         context.MinStepsBetweenValues = MinStepsBetweenValues;
+        context.Form = Form;
         context.Name = ResolvedName;
         context.Orientation = Orientation;
         context.Step = Step;
@@ -517,7 +540,11 @@
         return currentValues;
     }
 
-    private string? ResolveLabelId() => LabelableContext?.LabelId ?? localLabelId;
+    private string? ResolveLabelId()
+    {
+        var explicitAriaLabelledBy = AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-labelledby");
+        return explicitAriaLabelledBy ?? LabelableContext?.LabelId ?? localLabelId;
+    }
 
     private void SetLocalLabelId(string? id)
     {
@@ -581,6 +608,11 @@
 
     private void SetValue(double[] newValues, SliderChangeReason reason, int thumbIndex)
     {
+        _ = InvokeAsync(() => SetValueAwaitingCallbacksAsync(newValues, reason, thumbIndex));
+    }
+
+    private async Task SetValueAwaitingCallbacksAsync(double[] newValues, SliderChangeReason reason, int thumbIndex)
+    {
         if (ValuesEqual(newValues, currentValues))
             return;
 
@@ -589,14 +621,12 @@
             var eventArgs = new SliderValueChangeEventArgs<double[]>(newValues, reason, thumbIndex);
             if (OnValuesChange.HasDelegate)
             {
-                _ = InvokeAsync(async () =>
+                await OnValuesChange.InvokeAsync(eventArgs);
+                if (!eventArgs.IsCanceled)
                 {
-                    await OnValuesChange.InvokeAsync(eventArgs);
-                    if (!eventArgs.IsCanceled)
-                    {
-                        ApplyValueChange(newValues);
-                    }
-                });
+                    ApplyValueChange(newValues);
+                }
+
                 return;
             }
         }
@@ -605,14 +635,12 @@
             var eventArgs = new SliderValueChangeEventArgs<double>(newValues[0], reason, thumbIndex);
             if (OnValueChange.HasDelegate)
             {
-                _ = InvokeAsync(async () =>
+                await OnValueChange.InvokeAsync(eventArgs);
+                if (!eventArgs.IsCanceled)
                 {
-                    await OnValueChange.InvokeAsync(eventArgs);
-                    if (!eventArgs.IsCanceled)
-                    {
-                        ApplyValueChange(newValues);
-                    }
-                });
+                    ApplyValueChange(newValues);
+                }
+
                 return;
             }
         }
@@ -643,6 +671,7 @@
         UpdateContext();
         BuildComponentAttributes();
         StateHasChanged();
+        NotifyValueSubscribers();
     }
 
     private void CommitValue(double[] values, SliderChangeReason reason)
@@ -676,15 +705,38 @@
         }
     }
 
-    private void HandleInputChange(double value, int index, SliderChangeReason reason)
+    private async Task HandleInputChange(double value, int index, SliderChangeReason reason)
     {
         var newValues = SliderUtilities.GetSliderValue(value, index, Min, Max, IsRange, currentValues);
 
         if (!SliderUtilities.ValidateMinimumDistance(newValues, Step, MinStepsBetweenValues))
             return;
 
-        SetValue(newValues, reason, index);
+        await SetValueAwaitingCallbacksAsync(newValues, reason, index);
         CommitValue(newValues, reason);
+    }
+
+    private int RegisterImplicitThumbIndex(object thumbKey)
+    {
+        var existingIndex = implicitThumbIndexRegistry.IndexOf(thumbKey);
+        if (existingIndex >= 0)
+        {
+            return existingIndex;
+        }
+
+        implicitThumbIndexRegistry.Add(thumbKey);
+        return implicitThumbIndexRegistry.Count - 1;
+    }
+
+    private void UnregisterImplicitThumbIndex(object thumbKey)
+    {
+        implicitThumbIndexRegistry.Remove(thumbKey);
+    }
+
+    private int GetImplicitThumbIndex(object thumbKey)
+    {
+        var index = implicitThumbIndexRegistry.IndexOf(thumbKey);
+        return index >= 0 ? index : RegisterImplicitThumbIndex(thumbKey);
     }
 
     private void RegisterThumb(int index, ThumbMetadata metadata)
@@ -717,11 +769,31 @@
     private void RegisterRealtimeSubscriber()
     {
         Interlocked.Increment(ref realtimeSubscriberCount);
+        context.HasRealtimeSubscribers = HasRealtimeSubscribers;
     }
 
     private void UnregisterRealtimeSubscriber()
     {
         Interlocked.Decrement(ref realtimeSubscriberCount);
+        context.HasRealtimeSubscribers = HasRealtimeSubscribers;
+    }
+
+    private void RegisterValueSubscriber(Action subscriber)
+    {
+        valueSubscriberRegistry.Add(subscriber);
+    }
+
+    private void UnregisterValueSubscriber(Action subscriber)
+    {
+        valueSubscriberRegistry.Remove(subscriber);
+    }
+
+    private void NotifyValueSubscribers()
+    {
+        foreach (var subscriber in valueSubscriberRegistry.ToArray())
+        {
+            subscriber();
+        }
     }
 
     private void HandleValuesChanged()

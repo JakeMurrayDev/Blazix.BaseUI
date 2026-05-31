@@ -9,7 +9,7 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="displayContent"
+               ChildContent="BuildDisplayContent"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
@@ -18,7 +18,6 @@
     private SliderRootState state = null!;
     private RenderElement<SliderRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-    private RenderFragment? displayContent;
 
     [CascadingParameter]
     private SliderRootContext? Context { get; set; }
@@ -64,6 +63,7 @@
         if (Context is not null && !isRegistered)
         {
             Context.RegisterRealtimeSubscriber();
+            Context.RegisterValueSubscriber(NotifyValueChanged);
             isRegistered = true;
         }
     }
@@ -76,9 +76,6 @@
             state = Context.State;
         }
 
-        var formattedValues = GetFormattedValues();
-        displayContent = GetDisplayContent(formattedValues);
-
         BuildComponentAttributes();
     }
 
@@ -88,6 +85,7 @@
         if (Context is not null && isRegistered)
         {
             Context.UnregisterRealtimeSubscriber();
+            Context.UnregisterValueSubscriber(NotifyValueChanged);
             isRegistered = false;
         }
     }
@@ -147,19 +145,33 @@
         return [.. Context.Values.Select(v => SliderUtilities.FormatNumber(v, Context.Locale, Context.FormatOptions))];
     }
 
-    private RenderFragment GetDisplayContent(string[] formattedValues)
+    private void NotifyValueChanged()
+    {
+        if (Context is not null)
+        {
+            state = Context.State;
+            BuildComponentAttributes();
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildDisplayContent(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
     {
         if (Context is null)
-            return _ => { };
+            return;
+
+        var formattedValues = GetFormattedValues();
 
         if (ChildContent is not null)
         {
-            return ChildContent((formattedValues, Context.Values));
+            builder.AddContent(0, ChildContent((formattedValues, Context.Values)));
+            return;
         }
 
         var displayValue = string.Join(" \u2013 ", formattedValues.Select((f, i) =>
             !string.IsNullOrEmpty(f) ? f : Context.Values[i].ToString(CultureInfo.InvariantCulture)));
 
-        return builder => builder.AddContent(0, displayValue);
+        builder.AddContent(1, displayValue);
     }
 }

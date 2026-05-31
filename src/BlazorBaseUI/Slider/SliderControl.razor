@@ -186,6 +186,11 @@
 
         attrs["tabindex"] = -1;
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
+        if (Context?.ThumbAlignment == ThumbAlignment.Edge)
+        {
+            // lint-ignore:RULE-05 - Required for parity with Base UI's prehydration selector.
+            attrs["data-base-ui-slider-control"] = true;
+        }
 
         attrs["data-dragging"] = state.Dragging;
         attrs["data-orientation"] = orientationStr;
@@ -232,7 +237,7 @@
                 Context.Values,
                 Context.Disabled,
                 Context.ReadOnly,
-                Context.ThumbAlignment == ThumbAlignment.Edge ? await GetInsetOffsetAsync() : 0,
+                Context.Inset ? await GetInsetOffsetAsync() : 0,
                 Context.HasRealtimeSubscribers);
 
             try
@@ -412,6 +417,7 @@
         min = Context!.Min,
         max = Context.Max,
         orientation = Context.Orientation.ToDataAttributeString() ?? "horizontal",
+        direction = IsRtl ? "rtl" : "ltr",
         thumbAlignment = Context.ThumbAlignment.ToDataAttributeString(),
         values = Context.Values
     };

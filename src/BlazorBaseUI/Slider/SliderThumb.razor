@@ -5,6 +5,7 @@
 @using BlazorBaseUI.Utilities.LabelableProvider
 @using BlazorBaseUI.Form
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Rendering
 @inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
@@ -16,14 +17,18 @@
                ClassValue="ClassValue"
                StyleValue="computedStyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="innerContent"
+               ChildContent="BuildInputContent"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
     private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-slider.min.js";
 
+    private readonly object implicitIndexKey = new();
+
     private bool hasRendered;
+    private bool hasImplicitThumbIndex;
+    private int implicitIndex;
     private string inputId = null!;
     private ElementReference thumbElement;
     private ElementReference inputElement;
@@ -31,7 +36,6 @@
     private RenderElement<SliderThumbState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private Func<SliderThumbState, string?>? computedStyleValue;
-    private RenderFragment? innerContent;
     private ElementReference? previousElement;
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private DotNetObjectReference<SliderThumb>? dotNetRef;
@@ -44,6 +48,7 @@
     private string? inputAriaLabelledBy;
     private string? inputAriaDescribedBy;
     private string? inputName;
+    private string? inputForm;
     private string inputAriaOrientation = "horizontal";
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new(() =>
@@ -168,7 +173,7 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
-    private int ResolvedIndex => Index ?? 0;
+    private int ResolvedIndex => Index ?? implicitIndex;
 
     private bool IsRange => Context?.Values.Length > 1;
 
@@ -185,6 +190,8 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        ResolveImplicitIndex();
+
         inputId = IsRange
             ? Guid.NewGuid().ToIdString()
             : (LabelableContext?.ControlId ?? Guid.NewGuid().ToIdString());
@@ -198,6 +205,8 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        ResolveImplicitIndex();
+
         state = SliderThumbState.FromRootState(
             Context?.State ?? SliderRootState.Default,
             ResolvedIndex,
@@ -211,7 +220,6 @@
         };
 
         ComputeInputAttributes();
-        innerContent = BuildInputFragment;
 
         if (Context is not null && hasRendered)
         {
@@ -262,6 +270,12 @@
     public async ValueTask DisposeAsync()
     {
         Context?.UnregisterThumb(ResolvedIndex);
+
+        if (hasImplicitThumbIndex)
+        {
+            Context?.UnregisterImplicitThumbIndex(implicitIndexKey);
+            hasImplicitThumbIndex = false;
+        }
 
         if (!IsRange)
         {
@@ -324,40 +338,45 @@
             ?? (inputAriaLabel == null && !string.IsNullOrEmpty(Context.LabelId) ? Context.LabelId : null);
         inputAriaDescribedBy = AriaDescribedBy ?? LabelableContext?.GetAriaDescribedBy();
         inputName = !string.IsNullOrEmpty(Context.Name)
-            ? (IsRange ? $"{Context.Name}[{ResolvedIndex}]" : Context.Name)
+            ? Context.Name
             : null;
+        inputForm = Context.Form;
     }
 
-    private RenderFragment BuildInputFragment => __builder =>
+    private void BuildInputContent(RenderTreeBuilder builder)
     {
         if (Context is not null)
         {
             var inputStyle = GetInputStyle();
 
-            <input type="range"
-                   id="@inputId"
-                   min="@inputMin"
-                   max="@inputMax"
-                   step="@inputStep"
-                   value="@inputValue"
-                   tabindex="@TabIndex"
-                   disabled="@ResolvedDisabled"
-                   required="@state.Required"
-                   aria-valuenow="@inputValue"
-                   aria-orientation="@inputAriaOrientation"
-                   aria-label="@inputAriaLabel"
-                   aria-valuetext="@inputAriaValueText"
-                   aria-labelledby="@inputAriaLabelledBy"
-                   aria-describedby="@inputAriaDescribedBy"
-                   name="@inputName"
-                   style="@inputStyle"
-                   @onchange="HandleChange"
-                   @onfocus="HandleFocus"
-                   @onblur="HandleBlur"
-                   @ref="inputElement" />
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "range");
+            builder.AddAttribute(2, "id", inputId);
+            builder.AddAttribute(3, "min", inputMin);
+            builder.AddAttribute(4, "max", inputMax);
+            builder.AddAttribute(5, "step", inputStep);
+            builder.AddAttribute(6, "value", inputValue);
+            builder.AddAttribute(7, "tabindex", TabIndex);
+            builder.AddAttribute(8, "disabled", ResolvedDisabled);
+            builder.AddAttribute(9, "required", state.Required);
+            builder.AddAttribute(10, "aria-valuenow", inputValue);
+            builder.AddAttribute(11, "aria-orientation", inputAriaOrientation);
+            builder.AddAttribute(12, "aria-label", inputAriaLabel);
+            builder.AddAttribute(13, "aria-valuetext", inputAriaValueText);
+            builder.AddAttribute(14, "aria-labelledby", inputAriaLabelledBy);
+            builder.AddAttribute(15, "aria-describedby", inputAriaDescribedBy);
+            builder.AddAttribute(16, "name", inputName);
+            builder.AddAttribute(17, "form", inputForm);
+            builder.AddAttribute(18, "style", inputStyle);
+            builder.AddAttribute(19, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange));
+            builder.AddAttribute(20, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus));
+            builder.AddAttribute(21, "onblur", EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur));
+            builder.AddElementReferenceCapture(22, element => inputElement = element);
+            builder.CloseElement();
         }
-        @ChildContent
-    };
+
+        builder.AddContent(23, ChildContent);
+    }
 
     private string? GetDefaultAriaValueText(string formattedValue)
     {
@@ -373,6 +392,32 @@
         }
 
         return Context.FormatOptions is not null ? formattedValue : null;
+    }
+
+    private void ResolveImplicitIndex()
+    {
+        if (Index.HasValue)
+        {
+            if (hasImplicitThumbIndex)
+            {
+                Context?.UnregisterImplicitThumbIndex(implicitIndexKey);
+                hasImplicitThumbIndex = false;
+            }
+
+            implicitIndex = Index.Value;
+            return;
+        }
+
+        if (Context is null)
+        {
+            implicitIndex = 0;
+            return;
+        }
+
+        implicitIndex = hasImplicitThumbIndex
+            ? Context.GetImplicitThumbIndex(implicitIndexKey)
+            : Context.RegisterImplicitThumbIndex(implicitIndexKey);
+        hasImplicitThumbIndex = true;
     }
 
     private string GetInputStyle()
@@ -453,14 +498,14 @@
         return null;
     }
 
-    private void HandleChange(ChangeEventArgs e)
+    private async Task HandleChange(ChangeEventArgs e)
     {
         if (Context is null || Context.ReadOnly || ResolvedDisabled)
             return;
 
         if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var newValue))
         {
-            Context.HandleInputChange(newValue, ResolvedIndex, SliderChangeReason.InputChange);
+            await Context.HandleInputChange(newValue, ResolvedIndex, SliderChangeReason.InputChange);
         }
     }
 
@@ -524,7 +569,7 @@
 
             if (SliderUtilities.ValidateMinimumDistance(newValues, Context.Step, Context.MinStepsBetweenValues))
             {
-                Context.HandleInputChange(newValue.Value, ResolvedIndex, SliderChangeReason.Keyboard);
+                await Context.HandleInputChange(newValue.Value, ResolvedIndex, SliderChangeReason.Keyboard);
             }
         }
     }
@@ -556,11 +601,7 @@
         if (Context is null)
             return currentValue;
 
-        var newValue = direction == 1
-            ? Math.Min(currentValue + step, Context.Max)
-            : Math.Max(currentValue - step, Context.Min);
-
-        return newValue;
+        return SliderUtilities.GetNewValue(currentValue, step, direction, Context.Min, Context.Max);
     }
 
     private double GetHomeValue()

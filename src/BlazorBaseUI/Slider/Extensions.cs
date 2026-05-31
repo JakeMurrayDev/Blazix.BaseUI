@@ -26,6 +26,7 @@ internal static class Extensions
             {
                 ThumbAlignment.Center => "center",
                 ThumbAlignment.Edge => "edge",
+                ThumbAlignment.EdgeClientOnly => "edge-client-only",
                 _ => throw new InvalidEnumArgumentException(nameof(alignment), (int)alignment, typeof(ThumbAlignment))
             };
     }

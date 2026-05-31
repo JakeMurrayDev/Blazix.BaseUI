@@ -34,7 +34,12 @@ public enum ThumbAlignment
     /// <summary>
     /// The thumb is inset within the control such that its edge is aligned with the control edge.
     /// </summary>
-    Edge
+    Edge,
+
+    /// <summary>
+    /// The thumb is inset within the control, but without pre-hydration positioning attributes.
+    /// </summary>
+    EdgeClientOnly
 }
 
 /// <summary>
