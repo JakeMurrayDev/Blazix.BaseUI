@@ -1,3 +1,5 @@
+using BlazorBaseUI.Field;
+
 namespace BlazorBaseUI.Tests.Switch;
 
 public class SwitchRootTests : BunitContext, ISwitchRootContract
@@ -15,6 +17,7 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
         bool readOnly = false,
         bool required = false,
         string? name = null,
+        string? form = null,
         string? value = null,
         string? uncheckedValue = null,
         bool nativeButton = false,
@@ -43,6 +46,8 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
                 builder.AddAttribute(attrIndex++, "Required", true);
             if (name is not null)
                 builder.AddAttribute(attrIndex++, "Name", name);
+            if (form is not null)
+                builder.AddAttribute(attrIndex++, "Form", form);
             if (value is not null)
                 builder.AddAttribute(attrIndex++, "Value", value);
             if (uncheckedValue is not null)
@@ -217,6 +222,100 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task RoleAttributeOverridesBuiltInRole()
+    {
+        var cut = Render(CreateSwitchRoot(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "role", "checkbox" },
+                { "data-testid", "switch-root" }
+            }
+        ));
+
+        var switchEl = cut.Find("[data-testid='switch-root']");
+        switchEl.GetAttribute("role").ShouldBe("checkbox");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ExplicitAriaLabelledByOverridesFieldLabel()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<FieldLabel>(0);
+                fieldBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(labelBuilder =>
+                {
+                    labelBuilder.AddContent(0, "Notifications");
+                }));
+                fieldBuilder.CloseComponent();
+
+                fieldBuilder.OpenComponent<SwitchRoot>(2);
+                fieldBuilder.AddAttribute(3, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "aria-labelledby", "external-label" },
+                        { "data-testid", "switch-root" }
+                    });
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var switchEl = cut.Find("[data-testid='switch-root']");
+        switchEl.GetAttribute("aria-labelledby").ShouldBe("external-label");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task CombinesExternalAriaDescribedByWithFieldDescription()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SwitchRoot>(0);
+                fieldBuilder.AddAttribute(1, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "aria-describedby", "external-description" },
+                        { "data-testid", "switch-root" }
+                    });
+                fieldBuilder.CloseComponent();
+
+                fieldBuilder.OpenComponent<FieldDescription>(2);
+                fieldBuilder.AddAttribute(3, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "id", "field-description" }
+                    });
+                fieldBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(descriptionBuilder =>
+                {
+                    descriptionBuilder.AddContent(0, "Description");
+                }));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            var switchEl = cut.Find("[data-testid='switch-root']");
+            var input = cut.Find("input[type='checkbox']");
+
+            switchEl.GetAttribute("aria-describedby").ShouldBe("external-description field-description");
+            input.GetAttribute("aria-describedby").ShouldBe("field-description");
+        });
+
+        return Task.CompletedTask;
+    }
+
     // ARIA and role tests
     [Fact]
     public Task HasRoleSwitch()
@@ -276,6 +375,18 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
     // Disabled tests
     [Fact]
     public Task UsesAriaDisabledInsteadOfHtmlDisabled()
+    {
+        var cut = Render(CreateSwitchRoot(disabled: true));
+
+        var switchEl = cut.Find("[role='switch']");
+        switchEl.HasAttribute("disabled").ShouldBeFalse();
+        switchEl.GetAttribute("aria-disabled").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NativeButtonUsesHtmlDisabled()
     {
         var cut = Render(CreateSwitchRoot(disabled: true, nativeButton: true));
 
@@ -353,6 +464,51 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
 
         switchEl.HasAttribute("name").ShouldBeFalse();
         input.GetAttribute("name").ShouldBe("switch-name");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FieldRootNameTakesPrecedenceOverSwitchName()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "Name", "field-switch");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SwitchRoot>(0);
+                fieldBuilder.AddAttribute(1, "Name", "root-switch");
+                fieldBuilder.AddAttribute(2, "UncheckedValue", "off");
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var input = cut.Find("input[type='checkbox']");
+        var uncheckedInput = cut.Find("input[type='hidden']");
+
+        input.GetAttribute("name").ShouldBe("field-switch");
+        uncheckedInput.GetAttribute("name").ShouldBe("field-switch");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SetsFormOnInputsOnly()
+    {
+        var cut = Render(CreateSwitchRoot(
+            name: "switch-name",
+            form: "external-form",
+            uncheckedValue: "off"));
+
+        var switchEl = cut.Find("[role='switch']");
+        var input = cut.Find("input[type='checkbox']");
+        var uncheckedInput = cut.Find("input[type='hidden']");
+
+        switchEl.HasAttribute("form").ShouldBeFalse();
+        input.GetAttribute("form").ShouldBe("external-form");
+        uncheckedInput.GetAttribute("form").ShouldBe("external-form");
 
         return Task.CompletedTask;
     }
@@ -560,6 +716,114 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
 
         invoked.ShouldBeTrue();
         receivedValue.ShouldBe(true);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnCheckedChangeReceivesModifierKeys()
+    {
+        SwitchCheckedChangeEventArgs? receivedArgs = null;
+
+        var cut = Render(CreateSwitchRoot(
+            onCheckedChange: EventCallback.Factory.Create<SwitchCheckedChangeEventArgs>(this, args =>
+            {
+                receivedArgs = args;
+            })
+        ));
+
+        var input = cut.Find("input[type='checkbox']");
+        input.Click(new MouseEventArgs
+        {
+            ShiftKey = true,
+            CtrlKey = true,
+            AltKey = true,
+            MetaKey = true
+        });
+        input.Change(true);
+
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs.ShiftKey.ShouldBeTrue();
+        receivedArgs.CtrlKey.ShouldBeTrue();
+        receivedArgs.AltKey.ShouldBeTrue();
+        receivedArgs.MetaKey.ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ClearsModifierKeysFromIgnoredInputChanges()
+    {
+        SwitchCheckedChangeEventArgs? receivedArgs = null;
+        var callback = EventCallback.Factory.Create<SwitchCheckedChangeEventArgs>(this, args =>
+        {
+            receivedArgs = args;
+        });
+
+        var cut = Render<SwitchRoot>(parameters => parameters
+            .Add(p => p.Disabled, true)
+            .Add(p => p.OnCheckedChange, callback));
+
+        var input = cut.Find("input[type='checkbox']");
+        input.Click(new MouseEventArgs { ShiftKey = true });
+        input.Change(true);
+
+        receivedArgs.ShouldBeNull();
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Disabled, false)
+            .Add(p => p.OnCheckedChange, callback));
+
+        input = cut.Find("input[type='checkbox']");
+        input.Change(true);
+
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs.ShiftKey.ShouldBeFalse();
+        receivedArgs.CtrlKey.ShouldBeFalse();
+        receivedArgs.AltKey.ShouldBeFalse();
+        receivedArgs.MetaKey.ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FieldRootUsesSwitchNameForFormErrors()
+    {
+        var errors = new Dictionary<string, string[]>
+        {
+            ["notifications"] = ["Required"]
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Model", new { });
+            builder.AddAttribute(2, "Errors", errors);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(formBuilder =>
+                {
+                    formBuilder.OpenComponent<FieldRoot>(0);
+                    formBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<SwitchRoot>(0);
+                        fieldBuilder.AddAttribute(1, "Name", "notifications");
+                        fieldBuilder.AddAttribute(2, "data-testid", "switch-root");
+                        fieldBuilder.CloseComponent();
+
+                        fieldBuilder.OpenComponent<FieldError>(10);
+                        fieldBuilder.AddAttribute(11, "data-testid", "field-error");
+                        fieldBuilder.CloseComponent();
+                    }));
+                    formBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='switch-root']").GetAttribute("aria-invalid").ShouldBe("true");
+            cut.Find("[data-testid='field-error']").TextContent.ShouldBe("Required");
+        });
 
         return Task.CompletedTask;
     }
@@ -836,6 +1100,29 @@ public class SwitchRootTests : BunitContext, ISwitchRootContract
         thumb.HasAttribute("data-disabled").ShouldBeTrue();
         thumb.HasAttribute("data-readonly").ShouldBeTrue();
         thumb.HasAttribute("data-required").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UpdatesThumbStyleHooksWhenCheckedStateChanges()
+    {
+        var cut = Render(CreateSwitchWithThumb(
+            thumbAttributes: new Dictionary<string, object> { { "data-testid", "thumb" } }
+        ));
+
+        var input = cut.Find("input[type='checkbox']");
+        input.Change(true);
+
+        var thumb = cut.Find("[data-testid='thumb']");
+        thumb.HasAttribute("data-checked").ShouldBeTrue();
+        thumb.HasAttribute("data-unchecked").ShouldBeFalse();
+
+        input.Change(false);
+
+        thumb = cut.Find("[data-testid='thumb']");
+        thumb.HasAttribute("data-unchecked").ShouldBeTrue();
+        thumb.HasAttribute("data-checked").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

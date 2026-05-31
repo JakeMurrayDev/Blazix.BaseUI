@@ -376,6 +376,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithSwitchForm(string form)
+    {
+        queryParams["form"] = form;
+        return this;
+    }
+
     public TestPageUrlBuilder WithSwitchValue(string value)
     {
         queryParams["value"] = value;
@@ -397,6 +403,12 @@ public sealed class TestPageUrlBuilder
     public TestPageUrlBuilder WithShowWrappingLabel(bool value)
     {
         queryParams["showWrappingLabel"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithShowDynamicLabel(bool value)
+    {
+        queryParams["showDynamicLabel"] = value.ToString().ToLowerInvariant();
         return this;
     }
 

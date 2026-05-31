@@ -66,7 +66,13 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var newState = SwitchContext?.State ?? SwitchRootState.Default;
+        if (SwitchContext is null)
+        {
+            throw new InvalidOperationException(
+                "Base UI: SwitchRootContext is missing. Switch parts must be placed within <Switch.Root>.");
+        }
+
+        var newState = SwitchContext.State;
 
         var stateChanged = previousChecked != newState.Checked ||
                            previousDisabled != newState.Disabled ||
@@ -100,18 +106,24 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["data-checked"] = state.Checked;
-        attrs["data-unchecked"] = !state.Checked;
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-readonly"] = state.ReadOnly;
-        attrs["data-required"] = state.Required;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
+        AddAttributeUnlessOverridden(attrs, "data-checked", state.Checked);
+        AddAttributeUnlessOverridden(attrs, "data-unchecked", !state.Checked);
+        AddAttributeUnlessOverridden(attrs, "data-disabled", state.Disabled);
+        AddAttributeUnlessOverridden(attrs, "data-readonly", state.ReadOnly);
+        AddAttributeUnlessOverridden(attrs, "data-required", state.Required);
+        AddAttributeUnlessOverridden(attrs, "data-valid", state.Valid == true);
+        AddAttributeUnlessOverridden(attrs, "data-invalid", state.Valid == false);
+        AddAttributeUnlessOverridden(attrs, "data-touched", state.Touched);
+        AddAttributeUnlessOverridden(attrs, "data-dirty", state.Dirty);
+        AddAttributeUnlessOverridden(attrs, "data-filled", state.Filled);
+        AddAttributeUnlessOverridden(attrs, "data-focused", state.Focused);
 
         componentAttributes = attrs;
+    }
+
+    private void AddAttributeUnlessOverridden(Dictionary<string, object> attrs, string key, object value)
+    {
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, key))
+            attrs[key] = value;
     }
 }

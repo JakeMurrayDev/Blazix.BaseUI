@@ -121,15 +121,22 @@ public static class JsInteropSetup
     }
 
     private const string SwitchModule = "./_content/BlazorBaseUI/blazor-baseui-switch.js";
+    private const string SwitchMinModule = "./_content/BlazorBaseUI/blazor-baseui-switch.min.js";
 
     public static void SetupSwitchModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(SwitchModule);
-        module.SetupVoid("initialize", _ => true);
-        module.SetupVoid("dispose", _ => true);
-        module.SetupVoid("updateState", _ => true);
-        module.SetupVoid("setInputChecked", _ => true);
-        module.SetupVoid("focus", _ => true);
+        SetupSwitchModulePath(SwitchModule);
+        SetupSwitchModulePath(SwitchMinModule);
+
+        void SetupSwitchModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initialize", _ => true).SetVoidResult();
+            module.SetupVoid("dispose", _ => true).SetVoidResult();
+            module.SetupVoid("updateState", _ => true).SetVoidResult();
+            module.SetupVoid("setInputChecked", _ => true).SetVoidResult();
+            module.SetupVoid("focus", _ => true).SetVoidResult();
+        }
     }
 
     private const string CheckboxModule = "./_content/BlazorBaseUI/blazor-baseui-checkbox.js";

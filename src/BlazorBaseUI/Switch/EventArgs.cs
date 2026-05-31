@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Components.Web;
+
 namespace BlazorBaseUI.Switch;
 
 /// <summary>
@@ -11,6 +13,31 @@ public class SwitchCheckedChangeEventArgs : EventArgs
     public bool Checked { get; }
 
     /// <summary>
+    /// Gets the reason the checked state changed.
+    /// </summary>
+    public SwitchChangeReason Reason { get; }
+
+    /// <summary>
+    /// Gets whether the Shift key was pressed for the input event that changed the switch, when available.
+    /// </summary>
+    public bool ShiftKey { get; }
+
+    /// <summary>
+    /// Gets whether the Ctrl key was pressed for the input event that changed the switch, when available.
+    /// </summary>
+    public bool CtrlKey { get; }
+
+    /// <summary>
+    /// Gets whether the Alt key was pressed for the input event that changed the switch, when available.
+    /// </summary>
+    public bool AltKey { get; }
+
+    /// <summary>
+    /// Gets whether the Meta key was pressed for the input event that changed the switch, when available.
+    /// </summary>
+    public bool MetaKey { get; }
+
+    /// <summary>
     /// Gets a value indicating whether the checked change has been canceled.
     /// </summary>
     public bool IsCanceled { get; private set; }
@@ -20,8 +47,21 @@ public class SwitchCheckedChangeEventArgs : EventArgs
     /// </summary>
     /// <param name="isChecked">The new checked state of the switch.</param>
     public SwitchCheckedChangeEventArgs(bool isChecked)
+        : this(isChecked, SwitchChangeReason.None, null)
+    {
+    }
+
+    internal SwitchCheckedChangeEventArgs(
+        bool isChecked,
+        SwitchChangeReason reason,
+        MouseEventArgs? mouseEventArgs)
     {
         Checked = isChecked;
+        Reason = reason;
+        ShiftKey = mouseEventArgs?.ShiftKey ?? false;
+        CtrlKey = mouseEventArgs?.CtrlKey ?? false;
+        AltKey = mouseEventArgs?.AltKey ?? false;
+        MetaKey = mouseEventArgs?.MetaKey ?? false;
     }
 
     /// <summary>

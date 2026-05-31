@@ -10,6 +10,9 @@ public interface ISwitchRootContract
     Task AppliesStyleValue();
     Task CombinesClassFromBothSources();
     Task OverridesBuiltInAttributes();
+    Task RoleAttributeOverridesBuiltInRole();
+    Task ExplicitAriaLabelledByOverridesFieldLabel();
+    Task CombinesExternalAriaDescribedByWithFieldDescription();
 
     // ARIA and role
     Task HasRoleSwitch();
@@ -20,6 +23,7 @@ public interface ISwitchRootContract
 
     // Disabled
     Task UsesAriaDisabledInsteadOfHtmlDisabled();
+    Task NativeButtonUsesHtmlDisabled();
     Task DoesNotHaveDisabledAttributeByDefault();
 
     // ReadOnly
@@ -32,6 +36,8 @@ public interface ISwitchRootContract
 
     // Name and Value on hidden input
     Task SetsNameOnInputOnly();
+    Task FieldRootNameTakesPrecedenceOverSwitchName();
+    Task SetsFormOnInputsOnly();
     Task DoesNotSetValueByDefault();
     Task SetsValueOnInputOnly();
 
@@ -58,13 +64,17 @@ public interface ISwitchRootContract
 
     // Event callbacks
     Task InvokesOnCheckedChangeOnInputChange();
+    Task OnCheckedChangeReceivesModifierKeys();
     Task InvokesCheckedChangedOnInputChange();
     Task DoesNotInvokeCallbacksWhenDisabled();
     Task DoesNotInvokeCallbacksWhenReadOnly();
     Task OnCheckedChangeCancellationPreventsStateChange();
+    Task ClearsModifierKeysFromIgnoredInputChanges();
+    Task FieldRootUsesSwitchNameForFormErrors();
 
     // Context cascading
     Task CascadesContextToChildren();
+    Task UpdatesThumbStyleHooksWhenCheckedStateChanges();
 
     // NativeButton mode
     Task NativeButtonRendersAsButton();

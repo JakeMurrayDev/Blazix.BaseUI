@@ -9,6 +9,7 @@ public interface ISwitchThumbContract
     Task AppliesClassValue();
     Task AppliesStyleValue();
     Task CombinesClassFromBothSources();
+    Task DataAttributesCanBeOverridden();
 
     // Style hooks (data attributes)
     Task HasDataCheckedWhenChecked();
@@ -19,7 +20,7 @@ public interface ISwitchThumbContract
 
     // Context
     Task ReceivesStateFromContext();
-    Task HandlesNullContext();
+    Task ThrowsOutsideRoot();
 
     // State
     Task ClassValueReceivesCorrectState();

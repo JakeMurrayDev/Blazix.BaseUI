@@ -84,6 +84,28 @@ public abstract class SwitchTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that a disabled non-native switch exposes aria-disabled without firing user click callbacks.
+    /// </summary>
+    [Fact]
+    public virtual async Task DisabledSwitch_HasAriaDisabledAndDoesNotInvokeClickCallback()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithDisabled(true));
+
+        var switchEl = GetSwitch();
+        var clickCount = GetByTestId("click-count");
+
+        await Assertions.Expect(switchEl).ToHaveAttributeAsync("aria-disabled", "true");
+        Assert.Null(await switchEl.GetAttributeAsync("disabled"));
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+
+        await switchEl.ClickAsync(new LocatorClickOptions { Force = true });
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+    }
+
+    /// <summary>
     /// Tests that clicking a readonly switch does not change state.
     /// </summary>
     [Fact]
@@ -139,6 +161,25 @@ public abstract class SwitchTestsBase : TestBase
         await Assertions.Expect(changeCount).ToHaveTextAsync("1");
     }
 
+    /// <summary>
+    /// Tests that pointer modifier keys are preserved when dispatching the hidden input click.
+    /// </summary>
+    [Fact]
+    public virtual async Task Click_ReportsModifierKeysToOnCheckedChange()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch"));
+
+        var switchEl = GetSwitch();
+        var modifierState = GetByTestId("modifier-state");
+
+        await Page.Keyboard.DownAsync("Shift");
+        await switchEl.ClickAsync();
+        await Page.Keyboard.UpAsync("Shift");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(modifierState).ToHaveTextAsync("shift=true;ctrl=false;alt=false;meta=false");
+    }
+
     #endregion
 
     #region Keyboard Activation Tests
@@ -179,6 +220,74 @@ public abstract class SwitchTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await WaitForCheckedStateAsync(true);
+    }
+
+    /// <summary>
+    /// Tests that pressing Enter invokes the root click callback in the same activation path as React useButton.
+    /// </summary>
+    [Fact]
+    public virtual async Task Enter_InvokesOnClickCallback()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch"));
+
+        var switchEl = GetSwitch();
+        var clickCount = GetByTestId("click-count");
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+
+        await switchEl.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+        await WaitForCheckedStateAsync(true);
+    }
+
+    /// <summary>
+    /// Tests that pressing Space invokes the root click callback in the same activation path as React useButton.
+    /// </summary>
+    [Fact]
+    public virtual async Task Space_InvokesOnClickCallback()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch"));
+
+        var switchEl = GetSwitch();
+        var clickCount = GetByTestId("click-count");
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+
+        await switchEl.FocusAsync();
+        await Page.Keyboard.PressAsync("Space");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+        await WaitForCheckedStateAsync(true);
+    }
+
+    /// <summary>
+    /// Tests that readonly keyboard activation preserves the root click callback while blocking state changes.
+    /// </summary>
+    [Fact]
+    public virtual async Task ReadOnlySwitch_KeyboardInvokesClickCallbackWithoutToggling()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithReadOnly(true));
+
+        var switchEl = GetSwitch();
+        var clickCount = GetByTestId("click-count");
+        var changeCount = GetByTestId("change-count");
+
+        await WaitForCheckedStateAsync(false);
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("0");
+
+        await switchEl.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("1");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("0");
+        await WaitForCheckedStateAsync(false);
     }
 
     /// <summary>
@@ -289,6 +398,30 @@ public abstract class SwitchTestsBase : TestBase
 
         var switchEl = GetSwitch();
         await Assertions.Expect(switchEl).ToBeDisabledAsync();
+    }
+
+    /// <summary>
+    /// Tests that native button mode associates the public id with the button rather than the hidden input.
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeButton_LinkedLabelTargetsButton()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithNativeButton(true)
+            .WithShowLabel(true));
+
+        var switchEl = GetSwitch();
+        var hiddenInput = GetHiddenInput();
+        var label = GetByTestId("linked-label");
+
+        await Assertions.Expect(switchEl).ToHaveAttributeAsync("id", "my-switch");
+        Assert.NotEqual("my-switch", await hiddenInput.GetAttributeAsync("id"));
+        await WaitForCheckedStateAsync(false);
+
+        await label.ClickAsync();
+        await WaitForDelayAsync(100);
+
+        await WaitForCheckedStateAsync(true);
     }
 
     #endregion
@@ -411,6 +544,46 @@ public abstract class SwitchTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await WaitForCheckedStateAsync(true);
+    }
+
+    /// <summary>
+    /// Tests that the non-native root receives fallback aria-labelledby from an explicitly linked native label.
+    /// </summary>
+    [Fact]
+    public virtual async Task LinkedLabel_ProvidesFallbackAriaLabelledBy()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithShowLabel(true));
+
+        var switchEl = GetSwitch();
+        var label = GetByTestId("linked-label");
+
+        var labelId = await label.GetAttributeAsync("id");
+        Assert.False(string.IsNullOrEmpty(labelId));
+        await Assertions.Expect(switchEl).ToHaveAttributeAsync("aria-labelledby", labelId!);
+    }
+
+    /// <summary>
+    /// Tests that fallback aria-labelledby tracks the hidden input id when it changes.
+    /// </summary>
+    [Fact]
+    public virtual async Task LinkedLabel_UpdatesFallbackAriaLabelledByWhenInputIdChanges()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithShowDynamicLabel(true));
+
+        var switchEl = GetSwitch();
+        var labelA = GetByTestId("linked-label-a");
+        var labelB = GetByTestId("linked-label-b");
+        var toggleId = GetByTestId("toggle-switch-id");
+
+        await Assertions.Expect(labelA).ToHaveAttributeAsync("id", "dynamic-switch-a-label");
+        await Assertions.Expect(switchEl).ToHaveAttributeAsync("aria-labelledby", "dynamic-switch-a-label");
+
+        await toggleId.ClickAsync();
+
+        await Assertions.Expect(labelB).ToHaveAttributeAsync("id", "dynamic-switch-b-label");
+        await Assertions.Expect(switchEl).ToHaveAttributeAsync("aria-labelledby", "dynamic-switch-b-label");
     }
 
     #endregion
@@ -538,6 +711,26 @@ public abstract class SwitchTestsBase : TestBase
 
         var formData = GetByTestId("form-data");
         await Assertions.Expect(formData).ToContainTextAsync("toggle=yes");
+    }
+
+    /// <summary>
+    /// Tests that the form attribute is forwarded to the checkbox input and unchecked hidden input only.
+    /// </summary>
+    [Fact]
+    public virtual async Task FormAttribute_AppliesToHiddenInputsOnly()
+    {
+        await NavigateAsync(CreateUrl("/tests/switch")
+            .WithSwitchName("toggle")
+            .WithSwitchForm("external-form")
+            .WithUncheckedValue("off"));
+
+        var switchEl = GetSwitch();
+        var input = GetHiddenInput();
+        var uncheckedInput = Page.Locator("input[type='hidden']");
+
+        Assert.Null(await switchEl.GetAttributeAsync("form"));
+        Assert.Equal("external-form", await input.GetAttributeAsync("form"));
+        Assert.Equal("external-form", await uncheckedInput.GetAttributeAsync("form"));
     }
 
     #endregion

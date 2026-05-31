@@ -186,6 +186,27 @@ public class SwitchThumbTests : BunitContext, ISwitchThumbContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task DataAttributesCanBeOverridden()
+    {
+        var cut = Render(CreateSwitchWithThumb(
+            defaultChecked: true,
+            disabled: true,
+            thumbAdditionalAttributes: new Dictionary<string, object>
+            {
+                { "data-testid", "thumb" },
+                { "data-checked", "custom-checked" },
+                { "data-disabled", "custom-disabled" }
+            }
+        ));
+
+        var thumb = cut.Find("[data-testid='thumb']");
+        thumb.GetAttribute("data-checked").ShouldBe("custom-checked");
+        thumb.GetAttribute("data-disabled").ShouldBe("custom-disabled");
+
+        return Task.CompletedTask;
+    }
+
     // Style hooks (data attributes) tests
     [Fact]
     public Task HasDataCheckedWhenChecked()
@@ -295,20 +316,17 @@ public class SwitchThumbTests : BunitContext, ISwitchThumbContract
     }
 
     [Fact]
-    public Task HandlesNullContext()
+    public Task ThrowsOutsideRoot()
     {
-        var cut = Render(builder =>
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
         {
             builder.OpenComponent<SwitchThumb>(0);
             builder.AddAttribute(1, "AdditionalAttributes",
                 (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "thumb" } });
             builder.CloseComponent();
-        });
+        }));
 
-        var thumb = cut.Find("[data-testid='thumb']");
-        thumb.ShouldNotBeNull();
-        thumb.HasAttribute("data-unchecked").ShouldBeTrue();
-
+        exception.Message.ShouldBe("Base UI: SwitchRootContext is missing. Switch parts must be placed within <Switch.Root>.");
         return Task.CompletedTask;
     }
 

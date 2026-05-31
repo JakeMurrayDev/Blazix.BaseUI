@@ -53,6 +53,15 @@
             Toggle setting
         </label>
     }
+    else if (ShowDynamicLabel)
+    {
+        <div>
+            <label data-testid="linked-label-a" for="dynamic-switch-a">Label A</label>
+            <label data-testid="linked-label-b" for="dynamic-switch-b">Label B</label>
+            @RenderSwitchWithDynamicId()
+            <button type="button" data-testid="toggle-switch-id" @onclick="ToggleSwitchId">Toggle Switch Id</button>
+        </div>
+    }
     else if (ShowLabel)
     {
         <div>
@@ -71,6 +80,7 @@
         <div>Click Count: <span data-testid="click-count">@clickCount</span></div>
         <div>Focus Count: <span data-testid="focus-count">@focusCount</span></div>
         <div>Blur Count: <span data-testid="blur-count">@blurCount</span></div>
+        <div>Modifiers: <span data-testid="modifier-state">@modifierState</span></div>
     </div>
 
     <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
@@ -99,6 +109,9 @@
     [SupplyParameterFromQuery(Name = "name")]
     public string? Name { get; set; }
 
+    [SupplyParameterFromQuery(Name = "form")]
+    public string? Form { get; set; }
+
     [SupplyParameterFromQuery(Name = "value")]
     public string? Value { get; set; }
 
@@ -111,6 +124,9 @@
     [SupplyParameterFromQuery(Name = "showWrappingLabel")]
     public bool ShowWrappingLabel { get; set; }
 
+    [SupplyParameterFromQuery(Name = "showDynamicLabel")]
+    public bool ShowDynamicLabel { get; set; }
+
     [SupplyParameterFromQuery(Name = "showForm")]
     public bool ShowForm { get; set; }
 
@@ -119,7 +135,9 @@
     private int clickCount;
     private int focusCount;
     private int blurCount;
+    private string modifierState = "none";
     private string formData = "";
+    private string dynamicSwitchId = "dynamic-switch-a";
 
     protected override void OnInitialized()
     {
@@ -136,6 +154,7 @@
             Required="@Required"
             NativeButton="@NativeButton"
             Name="@Name"
+            Form="@Form"
             Value="@Value"
             UncheckedValue="@UncheckedValue"
             OnCheckedChange="HandleCheckedChange"
@@ -159,6 +178,31 @@
             Required="@Required"
             NativeButton="@NativeButton"
             Name="@Name"
+            Form="@Form"
+            Value="@Value"
+            UncheckedValue="@UncheckedValue"
+            OnCheckedChange="HandleCheckedChange"
+            @onfocus="HandleFocus"
+            @onblur="HandleBlur"
+            @onclick="HandleClick"
+            class="switch-root"
+            data-testid="switch-root">
+            <SwitchThumb class="switch-thumb" data-testid="switch-thumb" />
+        </SwitchRoot>
+    };
+
+    private RenderFragment RenderSwitchWithDynamicId() => __builder =>
+    {
+        <SwitchRoot
+            id="@dynamicSwitchId"
+            @bind-Checked="currentChecked"
+            DefaultChecked="@DefaultChecked"
+            Disabled="@Disabled"
+            ReadOnly="@ReadOnly"
+            Required="@Required"
+            NativeButton="@NativeButton"
+            Name="@Name"
+            Form="@Form"
             Value="@Value"
             UncheckedValue="@UncheckedValue"
             OnCheckedChange="HandleCheckedChange"
@@ -174,6 +218,7 @@
     private void HandleCheckedChange(SwitchCheckedChangeEventArgs args)
     {
         changeCount++;
+        modifierState = $"shift={args.ShiftKey.ToString().ToLowerInvariant()};ctrl={args.CtrlKey.ToString().ToLowerInvariant()};alt={args.AltKey.ToString().ToLowerInvariant()};meta={args.MetaKey.ToString().ToLowerInvariant()}";
     }
 
     private void HandleClick()
@@ -194,6 +239,13 @@
     private void ToggleExternal()
     {
         currentChecked = !currentChecked;
+    }
+
+    private void ToggleSwitchId()
+    {
+        dynamicSwitchId = dynamicSwitchId == "dynamic-switch-a"
+            ? "dynamic-switch-b"
+            : "dynamic-switch-a";
     }
 
     private void HandleSubmit()

@@ -9,7 +9,7 @@
 
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context" IsFixed="true">
+<CascadingValue Value="context">
     @if (NativeButton)
     {
         <RenderElement TState="SwitchRootState"
@@ -40,7 +40,7 @@
 
 @if (!CurrentChecked && ResolvedName is not null && UncheckedValue is not null)
 {
-    <input type="hidden" name="@ResolvedName" value="@UncheckedValue" />
+    <input type="hidden" form="@Form" name="@ResolvedName" value="@UncheckedValue" />
 }
 
 <input type="checkbox"
@@ -48,22 +48,31 @@
        checked="@CurrentChecked"
        disabled="@ResolvedDisabled"
        required="@Required"
+       form="@Form"
        aria-hidden="true"
+       aria-describedby="@InputAriaDescribedBy"
        tabindex="-1"
-       style="position:absolute;pointer-events:none;opacity:0;margin:0;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;"
+       style="@HiddenInputStyle"
        name="@(ResolvedName is not null ? ResolvedName : null)"
        value="@Value"
+       @onclick="HandleInputClick"
        @onchange="HandleInputChangeAsync"
        @onfocus="HandleInputFocusAsync"
        @ref="inputElement" />
 
 @code {
     private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-switch.min.js";
+    private const string VisuallyHiddenStyle = "position:fixed;top:0;left:0;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);";
+    private const string VisuallyHiddenInputStyle = "position:absolute;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);";
 
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private readonly string fieldControlSource = Guid.NewGuid().ToIdString();
 
     private bool hasRendered;
     private bool isChecked;
+    private bool fieldControlRegistered;
+    private bool jsReinitializePending;
+    private bool jsUpdatePending;
     private bool previousChecked;
     private bool previousDisabled;
     private bool previousReadOnly;
@@ -75,6 +84,8 @@
     private bool previousFilled;
     private bool previousFocused;
     private string? defaultId;
+    private string? registeredControlId;
+    private string? registeredName;
     private string resolvedControlId = null!;
     private string switchId = null!;
     private string inputId = null!;
@@ -84,6 +95,7 @@
     private RenderElement<SwitchRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private Dictionary<string, object> nativeButtonAttributes = new();
+    private MouseEventArgs? lastInputClickArgs;
 
     private bool IsControlled => Checked.HasValue;
 
@@ -91,11 +103,25 @@
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
-    private string? ResolvedName => Name ?? FieldContext?.Name;
+    private string? ResolvedName => FieldContext?.Name ?? Name;
 
     private string ResolvedControlId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
     private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
+
+    private string HiddenInputStyle => ResolvedName is not null ? VisuallyHiddenInputStyle : VisuallyHiddenStyle;
+
+    private string? ExplicitAriaLabelledBy => AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-labelledby");
+
+    private string? ExternalAriaDescribedBy => AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby");
+
+    private string? FieldAriaDescribedBy => LabelableContext?.GetAriaDescribedBy();
+
+    private string? InputAriaDescribedBy => FieldAriaDescribedBy;
+
+    private bool EnableNativeLabelFallback => string.IsNullOrEmpty(ExplicitAriaLabelledBy) &&
+                                              string.IsNullOrEmpty(LabelableContext?.LabelId) &&
+                                              !NativeButton;
 
     [CascadingParameter]
     private FieldRootContext? FieldContext { get; set; }
@@ -147,6 +173,12 @@
     /// </summary>
     [Parameter]
     public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the form that owns the hidden input when the switch is rendered outside the form.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
 
     /// <summary>
     /// Gets or sets the value submitted with the form when the switch is off.
@@ -234,8 +266,8 @@
     {
         switchId = Guid.NewGuid().ToIdString();
         resolvedControlId = ResolvedControlId;
-        LabelableContext?.SetControlId(resolvedControlId);
         inputId = resolvedControlId;
+        UpdateLabelableControlId();
 
         if (!IsControlled)
         {
@@ -246,6 +278,7 @@
         FieldContext?.Validation.SetInitialValue(initialValue);
         FieldContext?.SetFilled(initialValue);
         FieldContext?.RegisterFocusHandlerFunc(FocusAsync);
+        RegisterFieldControl();
         FieldContext?.SubscribeFunc(this);
 
         previousChecked = CurrentChecked;
@@ -266,14 +299,7 @@
             ReadOnly,
             Required);
 
-        context = new SwitchRootContext
-        {
-            Checked = CurrentChecked,
-            Disabled = ResolvedDisabled,
-            ReadOnly = ReadOnly,
-            Required = Required,
-            State = state
-        };
+        UpdateContext(CurrentChecked, ResolvedDisabled, state);
 
         BuildComponentAttributes();
     }
@@ -286,8 +312,11 @@
         {
             resolvedControlId = newResolvedId;
             inputId = newResolvedId;
-            LabelableContext?.SetControlId(resolvedControlId);
+            jsUpdatePending = true;
         }
+
+        UpdateLabelableControlId();
+        RegisterFieldControl();
 
         var currentChecked = CurrentChecked;
         var currentDisabled = ResolvedDisabled;
@@ -312,11 +341,7 @@
                 ReadOnly,
                 Required);
 
-            context.Checked = currentChecked;
-            context.Disabled = currentDisabled;
-            context.ReadOnly = ReadOnly;
-            context.Required = Required;
-            context.State = state;
+            UpdateContext(currentChecked, currentDisabled, state);
         }
 
         BuildComponentAttributes();
@@ -331,10 +356,14 @@
 
             if (currentDisabled != previousDisabled || ReadOnly != previousReadOnly || NativeButton != previousNativeButton)
             {
-                previousDisabled = currentDisabled;
-                previousReadOnly = ReadOnly;
-                previousNativeButton = NativeButton;
-                _ = UpdateJsStateAsync();
+                if (NativeButton != previousNativeButton)
+                {
+                    jsReinitializePending = true;
+                }
+                else
+                {
+                    jsUpdatePending = true;
+                }
             }
         }
 
@@ -357,6 +386,21 @@
         {
             hasRendered = true;
             await InitializeJsAsync();
+            return;
+        }
+
+        if (jsReinitializePending)
+        {
+            jsReinitializePending = false;
+            jsUpdatePending = false;
+            await InitializeJsAsync();
+            return;
+        }
+
+        if (jsUpdatePending || EnableNativeLabelFallback)
+        {
+            jsUpdatePending = false;
+            await UpdateJsStateAsync();
         }
     }
 
@@ -364,6 +408,9 @@
     public async ValueTask DisposeAsync()
     {
         LabelableContext?.SetControlId(null);
+        if (fieldControlRegistered)
+            FieldContext?.RegisterFieldControl(fieldControlSource, null);
+
         FieldContext?.UnsubscribeFunc(this);
 
         if (moduleTask.IsValueCreated && Element.HasValue)
@@ -384,118 +431,71 @@
     /// <inheritdoc />
     public void NotifyStateChanged()
     {
+        UpdateStateAndContext();
         _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()
     {
-        var labelId = LabelableContext?.LabelId;
-        var describedBy = LabelableContext?.GetAriaDescribedBy();
-
-        // Build shared attributes for the non-native-button case
-        var attrs = new Dictionary<string, object>();
-
+        var attrs = CreateBaseRootAttributes(isNativeButton: false);
         attrs["id"] = switchId;
-        attrs["role"] = "switch";
-        attrs["aria-checked"] = CurrentChecked ? "true" : "false";
-        attrs["tabindex"] = ResolvedDisabled ? -1 : 0;
-
-        if (ReadOnly)
-        {
-            attrs["aria-readonly"] = "true";
-        }
-
-        if (Required)
-        {
-            attrs["aria-required"] = "true";
-        }
-
-        if (!string.IsNullOrEmpty(labelId))
-        {
-            attrs["aria-labelledby"] = labelId;
-        }
-
-        if (!string.IsNullOrEmpty(describedBy))
-        {
-            attrs["aria-describedby"] = describedBy;
-        }
-
-        if (state.Valid == false)
-        {
-            attrs["aria-invalid"] = "true";
-        }
-
-        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
-        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
-
-        attrs["data-checked"] = state.Checked;
-        attrs["data-unchecked"] = !state.Checked;
-        attrs["data-disabled"] = state.Disabled;
-        attrs["data-readonly"] = state.ReadOnly;
-        attrs["data-required"] = state.Required;
-        attrs["data-valid"] = state.Valid == true;
-        attrs["data-invalid"] = state.Valid == false;
-        attrs["data-touched"] = state.Touched;
-        attrs["data-dirty"] = state.Dirty;
-        attrs["data-filled"] = state.Filled;
-        attrs["data-focused"] = state.Focused;
-
+        AddAttributeUnlessOverridden(attrs, "tabindex", ResolvedDisabled ? -1 : 0);
         componentAttributes = attrs;
 
-        // Build native button attributes
-        var btnAttrs = new Dictionary<string, object>();
-
+        var btnAttrs = CreateBaseRootAttributes(isNativeButton: true);
         btnAttrs["id"] = resolvedControlId;
-        btnAttrs["type"] = "button";
-        btnAttrs["role"] = "switch";
-        btnAttrs["aria-checked"] = CurrentChecked ? "true" : "false";
+        AddAttributeUnlessOverridden(btnAttrs, "type", "button");
 
         if (ResolvedDisabled)
         {
             btnAttrs["disabled"] = true;
         }
 
+        nativeButtonAttributes = btnAttrs;
+    }
+
+    private Dictionary<string, object> CreateBaseRootAttributes(bool isNativeButton)
+    {
+        var attrs = new Dictionary<string, object>();
+
+        AddAttributeUnlessOverridden(attrs, "role", "switch");
+        AddAttributeUnlessOverridden(attrs, "aria-checked", CurrentChecked ? "true" : "false");
+
+        if (ResolvedDisabled && !isNativeButton)
+            AddAttributeUnlessOverridden(attrs, "aria-disabled", "true");
+
         if (ReadOnly)
-        {
-            btnAttrs["aria-readonly"] = "true";
-        }
+            AddAttributeUnlessOverridden(attrs, "aria-readonly", "true");
 
         if (Required)
-        {
-            btnAttrs["aria-required"] = "true";
-        }
+            AddAttributeUnlessOverridden(attrs, "aria-required", "true");
 
-        if (!string.IsNullOrEmpty(labelId))
-        {
-            btnAttrs["aria-labelledby"] = labelId;
-        }
+        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+            AddAttributeUnlessOverridden(attrs, "aria-labelledby", LabelableContext.LabelId);
 
+        var describedBy = AttributeUtilities.CombineIdRefs(ExternalAriaDescribedBy, FieldAriaDescribedBy);
         if (!string.IsNullOrEmpty(describedBy))
-        {
-            btnAttrs["aria-describedby"] = describedBy;
-        }
+            attrs["aria-describedby"] = describedBy;
 
         if (state.Valid == false)
-        {
-            btnAttrs["aria-invalid"] = "true";
-        }
+            AddAttributeUnlessOverridden(attrs, "aria-invalid", "true");
 
-        btnAttrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
-        btnAttrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
 
-        btnAttrs["data-checked"] = state.Checked;
-        btnAttrs["data-unchecked"] = !state.Checked;
-        btnAttrs["data-disabled"] = state.Disabled;
-        btnAttrs["data-readonly"] = state.ReadOnly;
-        btnAttrs["data-required"] = state.Required;
-        btnAttrs["data-valid"] = state.Valid == true;
-        btnAttrs["data-invalid"] = state.Valid == false;
-        btnAttrs["data-touched"] = state.Touched;
-        btnAttrs["data-dirty"] = state.Dirty;
-        btnAttrs["data-filled"] = state.Filled;
-        btnAttrs["data-focused"] = state.Focused;
+        AddAttributeUnlessOverridden(attrs, "data-checked", state.Checked);
+        AddAttributeUnlessOverridden(attrs, "data-unchecked", !state.Checked);
+        AddAttributeUnlessOverridden(attrs, "data-disabled", state.Disabled);
+        AddAttributeUnlessOverridden(attrs, "data-readonly", state.ReadOnly);
+        AddAttributeUnlessOverridden(attrs, "data-required", state.Required);
+        AddAttributeUnlessOverridden(attrs, "data-valid", state.Valid == true);
+        AddAttributeUnlessOverridden(attrs, "data-invalid", state.Valid == false);
+        AddAttributeUnlessOverridden(attrs, "data-touched", state.Touched);
+        AddAttributeUnlessOverridden(attrs, "data-dirty", state.Dirty);
+        AddAttributeUnlessOverridden(attrs, "data-filled", state.Filled);
+        AddAttributeUnlessOverridden(attrs, "data-focused", state.Focused);
 
-        nativeButtonAttributes = btnAttrs;
+        return attrs;
     }
 
     private async Task InitializeJsAsync()
@@ -508,7 +508,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ReadOnly, NativeButton);
+            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ReadOnly, NativeButton, EnableNativeLabelFallback);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -526,7 +526,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("updateState", Element.Value, ResolvedDisabled, ReadOnly, NativeButton);
+            await module.InvokeVoidAsync("updateState", Element.Value, inputElement, ResolvedDisabled, ReadOnly, NativeButton, EnableNativeLabelFallback);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -565,8 +565,12 @@
 
     private async Task HandleInputChangeAsync(ChangeEventArgs e)
     {
+        var inputClickArgs = lastInputClickArgs;
+        lastInputClickArgs = null;
+
         if (ReadOnly || ResolvedDisabled)
         {
+            await ResetInputCheckedAsync();
             return;
         }
 
@@ -577,7 +581,12 @@
             return;
         }
 
-        await SetChecked(nextChecked);
+        await SetChecked(nextChecked, inputClickArgs);
+    }
+
+    private void HandleInputClick(MouseEventArgs e)
+    {
+        lastInputClickArgs = e;
     }
 
     private async Task HandleInputFocusAsync(FocusEventArgs e)
@@ -585,9 +594,9 @@
         await FocusAsync();
     }
 
-    private async Task SetChecked(bool value)
+    private async Task SetChecked(bool value, MouseEventArgs? mouseEventArgs = null)
     {
-        var eventArgs = new SwitchCheckedChangeEventArgs(value);
+        var eventArgs = new SwitchCheckedChangeEventArgs(value, SwitchChangeReason.None, mouseEventArgs);
 
         if (OnCheckedChange.HasDelegate)
         {
@@ -647,7 +656,14 @@
 
         if (FieldContext?.ShouldValidateOnChangeFunc() == true)
         {
-            _ = FieldContext.Validation.CommitAsync(CurrentChecked);
+            if (FieldContext.ValidationDebounceTime > 0)
+            {
+                FieldContext.Validation.CommitDebounced(CurrentChecked);
+            }
+            else
+            {
+                _ = FieldContext.Validation.CommitAsync(CurrentChecked);
+            }
         }
         else
         {
@@ -668,11 +684,7 @@
             ReadOnly,
             Required);
 
-        context.Checked = currentChecked;
-        context.Disabled = currentDisabled;
-        context.ReadOnly = ReadOnly;
-        context.Required = Required;
-        context.State = state;
+        UpdateContext(currentChecked, currentDisabled, state);
 
         BuildComponentAttributes();
 
@@ -685,6 +697,57 @@
         previousDirty = fieldState.Dirty;
         previousFilled = fieldState.Filled;
         previousFocused = fieldState.Focused;
+    }
+
+    private void RegisterFieldControl()
+    {
+        if (FieldContext is null)
+            return;
+
+        var registrationName = string.IsNullOrEmpty(Name) ? null : Name;
+        if (fieldControlRegistered && registeredControlId == switchId && registeredName == registrationName)
+            return;
+
+        FieldContext.RegisterFieldControl(
+            fieldControlSource,
+            new FieldControlRegistration(
+                Id: switchId,
+                Name: registrationName,
+                GetValue: GetRegisteredValue,
+                ValidateAsync: ValidateRegisteredValueAsync,
+                FocusAsync: FocusAsync));
+
+        fieldControlRegistered = true;
+        registeredControlId = switchId;
+        registeredName = registrationName;
+    }
+
+    private void UpdateContext(bool currentChecked, bool currentDisabled, SwitchRootState currentState)
+    {
+        context = new SwitchRootContext
+        {
+            Checked = currentChecked,
+            Disabled = currentDisabled,
+            ReadOnly = ReadOnly,
+            Required = Required,
+            State = currentState
+        };
+    }
+
+    private object? GetRegisteredValue() => CurrentChecked;
+
+    private Task ValidateRegisteredValueAsync() =>
+        FieldContext?.Validation.CommitAsync(CurrentChecked) ?? Task.CompletedTask;
+
+    private void UpdateLabelableControlId()
+    {
+        LabelableContext?.SetControlId(NativeButton ? resolvedControlId : inputId);
+    }
+
+    private void AddAttributeUnlessOverridden(Dictionary<string, object> attrs, string key, object value)
+    {
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, key))
+            attrs[key] = value;
     }
 
     private async ValueTask FocusAsync()
