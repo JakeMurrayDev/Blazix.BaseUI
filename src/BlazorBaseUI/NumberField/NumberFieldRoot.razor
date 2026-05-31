@@ -11,7 +11,7 @@
 
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context" IsFixed="true">
+<CascadingValue Value="context">
     <RenderElement TState="NumberFieldRootState"
                    Tag="@DefaultTag"
                    State="state"
@@ -31,8 +31,14 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private bool hasRendered;
+    private bool inputInteropInitialized;
+    private bool hasWheelListener;
+    private bool isValueParameterSupplied;
+    private bool allowInputSync = true;
+    private bool hasPendingCommit;
     private string? defaultId;
     private double? currentValue;
+    private double? lastChangedValue;
     private string inputValue = string.Empty;
     private bool isScrubbing;
     private ElementReference? inputElement;
@@ -42,7 +48,7 @@
     private NumberFieldRootState state = NumberFieldRootState.Default;
     private Dictionary<string, object> componentAttributes = new();
 
-    private bool IsControlled => Value.HasValue;
+    private bool IsControlled => isValueParameterSupplied;
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
@@ -58,28 +64,9 @@
 
     private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
 
-    private string InputMode
-    {
-        get
-        {
-            if (MinWithDefault >= 0)
-                return "decimal";
-            return "text";
-        }
-    }
+    private double StepValue => ResolveStepValue();
 
-    private CultureInfo ResolvedCulture
-    {
-        get
-        {
-            if (!string.IsNullOrEmpty(Locale))
-            {
-                try { return CultureInfo.GetCultureInfo(Locale); }
-                catch { return CultureInfo.CurrentCulture; }
-            }
-            return CultureInfo.CurrentCulture;
-        }
-    }
+    private object HiddenStepValue => IsStepAny() ? "any" : StepValue;
 
     private RenderFragment RootContent => builder =>
     {
@@ -87,15 +74,16 @@
         builder.OpenElement(1, "input");
         builder.AddAttribute(2, "type", "number");
         builder.AddAttribute(3, "name", ResolvedName);
-        builder.AddAttribute(4, "value", currentValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty);
+        builder.AddAttribute(4, "value", NumberFieldUtilities.ToHiddenInputValue(currentValue));
         builder.AddAttribute(5, "min", Min);
         builder.AddAttribute(6, "max", Max);
-        builder.AddAttribute(7, "step", Step);
+        builder.AddAttribute(7, "step", HiddenStepValue);
         builder.AddAttribute(8, "disabled", ResolvedDisabled);
         builder.AddAttribute(9, "required", Required);
         builder.AddAttribute(10, "aria-hidden", "true");
         builder.AddAttribute(11, "tabindex", -1);
         builder.AddAttribute(12, "style", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0");
+        builder.AddAttribute(13, "form", Form);
         builder.CloseElement();
     };
 
@@ -140,7 +128,7 @@
     /// Defaults to <c>1</c>.
     /// </summary>
     [Parameter]
-    public double Step { get; set; } = 1;
+    public object? Step { get; set; } = 1d;
 
     /// <summary>
     /// Gets or sets the large step value of the input element when incrementing while the shift key is held.
@@ -176,6 +164,12 @@
     /// </summary>
     [Parameter]
     public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the id of the external form that owns the hidden input.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
 
     /// <summary>
     /// Gets or sets the raw numeric value of the field.
@@ -218,6 +212,14 @@
     /// </summary>
     [Parameter]
     public bool AllowWheelScrub { get; set; }
+
+    /// <summary>
+    /// Determines whether direct text input may exceed the configured <see cref="Min"/> and <see cref="Max"/> values.
+    /// Step interactions still clamp to the configured range.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool AllowOutOfRange { get; set; }
 
     /// <summary>
     /// Determines whether the value should snap to the nearest step when incrementing or decrementing.
@@ -285,6 +287,13 @@
     }
 
     /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        isValueParameterSupplied = parameters.TryGetValue<double?>(nameof(Value), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
     protected override void OnInitialized()
     {
         InitializeValue();
@@ -297,11 +306,13 @@
         context = new NumberFieldRootContext
         {
             SetValue = SetValueInternal,
+            GetValidatedValue = GetValidatedValue,
             IncrementValue = IncrementValueInternal,
             GetStepAmount = GetStepAmount,
             StartAutoChange = StartAutoChangeInternal,
             StopAutoChange = StopAutoChangeInternal,
             SetInputValue = SetInputValueDirect,
+            SetAllowInputSync = SetAllowInputSyncInternal,
             SetIsScrubbing = SetIsScrubbingInternal,
             OnValueCommitted = HandleValueCommitted,
             SetInputElement = SetInputElementInternal,
@@ -311,6 +322,11 @@
         UpdateState();
         UpdateContext();
         BuildComponentAttributes();
+
+        if (hasRendered)
+        {
+            _ = UpdateInputInteropConfigAsync();
+        }
     }
 
     /// <inheritdoc />
@@ -322,7 +338,8 @@
             if (newValue != currentValue)
             {
                 currentValue = newValue;
-                inputValue = FormatNumber(currentValue);
+                allowInputSync = true;
+                inputValue = FormatNumber(currentValue, maximumPrecision: Format is null);
             }
         }
 
@@ -339,9 +356,9 @@
             hasRendered = true;
             dotNetRef = DotNetObjectReference.Create(this);
 
-            if (inputElement.HasValue && AllowWheelScrub)
+            if (inputElement.HasValue)
             {
-                await RegisterWheelListenerAsync();
+                await InitializeInputInteropAsync();
             }
         }
     }
@@ -392,8 +409,9 @@
         if (ResolvedDisabled || ReadOnly) return;
 
         var amount = GetStepAmount(altKey, shiftKey);
+        allowInputSync = true;
         IncrementValueInternal(amount, direction, NumberFieldChangeReason.Wheel);
-        HandleValueCommitted(currentValue, NumberFieldChangeReason.Wheel);
+        HandleValueCommitted(lastChangedValue ?? currentValue, NumberFieldChangeReason.Wheel);
     }
 
     /// <summary>
@@ -404,7 +422,8 @@
     {
         if (ResolvedDisabled || ReadOnly) return;
 
-        var amount = Step;
+        var amount = StepValue;
+        allowInputSync = true;
         IncrementValueInternal(amount, isIncrement ? 1 : -1, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
     }
 
@@ -414,7 +433,23 @@
     [JSInvokable]
     public void OnAutoChangeEnd(bool isIncrement)
     {
-        HandleValueCommitted(currentValue, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+        HandleValueCommitted(lastChangedValue ?? currentValue, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+    }
+
+    /// <summary>
+    /// Handles validated clipboard text from JavaScript paste handling.
+    /// </summary>
+    [JSInvokable]
+    public void OnPasteText(string pastedText)
+    {
+        if (ResolvedDisabled || ReadOnly) return;
+
+        var parsedValue = NumberFieldUtilities.ParseNumber(pastedText, Locale, Format);
+        if (!parsedValue.HasValue) return;
+
+        allowInputSync = false;
+        SetValueInternal(parsedValue.Value, NumberFieldChangeReason.InputPaste, null);
+        SetInputValueDirect(pastedText);
     }
 
     private void BuildComponentAttributes()
@@ -439,27 +474,39 @@
     {
         if (Value.HasValue)
         {
-            currentValue = ClampValue(Value.Value);
+            currentValue = Value.Value;
         }
         else if (DefaultValue.HasValue)
         {
-            currentValue = ClampValue(DefaultValue.Value);
+            currentValue = DefaultValue.Value;
         }
         else
         {
             currentValue = null;
         }
 
-        inputValue = FormatNumber(currentValue);
+        inputValue = FormatNumber(currentValue, maximumPrecision: IsControlled && Format is null);
     }
 
     private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
     {
-        var validatedValue = ValidateNumber(unvalidatedValue, direction);
+        SetValueInternal(unvalidatedValue, reason, direction, null);
+    }
 
-        if (validatedValue != currentValue || unvalidatedValue != currentValue)
+    private double? GetValidatedValue(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
+    {
+        return ValidateNumber(unvalidatedValue, reason, direction, null);
+    }
+
+    private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction, double? stepAmount)
+    {
+        var validatedValue = ValidateNumber(unvalidatedValue, reason, direction, stepAmount);
+        var isInputReason = IsInputReason(reason);
+
+        if (validatedValue != currentValue || (isInputReason && unvalidatedValue != currentValue))
         {
             var eventArgs = new NumberFieldValueChangeEventArgs(validatedValue, reason, direction);
+            lastChangedValue = validatedValue;
 
             if (OnValueChange.HasDelegate)
             {
@@ -490,7 +537,12 @@
             _ = ValueChanged.InvokeAsync(newValue);
         }
 
-        inputValue = FormatNumber(newValue);
+        if (allowInputSync)
+        {
+            inputValue = FormatNumber(newValue);
+        }
+
+        hasPendingCommit = true;
         HandleValuesChanged();
         UpdateState();
         UpdateContext();
@@ -502,14 +554,12 @@
     {
         var prevValue = currentValue ?? Math.Max(0, Min ?? 0);
         var nextValue = prevValue + amount * direction;
-        SetValueInternal(nextValue, reason, direction);
+        SetValueInternal(nextValue, reason, direction, amount);
     }
 
     private double GetStepAmount(bool altKey, bool shiftKey)
     {
-        if (altKey) return SmallStep;
-        if (shiftKey) return LargeStep;
-        return Step;
+        return NumberFieldUtilities.GetStepAmount(altKey, shiftKey, SmallStep, LargeStep, StepValue);
     }
 
     private void StartAutoChangeInternal(bool isIncrement)
@@ -521,7 +571,7 @@
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, Step, Min ?? double.MinValue, Max ?? double.MaxValue);
+                await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, StepValue, Min ?? double.MinValue, Max ?? double.MaxValue);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
@@ -557,6 +607,12 @@
         StateHasChanged();
     }
 
+    private void SetAllowInputSyncInternal(bool value)
+    {
+        allowInputSync = value;
+        context.AllowInputSync = value;
+    }
+
     private void SetIsScrubbingInternal(bool value)
     {
         if (isScrubbing != value)
@@ -577,6 +633,7 @@
             _ = OnValueCommitted.InvokeAsync(eventArgs);
         }
 
+        hasPendingCommit = false;
         FieldContext?.SetTouched(true);
 
         if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
@@ -589,25 +646,105 @@
     {
         inputElement = element;
 
-        if (hasRendered && AllowWheelScrub)
+        if (hasRendered)
         {
-            _ = RegisterWheelListenerAsync();
+            _ = InitializeInputInteropAsync();
         }
     }
 
-    private async Task RegisterWheelListenerAsync()
+    private async Task InitializeInputInteropAsync()
     {
         if (!inputElement.HasValue || dotNetRef is null) return;
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("registerWheelListener", inputElement.Value, dotNetRef, ResolvedDisabled, ReadOnly);
+            if (!inputInteropInitialized)
+            {
+                await module.InvokeVoidAsync("initialize", inputElement.Value, dotNetRef, BuildInputInteropConfig());
+                inputInteropInitialized = true;
+            }
+            else
+            {
+                await module.InvokeVoidAsync("updateConfig", inputElement.Value, BuildInputInteropConfig());
+            }
+
+            await UpdateWheelListenerAsync(module);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private async Task UpdateInputInteropConfigAsync()
+    {
+        if (!hasRendered || !inputElement.HasValue || dotNetRef is null) return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            if (!inputInteropInitialized)
+            {
+                await InitializeInputInteropAsync();
+                return;
+            }
+
+            await module.InvokeVoidAsync("updateConfig", inputElement.Value, BuildInputInteropConfig());
+            await UpdateWheelListenerAsync(module);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateWheelListenerAsync(IJSObjectReference module)
+    {
+        if (!inputElement.HasValue || dotNetRef is null) return;
+
+        try
+        {
+            if (AllowWheelScrub && !ResolvedDisabled && !ReadOnly)
+            {
+                await module.InvokeVoidAsync("registerWheelListener", inputElement.Value, dotNetRef, false, false);
+                hasWheelListener = true;
+            }
+            else if (hasWheelListener)
+            {
+                await module.InvokeVoidAsync("unregisterWheelListener", inputElement.Value);
+                hasWheelListener = false;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private object BuildInputInteropConfig()
+    {
+        return new
+        {
+            disabled = ResolvedDisabled,
+            readOnly = ReadOnly,
+            minWithDefault = MinWithDefault,
+            locale = Locale,
+            format = Format is null
+                ? null
+                : new
+                {
+                    style = Format.Style,
+                    currency = Format.Currency,
+                    unit = Format.Unit,
+                    minimumFractionDigits = Format.MinimumFractionDigits,
+                    maximumFractionDigits = Format.MaximumFractionDigits,
+                    minimumIntegerDigits = Format.MinimumIntegerDigits,
+                    minimumSignificantDigits = Format.MinimumSignificantDigits,
+                    maximumSignificantDigits = Format.MaximumSignificantDigits,
+                    useGrouping = Format.UseGrouping
+                }
+        };
     }
 
     private async ValueTask FocusInputAsync()
@@ -645,85 +782,25 @@
         }
     }
 
-    private double? ValidateNumber(double? value, int? direction)
+    private double? ValidateNumber(double? value, NumberFieldChangeReason reason, int? direction, double? stepAmount)
     {
-        if (!value.HasValue) return null;
-
-        var clamped = ClampValue(value.Value);
-
-        if (SnapOnStep && direction.HasValue)
-        {
-            var step = direction.Value * Step;
-            if (step != 0)
-            {
-                var baseVal = MinWithZeroDefault;
-                if (MinWithDefault != double.MinValue)
-                {
-                    baseVal = MinWithDefault;
-                }
-                clamped = SnapToStep(clamped, baseVal, step);
-            }
-        }
-
-        return RemoveFloatingPointErrors(clamped);
+        var shouldClamp = !AllowOutOfRange || !IsInputReason(reason);
+        var step = direction.HasValue ? (stepAmount ?? GetStepAmount(false, false)) * direction.Value : (double?)null;
+        return NumberFieldUtilities.ToValidatedNumber(
+            value,
+            step,
+            MinWithDefault,
+            MaxWithDefault,
+            MinWithZeroDefault,
+            Format,
+            SnapOnStep,
+            small: false,
+            clamp: shouldClamp);
     }
 
-    private double ClampValue(double value)
+    private string FormatNumber(double? value, bool maximumPrecision = false)
     {
-        return Math.Max(MinWithDefault, Math.Min(MaxWithDefault, value));
-    }
-
-    private static double SnapToStep(double value, double baseVal, double step)
-    {
-        if (step == 0) return value;
-
-        var stepSize = Math.Abs(step);
-        var direction = Math.Sign(step);
-        var rawSteps = (value - baseVal) / stepSize;
-
-        int snappedSteps;
-        if (direction > 0)
-            snappedSteps = (int)Math.Floor(rawSteps);
-        else
-            snappedSteps = (int)Math.Ceiling(rawSteps);
-
-        return baseVal + snappedSteps * stepSize;
-    }
-
-    private static double RemoveFloatingPointErrors(double value)
-    {
-        return Math.Round(value * 1e10) / 1e10;
-    }
-
-    private string FormatNumber(double? value)
-    {
-        if (!value.HasValue) return string.Empty;
-
-        var culture = ResolvedCulture;
-
-        if (Format is not null)
-        {
-            var formatString = GetFormatString();
-            return value.Value.ToString(formatString, culture);
-        }
-
-        return value.Value.ToString("G", culture);
-    }
-
-    private string GetFormatString()
-    {
-        if (Format is null) return "G";
-
-        var style = Format.Style?.ToLowerInvariant();
-        var minFrac = Format.MinimumFractionDigits ?? 0;
-        var maxFrac = Format.MaximumFractionDigits ?? 20;
-
-        return style switch
-        {
-            "currency" => $"C{minFrac}",
-            "percent" => $"P{minFrac}",
-            _ => maxFrac > 0 ? $"N{Math.Min(minFrac, maxFrac)}" : "N0"
-        };
+        return NumberFieldUtilities.FormatNumber(value, Locale, Format, maximumPrecision);
     }
 
     private void UpdateState()
@@ -752,11 +829,55 @@
         context.Name = ResolvedName;
         context.Required = Required;
         context.Invalid = FieldContext?.Invalid;
-        context.InputMode = InputMode;
+        context.InputMode = "numeric";
         context.IsScrubbing = isScrubbing;
         context.Locale = Locale;
         context.FormatOptions = Format;
+        context.AllowOutOfRange = AllowOutOfRange;
+        context.HasPendingCommit = hasPendingCommit;
+        context.AllowInputSync = allowInputSync;
         context.State = state;
         context.InputElement = inputElement;
     }
+
+    private double ResolveStepValue()
+    {
+        if (Step is null)
+            return NumberFieldUtilities.DefaultStep;
+
+        if (Step is string text)
+        {
+            if (string.Equals(text, "any", StringComparison.OrdinalIgnoreCase))
+                return NumberFieldUtilities.DefaultStep;
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                return parsed;
+        }
+
+        if (Step is IConvertible convertible)
+        {
+            try
+            {
+                return convertible.ToDouble(CultureInfo.InvariantCulture);
+            }
+            catch (FormatException)
+            {
+            }
+            catch (InvalidCastException)
+            {
+            }
+        }
+
+        return NumberFieldUtilities.DefaultStep;
+    }
+
+    private bool IsStepAny() =>
+        Step is string text && string.Equals(text, "any", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInputReason(NumberFieldChangeReason reason) =>
+        reason is NumberFieldChangeReason.InputChange
+            or NumberFieldChangeReason.InputBlur
+            or NumberFieldChangeReason.InputPaste
+            or NumberFieldChangeReason.InputClear
+            or NumberFieldChangeReason.None;
 }

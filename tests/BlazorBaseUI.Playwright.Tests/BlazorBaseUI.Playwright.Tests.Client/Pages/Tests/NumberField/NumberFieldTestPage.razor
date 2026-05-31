@@ -1,5 +1,6 @@
 @page "/tests/numberfield/wasm"
 @using BlazorBaseUI.NumberField
+@using BlazorBaseUI.Slider
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 
 <PageTitle>NumberField Test Page (WASM)</PageTitle>
@@ -59,6 +60,9 @@
     [SupplyParameterFromQuery(Name = "step")]
     public double? Step { get; set; }
 
+    [SupplyParameterFromQuery(Name = "stepAny")]
+    public bool? StepAny { get; set; }
+
     [SupplyParameterFromQuery(Name = "disabled")]
     public bool? QueryDisabled { get; set; }
 
@@ -74,8 +78,14 @@
     [SupplyParameterFromQuery(Name = "snapOnStep")]
     public bool? SnapOnStep { get; set; }
 
+    [SupplyParameterFromQuery(Name = "allowOutOfRange")]
+    public bool? AllowOutOfRange { get; set; }
+
     [SupplyParameterFromQuery(Name = "locale")]
     public string? Locale { get; set; }
+
+    [SupplyParameterFromQuery(Name = "formatStyle")]
+    public string? FormatStyle { get; set; }
 
     [SupplyParameterFromQuery(Name = "name")]
     public string? FieldName { get; set; }
@@ -90,6 +100,14 @@
     private bool IsReadOnly { get; set; }
     private bool ShowForm => QueryShowForm ?? false;
     private bool ShowScrubArea => QueryShowScrubArea ?? false;
+    private bool HasExplicitStep => StepAny == true || Step.HasValue;
+    private object? StepParameter => StepAny == true ? "any" : Step;
+    private IReadOnlyDictionary<string, object>? StepAttributes => HasExplicitStep
+        ? new Dictionary<string, object> { ["Step"] = StepParameter! }
+        : null;
+    private NumberFormatOptions? FormatOptions => string.IsNullOrEmpty(FormatStyle)
+        ? null
+        : new NumberFormatOptions(Style: FormatStyle);
 
     private double? currentValue;
     private int changeCount;
@@ -115,34 +133,65 @@
 
     private RenderFragment RenderNumberField() => __builder =>
     {
-        <NumberFieldRoot
-            Value="@(ControlledValue.HasValue ? currentValue : null)"
-            DefaultValue="@(ControlledValue.HasValue ? null : DefaultValue)"
-            Min="@Min"
-            Max="@Max"
-            Step="@(Step ?? 1)"
-            Disabled="@IsDisabled"
-            ReadOnly="@IsReadOnly"
-            Required="@(QueryRequired ?? false)"
-            AllowWheelScrub="@(AllowWheelScrub ?? false)"
-            SnapOnStep="@(SnapOnStep ?? false)"
-            Locale="@Locale"
-            Name="@FieldName"
-            OnValueChange="HandleValueChange"
-            OnValueCommitted="HandleValueCommitted"
-            data-testid="numberfield-root">
-            <NumberFieldGroup data-testid="numberfield-group">
-                <NumberFieldDecrement data-testid="decrement-button">-</NumberFieldDecrement>
-                <NumberFieldInput data-testid="numberfield-input" />
-                <NumberFieldIncrement data-testid="increment-button">+</NumberFieldIncrement>
-            </NumberFieldGroup>
-            @if (ShowScrubArea)
-            {
-                <NumberFieldScrubArea data-testid="scrub-area">
-                    <NumberFieldScrubAreaCursor data-testid="scrub-cursor" />
-                </NumberFieldScrubArea>
-            }
-        </NumberFieldRoot>
+        @if (ControlledValue.HasValue)
+        {
+            <NumberFieldRoot
+                Value="@currentValue"
+                Min="@Min"
+                Max="@Max"
+                @attributes="StepAttributes"
+                Disabled="@IsDisabled"
+                ReadOnly="@IsReadOnly"
+                Required="@(QueryRequired ?? false)"
+                AllowWheelScrub="@(AllowWheelScrub ?? false)"
+                AllowOutOfRange="@(AllowOutOfRange ?? false)"
+                SnapOnStep="@(SnapOnStep ?? false)"
+                Format="@FormatOptions"
+                Locale="@Locale"
+                Name="@FieldName"
+                OnValueChange="HandleValueChange"
+                OnValueCommitted="HandleValueCommitted"
+                data-testid="numberfield-root">
+                @RenderNumberFieldContent()
+            </NumberFieldRoot>
+        }
+        else
+        {
+            <NumberFieldRoot
+                DefaultValue="@DefaultValue"
+                Min="@Min"
+                Max="@Max"
+                @attributes="StepAttributes"
+                Disabled="@IsDisabled"
+                ReadOnly="@IsReadOnly"
+                Required="@(QueryRequired ?? false)"
+                AllowWheelScrub="@(AllowWheelScrub ?? false)"
+                AllowOutOfRange="@(AllowOutOfRange ?? false)"
+                SnapOnStep="@(SnapOnStep ?? false)"
+                Format="@FormatOptions"
+                Locale="@Locale"
+                Name="@FieldName"
+                OnValueChange="HandleValueChange"
+                OnValueCommitted="HandleValueCommitted"
+                data-testid="numberfield-root">
+                @RenderNumberFieldContent()
+            </NumberFieldRoot>
+        }
+    };
+
+    private RenderFragment RenderNumberFieldContent() => __builder =>
+    {
+        <NumberFieldGroup data-testid="numberfield-group">
+            <NumberFieldDecrement data-testid="decrement-button">-</NumberFieldDecrement>
+            <NumberFieldInput data-testid="numberfield-input" />
+            <NumberFieldIncrement data-testid="increment-button">+</NumberFieldIncrement>
+        </NumberFieldGroup>
+        @if (ShowScrubArea)
+        {
+            <NumberFieldScrubArea data-testid="scrub-area">
+                <NumberFieldScrubAreaCursor data-testid="scrub-cursor" />
+            </NumberFieldScrubArea>
+        }
     };
 
     private void HandleValueChange(NumberFieldValueChangeEventArgs args)

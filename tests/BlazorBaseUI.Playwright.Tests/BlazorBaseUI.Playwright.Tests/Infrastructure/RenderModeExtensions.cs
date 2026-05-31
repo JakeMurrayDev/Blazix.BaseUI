@@ -995,6 +995,24 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithNumberFieldAllowOutOfRange(bool value)
+    {
+        queryParams["allowOutOfRange"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithNumberFieldStepAny(bool value)
+    {
+        queryParams["stepAny"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithNumberFieldFormatStyle(string value)
+    {
+        queryParams["formatStyle"] = value;
+        return this;
+    }
+
     public TestPageUrlBuilder WithNumberFieldName(string name)
     {
         queryParams["name"] = name;

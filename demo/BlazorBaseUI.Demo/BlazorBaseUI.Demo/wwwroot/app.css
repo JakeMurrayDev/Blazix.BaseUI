@@ -1430,49 +1430,170 @@ h1:focus {
     transform: scale(1);
 }
 
+.demo-number-field-overview {
+    display: grid;
+    gap: 14px;
+    width: min(100%, 760px);
+    margin: 0 0 24px;
+    padding: 16px;
+    border: 1px solid var(--demo-stroke-subtle);
+    border-radius: var(--demo-radius-large);
+    background: var(--demo-surface-layer);
+}
+
+.demo-number-field-overview__header {
+    display: grid;
+    gap: 4px;
+}
+
+.demo-number-field-overview__header h2 {
+    margin: 0;
+    color: var(--demo-text);
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+}
+
+.demo-number-field-overview__header p {
+    max-width: 64ch;
+    margin: 0;
+    color: var(--demo-text-muted);
+    font-size: 14px;
+    line-height: 20px;
+}
+
+.demo-number-field-eyebrow {
+    color: var(--demo-brand);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.demo-number-field-token-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.demo-number-field-token {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border: 1px solid var(--demo-stroke-subtle);
+    border-radius: var(--demo-radius-small);
+    background: var(--demo-surface);
+    color: var(--demo-text-muted);
+    padding: 0 9px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.demo-number-field-demo {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    width: min(100%, 360px);
+    margin-inline: auto;
+    text-align: center;
+}
+
+.demo-number-field-demo > *,
+.demo-number-field-demo form {
+    justify-self: center;
+}
+
+.demo-number-field-demo form,
+.demo-number-field-demo :where(.space-y-2, .space-y-4, .space-y-6) {
+    width: 100%;
+}
+
 .demo-number-field-root {
     position: relative;
+    display: inline-grid;
+    gap: 8px;
+    color: var(--demo-text);
+    font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+    justify-self: center;
 }
 
 .demo-number-field-root[data-disabled] {
     cursor: not-allowed;
-    opacity: .62;
+    opacity: .64;
+}
+
+.demo-number-field-root[data-readonly] .demo-number-field-group {
+    background: var(--demo-surface-subtle);
+}
+
+.demo-number-field-root[data-invalid] .demo-number-field-group,
+.demo-number-field-root[aria-invalid="true"] .demo-number-field-group {
+    border-color: var(--demo-danger);
+    box-shadow: inset 0 -2px 0 var(--demo-danger), 0 0 0 2px color-mix(in srgb, var(--demo-danger) 18%, transparent);
 }
 
 .demo-number-field-group {
+    width: max-content;
+    min-width: 128px;
     overflow: hidden;
+    isolation: isolate;
 }
 
 .demo-number-field-input {
-    width: 64px !important;
+    width: 72px !important;
     height: calc(var(--demo-control-height) - 2px) !important;
     min-height: 0 !important;
     border: 0 !important;
     border-radius: 0 !important;
     background: transparent !important;
     color: var(--demo-text) !important;
-    padding: 0 8px !important;
+    padding: 0 10px !important;
     text-align: center;
     font-size: 14px !important;
+    line-height: 20px !important;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     box-shadow: none !important;
 }
 
+.demo-number-field-input:focus {
+    outline: none !important;
+}
+
+.demo-number-field-input::selection {
+    background: color-mix(in srgb, var(--demo-brand) 22%, transparent);
+}
+
 .demo-number-field-input--wide {
-    width: 112px !important;
+    width: 124px !important;
 }
 
 .demo-number-field-input-only {
-    width: 100% !important;
+    width: min(100%, 176px) !important;
     height: var(--demo-control-height) !important;
+    min-height: var(--demo-control-height) !important;
     border: 1px solid var(--demo-control-border) !important;
     border-radius: var(--demo-radius-small) !important;
     background: var(--demo-control-bg) !important;
     color: var(--demo-text) !important;
     padding: 0 var(--demo-control-padding-x) !important;
     text-align: start;
-    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--demo-stroke-strong) 72%, transparent) !important;
+    font-size: 14px !important;
+    line-height: 20px !important;
+    font-variant-numeric: tabular-nums;
+    box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--demo-stroke-strong) 72%, transparent), var(--demo-shadow-2) !important;
+    transition: background var(--demo-motion), border-color var(--demo-motion), box-shadow var(--demo-motion);
+}
+
+.demo-number-field-input-only:hover {
+    border-color: var(--demo-stroke-strong) !important;
+    background: var(--demo-control-bg-hover) !important;
+}
+
+.demo-number-field-input-only:focus {
+    border-color: var(--demo-focus) !important;
+    box-shadow: inset 0 -2px 0 var(--demo-focus), 0 0 0 2px color-mix(in srgb, var(--demo-focus) 18%, transparent) !important;
+    outline: none !important;
 }
 
 .demo-number-field-button {
@@ -1480,7 +1601,9 @@ h1:focus {
     align-items: center;
     justify-content: center;
     width: var(--demo-control-icon-size) !important;
-    height: var(--demo-control-height) !important;
+    height: calc(var(--demo-control-height) - 2px) !important;
+    min-width: var(--demo-control-icon-size) !important;
+    min-height: calc(var(--demo-control-height) - 2px) !important;
     border: 0;
     border-radius: 0 !important;
     background: transparent;
@@ -1490,13 +1613,25 @@ h1:focus {
     transition: background var(--demo-motion), color var(--demo-motion);
 }
 
+.demo-number-field-button svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
 .demo-number-field-button:hover {
-    background: var(--demo-brand-subtle);
-    color: var(--demo-brand);
+    background: var(--demo-surface-hover);
+    color: var(--demo-text);
 }
 
 .demo-number-field-button:active {
-    background: var(--demo-accent-muted);
+    background: var(--demo-control-bg-pressed);
+    color: var(--demo-brand-pressed);
+}
+
+.demo-number-field-button:focus-visible {
+    outline: 2px solid var(--demo-focus);
+    outline-offset: -2px;
 }
 
 .demo-number-field-button[data-disabled],
@@ -1517,16 +1652,24 @@ h1:focus {
 .demo-number-field-scrub {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    min-height: 24px;
+    gap: 8px;
+    min-height: 28px;
+    width: max-content;
+    border: 1px solid var(--demo-stroke-subtle);
+    border-radius: var(--demo-radius-small);
+    background: var(--demo-surface);
     color: var(--demo-text-muted);
     cursor: ew-resize;
+    padding: 3px 9px;
     user-select: none;
-    transition: color var(--demo-motion);
+    box-shadow: var(--demo-shadow-2);
+    transition: background var(--demo-motion), border-color var(--demo-motion), color var(--demo-motion), box-shadow var(--demo-motion);
 }
 
 .demo-number-field-scrub:hover,
 .demo-number-field-scrub[data-scrubbing] {
+    border-color: color-mix(in srgb, var(--demo-brand) 52%, var(--demo-control-border));
+    background: var(--demo-brand-subtle);
     color: var(--demo-brand);
 }
 
@@ -1537,11 +1680,192 @@ h1:focus {
 .demo-number-field-scrub[data-disabled],
 .demo-number-field-scrub[data-readonly] {
     cursor: default;
+    background: var(--demo-surface-subtle);
     color: var(--demo-text-subtle);
+    box-shadow: none;
+}
+
+.demo-number-field-scrub-label {
+    color: inherit;
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .demo-number-field-scrub-cursor {
     color: var(--demo-brand);
+}
+
+.demo-number-field-scrub-icon {
+    width: 20px;
+    height: 20px;
+    color: currentColor;
+}
+
+.demo-number-field-action-row,
+.demo-number-field-state-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.demo-number-field-live-value,
+.demo-number-field-caption,
+.demo-number-field-helper-text,
+.demo-number-field-description {
+    color: var(--demo-text-muted);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.demo-number-field-caption,
+.demo-number-field-label {
+    display: block;
+}
+
+.demo-number-field-label {
+    color: var(--demo-text);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+}
+
+.demo-number-field-label--muted {
+    color: var(--demo-text-subtle);
+}
+
+.demo-number-field-required,
+.demo-number-field-error {
+    color: var(--demo-danger);
+}
+
+.demo-number-field-error {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+}
+
+.demo-number-field-helper-text {
+    margin: 0;
+}
+
+.demo-number-field-success {
+    margin: 0;
+    color: var(--demo-success);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 600;
+}
+
+.demo-number-field-status,
+.demo-number-field-output,
+.demo-number-field-state-strip,
+.demo-number-field-kbd-list {
+    display: grid;
+    gap: 4px;
+    width: min(100%, 320px);
+    border: 1px solid var(--demo-stroke-subtle);
+    border-radius: var(--demo-radius-small);
+    background: var(--demo-surface-layer);
+    color: var(--demo-text-muted);
+    padding: 10px;
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.demo-number-field-status p,
+.demo-number-field-kbd-list p,
+.demo-number-field-helper-text p {
+    margin: 0;
+}
+
+.demo-number-field-kbd-list kbd {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    border: 1px solid var(--demo-stroke-subtle);
+    border-radius: var(--demo-radius-small);
+    background: var(--demo-surface);
+    color: var(--demo-text);
+    padding: 0 5px;
+    font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+    font-size: 11px;
+    line-height: 16px;
+    font-weight: 600;
+    box-shadow: inset 0 -1px 0 var(--demo-stroke-subtle);
+}
+
+.demo-number-field-output {
+    margin-top: 16px;
+}
+
+.demo-number-field-output pre {
+    margin: 4px 0 0;
+    color: var(--demo-text);
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 16px;
+    white-space: pre-wrap;
+}
+
+.demo-number-field-code {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    border-radius: var(--demo-radius-small);
+    background: var(--demo-surface-subtle);
+    color: var(--demo-text);
+    padding: 0 5px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 12px;
+}
+
+.demo-number-field-command {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--demo-control-height);
+    border: 1px solid var(--demo-control-border);
+    border-radius: var(--demo-radius-small);
+    padding: 0 12px;
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--demo-motion), border-color var(--demo-motion), color var(--demo-motion), box-shadow var(--demo-motion);
+}
+
+.demo-number-field-command--primary {
+    border-color: var(--demo-brand);
+    background: var(--demo-brand);
+    color: #fff;
+}
+
+.demo-number-field-command--primary:hover {
+    border-color: var(--demo-brand-hover);
+    background: var(--demo-brand-hover);
+}
+
+.demo-number-field-command--primary:active {
+    border-color: var(--demo-brand-pressed);
+    background: var(--demo-brand-pressed);
+}
+
+.demo-number-field-command--secondary {
+    background: var(--demo-control-bg);
+    color: var(--demo-text);
+}
+
+.demo-number-field-command--secondary:hover {
+    border-color: var(--demo-stroke-strong);
+    background: var(--demo-control-bg-hover);
+}
+
+.demo-number-field-command:focus-visible {
+    outline: 2px solid var(--demo-focus);
+    outline-offset: 2px;
 }
 
 .demo-toggle {

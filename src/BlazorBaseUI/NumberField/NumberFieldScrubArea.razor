@@ -5,7 +5,7 @@
 
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="scrubContext" IsFixed="true">
+<CascadingValue Value="scrubContext">
     <RenderElement TState="NumberFieldRootState"
                    Tag="@DefaultTag"
                    State="state"
@@ -195,12 +195,13 @@
     /// Handles scrub movement from JavaScript interop to adjust the field value.
     /// </summary>
     [JSInvokable]
-    public void OnScrubMove(int direction, bool altKey, bool shiftKey)
+    public void OnScrubMove(double movement, int direction, bool altKey, bool shiftKey)
     {
         if (RootContext?.Disabled == true || RootContext?.ReadOnly == true)
             return;
 
-        var amount = RootContext?.GetStepAmount(altKey, shiftKey) ?? 1;
+        var stepAmount = RootContext?.GetStepAmount(altKey, shiftKey) ?? 1;
+        var amount = Math.Abs(movement) * stepAmount;
         RootContext?.IncrementValue(amount, direction, NumberFieldChangeReason.Scrub);
     }
 

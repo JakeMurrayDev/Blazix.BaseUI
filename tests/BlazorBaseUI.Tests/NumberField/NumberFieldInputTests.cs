@@ -302,6 +302,24 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
     }
 
     [Fact]
+    public Task PreservesRawInputUntilBlur()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0));
+        var input = cut.Find("input[type='text']");
+
+        input.Input(new ChangeEventArgs { Value = "1.20" });
+
+        input.GetAttribute("value").ShouldBe("1.20");
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("1.2");
+
+        input.Blur();
+
+        input.GetAttribute("value").ShouldBe("1.2");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task CommitsValidatedNumberOnBlur_Min()
     {
         var cut = Render(CreateNumberField(defaultValue: 5, min: 10));
@@ -317,13 +335,20 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
     [Fact]
     public Task CommitsValidatedNumberOnBlur_Max()
     {
-        var cut = Render(CreateNumberField(defaultValue: 5, max: 10));
+        NumberFieldValueCommittedEventArgs? receivedArgs = null;
+        var onValueCommitted = EventCallback.Factory.Create<NumberFieldValueCommittedEventArgs>(
+            this, args => receivedArgs = args);
+
+        var cut = Render(CreateNumberField(defaultValue: 5, max: 10, onValueCommitted: onValueCommitted));
         var input = cut.Find("input[type='text']");
         input.Input(new ChangeEventArgs { Value = "20" });
         input.Blur();
         // Should clamp to max on blur
         var hiddenInput = cut.Find("input[type='number']");
         hiddenInput.GetAttribute("value").ShouldBe("10");
+        input.GetAttribute("value").ShouldBe("10");
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs!.Value.ShouldBe(10);
         return Task.CompletedTask;
     }
 
@@ -489,10 +514,9 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
         var input = cut.Find("input[type='text']");
         input.Input(new ChangeEventArgs { Value = "1.23456" });
         input.Blur();
-        // Step of 0.01 implies 2 decimal places but blur does NOT snap to step
-        // It just parses and formats
+        // Base UI removes floating-point noise through Intl's default maximum precision.
         var hiddenInput = cut.Find("input[type='number']");
-        hiddenInput.GetAttribute("value").ShouldBe("1.23456");
+        hiddenInput.GetAttribute("value").ShouldBe("1.235");
         return Task.CompletedTask;
     }
 
@@ -501,7 +525,7 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
     {
         var cut = Render(CreateNumberField(defaultValue: 0));
         var input = cut.Find("input[type='text']");
-        input.Input(new ChangeEventArgs { Value = "  42  " });
+        input.Input(new ChangeEventArgs { Value = "042" });
         input.Blur();
         var hiddenInput = cut.Find("input[type='number']");
         hiddenInput.GetAttribute("value").ShouldBe("42");

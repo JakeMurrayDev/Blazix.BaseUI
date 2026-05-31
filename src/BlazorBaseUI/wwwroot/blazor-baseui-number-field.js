@@ -10,16 +10,43 @@ const TOUCH_TIMEOUT = 50;
 const MAX_POINTER_MOVES_AFTER_TOUCH = 3;
 const SCROLLING_POINTER_MOVE_DISTANCE = 8;
 const DEFAULT_STEP = 1;
+const NAVIGATE_KEYS = new Set(['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape']);
+const ACTION_KEYS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End']);
+const BASE_NON_NUMERIC_SYMBOLS = ['.', ',', '．', '，', '٫', '٬'];
+const PERCENTAGES = ['%', '٪', '％', '﹪'];
+const PERMILLE = ['‰', '؉'];
+const PLUS_SIGNS_WITH_ASCII = ['+', '＋', '﹢'];
+const MINUS_SIGNS_WITH_ASCII = ['-', '−', '－', '‒', '–', '—', '﹣'];
+const ANY_MINUS_RE = /[-−－‒–—﹣]/u;
+const ANY_PLUS_RE = /[+＋﹢]/u;
+const ARABIC_DETECT_RE = /[٠١٢٣٤٥٦٧٨٩]/u;
+const PERSIAN_DETECT_RE = /[۰۱۲۳۴۵۶۷۸۹]/u;
+const HAN_DETECT_RE = /[零〇一二三四五六七八九]/u;
+const FULLWIDTH_DETECT_RE = /[０１２３４５６７８９]/u;
+const SPACE_SEPARATOR_RE = /\p{Zs}/u;
 
 export function initialize(inputElement, dotNetRef, config) {
     if (!inputElement) return;
 
-    const elementState = {
+    let elementState = state.get(inputElement);
+    if (elementState) {
+        removeInputEventHandlers(inputElement, elementState);
+    } else {
+        elementState = {
+            wheelHandler: null,
+            autoChangeState: null
+        };
+    }
+
+    Object.assign(elementState, {
         dotNetRef,
-        config,
-        wheelHandler: null,
-        autoChangeState: null
-    };
+        config: normalizeConfig(config),
+        keydownHandler: (event) => handleInputKeyDown(inputElement, event),
+        pasteHandler: (event) => handleInputPaste(inputElement, event)
+    });
+
+    inputElement.addEventListener('keydown', elementState.keydownHandler);
+    inputElement.addEventListener('paste', elementState.pasteHandler);
 
     state.set(inputElement, elementState);
 }
@@ -32,6 +59,7 @@ export function dispose(inputElement) {
         if (elementState.wheelHandler) {
             inputElement.removeEventListener('wheel', elementState.wheelHandler);
         }
+        removeInputEventHandlers(inputElement, elementState);
         stopAutoChangeInternal(elementState);
     }
 
@@ -43,8 +71,202 @@ export function updateConfig(inputElement, config) {
 
     const elementState = state.get(inputElement);
     if (elementState) {
-        elementState.config = config;
+        elementState.config = normalizeConfig(config);
     }
+}
+
+function removeInputEventHandlers(inputElement, elementState) {
+    if (elementState.keydownHandler) {
+        inputElement.removeEventListener('keydown', elementState.keydownHandler);
+        elementState.keydownHandler = null;
+    }
+
+    if (elementState.pasteHandler) {
+        inputElement.removeEventListener('paste', elementState.pasteHandler);
+        elementState.pasteHandler = null;
+    }
+}
+
+function normalizeConfig(config) {
+    return config || {};
+}
+
+function normalizeFormatOptions(format) {
+    if (!format) return undefined;
+
+    const options = {};
+    Object.entries(format).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+            options[key] = value;
+        }
+    });
+
+    return Object.keys(options).length === 0 ? undefined : options;
+}
+
+function getFormatter(locale, format) {
+    try {
+        return new Intl.NumberFormat(locale || undefined, normalizeFormatOptions(format));
+    } catch {
+        return new Intl.NumberFormat(undefined, normalizeFormatOptions(format));
+    }
+}
+
+function getNumberLocaleDetails(locale, format) {
+    const result = {};
+
+    getFormatter(locale, format).formatToParts(11111.1).forEach((part) => {
+        result[part.type] = part.value;
+    });
+
+    getFormatter(locale, undefined).formatToParts(0.1).forEach((part) => {
+        if (part.type === 'decimal') {
+            result.decimal = part.value;
+        }
+    });
+
+    return result;
+}
+
+function getAllowedNonNumericKeys(config) {
+    const format = config.format;
+    const style = format?.style;
+    const { decimal, group, currency, literal } = getNumberLocaleDetails(config.locale, format);
+    const keys = new Set(BASE_NON_NUMERIC_SYMBOLS);
+
+    if (decimal) {
+        keys.add(decimal);
+    }
+
+    if (group) {
+        keys.add(group);
+        if (SPACE_SEPARATOR_RE.test(group)) {
+            keys.add(' ');
+        }
+    }
+
+    const allowPercentSymbols = style === 'percent' || (style === 'unit' && format?.unit === 'percent');
+    const allowPermilleSymbols = style === 'percent' || (style === 'unit' && format?.unit === 'permille');
+
+    if (allowPercentSymbols) {
+        PERCENTAGES.forEach((key) => keys.add(key));
+    }
+
+    if (allowPermilleSymbols) {
+        PERMILLE.forEach((key) => keys.add(key));
+    }
+
+    if (style === 'currency' && currency) {
+        keys.add(currency);
+    }
+
+    if (literal) {
+        Array.from(literal).forEach((char) => keys.add(char));
+        if (SPACE_SEPARATOR_RE.test(literal)) {
+            keys.add(' ');
+        }
+    }
+
+    PLUS_SIGNS_WITH_ASCII.forEach((key) => keys.add(key));
+    if ((config.minWithDefault ?? Number.MIN_VALUE) < 0) {
+        MINUS_SIGNS_WITH_ASCII.forEach((key) => keys.add(key));
+    }
+
+    return keys;
+}
+
+function handleInputKeyDown(inputElement, event) {
+    const elementState = state.get(inputElement);
+    const config = elementState?.config || {};
+    if (event.defaultPrevented || config.readOnly || config.disabled) {
+        return;
+    }
+
+    if (event.which === 229 || event.ctrlKey || event.metaKey) {
+        return;
+    }
+
+    if (ACTION_KEYS.has(event.key)) {
+        event.preventDefault();
+        return;
+    }
+
+    if (event.altKey || NAVIGATE_KEYS.has(event.key) || event.key.length !== 1) {
+        return;
+    }
+
+    if (isAllowedInputKey(inputElement, event, config)) {
+        return;
+    }
+
+    event.preventDefault();
+}
+
+function isAllowedInputKey(inputElement, event, config) {
+    const key = event.key;
+    const allowedNonNumericKeys = getAllowedNonNumericKeys(config);
+    let isAllowedNonNumericKey = allowedNonNumericKeys.has(key);
+    const inputValue = inputElement.value || '';
+    const selectionStart = inputElement.selectionStart;
+    const selectionEnd = inputElement.selectionEnd;
+    const isAllSelected = selectionStart === 0 && selectionEnd === inputValue.length;
+    const selectionContainsIndex = (index) =>
+        selectionStart != null &&
+        selectionEnd != null &&
+        index >= selectionStart &&
+        index < selectionEnd;
+
+    if (ANY_MINUS_RE.test(key) && Array.from(allowedNonNumericKeys).some((candidate) => ANY_MINUS_RE.test(candidate || ''))) {
+        const existingIndex = inputValue.search(ANY_MINUS_RE);
+        const isReplacingExisting = existingIndex !== -1 && selectionContainsIndex(existingIndex);
+        isAllowedNonNumericKey =
+            !(ANY_MINUS_RE.test(inputValue) || ANY_PLUS_RE.test(inputValue)) ||
+            isAllSelected ||
+            isReplacingExisting;
+    }
+
+    if (ANY_PLUS_RE.test(key) && Array.from(allowedNonNumericKeys).some((candidate) => ANY_PLUS_RE.test(candidate || ''))) {
+        const existingIndex = inputValue.search(ANY_PLUS_RE);
+        const isReplacingExisting = existingIndex !== -1 && selectionContainsIndex(existingIndex);
+        isAllowedNonNumericKey =
+            !(ANY_MINUS_RE.test(inputValue) || ANY_PLUS_RE.test(inputValue)) ||
+            isAllSelected ||
+            isReplacingExisting;
+    }
+
+    const { decimal, currency, percentSign } = getNumberLocaleDetails(config.locale, config.format);
+    [decimal, currency, percentSign].forEach((symbol) => {
+        if (key === symbol) {
+            const symbolIndex = inputValue.indexOf(symbol);
+            const isSymbolHighlighted = selectionContainsIndex(symbolIndex);
+            isAllowedNonNumericKey = !inputValue.includes(symbol) || isAllSelected || isSymbolHighlighted;
+        }
+    });
+
+    return isAllowedNonNumericKey ||
+        (key >= '0' && key <= '9') ||
+        ARABIC_DETECT_RE.test(key) ||
+        PERSIAN_DETECT_RE.test(key) ||
+        HAN_DETECT_RE.test(key) ||
+        FULLWIDTH_DETECT_RE.test(key);
+}
+
+function handleInputPaste(inputElement, event) {
+    const elementState = state.get(inputElement);
+    const config = elementState?.config || {};
+    if (event.defaultPrevented || config.readOnly || config.disabled || !elementState?.dotNetRef) {
+        return;
+    }
+
+    let pastedData = '';
+    try {
+        pastedData = event.clipboardData?.getData('text/plain') ?? '';
+    } catch {
+        return;
+    }
+
+    event.preventDefault();
+    elementState.dotNetRef.invokeMethodAsync('OnPasteText', pastedData);
 }
 
 export function registerWheelListener(inputElement, dotNetRef, disabled, readOnly) {
@@ -163,6 +385,7 @@ export function initializeScrubArea(scrubAreaElement, dotNetRef, config) {
         isScrubbingRef: false,
         virtualCursorCoords: { x: 0, y: 0 },
         visualScaleRef: 1,
+        visualResizeHandler: null,
         cumulativeDelta: 0,
         boundHandlers: null,
         cursorElement: null
@@ -185,11 +408,12 @@ export function disposeScrubArea(scrubAreaElement) {
         window.removeEventListener('pointerup', elementState.boundHandlers.pointerUp, true);
         window.removeEventListener('pointermove', elementState.boundHandlers.pointerMove, true);
     }
+    unsubscribeFromVisualViewportResize(elementState);
 
     state.delete(scrubAreaElement);
 }
 
-export function startScrub(scrubAreaElement, dotNetRef, cursorElement, config, clientX, clientY, isTouch) {
+export async function startScrub(scrubAreaElement, dotNetRef, cursorElement, config, clientX, clientY, isTouch) {
     if (!scrubAreaElement) return { success: false };
 
     let elementState = state.get(scrubAreaElement);
@@ -200,6 +424,7 @@ export function startScrub(scrubAreaElement, dotNetRef, cursorElement, config, c
             isScrubbingRef: false,
             virtualCursorCoords: { x: 0, y: 0 },
             visualScaleRef: 1,
+            visualResizeHandler: null,
             cumulativeDelta: 0,
             boundHandlers: null,
             cursorElement: null
@@ -214,6 +439,7 @@ export function startScrub(scrubAreaElement, dotNetRef, cursorElement, config, c
     elementState.cumulativeDelta = 0;
 
     if (cursorElement) {
+        subscribeToVisualViewportResize(elementState);
         const initialCoords = {
             x: clientX - cursorElement.offsetWidth / 2,
             y: clientY - cursorElement.offsetHeight / 2
@@ -238,7 +464,7 @@ export function startScrub(scrubAreaElement, dotNetRef, cursorElement, config, c
     let pointerLockDenied = false;
     if (!isTouch && !isWebKit()) {
         try {
-            document.body.requestPointerLock();
+            await document.body.requestPointerLock();
         } catch {
             pointerLockDenied = true;
         }
@@ -292,7 +518,7 @@ function handleScrubPointerMove(scrubAreaElement, event) {
 
         if (dValue !== 0) {
             const direction = dValue >= 0 ? 1 : -1;
-            elementState.dotNetRef.invokeMethodAsync('OnScrubMove', direction, event.altKey, event.shiftKey);
+            elementState.dotNetRef.invokeMethodAsync('OnScrubMove', Math.abs(dValue), direction, event.altKey, event.shiftKey);
         }
     }
 }
@@ -309,6 +535,7 @@ function handleScrubPointerUp(scrubAreaElement, event) {
         window.removeEventListener('pointermove', elementState.boundHandlers.pointerMove, true);
         window.removeEventListener('pointerup', elementState.boundHandlers.pointerUp, true);
     }
+    unsubscribeFromVisualViewportResize(elementState);
 
     elementState.isScrubbingRef = false;
     elementState.boundHandlers = null;
@@ -322,21 +549,39 @@ function getViewportRect(teleportDistance, element) {
     const vv = window.visualViewport;
     if (teleportDistance != null) {
         const rect = element.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
         return {
-            x: centerX - teleportDistance,
-            y: centerY - teleportDistance,
-            width: centerX + teleportDistance,
-            height: centerY + teleportDistance
+            x: rect.left - teleportDistance / 2,
+            y: rect.top - teleportDistance / 2,
+            width: rect.right + teleportDistance / 2,
+            height: rect.bottom + teleportDistance / 2
         };
     }
     return {
         x: vv?.offsetLeft ?? 0,
         y: vv?.offsetTop ?? 0,
-        width: vv?.width ?? window.innerWidth,
-        height: vv?.height ?? window.innerHeight
+        width: vv ? vv.offsetLeft + vv.width : document.documentElement.clientWidth,
+        height: vv ? vv.offsetTop + vv.height : document.documentElement.clientHeight
     };
+}
+
+function subscribeToVisualViewportResize(elementState) {
+    unsubscribeFromVisualViewportResize(elementState);
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    elementState.visualResizeHandler = () => {
+        elementState.visualScaleRef = vv.scale || 1;
+    };
+    elementState.visualResizeHandler();
+    vv.addEventListener('resize', elementState.visualResizeHandler);
+}
+
+function unsubscribeFromVisualViewportResize(elementState) {
+    if (elementState?.visualResizeHandler && window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', elementState.visualResizeHandler);
+        elementState.visualResizeHandler = null;
+    }
 }
 
 function updateCursorTransformInternal(cursorElement, x, y, scale) {

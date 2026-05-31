@@ -9,9 +9,23 @@
                    BaseRoute="/number-field"
                    IsWasmMode="IsWasmMode">
 
+    <div class="demo-number-field-overview">
+        <div class="demo-number-field-overview__header">
+            <span class="demo-number-field-eyebrow">Fluent 2 spin button</span>
+            <h2>Numeric input states</h2>
+            <p>Buttons, direct text entry, locale formatting, form validation, and scrub interactions share the same neutral control treatment.</p>
+        </div>
+        <div class="demo-number-field-token-row" aria-label="Number field capability summary">
+            <span class="demo-number-field-token">Spinbutton role</span>
+            <span class="demo-number-field-token">Native form values</span>
+            <span class="demo-number-field-token">Locale aware</span>
+            <span class="demo-number-field-token">Scrub input</span>
+        </div>
+    </div>
+
     <DemoSection Title="Basic Number Field"
                  Description="Uncontrolled number field with DefaultValue.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <NumberFieldRoot DefaultValue="50"
                              ClassValue="@(state => NumberFieldRootClass(state))">
                 <NumberFieldGroup ClassValue="@(state => NumberFieldGroupClass(state))">
@@ -29,7 +43,7 @@
 
     <DemoSection Title="Controlled Number Field"
                  Description="Value controlled externally. Can be changed via input or external controls.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot Value="@controlledValue"
                              ValueChanged="@(value => controlledValue = value)"
                              ClassValue="@(state => NumberFieldRootClass(state))">
@@ -43,15 +57,15 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="flex items-center gap-4">
-                <span class="text-sm text-gray-700">Value: @(controlledValue?.ToString("F1") ?? "null")</span>
+            <div class="demo-number-field-action-row">
+                <span class="demo-number-field-live-value">Value: @(controlledValue?.ToString("F1") ?? "null")</span>
                 <button type="button"
-                        class="rounded bg-indigo-600 px-3 py-1 text-sm text-white transition hover:bg-indigo-700"
+                        class="demo-number-field-command demo-number-field-command--primary"
                         @onclick="@(() => controlledValue = 100)">
                     Set to 100
                 </button>
                 <button type="button"
-                        class="rounded bg-gray-600 px-3 py-1 text-sm text-white transition hover:bg-gray-700"
+                        class="demo-number-field-command demo-number-field-command--secondary"
                         @onclick="@(() => controlledValue = null)">
                     Clear
                 </button>
@@ -61,9 +75,9 @@
 
     <DemoSection Title="Min, Max, and Step"
                  Description="Configure range and step increment.">
-        <div class="w-full max-w-xs space-y-6">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-6">
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">Min: 0, Max: 10, Step: 1</span>
+                <span class="demo-number-field-caption">Min: 0, Max: 10, Step: 1</span>
                 <NumberFieldRoot DefaultValue="5"
                                  Min="0"
                                  Max="10"
@@ -81,7 +95,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">Min: 0, Max: 1, Step: 0.1 (Decimal)</span>
+                <span class="demo-number-field-caption">Min: 0, Max: 1, Step: 0.1 (Decimal)</span>
                 <NumberFieldRoot DefaultValue="0.5"
                                  Min="0"
                                  Max="1"
@@ -99,7 +113,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">Min: -50, Max: 50, Step: 5 (Negative allowed)</span>
+                <span class="demo-number-field-caption">Min: -50, Max: 50, Step: 5 (Negative allowed)</span>
                 <NumberFieldRoot DefaultValue="0"
                                  Min="-50"
                                  Max="50"
@@ -121,7 +135,7 @@
 
     <DemoSection Title="Step Modifiers"
                  Description="Hold Shift for large step, Alt for small step.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              Step="1"
                              SmallStep="0.1"
@@ -137,17 +151,17 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="space-y-1 text-xs text-gray-500">
-                <p>Arrow keys: Step by 1</p>
-                <p>Shift + Arrow: Step by 10</p>
-                <p>Alt + Arrow: Step by 0.1</p>
+            <div class="demo-number-field-kbd-list">
+                <p><kbd>Arrow</kbd> Step by 1</p>
+                <p><kbd>Shift</kbd> + <kbd>Arrow</kbd> Step by 10</p>
+                <p><kbd>Alt</kbd> + <kbd>Arrow</kbd> Step by 0.1</p>
             </div>
         </div>
     </DemoSection>
 
     <DemoSection Title="Disabled State"
                  Description="Field cannot be interacted with when disabled.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <NumberFieldRoot DefaultValue="25"
                              Disabled="true"
                              ClassValue="@(state => NumberFieldRootClass(state))">
@@ -166,7 +180,7 @@
 
     <DemoSection Title="ReadOnly State"
                  Description="Field displays value but cannot be changed.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <NumberFieldRoot DefaultValue="75"
                              ReadOnly="true"
                              ClassValue="@(state => NumberFieldRootClass(state))">
@@ -185,19 +199,28 @@
 
     <DemoSection Title="Scrub Area"
                  Description="Click and drag the label to adjust the value.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              ClassValue="@(state => NumberFieldRootClass(state))">
                 <div class="mb-2">
                     <NumberFieldScrubArea Direction="ScrubDirection.Horizontal"
                                           PixelSensitivity="2"
                                           ClassValue="@(state => NumberFieldScrubAreaClass(state))">
-                        <span class="text-sm font-medium text-gray-700 select-none">Drag me to change value</span>
+                        <span class="demo-number-field-scrub-label">Drag me to change value</span>
                         <NumberFieldScrubAreaCursor ClassValue="@(state => NumberFieldScrubAreaCursorClass(state))">
-                            <svg width="26" height="14" viewBox="0 0 26 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 7L0 3.5V10.5L4 7Z" fill="currentColor" />
-                                <path d="M22 7L26 3.5V10.5L22 7Z" fill="currentColor" />
-                                <line x1="4" y1="7" x2="22" y2="7" stroke="currentColor" stroke-width="2" />
+                            <svg class="demo-number-field-scrub-icon"
+                                 viewBox="0 0 20 20"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="1.75"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round"
+                                 aria-hidden="true"
+                                 focusable="false"
+                                 xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7.25 5 3.5 10l3.75 5" />
+                                <path d="M12.75 5 16.5 10l-3.75 5" />
+                                <path d="M4.5 10h11" />
                             </svg>
                         </NumberFieldScrubAreaCursor>
                     </NumberFieldScrubArea>
@@ -212,25 +235,34 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <p class="text-xs text-gray-500">Click and drag horizontally on the label above to scrub the value.</p>
+            <p class="demo-number-field-helper-text">Click and drag horizontally on the label above to scrub the value.</p>
         </div>
     </DemoSection>
 
     <DemoSection Title="Vertical Scrub"
                  Description="Scrub area with vertical direction.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              ClassValue="@(state => NumberFieldRootClass(state))">
                 <div class="mb-2">
                     <NumberFieldScrubArea Direction="ScrubDirection.Vertical"
                                           PixelSensitivity="2"
                                           ClassValue="@(state => NumberFieldVerticalScrubAreaClass(state))">
-                        <span class="text-sm font-medium text-gray-700 select-none">Drag up/down</span>
+                        <span class="demo-number-field-scrub-label">Drag up/down</span>
                         <NumberFieldScrubAreaCursor ClassValue="@(state => NumberFieldScrubAreaCursorClass(state))">
-                            <svg width="14" height="26" viewBox="0 0 14 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M7 4L3.5 0H10.5L7 4Z" fill="currentColor" />
-                                <path d="M7 22L3.5 26H10.5L7 22Z" fill="currentColor" />
-                                <line x1="7" y1="4" x2="7" y2="22" stroke="currentColor" stroke-width="2" />
+                            <svg class="demo-number-field-scrub-icon"
+                                 viewBox="0 0 20 20"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 stroke-width="1.75"
+                                 stroke-linecap="round"
+                                 stroke-linejoin="round"
+                                 aria-hidden="true"
+                                 focusable="false"
+                                 xmlns="http://www.w3.org/2000/svg">
+                                <path d="M5 7.25 10 3.5l5 3.75" />
+                                <path d="M5 12.75 10 16.5l5-3.75" />
+                                <path d="M10 4.5v11" />
                             </svg>
                         </NumberFieldScrubAreaCursor>
                     </NumberFieldScrubArea>
@@ -250,7 +282,7 @@
 
     <DemoSection Title="OnValueChange and OnValueCommitted"
                  Description="Callbacks fire during change and on commit (blur/enter).">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              OnValueChange="@HandleValueChange"
                              OnValueCommitted="@HandleValueCommitted"
@@ -265,7 +297,7 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="space-y-1 text-sm text-gray-700">
+            <div class="demo-number-field-status">
                 <p>Change count: @valueChangeCount</p>
                 <p>Commit count: @valueCommitCount</p>
                 <p>Last committed: @(lastCommittedValue?.ToString("F1") ?? "null")</p>
@@ -275,10 +307,10 @@
 
     <DemoSection Title="Field Integration"
                  Description="Integrates with FieldRoot for labels, descriptions, and validation.">
-        <div class="w-full max-w-xs space-y-6">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-6">
             <FieldRoot Name="quantity">
                 <div class="space-y-2">
-                    <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                    <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                         Quantity
                     </FieldLabel>
                     <NumberFieldRoot DefaultValue="1"
@@ -295,7 +327,7 @@
                             </NumberFieldIncrement>
                         </NumberFieldGroup>
                     </NumberFieldRoot>
-                    <FieldDescription ClassValue="@(_ => "text-xs text-gray-500")">
+                    <FieldDescription ClassValue="@(_ => NumberFieldDescriptionClass())">
                         Select quantity between 1 and 99.
                     </FieldDescription>
                 </div>
@@ -303,7 +335,7 @@
 
             <FieldRoot Name="temperature" Disabled="true">
                 <div class="space-y-2">
-                    <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-500")">
+                    <FieldLabel ClassValue="@(_ => NumberFieldMutedLabelClass())">
                         Temperature (Disabled via Field)
                     </FieldLabel>
                     <NumberFieldRoot DefaultValue="72"
@@ -325,10 +357,10 @@
 
     <DemoSection Title="Field State Tracking"
                  Description="Tracks touched, dirty, filled, and focused states.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <FieldRoot Name="tracking">
                 <div class="space-y-2">
-                    <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                    <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                         Track my state
                     </FieldLabel>
                     <NumberFieldRoot DefaultValue="0"
@@ -345,8 +377,8 @@
                     </NumberFieldRoot>
                 </div>
                 <FieldStateDisplay Context="fieldState">
-                    <div class="mt-3 space-y-1 text-xs">
-                        <div class="flex gap-4">
+                    <div class="demo-number-field-state-strip">
+                        <div class="demo-number-field-state-row">
                             <StateIndicator Label="Touched" IsActive="@fieldState.Touched" />
                             <StateIndicator Label="Dirty" IsActive="@fieldState.Dirty" />
                             <StateIndicator Label="Filled" IsActive="@fieldState.Filled" />
@@ -360,12 +392,12 @@
 
     <DemoSection Title="Form Submission"
                  Description="Number field values are included in form submission data.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <Form Model="@formModel" OnFormSubmit="@HandleFormSubmit">
                 <div class="space-y-6">
                     <FieldRoot Name="age">
                         <div class="space-y-2">
-                            <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                            <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                                 Age
                             </FieldLabel>
                             <NumberFieldRoot DefaultValue="25"
@@ -387,7 +419,7 @@
 
                     <FieldRoot Name="score">
                         <div class="space-y-2">
-                            <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                            <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                                 Score (0-100)
                             </FieldLabel>
                             <NumberFieldRoot DefaultValue="85"
@@ -409,7 +441,7 @@
                     </FieldRoot>
 
                     <button type="submit"
-                            class="rounded bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700">
+                            class="demo-number-field-command demo-number-field-command--primary">
                         Submit
                     </button>
                 </div>
@@ -417,9 +449,9 @@
 
             @if (lastFormSubmission is not null)
             {
-                <div class="mt-4 rounded bg-gray-100 p-3 text-sm">
+                <div class="demo-number-field-output">
                     <strong>Last submission:</strong>
-                    <pre class="mt-1 text-xs">@lastFormSubmission</pre>
+                    <pre>@lastFormSubmission</pre>
                 </div>
             }
         </div>
@@ -427,13 +459,13 @@
 
     <DemoSection Title="Validation"
                  Description="Supports custom validation functions.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <Form Model="@(new object())">
                 <FieldRoot Name="validated"
                            ValidationMode="ValidationMode.OnChange"
                            Validate="@ValidateMinValue">
                     <div class="space-y-2">
-                        <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                        <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                             Must be at least 10
                         </FieldLabel>
                         <NumberFieldRoot DefaultValue="5"
@@ -449,7 +481,7 @@
                                 </NumberFieldIncrement>
                             </NumberFieldGroup>
                         </NumberFieldRoot>
-                        <FieldError ClassValue="@(_ => "text-red-600 text-sm")" />
+                        <FieldError ClassValue="@(_ => NumberFieldErrorClass())" />
                     </div>
                 </FieldRoot>
             </Form>
@@ -458,7 +490,7 @@
 
     <DemoSection Title="Keyboard Navigation"
                  Description="Full keyboard support for accessibility.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              Step="1"
                              SmallStep="0.1"
@@ -476,19 +508,19 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="space-y-1 text-xs text-gray-500">
-                <p>Arrow Up/Down: Increment/decrement by step</p>
-                <p>Shift + Arrow: Large step</p>
-                <p>Alt + Arrow: Small step</p>
-                <p>Home: Go to minimum</p>
-                <p>End: Go to maximum</p>
+            <div class="demo-number-field-kbd-list">
+                <p><kbd>Arrow</kbd> Increment/decrement by step</p>
+                <p><kbd>Shift</kbd> + <kbd>Arrow</kbd> Large step</p>
+                <p><kbd>Alt</kbd> + <kbd>Arrow</kbd> Small step</p>
+                <p><kbd>Home</kbd> Go to minimum</p>
+                <p><kbd>End</kbd> Go to maximum</p>
             </div>
         </div>
     </DemoSection>
 
     <DemoSection Title="Input Only (No Buttons)"
                  Description="Number field can be used without increment/decrement buttons.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <NumberFieldRoot DefaultValue="42"
                              ClassValue="@(state => NumberFieldRootClass(state))">
                 <NumberFieldInput ClassValue="@(state => NumberFieldInputOnlyClass(state))" />
@@ -498,9 +530,9 @@
 
     <DemoSection Title="Locale Formatting"
                  Description="Numbers are formatted according to the specified locale.">
-        <div class="w-full max-w-xs space-y-6">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-6">
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">German (de-DE): Uses comma as decimal, dot as thousands</span>
+                <span class="demo-number-field-caption">German (de-DE): Uses comma as decimal, dot as thousands</span>
                 <NumberFieldRoot DefaultValue="1000.5"
                                  Locale="de-DE"
                                  ClassValue="@(state => NumberFieldRootClass(state))">
@@ -516,7 +548,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">Polish (pl): Uses space as thousands separator</span>
+                <span class="demo-number-field-caption">Polish (pl): Uses space as thousands separator</span>
                 <NumberFieldRoot DefaultValue="12345.5"
                                  Locale="pl"
                                  ClassValue="@(state => NumberFieldRootClass(state))">
@@ -532,7 +564,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">French (fr-FR): Uses space as thousands, comma as decimal</span>
+                <span class="demo-number-field-caption">French (fr-FR): Uses space as thousands, comma as decimal</span>
                 <NumberFieldRoot DefaultValue="9876.54"
                                  Locale="fr-FR"
                                  ClassValue="@(state => NumberFieldRootClass(state))">
@@ -552,9 +584,9 @@
 
     <DemoSection Title="Currency Format"
                  Description="Display values as currency with locale-specific formatting.">
-        <div class="w-full max-w-xs space-y-6">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-6">
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">USD Currency (en-US)</span>
+                <span class="demo-number-field-caption">USD Currency (en-US)</span>
                 <NumberFieldRoot DefaultValue="1000"
                                  Locale="en-US"
                                  Format="@(new NumberFormatOptions { Style = "currency", Currency = "USD" })"
@@ -571,7 +603,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">EUR Currency (de-DE)</span>
+                <span class="demo-number-field-caption">EUR Currency (de-DE)</span>
                 <NumberFieldRoot DefaultValue="12.34"
                                  Locale="de-DE"
                                  Format="@(new NumberFormatOptions { Style = "currency", Currency = "EUR", MinimumFractionDigits = 2, MaximumFractionDigits = 2 })"
@@ -588,7 +620,7 @@
                 </NumberFieldRoot>
             </div>
             <div class="space-y-2">
-                <span class="text-sm text-gray-500">GBP Currency (en-GB)</span>
+                <span class="demo-number-field-caption">GBP Currency (en-GB)</span>
                 <NumberFieldRoot DefaultValue="500.99"
                                  Locale="en-GB"
                                  Format="@(new NumberFormatOptions { Style = "currency", Currency = "GBP" })"
@@ -609,7 +641,7 @@
 
     <DemoSection Title="Percent Format"
                  Description="Display values as percentages. Input 12 displays as 12% but represents 0.12.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot Value="@percentValue"
                              ValueChanged="@(v => percentValue = v)"
                              Format="@(new NumberFormatOptions { Style = "percent" })"
@@ -624,7 +656,7 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="text-sm text-gray-700">
+            <div class="demo-number-field-status">
                 <p>Displayed: @(percentValue.HasValue ? $"{percentValue.Value * 100:F0}%" : "empty")</p>
                 <p>Actual value: @(percentValue?.ToString("F2") ?? "null")</p>
             </div>
@@ -633,7 +665,7 @@
 
     <DemoSection Title="Wheel Scrub"
                  Description="Use mouse wheel to increment/decrement value when input is focused.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="5"
                              AllowWheelScrub="true"
                              ClassValue="@(state => NumberFieldRootClass(state))">
@@ -647,19 +679,19 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <p class="text-xs text-gray-500">Focus the input and use mouse wheel to change the value.</p>
+            <p class="demo-number-field-helper-text">Focus the input and use mouse wheel to change the value.</p>
         </div>
     </DemoSection>
 
     <DemoSection Title="Required Field"
                  Description="Mark field as required for form validation.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <Form Model="@(new object())" OnFormSubmit="@HandleRequiredFormSubmit">
                 <div class="space-y-4">
                     <FieldRoot Name="requiredQuantity">
                         <div class="space-y-2">
-                            <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
-                                Quantity <span class="text-red-500">*</span>
+                            <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
+                                Quantity <span class="demo-number-field-required">*</span>
                             </FieldLabel>
                             <NumberFieldRoot Required="true"
                                              ClassValue="@(state => NumberFieldRootClassWithValidation(state))">
@@ -673,18 +705,18 @@
                                     </NumberFieldIncrement>
                                 </NumberFieldGroup>
                             </NumberFieldRoot>
-                            <FieldError MatchValidity="valueMissing" ClassValue="@(_ => "text-red-600 text-sm")">
+                            <FieldError MatchValidity="valueMissing" ClassValue="@(_ => NumberFieldErrorClass())">
                                 This field is required
                             </FieldError>
                         </div>
                     </FieldRoot>
                     <button type="submit"
-                            class="rounded bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700">
+                            class="demo-number-field-command demo-number-field-command--primary">
                         Submit
                     </button>
                     @if (requiredFormSubmitted)
                     {
-                        <p class="text-green-600 text-sm">Form submitted successfully!</p>
+                        <p class="demo-number-field-success">Form submitted successfully!</p>
                     }
                 </div>
             </Form>
@@ -693,12 +725,12 @@
 
     <DemoSection Title="Step Mismatch Validation"
                  Description="Validates that the value matches the step increment.">
-        <div class="w-full max-w-xs">
+        <div class="demo-number-field-demo w-full max-w-xs">
             <Form Model="@(new object())" OnFormSubmit="@HandleStepMismatchFormSubmit">
                 <div class="space-y-4">
                     <FieldRoot Name="steppedValue">
                         <div class="space-y-2">
-                            <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                            <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                                 Value (Step: 0.1, Min: 0)
                             </FieldLabel>
                             <NumberFieldRoot DefaultValue="0"
@@ -715,19 +747,19 @@
                                     </NumberFieldIncrement>
                                 </NumberFieldGroup>
                             </NumberFieldRoot>
-                            <FieldError MatchValidity="stepMismatch" ClassValue="@(_ => "text-red-600 text-sm")">
+                            <FieldError MatchValidity="stepMismatch" ClassValue="@(_ => NumberFieldErrorClass())">
                                 Value must be a multiple of 0.1
                             </FieldError>
                         </div>
                     </FieldRoot>
                     <button type="submit"
-                            class="rounded bg-indigo-600 px-4 py-2 text-white transition hover:bg-indigo-700">
+                            class="demo-number-field-command demo-number-field-command--primary">
                         Submit
                     </button>
-                    <p class="text-xs text-gray-500">Try typing 0.11 (invalid) vs 0.1 (valid)</p>
+                    <p class="demo-number-field-helper-text">Try typing 0.11 (invalid) vs 0.1 (valid)</p>
                     @if (stepMismatchFormSubmitted)
                     {
-                        <p class="text-green-600 text-sm">Form submitted successfully!</p>
+                        <p class="demo-number-field-success">Form submitted successfully!</p>
                     }
                 </div>
             </Form>
@@ -736,7 +768,7 @@
 
     <DemoSection Title="Null and Empty Values"
                  Description="Handle null/empty states and transitions.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot Value="@nullableValue"
                              ValueChanged="@(v => nullableValue = v)"
                              ClassValue="@(state => NumberFieldRootClass(state))">
@@ -750,26 +782,26 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="flex items-center gap-4">
-                <span class="text-sm text-gray-700">Value: @(nullableValue?.ToString() ?? "null")</span>
+            <div class="demo-number-field-action-row">
+                <span class="demo-number-field-live-value">Value: @(nullableValue?.ToString() ?? "null")</span>
                 <button type="button"
-                        class="rounded bg-gray-600 px-3 py-1 text-sm text-white transition hover:bg-gray-700"
+                        class="demo-number-field-command demo-number-field-command--secondary"
                         @onclick="@(() => nullableValue = null)">
                     Set to null
                 </button>
                 <button type="button"
-                        class="rounded bg-indigo-600 px-3 py-1 text-sm text-white transition hover:bg-indigo-700"
+                        class="demo-number-field-command demo-number-field-command--primary"
                         @onclick="@(() => nullableValue = 5)">
                     Set to 5
                 </button>
             </div>
-            <p class="text-xs text-gray-500">Clear the input to see null state. Value changes fire for each parseable input.</p>
+            <p class="demo-number-field-helper-text">Clear the input to see null state. Value changes fire for each parseable input.</p>
         </div>
     </DemoSection>
 
     <DemoSection Title="Change Reasons"
                  Description="Track the reason for each value change.">
-        <div class="w-full max-w-xs space-y-4">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-4">
             <NumberFieldRoot DefaultValue="50"
                              AllowWheelScrub="true"
                              OnValueChange="@HandleValueChangeWithReason"
@@ -778,7 +810,7 @@
                     <NumberFieldScrubArea Direction="ScrubDirection.Horizontal"
                                           PixelSensitivity="2"
                                           ClassValue="@(state => NumberFieldScrubAreaClass(state))">
-                        <span class="text-sm font-medium text-gray-700 select-none">Scrub label</span>
+                        <span class="demo-number-field-scrub-label">Scrub label</span>
                     </NumberFieldScrubArea>
                 </div>
                 <NumberFieldGroup ClassValue="@(state => NumberFieldGroupClass(state))">
@@ -791,11 +823,11 @@
                     </NumberFieldIncrement>
                 </NumberFieldGroup>
             </NumberFieldRoot>
-            <div class="space-y-1 text-sm text-gray-700">
-                <p>Last change reason: <span class="font-mono bg-gray-100 px-1">@lastChangeReason</span></p>
+            <div class="demo-number-field-status">
+                <p>Last change reason: <span class="demo-number-field-code">@lastChangeReason</span></p>
                 <p>Last value: @(lastChangedValue?.ToString() ?? "null")</p>
             </div>
-            <div class="text-xs text-gray-500 space-y-1">
+            <div class="demo-number-field-helper-text">
                 <p>Try: typing, clicking +/-, arrow keys, wheel, scrubbing</p>
             </div>
         </div>
@@ -803,13 +835,13 @@
 
     <DemoSection Title="Validation Modes"
                  Description="Different validation timing options.">
-        <div class="w-full max-w-xs space-y-6">
+        <div class="demo-number-field-demo w-full max-w-xs space-y-6">
             <Form Model="@(new object())">
                 <FieldRoot Name="onChangeValidation"
                            ValidationMode="ValidationMode.OnChange"
                            Validate="@ValidateRange">
                     <div class="space-y-2">
-                        <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                        <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                             OnChange (validates as you type)
                         </FieldLabel>
                         <NumberFieldRoot DefaultValue="50"
@@ -824,7 +856,7 @@
                                 </NumberFieldIncrement>
                             </NumberFieldGroup>
                         </NumberFieldRoot>
-                        <FieldError ClassValue="@(_ => "text-red-600 text-sm")" />
+                        <FieldError ClassValue="@(_ => NumberFieldErrorClass())" />
                     </div>
                 </FieldRoot>
             </Form>
@@ -834,7 +866,7 @@
                            ValidationMode="ValidationMode.OnBlur"
                            Validate="@ValidateRange">
                     <div class="space-y-2">
-                        <FieldLabel ClassValue="@(_ => "text-sm font-medium text-gray-700")">
+                        <FieldLabel ClassValue="@(_ => NumberFieldLabelClass())">
                             OnBlur (validates when focus leaves)
                         </FieldLabel>
                         <NumberFieldRoot DefaultValue="50"
@@ -849,12 +881,12 @@
                                 </NumberFieldIncrement>
                             </NumberFieldGroup>
                         </NumberFieldRoot>
-                        <FieldError ClassValue="@(_ => "text-red-600 text-sm")" />
+                        <FieldError ClassValue="@(_ => NumberFieldErrorClass())" />
                     </div>
                 </FieldRoot>
             </Form>
 
-            <p class="text-xs text-gray-500">Value must be between 10 and 90 (inclusive)</p>
+            <p class="demo-number-field-helper-text">Value must be between 10 and 90 (inclusive)</p>
         </div>
     </DemoSection>
 
@@ -988,5 +1020,25 @@
     private static string NumberFieldScrubAreaCursorClass(NumberFieldRootState state)
     {
         return "demo-number-field-scrub-cursor";
+    }
+
+    private static string NumberFieldLabelClass()
+    {
+        return "demo-number-field-label";
+    }
+
+    private static string NumberFieldMutedLabelClass()
+    {
+        return "demo-number-field-label demo-number-field-label--muted";
+    }
+
+    private static string NumberFieldDescriptionClass()
+    {
+        return "demo-number-field-description";
+    }
+
+    private static string NumberFieldErrorClass()
+    {
+        return "demo-number-field-error";
     }
 }

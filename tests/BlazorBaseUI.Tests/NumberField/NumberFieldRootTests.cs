@@ -18,14 +18,16 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
         EventCallback<NumberFieldValueCommittedEventArgs>? onValueCommitted = null,
         double? min = null,
         double? max = null,
-        double step = 1,
+        object? step = null,
         bool disabled = false,
         bool readOnly = false,
         bool required = false,
         string? name = null,
+        string? form = null,
         string? locale = null,
         NumberFormatOptions? format = null,
         bool allowWheelScrub = false,
+        bool allowOutOfRange = false,
         bool snapOnStep = false,
         Func<NumberFieldRootState, string?>? classValue = null,
         Func<NumberFieldRootState, string?>? styleValue = null,
@@ -51,7 +53,8 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
                 builder.AddAttribute(attrIndex++, "Min", min.Value);
             if (max.HasValue)
                 builder.AddAttribute(attrIndex++, "Max", max.Value);
-            builder.AddAttribute(attrIndex++, "Step", step);
+            if (step is not null)
+                builder.AddAttribute(attrIndex++, "Step", step);
             if (disabled)
                 builder.AddAttribute(attrIndex++, "Disabled", true);
             if (readOnly)
@@ -60,12 +63,16 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
                 builder.AddAttribute(attrIndex++, "Required", true);
             if (name is not null)
                 builder.AddAttribute(attrIndex++, "Name", name);
+            if (form is not null)
+                builder.AddAttribute(attrIndex++, "Form", form);
             if (locale is not null)
                 builder.AddAttribute(attrIndex++, "Locale", locale);
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
             if (allowWheelScrub)
                 builder.AddAttribute(attrIndex++, "AllowWheelScrub", true);
+            if (allowOutOfRange)
+                builder.AddAttribute(attrIndex++, "AllowOutOfRange", true);
             if (snapOnStep)
                 builder.AddAttribute(attrIndex++, "SnapOnStep", true);
             if (classValue is not null)
@@ -513,7 +520,7 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
     // --- onValueCommitted ---
 
     [Fact]
-    public Task OnValueCommitted_FiresOnBlurWithNumericValue()
+    public Task OnValueCommitted_FiresOnBlurAfterManualInput()
     {
         NumberFieldValueCommittedEventArgs? receivedArgs = null;
         var onValueCommitted = EventCallback.Factory.Create<NumberFieldValueCommittedEventArgs>(
@@ -521,6 +528,7 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
 
         var cut = Render(CreateNumberField(defaultValue: 5, onValueCommitted: onValueCommitted));
         var input = cut.Find("input[type='text']");
+        input.Input(new ChangeEventArgs { Value = "5" });
         input.Blur();
 
         receivedArgs.ShouldNotBeNull();
@@ -617,6 +625,15 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task Form_SetsFormOnHiddenInput()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0, name: "quantity", form: "external-form"));
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("form").ShouldBe("external-form");
+        return Task.CompletedTask;
+    }
+
     // --- Min ---
 
     [Fact]
@@ -675,6 +692,48 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
 
         var hiddenInput = cut.Find("input[type='number']");
         hiddenInput.GetAttribute("value").ShouldBe("4");
+        return Task.CompletedTask;
+    }
+
+    // --- allowOutOfRange ---
+
+    [Fact]
+    public Task AllowOutOfRange_AllowsOverflowForDirectInput()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0, max: 5, allowOutOfRange: true));
+        var input = cut.Find("input[type='text']");
+
+        input.Input(new ChangeEventArgs { Value = "6" });
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("6");
+        input.GetAttribute("value").ShouldBe("6");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AllowOutOfRange_ClampsStepInteractions()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 5, max: 5, allowOutOfRange: true));
+        var btn = cut.Find("[aria-label='Increase']");
+
+        btn.Click(new MouseEventArgs { Detail = 0 });
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("5");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AllowOutOfRange_ClampsDirectInputWhenFalse()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0, max: 5, allowOutOfRange: false));
+        var input = cut.Find("input[type='text']");
+
+        input.Input(new ChangeEventArgs { Value = "6" });
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("5");
         return Task.CompletedTask;
     }
 
@@ -938,10 +997,9 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
     [Fact]
     public Task InputMode_SetsToNumericByDefault()
     {
-        // When min is not specified (can be negative), InputMode should be "text"
         var cut = Render(CreateNumberField(defaultValue: 0));
         var input = cut.Find("input[type='text']");
-        input.GetAttribute("inputmode").ShouldBe("text");
+        input.GetAttribute("inputmode").ShouldBe("numeric");
         return Task.CompletedTask;
     }
 
@@ -950,7 +1008,7 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
     {
         var cut = Render(CreateNumberField(defaultValue: 0, min: 0));
         var input = cut.Find("input[type='text']");
-        input.GetAttribute("inputmode").ShouldBe("decimal");
+        input.GetAttribute("inputmode").ShouldBe("numeric");
         return Task.CompletedTask;
     }
 
@@ -1229,22 +1287,27 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task HiddenInput_AllowsStepAny()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 5, min: 0, step: "any"));
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("step").ShouldBe("any");
+        return Task.CompletedTask;
+    }
+
     // --- Parse utility tests (from parse.test.ts via component interface) ---
 
     [Fact]
     public Task Parse_HandlesHanNumerals()
     {
-        // Han numerals are currently rejected by IsValidInputCharacters
-        // (C# implementation gap: input filter doesn't include Han digit range)
-        // Verify the input is rejected and value stays at default
         var cut = Render(CreateNumberField(defaultValue: 0));
         var input = cut.Find("input[type='text']");
         input.Input(new ChangeEventArgs { Value = "\u4E00\u4E8C\u4E09\u56DB" }); // 一二三四
         input.Blur();
 
         var hiddenInput = cut.Find("input[type='number']");
-        // Value stays at default because Han chars are rejected by input filter
-        hiddenInput.GetAttribute("value").ShouldBe("0");
+        hiddenInput.GetAttribute("value").ShouldBe("1234");
         return Task.CompletedTask;
     }
 
@@ -1285,6 +1348,32 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
 
         var hiddenInput = cut.Find("input[type='number']");
         hiddenInput.GetAttribute("value").ShouldBe("-1234");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Parse_HandlesTrailingAsciiSign()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0));
+        var input = cut.Find("input[type='text']");
+        input.Input(new ChangeEventArgs { Value = "1234-" });
+        input.Blur();
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("-1234");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Parse_HandlesPermilleWhenFormattedAsPercent()
+    {
+        var format = new NumberFormatOptions(Style: "percent");
+        var cut = Render(CreateNumberField(defaultValue: 0, format: format));
+        var input = cut.Find("input[type='text']");
+        input.Input(new ChangeEventArgs { Value = "12\u2030" });
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("0.012");
         return Task.CompletedTask;
     }
 

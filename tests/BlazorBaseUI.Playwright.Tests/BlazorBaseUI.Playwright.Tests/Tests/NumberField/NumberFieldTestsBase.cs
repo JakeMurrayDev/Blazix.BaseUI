@@ -281,6 +281,66 @@ public abstract class NumberFieldTestsBase : TestBase
         await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("42");
     }
 
+    [Fact]
+    public virtual async Task Paste_EventUsesClipboardTextAndReason()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0));
+
+        var input = GetInput();
+        await input.FocusAsync();
+
+        await Page.EvaluateAsync(@"() => {
+            const input = document.querySelector('input[type=""text""]');
+            const event = new Event('paste', { bubbles: true, cancelable: true });
+            Object.defineProperty(event, 'clipboardData', {
+                value: { getData: (type) => type === 'text/plain' ? '42' : '' }
+            });
+            input.dispatchEvent(event);
+        }");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("42");
+        await Assertions.Expect(GetLastReason()).ToHaveTextAsync("InputPaste");
+    }
+
+    #endregion
+
+    #region Character Filtering
+
+    [Fact]
+    public virtual async Task Keyboard_BlocksPercentWhenNotFormattedAsPercent()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0));
+
+        var input = GetInput();
+        await input.FocusAsync();
+        await input.FillAsync("");
+        await Page.Keyboard.TypeAsync("%");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(input).ToHaveValueAsync("");
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("null");
+    }
+
+    [Fact]
+    public virtual async Task Keyboard_AllowsPercentWhenFormattedAsPercent()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0)
+            .WithNumberFieldFormatStyle("percent"));
+
+        var input = GetInput();
+        await input.FocusAsync();
+        await input.FillAsync("");
+        await Page.Keyboard.TypeAsync("12%");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(input).ToHaveValueAsync("12%");
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("0.12");
+    }
+
     #endregion
 
     #region Focus and Blur
@@ -452,6 +512,71 @@ public abstract class NumberFieldTestsBase : TestBase
         // Check the form data display
         var formData = GetByTestId("form-data");
         await Assertions.Expect(formData).ToContainTextAsync("quantity=42");
+    }
+
+    [Fact]
+    public virtual async Task Form_AllowOutOfRangePreservesNativeOverflow()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0)
+            .WithNumberFieldName("quantity")
+            .WithMax(5)
+            .WithNumberFieldAllowOutOfRange(true)
+            .WithNumberFieldShowForm(true));
+
+        var input = GetInput();
+        await input.FillAsync("6");
+        await WaitForDelayAsync(100);
+
+        var overflow = await GetHiddenInput().EvaluateAsync<bool>("input => input.validity.rangeOverflow");
+        Assert.True(overflow);
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("6");
+    }
+
+    [Fact]
+    public virtual async Task Form_StepAnyDoesNotCreateStepMismatch()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0)
+            .WithNumberFieldName("quantity")
+            .WithMin(0)
+            .WithNumberFieldStepAny(true)
+            .WithNumberFieldShowForm(true));
+
+        var input = GetInput();
+        await input.FillAsync("0.11");
+        await WaitForDelayAsync(100);
+
+        var stepMismatch = await GetHiddenInput().EvaluateAsync<bool>("input => input.validity.stepMismatch");
+        Assert.False(stepMismatch);
+    }
+
+    #endregion
+
+    #region Scrub Area
+
+    [Fact]
+    public virtual async Task ScrubArea_UsesPointerMovementMagnitude()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0)
+            .WithNumberFieldShowScrubArea(true));
+
+        var scrubArea = GetScrubArea();
+        await scrubArea.DispatchEventAsync("pointerdown", new { button = 0, pointerType = "mouse", clientX = 20, clientY = 20 });
+        await WaitForDelayAsync(100);
+        await Page.EvaluateAsync(@"() => {
+            const move = new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerType: 'mouse' });
+            Object.defineProperty(move, 'movementX', { value: 10 });
+            Object.defineProperty(move, 'movementY', { value: 0 });
+            window.dispatchEvent(move);
+            const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' });
+            window.dispatchEvent(up);
+        }");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("10");
+        await Assertions.Expect(GetCommittedValue()).ToHaveTextAsync("10");
     }
 
     #endregion

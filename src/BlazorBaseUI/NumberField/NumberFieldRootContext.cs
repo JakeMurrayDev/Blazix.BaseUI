@@ -5,7 +5,7 @@ namespace BlazorBaseUI.NumberField;
 
 /// <summary>
 /// Provides shared state and callbacks for child components of the <see cref="NumberFieldRoot"/>.
-/// Cascaded as a fixed value from the root to all descendants.
+/// Cascaded from the root to all descendants.
 /// </summary>
 internal sealed class NumberFieldRootContext
 {
@@ -90,6 +90,21 @@ internal sealed class NumberFieldRootContext
     public NumberFormatOptions? FormatOptions { get; set; }
 
     /// <summary>
+    /// Gets or sets whether direct input may exceed the configured range.
+    /// </summary>
+    public bool AllowOutOfRange { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a programmatic value change is waiting to be committed.
+    /// </summary>
+    public bool HasPendingCommit { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether programmatic value changes may synchronize the displayed input text.
+    /// </summary>
+    public bool AllowInputSync { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the current component state exposed to style and render callbacks.
     /// </summary>
     public NumberFieldRootState State { get; set; } = NumberFieldRootState.Default;
@@ -103,6 +118,11 @@ internal sealed class NumberFieldRootContext
     /// Sets the numeric value with a reason and optional direction.
     /// </summary>
     public Action<double?, NumberFieldChangeReason, int?> SetValue { get; set; } = null!;
+
+    /// <summary>
+    /// Returns the validated numeric value for the specified reason and optional direction.
+    /// </summary>
+    public Func<double?, NumberFieldChangeReason, int?, double?> GetValidatedValue { get; set; } = null!;
 
     /// <summary>
     /// Increments the value by the specified amount in the given direction.
@@ -128,6 +148,11 @@ internal sealed class NumberFieldRootContext
     /// Sets the displayed input text directly without parsing.
     /// </summary>
     public Action<string> SetInputValue { get; set; } = null!;
+
+    /// <summary>
+    /// Sets whether programmatic value changes should synchronize the displayed input text.
+    /// </summary>
+    public Action<bool> SetAllowInputSync { get; set; } = null!;
 
     /// <summary>
     /// Sets the scrubbing state of the number field.

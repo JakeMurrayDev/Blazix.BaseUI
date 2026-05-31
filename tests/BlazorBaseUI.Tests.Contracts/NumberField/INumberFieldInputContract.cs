@@ -27,6 +27,7 @@ public interface INumberFieldInputContract
 
     // Blur formatting
     Task CommitsFormattedValueOnlyOnBlur();
+    Task PreservesRawInputUntilBlur();
     Task CommitsValidatedNumberOnBlur_Min();
     Task CommitsValidatedNumberOnBlur_Max();
     Task DoesNotSnapToStepOnBlur();

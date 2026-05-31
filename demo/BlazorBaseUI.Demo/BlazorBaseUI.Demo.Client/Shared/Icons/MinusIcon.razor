@@ -1,10 +1,21 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg"
-     class="h-3 w-3"
-     viewBox="0 0 24 24"
+@namespace BlazorBaseUI.Demo.Client.Shared.Icons
+
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 20 20"
+     width="1em"
+     height="1em"
      fill="none"
      stroke="currentColor"
-     stroke-width="3"
+     stroke-width="1.75"
      stroke-linecap="round"
-     stroke-linejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"></line>
+     stroke-linejoin="round"
+     aria-hidden="true"
+     focusable="false"
+     @attributes="AdditionalAttributes">
+    <path d="M4.5 10h11" />
 </svg>
+
+@code {
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

@@ -62,6 +62,7 @@ internal sealed class SliderRootContext
 /// </summary>
 /// <param name="Style">Gets or sets the formatting style (e.g., <c>"decimal"</c>, <c>"currency"</c>, <c>"percent"</c>).</param>
 /// <param name="Currency">Gets or sets the currency code to use when <paramref name="Style"/> is <c>"currency"</c> (e.g., <c>"USD"</c>).</param>
+/// <param name="Unit">Gets or sets the unit identifier to use when <paramref name="Style"/> is <c>"unit"</c>.</param>
 /// <param name="MinimumFractionDigits">Gets or sets the minimum number of fraction digits to display.</param>
 /// <param name="MaximumFractionDigits">Gets or sets the maximum number of fraction digits to display.</param>
 /// <param name="MinimumIntegerDigits">Gets or sets the minimum number of integer digits to display.</param>
@@ -71,6 +72,7 @@ internal sealed class SliderRootContext
 public sealed record NumberFormatOptions(
     string? Style = null,
     string? Currency = null,
+    string? Unit = null,
     int? MinimumFractionDigits = null,
     int? MaximumFractionDigits = null,
     int? MinimumIntegerDigits = null,

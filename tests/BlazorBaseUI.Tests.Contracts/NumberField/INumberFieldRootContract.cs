@@ -44,7 +44,7 @@ public interface INumberFieldRootContract
     Task Typing_AllowsDeletingTrailingCurrencySymbols();
 
     // onValueCommitted
-    Task OnValueCommitted_FiresOnBlurWithNumericValue();
+    Task OnValueCommitted_FiresOnBlurAfterManualInput();
     Task OnValueCommitted_FiresNullOnBlurWhenCleared();
     Task OnValueCommitted_FiresOnKeyboardInteractions();
     Task OnValueCommitted_FiresOnIncrementDecrementButtons();
@@ -54,6 +54,7 @@ public interface INumberFieldRootContract
     Task ReadOnly_MarksInputAsReadOnly();
     Task Required_MarksInputAsRequired();
     Task Name_SetsNameOnHiddenInput();
+    Task Form_SetsFormOnHiddenInput();
 
     // Min
     Task Min_PreventsValueBelowMin();
@@ -62,6 +63,11 @@ public interface INumberFieldRootContract
     // Max
     Task Max_PreventsValueAboveMax();
     Task Max_AllowsValueBelowMax();
+
+    // allowOutOfRange
+    Task AllowOutOfRange_AllowsOverflowForDirectInput();
+    Task AllowOutOfRange_ClampsStepInteractions();
+    Task AllowOutOfRange_ClampsDirectInputWhenFalse();
 
     // Step
     Task Step_DefaultsToOne();
@@ -132,12 +138,15 @@ public interface INumberFieldRootContract
     Task HiddenInput_HasAriaHiddenTrue();
     Task HiddenInput_HasNameAttribute();
     Task HiddenInput_HasMinMaxStepAttributes();
+    Task HiddenInput_AllowsStepAny();
 
     // Parse utility tests (parse.test.ts via component interface)
     Task Parse_HandlesHanNumerals();
     Task Parse_ReturnsNullForEmptyAndWhitespace();
     Task Parse_ReturnsNullForJustASign();
     Task Parse_HandlesLeadingAndTrailingSigns();
+    Task Parse_HandlesTrailingAsciiSign();
+    Task Parse_HandlesPermilleWhenFormattedAsPercent();
     Task Parse_HandlesDeDeFormattedNumbers();
     Task Parse_ReturnsNullForInfinityLikeInputs();
     Task Parse_CollapsesMultipleConsecutiveDots();

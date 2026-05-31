@@ -1,5 +1,3 @@
-@using System.Globalization
-@using System.Text.RegularExpressions
 @using Microsoft.AspNetCore.Components.Web
 @using BlazorBaseUI.Field
 @using BlazorBaseUI.Utilities.LabelableProvider
@@ -13,35 +11,18 @@
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
                ChildContent="ChildContent"
+               UpdatesAttributeName="value"
+               UpdatesAttributeEventName="oninput"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
     private const string DefaultTag = "input";
 
-    private static readonly Regex ArabicIndicRe = ArabicIndicRegex();
-    private static readonly Regex ExtendedArabicIndicRe = ExtendedArabicIndicRegex();
-    private static readonly Regex FullwidthRe = FullwidthRegex();
-    private static readonly Regex HanRe = HanRegex();
-
     private bool hasTouchedInput;
     private RenderElement<NumberFieldRootState>? renderElementReference;
     private NumberFieldRootState state = NumberFieldRootState.Default;
     private Dictionary<string, object> componentAttributes = new();
-
-    private CultureInfo ResolvedCulture
-    {
-        get
-        {
-            var locale = RootContext?.Locale;
-            if (!string.IsNullOrEmpty(locale))
-            {
-                try { return CultureInfo.GetCultureInfo(locale); }
-                catch { return CultureInfo.CurrentCulture; }
-            }
-            return CultureInfo.CurrentCulture;
-        }
-    }
 
     [CascadingParameter]
     private NumberFieldRootContext? RootContext { get; set; }
@@ -173,6 +154,9 @@
         FieldContext?.SetFocused(false);
 
         var inputValue = RootContext?.InputValue ?? string.Empty;
+        var hadManualInput = RootContext?.AllowInputSync == false;
+        var hadPendingProgrammaticChange = RootContext?.HasPendingCommit == true;
+        RootContext?.SetAllowInputSync(true);
 
         if (string.IsNullOrWhiteSpace(inputValue))
         {
@@ -194,14 +178,18 @@
                 ? Math.Round(parsedValue.Value, maxFrac.Value, MidpointRounding.AwayFromZero)
                 : parsedValue.Value;
 
+            var validatedValue = RootContext?.GetValidatedValue(committed, NumberFieldChangeReason.InputBlur, null) ?? committed;
             var currentValue = RootContext?.Value;
             if (currentValue != committed)
             {
                 RootContext?.SetValue(committed, NumberFieldChangeReason.InputBlur, null);
             }
-            RootContext?.OnValueCommitted(committed, NumberFieldChangeReason.InputBlur);
+            if (hadManualInput || currentValue != committed || hadPendingProgrammaticChange)
+            {
+                RootContext?.OnValueCommitted(validatedValue, NumberFieldChangeReason.InputBlur);
+            }
 
-            var formattedValue = FormatNumber(committed);
+            var formattedValue = FormatNumber(validatedValue);
             if (inputValue != formattedValue)
             {
                 RootContext?.SetInputValue(formattedValue);
@@ -217,6 +205,7 @@
 
         if (string.IsNullOrWhiteSpace(newValue))
         {
+            RootContext?.SetAllowInputSync(false);
             RootContext?.SetInputValue(newValue);
             RootContext?.SetValue(null, NumberFieldChangeReason.InputClear, null);
             return;
@@ -225,6 +214,7 @@
         if (!IsValidInputCharacters(newValue))
             return;
 
+        RootContext?.SetAllowInputSync(false);
         RootContext?.SetInputValue(newValue);
 
         var parsedValue = ParseNumber(newValue);
@@ -239,6 +229,7 @@
         if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
             return;
 
+        RootContext?.SetAllowInputSync(true);
         var amount = RootContext?.GetStepAmount(e.AltKey, e.ShiftKey) ?? 1;
 
         switch (e.Key)
@@ -279,106 +270,20 @@
 
     private bool IsValidInputCharacters(string input)
     {
-        var culture = ResolvedCulture;
-        var decimalSeparator = culture.NumberFormat.NumberDecimalSeparator;
-        var groupSeparator = culture.NumberFormat.NumberGroupSeparator;
-
-        foreach (var ch in input)
-        {
-            var isDigit = char.IsDigit(ch);
-            var isDecimal = decimalSeparator.Contains(ch);
-            var isGroup = groupSeparator.Contains(ch);
-            var isMinus = ch == '-' || ch == '\u2212';
-            var isPlus = ch == '+';
-            var isSpace = char.IsWhiteSpace(ch);
-            var isArabicIndic = ch >= '\u0660' && ch <= '\u0669';
-            var isExtendedArabicIndic = ch >= '\u06F0' && ch <= '\u06F9';
-            var isFullwidth = ch >= '\uFF10' && ch <= '\uFF19';
-
-            if (!isDigit && !isDecimal && !isGroup && !isMinus && !isPlus && !isSpace
-                && !isArabicIndic && !isExtendedArabicIndic && !isFullwidth)
-            {
-                return false;
-            }
-        }
-
-        return true;
+        return NumberFieldUtilities.IsValidCharacterString(
+            input,
+            RootContext?.Locale,
+            RootContext?.FormatOptions,
+            RootContext?.MinWithDefault ?? double.MinValue);
     }
 
     private double? ParseNumber(string input)
     {
-        if (string.IsNullOrWhiteSpace(input))
-            return null;
-
-        var culture = ResolvedCulture;
-
-        input = NormalizeNumerals(input);
-        input = input.Replace('\u2212', '-').Trim();
-
-        if (double.TryParse(input, NumberStyles.Number, culture, out var result))
-        {
-            return result;
-        }
-
-        if (double.TryParse(input, NumberStyles.Number, CultureInfo.InvariantCulture, out result))
-        {
-            return result;
-        }
-
-        return null;
-    }
-
-    private static string NormalizeNumerals(string input)
-    {
-        input = ArabicIndicRe.Replace(input, m => ((char)(m.Value[0] - '\u0660' + '0')).ToString());
-        input = ExtendedArabicIndicRe.Replace(input, m => ((char)(m.Value[0] - '\u06F0' + '0')).ToString());
-        input = FullwidthRe.Replace(input, m => ((char)(m.Value[0] - '\uFF10' + '0')).ToString());
-        input = HanRe.Replace(input, m =>
-        {
-            var ch = m.Value[0];
-            return ch switch
-            {
-                '\u3007' => "0",
-                '\u4E00' => "1",
-                '\u4E8C' => "2",
-                '\u4E09' => "3",
-                '\u56DB' => "4",
-                '\u4E94' => "5",
-                '\u516D' => "6",
-                '\u4E03' => "7",
-                '\u516B' => "8",
-                '\u4E5D' => "9",
-                _ => m.Value
-            };
-        });
-
-        return input;
+        return NumberFieldUtilities.ParseNumber(input, RootContext?.Locale, RootContext?.FormatOptions);
     }
 
     private string FormatNumber(double value)
     {
-        var culture = ResolvedCulture;
-        var format = RootContext?.FormatOptions;
-
-        if (format is not null)
-        {
-            var style = format.Style?.ToLowerInvariant();
-            var hasExplicitPrecision =
-                format.MaximumFractionDigits is not null ||
-                format.MinimumFractionDigits is not null;
-            var minFrac = format.MinimumFractionDigits ?? 0;
-            var maxFrac = format.MaximumFractionDigits ?? 20;
-
-            return style switch
-            {
-                "currency" => value.ToString($"C{minFrac}", culture),
-                "percent" => value.ToString($"P{minFrac}", culture),
-                _ => hasExplicitPrecision
-                    ? value.ToString($"N{Math.Min(Math.Max(minFrac, 0), maxFrac)}", culture)
-                    : value.ToString("G", culture)
-            };
-        }
-
-        return value.ToString("G", culture);
+        return NumberFieldUtilities.FormatNumber(value, RootContext?.Locale, RootContext?.FormatOptions);
     }
 }
