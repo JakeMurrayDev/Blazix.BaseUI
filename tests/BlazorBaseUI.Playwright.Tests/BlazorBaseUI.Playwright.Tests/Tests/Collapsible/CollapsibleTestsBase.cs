@@ -159,6 +159,7 @@ public abstract class CollapsibleTestsBase : TestBase
         var panel = GetByTestId("collapsible-panel");
         await Assertions.Expect(panel).ToBeAttachedAsync();
         await Assertions.Expect(panel).ToHaveAttributeAsync("data-closed", "");
+        await Assertions.Expect(panel).ToHaveAttributeAsync("hidden", "");
 
         await ClickTriggerAsync();
         await WaitForAttributeValueAsync(panel, "data-open", "");
@@ -167,6 +168,7 @@ public abstract class CollapsibleTestsBase : TestBase
         await ClickTriggerAsync();
         await WaitForAttributeValueAsync(panel, "data-closed", "");
         await Assertions.Expect(panel).ToBeAttachedAsync();
+        await Assertions.Expect(panel).ToHaveAttributeAsync("hidden", "");
     }
 
     [Fact]
@@ -213,6 +215,7 @@ public abstract class CollapsibleTestsBase : TestBase
         // Panel should be attached (present in DOM) even when closed
         await Assertions.Expect(panel).ToBeAttachedAsync();
         await Assertions.Expect(panel).ToHaveAttributeAsync("data-closed", "");
+        await Assertions.Expect(panel).ToHaveAttributeAsync("hidden", "until-found");
     }
 
     [Fact]
@@ -344,23 +347,19 @@ public abstract class CollapsibleTestsBase : TestBase
     {
         await NavigateAsync(CreateUrl("/tests/collapsible")
             .WithAnimated(true)
-            .WithKeepMounted(true));
+            .WithKeepMounted(true)
+            .WithAnimationDuration(1000));
 
         var panel = GetByTestId("collapsible-panel");
 
-        var startingStyleDetected = false;
-        await Page.ExposeFunctionAsync("onStartingStyle", () =>
-        {
-            startingStyleDetected = true;
-        });
-
         await panel.EvaluateAsync(@"
             (el) => {
+                window.__startingStyleDetected = false;
                 window.__startingStyleObserver = new MutationObserver((mutations) => {
                     for (const mutation of mutations) {
                         if (mutation.attributeName === 'data-starting-style') {
                             if (el.hasAttribute('data-starting-style')) {
-                                window.onStartingStyle();
+                                window.__startingStyleDetected = true;
                             }
                         }
                     }
@@ -370,10 +369,11 @@ public abstract class CollapsibleTestsBase : TestBase
         ");
 
         await ClickTriggerAsync();
-        await panel.WaitForAnimationsAsync();
+        await Page.WaitForFunctionAsync(
+            "() => window.__startingStyleDetected === true",
+            new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
 
         await panel.EvaluateAsync("() => window.__startingStyleObserver?.disconnect()");
-        Assert.True(startingStyleDetected, "data-starting-style should be set during open animation");
     }
 
     [Fact]
@@ -382,23 +382,19 @@ public abstract class CollapsibleTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/collapsible")
             .WithAnimated(true)
             .WithDefaultOpen(true)
-            .WithKeepMounted(true));
+            .WithKeepMounted(true)
+            .WithAnimationDuration(1000));
 
         var panel = GetByTestId("collapsible-panel");
 
-        var endingStyleDetected = false;
-        await Page.ExposeFunctionAsync("onEndingStyle", () =>
-        {
-            endingStyleDetected = true;
-        });
-
         await panel.EvaluateAsync(@"
             (el) => {
+                window.__endingStyleDetected = false;
                 window.__endingStyleObserver = new MutationObserver((mutations) => {
                     for (const mutation of mutations) {
                         if (mutation.attributeName === 'data-ending-style') {
                             if (el.hasAttribute('data-ending-style')) {
-                                window.onEndingStyle();
+                                window.__endingStyleDetected = true;
                             }
                         }
                     }
@@ -408,10 +404,11 @@ public abstract class CollapsibleTestsBase : TestBase
         ");
 
         await ClickTriggerAsync();
-        await panel.WaitForAnimationsAsync();
+        await Page.WaitForFunctionAsync(
+            "() => window.__endingStyleDetected === true",
+            new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
 
         await panel.EvaluateAsync("() => window.__endingStyleObserver?.disconnect()");
-        Assert.True(endingStyleDetected, "data-ending-style should be set during close animation");
     }
 
     [Fact]
@@ -436,7 +433,7 @@ public abstract class CollapsibleTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task Panel_ShouldHaveZeroHeightCssVariable_WhenClosed()
+    public virtual async Task Panel_ShouldUseAutoCssVariable_WhenClosedAndHidden()
     {
         await NavigateAsync(CreateUrl("/tests/collapsible")
             .WithAnimated(true)
@@ -445,7 +442,7 @@ public abstract class CollapsibleTestsBase : TestBase
         var panel = GetByTestId("collapsible-panel");
 
         var heightVar = await panel.GetStylePropertyAsync("--collapsible-panel-height");
-        Assert.Equal("0px", heightVar);
+        Assert.Equal("auto", heightVar);
     }
 
     [Fact]
@@ -489,6 +486,257 @@ public abstract class CollapsibleTestsBase : TestBase
 
         var closedHeight = await panel.GetHeightAsync();
         Assert.True(closedHeight < openHeight, $"Panel should collapse. Open: {openHeight}, Closed: {closedHeight}");
+    }
+
+    [Fact]
+    public virtual async Task AnimatedPanel_ShouldAnimateOpen_WhenNotKeepMounted()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithAnimated(true)
+            .WithAnimationDuration(1000));
+
+        var trigger = GetByTestId("collapsible-trigger");
+        var panel = GetByTestId("collapsible-panel");
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(trigger, "aria-expanded", "true");
+        await panel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+        await WaitForDelayAsync(100);
+
+        var currentHeight = await panel.GetHeightAsync();
+        var scrollHeight = await panel.EvaluateAsync<double>("el => el.scrollHeight");
+
+        Assert.True(currentHeight > 0, $"Panel should begin opening. Current: {currentHeight}");
+        Assert.True(
+            currentHeight < scrollHeight,
+            $"Panel should still be transitioning after 100ms. Current: {currentHeight}, ScrollHeight: {scrollHeight}");
+    }
+
+    [Fact]
+    public virtual async Task AnimatedPanel_ShouldApplyStartingStyle_OnSecondOpen_WhenNotKeepMounted()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithAnimated(true)
+            .WithAnimationDuration(1000));
+
+        var trigger = GetByTestId("collapsible-trigger");
+        var panel = GetByTestId("collapsible-panel");
+
+        await trigger.ClickAsync();
+        await panel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Attached,
+            Timeout = 5000 * TimeoutMultiplier
+        });
+        await WaitForDelayAsync(1100);
+
+        await trigger.ClickAsync();
+        await panel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 3000 * TimeoutMultiplier
+        });
+
+        await Page.EvaluateAsync(@"
+            () => {
+                const container = document.querySelector('[data-testid=""test-container""]');
+                window.__secondOpenRecords = [];
+
+                const record = (panel, label) => {
+                    window.__secondOpenRecords.push({
+                        label,
+                        hasStartingStyle: panel.hasAttribute('data-starting-style'),
+                        hasEndingStyle: panel.hasAttribute('data-ending-style'),
+                        hasOpen: panel.hasAttribute('data-open'),
+                        height: panel.getBoundingClientRect().height,
+                        scrollHeight: panel.scrollHeight,
+                        style: panel.getAttribute('style'),
+                    });
+                };
+
+                const observePanel = (panel) => {
+                    record(panel, 'attached');
+
+                    const panelObserver = new MutationObserver((mutations) => {
+                        record(panel, mutations
+                            .map((mutation) => mutation.type === 'attributes' ? mutation.attributeName : mutation.type)
+                            .join(','));
+                    });
+
+                    panelObserver.observe(panel, {
+                        attributes: true,
+                        attributeFilter: ['style', 'data-open', 'data-closed', 'data-starting-style', 'data-ending-style'],
+                    });
+
+                    window.__secondOpenPanelObserver = panelObserver;
+                    requestAnimationFrame(() => record(panel, 'raf-after-attach'));
+                };
+
+                window.__secondOpenContainerObserver = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeType !== Node.ELEMENT_NODE) {
+                                continue;
+                            }
+
+                            const panel = node.matches('[data-testid=""collapsible-panel""]')
+                                ? node
+                                : node.querySelector('[data-testid=""collapsible-panel""]');
+
+                            if (panel) {
+                                observePanel(panel);
+                            }
+                        }
+                    }
+                });
+
+                window.__secondOpenContainerObserver.observe(container, { childList: true, subtree: true });
+            }
+        ");
+
+        await trigger.ClickAsync();
+        await Page.WaitForFunctionAsync(
+            "() => window.__secondOpenRecords?.some((record) => record.label === 'attached') === true",
+            new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
+
+        var firstAttachedStartedCollapsed = await Page.EvaluateAsync<bool>(
+            @"() => {
+                const record = window.__secondOpenRecords.find((item) => item.label === 'attached');
+                return record?.hasStartingStyle === true && record.height < record.scrollHeight;
+            }");
+        var recordsJson = await Page.EvaluateAsync<string>("() => JSON.stringify(window.__secondOpenRecords)");
+
+        await WaitForDelayAsync(100);
+        var currentHeight = await panel.GetHeightAsync();
+        var scrollHeight = await panel.EvaluateAsync<double>("el => el.scrollHeight");
+
+        await Page.EvaluateAsync(@"
+            () => {
+                window.__secondOpenPanelObserver?.disconnect();
+                window.__secondOpenContainerObserver?.disconnect();
+            }
+        ");
+
+        Assert.True(firstAttachedStartedCollapsed, $"Second open must commit the panel collapsed with data-starting-style. Records: {recordsJson}");
+        Assert.True(currentHeight > 0, $"Panel should begin the second open transition. Current: {currentHeight}");
+        Assert.True(
+            currentHeight < scrollHeight,
+            $"Panel should still be transitioning during the second open. Current: {currentHeight}, ScrollHeight: {scrollHeight}");
+    }
+
+    [Fact]
+    public virtual async Task AnimatedPanel_ShouldRemainMountedDuringClose_WhenNotKeepMounted()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithAnimated(true)
+            .WithDefaultOpen(true)
+            .WithAnimationDuration(1000));
+
+        var trigger = GetByTestId("collapsible-trigger");
+        var panel = GetByTestId("collapsible-panel");
+        var openHeight = await panel.GetHeightAsync();
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(trigger, "aria-expanded", "false");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(panel).ToBeAttachedAsync();
+        var closingHeight = await panel.GetHeightAsync();
+
+        Assert.True(closingHeight > 0, $"Panel should remain mounted while closing. Height: {closingHeight}");
+        Assert.True(
+            closingHeight < openHeight,
+            $"Panel should be in-progress during close. Open: {openHeight}, Closing: {closingHeight}");
+
+        await panel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 3000 * TimeoutMultiplier
+        });
+    }
+
+    [Fact]
+    public virtual async Task AnimatedPanel_ShouldNotRestoreOpenHeightBeforeUnmount_WhenCloseCompletes()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithAnimated(true)
+            .WithDefaultOpen(true)
+            .WithAnimationDuration(300));
+
+        var trigger = GetByTestId("collapsible-trigger");
+        var panel = GetByTestId("collapsible-panel");
+        var openHeight = await panel.GetHeightAsync();
+
+        await panel.EvaluateAsync(@"
+            (panel) => {
+                window.__closeFlashRecords = [];
+
+                const record = (label) => {
+                    const attached = document.contains(panel);
+                    window.__closeFlashRecords.push({
+                        label,
+                        attached,
+                        hasEndingStyle: panel.hasAttribute('data-ending-style'),
+                        hidden: panel.hasAttribute('hidden'),
+                        height: attached ? panel.getBoundingClientRect().height : null,
+                        style: panel.getAttribute('style'),
+                    });
+                };
+
+                record('before-close');
+
+                const observer = new MutationObserver((mutations) => {
+                    record(mutations
+                        .map((mutation) => mutation.type === 'attributes' ? mutation.attributeName : mutation.type)
+                        .join(','));
+                    requestAnimationFrame(() => record('raf-after-mutation'));
+                });
+
+                observer.observe(panel, {
+                    attributes: true,
+                    attributeFilter: ['style', 'hidden', 'data-open', 'data-closed', 'data-ending-style'],
+                });
+
+                if (panel.parentNode) {
+                    observer.observe(panel.parentNode, { childList: true });
+                }
+
+                window.__closeFlashObserver = observer;
+            }
+        ");
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(trigger, "aria-expanded", "false");
+        await panel.WaitForAsync(new LocatorWaitForOptions
+        {
+            State = WaitForSelectorState.Detached,
+            Timeout = 3000 * TimeoutMultiplier
+        });
+
+        var restoredOpenHeightBeforeUnmount = await Page.EvaluateAsync<bool>(
+            @"(openHeight) => {
+                let endingStyleWasObserved = false;
+                return window.__closeFlashRecords.some((record) => {
+                    if (record.hasEndingStyle) {
+                        endingStyleWasObserved = true;
+                    }
+
+                    return endingStyleWasObserved &&
+                        record.attached &&
+                        !record.hidden &&
+                        !record.hasEndingStyle &&
+                        record.height >= openHeight - 1;
+                });
+            }",
+            openHeight);
+
+        await Page.EvaluateAsync("() => window.__closeFlashObserver?.disconnect()");
+
+        Assert.False(restoredOpenHeightBeforeUnmount, "Panel must not restore open height while still attached after close animation completes.");
     }
 
     [Fact]

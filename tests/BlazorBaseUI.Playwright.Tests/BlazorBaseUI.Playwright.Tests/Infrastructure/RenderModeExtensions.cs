@@ -54,6 +54,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithAnimationDuration(int durationMs)
+    {
+        queryParams["animationDuration"] = durationMs.ToString();
+        return this;
+    }
+
     public TestPageUrlBuilder WithDisabled(bool value)
     {
         queryParams["disabled"] = value.ToString().ToLowerInvariant();

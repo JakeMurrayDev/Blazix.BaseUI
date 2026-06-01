@@ -14,8 +14,11 @@ export function detectAnimationType(element) {
     if (!element) return 'none';
 
     const styles = getComputedStyle(element);
-    const hasAnimation = styles.animationName !== 'none' && styles.animationName !== '';
-    const hasTransition = styles.transitionDuration !== '0s' && styles.transitionDuration !== '';
+    const hasAnimation = styles.animationName
+        .split(',')
+        .map((name) => name.trim())
+        .some((name) => name !== '' && name !== 'none') && hasNonZeroDuration(styles.animationDuration);
+    const hasTransition = hasNonZeroDuration(styles.transitionDuration);
 
     if (hasAnimation && !hasTransition) {
         return 'css-animation';
@@ -28,6 +31,13 @@ export function detectAnimationType(element) {
         return 'css-transition';
     }
     return 'none';
+}
+
+function hasNonZeroDuration(value) {
+    return value
+        .split(',')
+        .map((part) => part.trim())
+        .some((part) => part !== '' && Number.parseFloat(part) > 0);
 }
 
 /**
@@ -74,6 +84,11 @@ export async function waitForAnimationsToFinish(element, signal = null) {
         return true;
     }
 
+    const frameOk = await requestAnimationFrameAsync(signal);
+    if (!frameOk) {
+        return false;
+    }
+
     const animations = element.getAnimations();
     if (animations.length === 0) {
         return true;
@@ -83,7 +98,16 @@ export async function waitForAnimationsToFinish(element, signal = null) {
         await Promise.all(animations.map(anim => anim.finished));
         return !(signal?.aborted);
     } catch {
-        return false;
+        if (signal?.aborted) {
+            return false;
+        }
+
+        const currentAnimations = element.getAnimations();
+        if (currentAnimations.some(anim => anim.pending || anim.playState !== 'finished')) {
+            return waitForAnimationsToFinish(element, signal);
+        }
+
+        return true;
     }
 }
 

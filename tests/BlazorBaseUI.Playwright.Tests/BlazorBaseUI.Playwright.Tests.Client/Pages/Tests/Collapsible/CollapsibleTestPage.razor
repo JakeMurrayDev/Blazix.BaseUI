@@ -9,17 +9,13 @@
     <style>
         .animated-panel {
             overflow: hidden;
-            transition: height 200ms ease-out, opacity 200ms ease-out;
-        }
-
-        .animated-panel[data-closed] {
-            height: 0;
-            opacity: 0;
-        }
-
-        .animated-panel[data-open] {
             height: var(--collapsible-panel-height);
             opacity: 1;
+            transition: height @(AnimationDuration)ms ease-out, opacity @(AnimationDuration)ms ease-out;
+        }
+
+        .animated-panel[hidden]:not([hidden='until-found']) {
+            display: none;
         }
 
         .animated-panel[data-starting-style] {
@@ -75,6 +71,9 @@
 
     [SupplyParameterFromQuery(Name = "animated")]
     public bool Animated { get; set; }
+
+    [SupplyParameterFromQuery(Name = "animationDuration")]
+    public int AnimationDuration { get; set; } = 200;
 
     [SupplyParameterFromQuery(Name = "disabled")]
     public bool Disabled { get; set; }

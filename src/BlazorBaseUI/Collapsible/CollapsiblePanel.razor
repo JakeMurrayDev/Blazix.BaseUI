@@ -1,3 +1,4 @@
+@using System.Globalization
 @using Microsoft.JSInterop
 
 @implements IAsyncDisposable
@@ -20,9 +21,13 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private string? defaultId;
+    private string? registeredPanelId;
+    private double? measuredHeight;
+    private double? measuredWidth;
     private bool hasRendered;
     private bool isMounted;
     private bool jsInitialized;
+    private bool shouldPreventMountAnimation;
     private DotNetObjectReference<CollapsiblePanel>? dotNetRef;
     private CollapsiblePanelState state = new(false, false, TransitionStatus.Undefined);
     private AnimationAction pendingAnimation = AnimationAction.None;
@@ -36,18 +41,24 @@
     {
         get
         {
-            var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
-            if (id != Context?.PanelId)
+            var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () =>
+                string.IsNullOrEmpty(Context?.PanelId)
+                    ? defaultId ??= Guid.NewGuid().ToIdString()
+                    : Context.PanelId);
+
+            if (id != registeredPanelId)
             {
                 Context?.SetPanelId(id);
+                registeredPanelId = id;
             }
+
             return id;
         }
     }
 
-    private bool IsPresent => KeepMounted || HiddenUntilFound || isMounted;
+    private bool IsPresent => Context is not null && (KeepMounted || HiddenUntilFound || isMounted || CurrentOpen);
 
-    private bool IsHidden => !KeepMounted && !HiddenUntilFound && !CurrentOpen && pendingAnimation != AnimationAction.Close;
+    private bool IsHidden => !CurrentOpen && !isMounted;
 
     [Inject]
     private IJSRuntime JSRuntime { get; set; } = null!;
@@ -119,17 +130,30 @@
     {
         var initialOpen = Context?.Open ?? false;
         isMounted = initialOpen;
-        state = new CollapsiblePanelState(initialOpen, Context?.Disabled ?? false, TransitionStatus.Undefined);
+        shouldPreventMountAnimation = initialOpen;
+        state = new CollapsiblePanelState(
+            initialOpen,
+            Context?.Disabled ?? false,
+            initialOpen ? TransitionStatus.Idle : TransitionStatus.Undefined);
 
         computedStyleValue = s =>
         {
             var userStyle = StyleValue?.Invoke(s);
-            if (!jsInitialized && IsPresent && !CurrentOpen)
+            if (!IsPresent)
             {
-                var cssVars = "--collapsible-panel-height: 0px; --collapsible-panel-width: 0px";
-                return string.IsNullOrEmpty(userStyle) ? cssVars : $"{cssVars}; {userStyle}";
+                return userStyle;
             }
-            return userStyle;
+
+            var cssVars =
+                $"--collapsible-panel-height: {FormatCssSize(measuredHeight)}; --collapsible-panel-width: {FormatCssSize(measuredWidth)}";
+            var style = string.IsNullOrEmpty(userStyle) ? cssVars : $"{cssVars}; {userStyle}";
+
+            if (shouldPreventMountAnimation && CurrentOpen)
+            {
+                style = $"{style}; animation-name: none";
+            }
+
+            return style;
         };
 
         BuildComponentAttributes();
@@ -140,6 +164,7 @@
     {
         var currentOpen = CurrentOpen;
         var currentDisabled = Context?.Disabled ?? false;
+        var nextTransitionStatus = state.TransitionStatus;
 
         if (currentOpen != state.Open)
         {
@@ -147,6 +172,7 @@
             {
                 isMounted = true;
                 pendingAnimation = AnimationAction.Open;
+                nextTransitionStatus = TransitionStatus.Starting;
             }
             else
             {
@@ -158,11 +184,17 @@
             // Race condition recovery: close animation completed after state was already set to open
             isMounted = true;
             pendingAnimation = AnimationAction.Open;
+            nextTransitionStatus = TransitionStatus.Starting;
         }
 
-        if (state.Open != currentOpen || state.Disabled != currentDisabled)
+        if (state.Open != currentOpen || state.Disabled != currentDisabled || state.TransitionStatus != nextTransitionStatus)
         {
-            state = state with { Open = currentOpen, Disabled = currentDisabled };
+            state = state with
+            {
+                Open = currentOpen,
+                Disabled = currentDisabled,
+                TransitionStatus = nextTransitionStatus
+            };
         }
 
         // Register panel ID with context early so trigger can reference it
@@ -233,20 +265,28 @@
     /// Called from JavaScript when the panel transition status changes.
     /// </summary>
     /// <param name="status">The new transition status string.</param>
+    /// <param name="height">The measured panel height, when a transition needs a pixel endpoint.</param>
+    /// <param name="width">The measured panel width, when a transition needs a pixel endpoint.</param>
     [JSInvokable]
-    public void OnTransitionStatusChanged(string status)
+    public void OnTransitionStatusChanged(string status, double? height, double? width)
     {
-        // Note: We don't call StateHasChanged() here because the JS is controlling
-        // the data-starting-style and data-ending-style attributes directly on the DOM.
-        // Calling StateHasChanged() during animation would cause re-renders that
-        // interfere with the animation timing.
-        state = status switch
+        if (height.HasValue || width.HasValue)
         {
-            "starting" => state with { TransitionStatus = TransitionStatus.Starting },
-            "ending" => state with { TransitionStatus = TransitionStatus.Ending },
-            "idle" => state with { TransitionStatus = TransitionStatus.Idle },
-            _ => state with { TransitionStatus = TransitionStatus.Undefined }
+            measuredHeight = height;
+            measuredWidth = width;
+        }
+
+        var transitionStatus = status switch
+        {
+            "starting" => TransitionStatus.Starting,
+            "ending" => TransitionStatus.Ending,
+            "idle" => TransitionStatus.Idle,
+            _ => TransitionStatus.Undefined
         };
+
+        state = state with { TransitionStatus = transitionStatus };
+        Context?.SetTransitionStatus(transitionStatus);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -259,14 +299,26 @@
     {
         if (animationType == "close")
         {
-            if (completed && !KeepMounted && !HiddenUntilFound && !CurrentOpen)
+            if (completed && !CurrentOpen)
             {
                 isMounted = false;
-                jsInitialized = false;
+                measuredHeight = null;
+                measuredWidth = null;
+                if (!KeepMounted && !HiddenUntilFound)
+                {
+                    jsInitialized = false;
+                }
             }
+        }
+        else if (completed)
+        {
+            measuredHeight = null;
+            measuredWidth = null;
         }
 
         state = state with { TransitionStatus = TransitionStatus.Idle };
+        Context?.SetTransitionStatus(TransitionStatus.Idle);
+        shouldPreventMountAnimation = false;
         StateHasChanged();
     }
 
@@ -290,7 +342,9 @@
         attrs["id"] = ResolvedId;
 
         if (IsHidden)
+        {
             attrs["hidden"] = HiddenUntilFound ? "until-found" : true;
+        }
 
         attrs["data-open"] = state.Open;
         attrs["data-closed"] = !state.Open;
@@ -342,6 +396,13 @@
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private static string FormatCssSize(double? value)
+    {
+        return value.HasValue
+            ? string.Create(CultureInfo.InvariantCulture, $"{value.Value:0.###}px")
+            : "auto";
     }
 
     private enum AnimationAction { None, Open, Close }

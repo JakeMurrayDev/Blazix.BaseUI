@@ -13,8 +13,9 @@
 </CascadingValue>
 
 @code {
+    private string defaultPanelId = string.Empty;
     private bool isOpen;
-    private string panelId = string.Empty;
+    private string? panelId;
     private CollapsibleRootState state = new(false, false, TransitionStatus.Undefined);
     private CollapsibleRootContext context = null!;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
@@ -24,6 +25,8 @@
     private bool IsControlled => Open.HasValue;
 
     private bool CurrentOpen => IsControlled ? Open!.Value : isOpen;
+
+    private string CurrentPanelId => panelId ?? defaultPanelId;
 
     /// <summary>
     /// Gets or sets whether the collapsible panel is currently open.
@@ -99,13 +102,15 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        defaultPanelId = Guid.NewGuid().ToIdString();
         isOpen = DefaultOpen;
+        transitionStatus = CurrentOpen ? TransitionStatus.Idle : TransitionStatus.Undefined;
         context = new CollapsibleRootContext
         {
             Open = CurrentOpen,
             Disabled = Disabled,
             TransitionStatus = transitionStatus,
-            PanelId = panelId,
+            PanelId = CurrentPanelId,
             HandleTrigger = HandleTrigger,
             HandleBeforeMatch = HandleBeforeMatch,
             SetPanelId = SetPanelId,
@@ -118,22 +123,19 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (string.IsNullOrEmpty(panelId))
+        var currentOpen = CurrentOpen;
+        if (state.Open != currentOpen)
         {
-            var id = AttributeUtilities.GetAttributeStringValue(AdditionalAttributes, "id");
-            if (!string.IsNullOrEmpty(id))
-            {
-                SetPanelId(id);
-            }
+            transitionStatus = currentOpen ? TransitionStatus.Starting : TransitionStatus.Ending;
         }
 
-        var currentOpen = CurrentOpen;
         if (state.Open != currentOpen || state.Disabled != Disabled || state.TransitionStatus != transitionStatus)
         {
             state = state with { Open = currentOpen, Disabled = Disabled, TransitionStatus = transitionStatus };
             context.Open = currentOpen;
             context.Disabled = Disabled;
             context.TransitionStatus = transitionStatus;
+            context.PanelId = CurrentPanelId;
             BuildComponentAttributes();
         }
     }
@@ -147,8 +149,8 @@
         if (panelId != id)
         {
             panelId = id;
-            context.PanelId = id;
-            StateHasChanged();
+            context.PanelId = CurrentPanelId;
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -202,9 +204,17 @@
             isOpen = nextOpen;
         }
 
-        _ = OpenChanged.InvokeAsync(nextOpen);
-        state = state with { Open = nextOpen };
-        context.Open = nextOpen;
+        await OpenChanged.InvokeAsync(nextOpen);
+
+        var currentOpen = CurrentOpen;
+        if (state.Open != currentOpen)
+        {
+            transitionStatus = currentOpen ? TransitionStatus.Starting : TransitionStatus.Ending;
+        }
+
+        state = state with { Open = currentOpen, TransitionStatus = transitionStatus };
+        context.Open = currentOpen;
+        context.TransitionStatus = transitionStatus;
         BuildComponentAttributes();
         StateHasChanged();
     }
@@ -231,9 +241,17 @@
             isOpen = true;
         }
 
-        _ = OpenChanged.InvokeAsync(true);
-        state = state with { Open = true };
-        context.Open = true;
+        await OpenChanged.InvokeAsync(true);
+
+        var currentOpen = CurrentOpen;
+        if (state.Open != currentOpen)
+        {
+            transitionStatus = currentOpen ? TransitionStatus.Starting : TransitionStatus.Ending;
+        }
+
+        state = state with { Open = currentOpen, TransitionStatus = transitionStatus };
+        context.Open = currentOpen;
+        context.TransitionStatus = transitionStatus;
         BuildComponentAttributes();
         StateHasChanged();
     }

@@ -1,4 +1,5 @@
 @using BlazorBaseUI.Collapsible
+@using System.Globalization
 @using Microsoft.JSInterop
 
 @implements IAsyncDisposable
@@ -22,6 +23,8 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private string? defaultId;
+    private double? measuredHeight;
+    private double? measuredWidth;
     private bool hasRendered;
     private bool isMounted;
     private bool jsInitialized;
@@ -145,7 +148,15 @@
                 var cssVars = $"--{CssVarPrefix}-height: 0px; --{CssVarPrefix}-width: 0px";
                 return string.IsNullOrEmpty(userStyle) ? cssVars : $"{cssVars}; {userStyle}";
             }
-            return userStyle;
+
+            if (!IsPresent)
+            {
+                return userStyle;
+            }
+
+            var measuredCssVars =
+                $"--{CssVarPrefix}-height: {FormatCssSize(measuredHeight)}; --{CssVarPrefix}-width: {FormatCssSize(measuredWidth)}";
+            return string.IsNullOrEmpty(userStyle) ? measuredCssVars : $"{measuredCssVars}; {userStyle}";
         };
 
         BuildComponentAttributes();
@@ -250,9 +261,17 @@
     /// Called from JavaScript when the panel's transition status changes.
     /// </summary>
     /// <param name="status">The new transition status string.</param>
+    /// <param name="height">The measured panel height, when a transition needs a pixel endpoint.</param>
+    /// <param name="width">The measured panel width, when a transition needs a pixel endpoint.</param>
     [JSInvokable]
-    public void OnTransitionStatusChanged(string status)
+    public void OnTransitionStatusChanged(string status, double? height, double? width)
     {
+        if (height.HasValue || width.HasValue)
+        {
+            measuredHeight = height;
+            measuredWidth = width;
+        }
+
         state = status switch
         {
             "starting" => state with { TransitionStatus = TransitionStatus.Starting },
@@ -260,6 +279,7 @@
             "idle" => state with { TransitionStatus = TransitionStatus.Idle },
             _ => state with { TransitionStatus = TransitionStatus.Undefined }
         };
+        StateHasChanged();
     }
 
     /// <summary>
@@ -277,6 +297,17 @@
                 isMounted = false;
                 jsInitialized = false;
             }
+
+            if (completed && !CurrentOpen)
+            {
+                measuredHeight = null;
+                measuredWidth = null;
+            }
+        }
+        else if (completed)
+        {
+            measuredHeight = null;
+            measuredWidth = null;
         }
 
         state = state with { TransitionStatus = TransitionStatus.Idle };
@@ -360,5 +391,12 @@
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private static string FormatCssSize(double? value)
+    {
+        return value.HasValue
+            ? string.Create(CultureInfo.InvariantCulture, $"{value.Value:0.###}px")
+            : "auto";
     }
 }

@@ -155,8 +155,19 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
     {
         var cut = Render(CreatePanelInRoot(defaultOpen: false, keepMounted: true));
 
-        var panel = cut.Find("div[data-closed]");
+        var panel = cut.FindAll("div[data-closed]").Last();
         panel.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task KeepMountedPanelIsHiddenWhenClosed()
+    {
+        var cut = Render(CreatePanelInRoot(defaultOpen: false, keepMounted: true));
+
+        var panel = cut.FindAll("div[data-closed]").Last();
+        panel.HasAttribute("hidden").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -179,9 +190,8 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
         // With hiddenUntilFound: true, panel is rendered when closed with hidden attribute
         var cut = Render(CreatePanelInRoot(defaultOpen: false, keepMounted: false, hiddenUntilFound: true));
 
-        // The panel should be present with data-closed
-        var panels = cut.FindAll("div[data-closed]");
-        panels.Count.ShouldBeGreaterThan(0);
+        var panel = cut.FindAll("div[data-closed]").Last();
+        panel.GetAttribute("hidden").ShouldBe("until-found");
 
         return Task.CompletedTask;
     }
@@ -193,6 +203,44 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
 
         var panel = cut.Find("div[data-open]");
         panel.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitialOpenStateReportsIdleTransitionStatus()
+    {
+        CollapsiblePanelState? capturedState = null;
+
+        Render(CreatePanelInRoot(
+            defaultOpen: true,
+            classValue: state =>
+            {
+                capturedState = state;
+                return "test-class";
+            }
+        ));
+
+        capturedState.ShouldNotBeNull();
+        capturedState!.TransitionStatus.ShouldBe(TransitionStatus.Idle);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitialOpenPanelSuppressesMountAnimationAfterUserStyles()
+    {
+        var cut = Render(CreatePanelInRoot(
+            defaultOpen: true,
+            styleValue: _ => "animation-name: panel-slide-down; animation-duration: 100ms"
+        ));
+
+        var panel = cut.FindAll("div[data-open]").Last();
+        var style = panel.GetAttribute("style");
+
+        style.ShouldNotBeNull();
+        style!.ShouldContain("animation-name: panel-slide-down");
+        style.ShouldEndWith("animation-name: none");
 
         return Task.CompletedTask;
     }

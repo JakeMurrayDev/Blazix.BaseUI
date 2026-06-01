@@ -270,6 +270,22 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
     }
 
     [Fact]
+    public Task ControlledModeDoesNotMutateOpenWithoutParameterUpdate()
+    {
+        var cut = Render(CreateCollapsibleRoot(open: false));
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        trigger.Click();
+
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+        cut.FindAll("div[data-open]").ShouldBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task ReceivesCorrectState()
     {
         CollapsibleRootState? capturedState = null;
@@ -286,6 +302,26 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
         capturedState.ShouldNotBeNull();
         capturedState!.Open.ShouldBeTrue();
         capturedState.Disabled.ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitialOpenStateReportsIdleTransitionStatus()
+    {
+        CollapsibleRootState? capturedState = null;
+
+        Render(CreateCollapsibleRoot(
+            defaultOpen: true,
+            classValue: state =>
+            {
+                capturedState = state;
+                return "test-class";
+            }
+        ));
+
+        capturedState.ShouldNotBeNull();
+        capturedState!.TransitionStatus.ShouldBe(TransitionStatus.Idle);
 
         return Task.CompletedTask;
     }

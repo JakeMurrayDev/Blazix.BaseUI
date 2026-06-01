@@ -37,6 +37,7 @@ function getVarNames(prefix) {
  * @property {boolean} keepMounted
  * @property {'height' | 'width' | null} transitionDimension
  * @property {string | null} latestAnimationName
+ * @property {Function | null} pendingTemporaryStyleRestore
  */
 
 function getOrCreateState(panel, dotNetRef, prefix) {
@@ -54,7 +55,8 @@ function getOrCreateState(panel, dotNetRef, prefix) {
             cancelInitialAnimation: false,
             keepMounted: false,
             transitionDimension: null,
-            latestAnimationName: null
+            latestAnimationName: null,
+            pendingTemporaryStyleRestore: null
         };
         panelStates.set(panel, state);
     } else {
@@ -63,6 +65,37 @@ function getOrCreateState(panel, dotNetRef, prefix) {
     }
 
     return state;
+}
+
+function restorePendingTemporaryStyle(state) {
+    if (state.pendingTemporaryStyleRestore) {
+        state.pendingTemporaryStyleRestore();
+        state.pendingTemporaryStyleRestore = null;
+    }
+}
+
+function setPendingTemporaryStyleRestore(state, restore) {
+    restorePendingTemporaryStyle(state);
+    state.pendingTemporaryStyleRestore = () => {
+        state.pendingTemporaryStyleRestore = null;
+        restore();
+    };
+}
+
+function setTemporaryStyle(element, property, value) {
+    const previousValue = element.style.getPropertyValue(property);
+    const previousPriority = element.style.getPropertyPriority(property);
+
+    element.style.setProperty(property, value);
+
+    return () => {
+        if (previousValue === '') {
+            element.style.removeProperty(property);
+            return;
+        }
+
+        element.style.setProperty(property, previousValue, previousPriority);
+    };
 }
 
 /**
@@ -165,8 +198,10 @@ export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFou
             [vars.width]: 'auto'
         });
     } else {
-        // Only collapse the active dimension; leave the other at auto
-        setCssVariables(panel, makeDimVars(vars, state.transitionDimension, '0px', '0px', 'auto'));
+        setCssVariables(panel, {
+            [vars.height]: 'auto',
+            [vars.width]: 'auto'
+        });
 
         // When hiddenUntilFound is used and the panel is closed, persist
         // data-starting-style to prevent CSS transitions from firing when the
@@ -174,7 +209,7 @@ export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFou
         // Matches React's useCollapsiblePanel behavior.
         if (hiddenUntilFound) {
             const animationType = detectAnimationType(panel);
-            if (animationType === 'css-transition') {
+            if (animationType !== 'css-animation') {
                 setDataAttribute(panel, 'starting-style', true);
             }
         }
@@ -210,26 +245,35 @@ export async function open(panel, skipAnimation) {
     // Handle beforematch-triggered open: suppress animation so content appears instantly
     // when revealed by browser find-in-page (matches React's isBeforeMatchRef behavior)
     if (state.isBeforeMatch) {
-        panel.style.transitionDuration = '0s';
+        state.isBeforeMatch = false;
+        setDataAttribute(panel, 'ending-style', false);
+        setDataAttribute(panel, 'starting-style', false);
+
+        const animationType = detectAnimationType(panel);
         const dims = measureDimensions(panel);
         setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
-        requestAnimationFrame(() => {
-            state.isBeforeMatch = false;
-            requestAnimationFrame(() => {
-                setTimeout(() => {
-                    panel.style.removeProperty('transition-duration');
-                });
-            });
-        });
+
+        if (animationType === 'css-transition') {
+            const restoreTransitionDuration = setTemporaryStyle(panel, 'transition-duration', '0s');
+            setPendingTemporaryStyleRestore(state, restoreTransitionDuration);
+        } else if (animationType === 'css-animation') {
+            const restoreAnimationName = setTemporaryStyle(panel, 'animation-name', 'none');
+            const restoreAnimationDuration = setTemporaryStyle(panel, 'animation-duration', '0s');
+
+            restoreAnimationName();
+            setPendingTemporaryStyleRestore(state, restoreAnimationDuration);
+        }
+
         setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
         state.animationDirection = 'idle';
         invokeAnimationEnded(state.dotNetRef, 'open', true);
         return;
     }
 
-    // Clear any transition attributes from previous animations
+    // Clear any exit transition attributes from previous animations. Preserve
+    // data-starting-style from the Blazor render so newly mounted panels start
+    // from the authored starting style before the first paint.
     setDataAttribute(panel, 'ending-style', false);
-    setDataAttribute(panel, 'starting-style', false);
 
     // Override layout properties that can distort scrollHeight/scrollWidth measurements
     // (matches React's useCollapsiblePanel open measurement behavior)
@@ -291,7 +335,7 @@ export async function open(panel, skipAnimation) {
         state.abortController = abortController;
         state.animationDirection = 'opening';
 
-        invokeTransitionStatusChanged(state.dotNetRef, 'starting');
+        invokeTransitionStatusChanged(state.dotNetRef, 'starting', animDims.height, animDims.width);
 
         // Wait for CSS animations to complete
         const completed = await waitForAnimationsToFinish(panel, abortController.signal);
@@ -327,7 +371,8 @@ export async function open(panel, skipAnimation) {
 
     // Set starting-style for CSS transition starting point
     setDataAttribute(panel, 'starting-style', true);
-    invokeTransitionStatusChanged(state.dotNetRef, 'starting');
+    panel.getBoundingClientRect();
+    invokeTransitionStatusChanged(state.dotNetRef, 'starting', dims.height, dims.width);
     state.cancelInitialTransition = false;
 
     // Wait one frame for starting-style to be applied
@@ -339,6 +384,8 @@ export async function open(panel, skipAnimation) {
 
     // Remove starting-style to trigger the transition
     setDataAttribute(panel, 'starting-style', false);
+    panel.getBoundingClientRect();
+    invokeTransitionStatusChanged(state.dotNetRef, 'idle', dims.height, dims.width);
 
     // Wait for animations to complete
     const completed = await waitForAnimationsToFinish(panel, signal);
@@ -366,6 +413,8 @@ export async function close(panel) {
     const vars = getVarNames(state.prefix);
     const dim = state.transitionDimension;
 
+    restorePendingTemporaryStyle(state);
+
     // Abort any ongoing animation and finalize its CSS state immediately
     abortAndFinalize(state, panel, vars);
 
@@ -387,7 +436,7 @@ export async function close(panel) {
     const animationType = detectAnimationType(panel);
 
     if (animationType === 'none') {
-        setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
+        setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
         state.animationDirection = 'idle';
         invokeAnimationEnded(state.dotNetRef, 'close', true);
         return;
@@ -412,7 +461,7 @@ export async function close(panel) {
         state.abortController = abortController;
         state.animationDirection = 'closing';
 
-        invokeTransitionStatusChanged(state.dotNetRef, 'ending');
+        invokeTransitionStatusChanged(state.dotNetRef, 'ending', animDims.height, animDims.width);
 
         // Wait for CSS animations to complete
         const completed = await waitForAnimationsToFinish(panel, abortController.signal);
@@ -425,8 +474,9 @@ export async function close(panel) {
         }
         state.animationDirection = 'idle';
 
-        panel.style.removeProperty('content-visibility');
-        setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
+        // React completes close by updating mounted/dimensions state in one render.
+        // Leave ending styles and measured dimensions in place until Blazor applies
+        // the close-complete render, otherwise the panel can re-expand for a frame.
         invokeAnimationEnded(state.dotNetRef, 'close', true);
         return;
     }
@@ -448,13 +498,10 @@ export async function close(panel) {
 
     // Set ending-style to trigger the close transition
     setDataAttribute(panel, 'ending-style', true);
-    invokeTransitionStatusChanged(state.dotNetRef, 'ending');
+    invokeTransitionStatusChanged(state.dotNetRef, 'ending', dims.height, dims.width);
 
     // Wait for animations to complete
     const completed = await waitForAnimationsToFinish(panel, signal);
-
-    // Always remove ending-style when done (even if aborted, but abort handles this too)
-    setDataAttribute(panel, 'ending-style', false);
 
     if (!completed) {
         // Aborted - CSS state was already finalized by abortAndFinalize
@@ -467,13 +514,9 @@ export async function close(panel) {
     }
     state.animationDirection = 'idle';
 
-    // Remove content-visibility to ensure the panel is visually collapsed
-    // (matches React's useCollapsiblePanel close completion behavior)
-    panel.style.removeProperty('content-visibility');
-
-    // Set final closed state
-    setCssVariables(panel, makeDimVars(vars, dim, '0px', '0px', 'auto'));
-
+    // React completes close by updating mounted/dimensions state in one render.
+    // Leave ending styles and measured dimensions in place until Blazor applies
+    // the close-complete render, otherwise the panel can re-expand for a frame.
     invokeAnimationEnded(state.dotNetRef, 'close', true);
 }
 
@@ -489,12 +532,13 @@ export function dispose(panel) {
         panel.removeEventListener('beforematch', state.beforeMatchHandler);
     }
 
+    restorePendingTemporaryStyle(state);
     panelStates.delete(panel);
 }
 
-function invokeTransitionStatusChanged(dotNetRef, status) {
+function invokeTransitionStatusChanged(dotNetRef, status, height, width) {
     try {
-        dotNetRef.invokeMethodAsync('OnTransitionStatusChanged', status);
+        dotNetRef.invokeMethodAsync('OnTransitionStatusChanged', status, height ?? null, width ?? null);
     } catch (e) { }
 }
 
