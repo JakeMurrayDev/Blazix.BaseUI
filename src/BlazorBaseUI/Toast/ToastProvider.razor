@@ -1,0 +1,91 @@
+@implements IDisposable
+
+<CascadingValue Value="store">
+    <CascadingValue Value="managerContext">
+        @ChildContent?.Invoke(managerContext)
+    </CascadingValue>
+</CascadingValue>
+
+@code {
+    private ToastStore store = null!;
+    private ToastManagerContext managerContext = null!;
+    private ToastManager? subscribedToastManager;
+    private Action? unsubscribeToastManager;
+
+    /// <summary>
+    /// Gets or sets the default amount of time in milliseconds before a toast is dismissed automatically.
+    /// A value of <c>0</c> prevents automatic dismissal.
+    /// </summary>
+    [Parameter]
+    public int Timeout { get; set; } = 5000;
+
+    /// <summary>
+    /// Gets or sets the maximum number of active toasts displayed at once.
+    /// Older active toasts are marked limited when this limit is exceeded.
+    /// </summary>
+    [Parameter]
+    public int Limit { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets a global manager for creating toasts outside the component tree.
+    /// </summary>
+    [Parameter]
+    public ToastManager? ToastManager { get; set; }
+
+    /// <summary>
+    /// Defines child content with access to the toast manager context.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<ToastManagerContext>? ChildContent { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        store = new ToastStore(Timeout, Limit);
+        store.Changed += OnStoreChanged;
+        managerContext = new ToastManagerContext(store);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        store.Timeout = Timeout;
+        store.Limit = Limit;
+
+        if (!ReferenceEquals(subscribedToastManager, ToastManager))
+        {
+            unsubscribeToastManager?.Invoke();
+            subscribedToastManager = ToastManager;
+            unsubscribeToastManager = ToastManager?.Subscribe(HandleManagerEvent);
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        unsubscribeToastManager?.Invoke();
+        store.Changed -= OnStoreChanged;
+        store.Dispose();
+    }
+
+    private void OnStoreChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleManagerEvent(ToastManagerEvent evt)
+    {
+        switch (evt.Action)
+        {
+            case ToastManagerAction.Add when evt.Options is ToastManagerAddOptions addOptions:
+                store.AddToast(addOptions);
+                break;
+            case ToastManagerAction.Close:
+                store.CloseToast(evt.Options as string);
+                break;
+            case ToastManagerAction.Update when evt.Options is ToastManagerUpdateRequest update:
+                store.UpdateToast(update.Id, update.Updates);
+                break;
+        }
+    }
+}

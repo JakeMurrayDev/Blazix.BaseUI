@@ -1,0 +1,93 @@
+@if (RootContext is not null && shouldRender)
+{
+    <RenderElement TState="ToastTitleState"
+                   Tag="h2"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="resolvedChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+}
+
+@code {
+    private readonly string defaultId = $"toast-title-{Guid.NewGuid().ToIdString()}";
+    private ToastTitleState state = new(null);
+    private RenderElement<ToastTitleState>? renderElementReference;
+    private RenderFragment? resolvedChildContent;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool shouldRender;
+
+    [CascadingParameter]
+    private ToastRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the title ID.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the title element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToastTitleState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastTitleState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastTitleState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        resolvedChildContent = ChildContent ?? ToastRenderFragmentUtilities.ToRenderFragment(RootContext?.Toast.Title);
+        shouldRender = resolvedChildContent is not null;
+        state = new ToastTitleState(RootContext?.Toast.Type);
+        BuildComponentAttributes();
+        RootContext?.SetTitleId(shouldRender ? ResolvedId : null);
+    }
+
+    private string ResolvedId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId);
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = ResolvedId
+        };
+
+        if (!string.IsNullOrWhiteSpace(state.Type))
+        {
+            attrs["data-type"] = state.Type;
+        }
+
+        componentAttributes = attrs;
+    }
+}

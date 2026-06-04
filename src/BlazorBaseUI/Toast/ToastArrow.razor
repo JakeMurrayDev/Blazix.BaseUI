@@ -1,0 +1,90 @@
+@if (PositionerContext is not null)
+{
+    <RenderElement TState="ToastArrowState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+}
+
+@code {
+    private ToastArrowState state = new(Side.Top, Align.Center, false);
+    private RenderElement<ToastArrowState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+
+    [CascadingParameter]
+    private ToastPositionerContext? PositionerContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the arrow element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToastArrowState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastArrowState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastArrowState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = new ToastArrowState(
+            PositionerContext?.Side ?? Side.Top,
+            PositionerContext?.Align ?? Align.Center,
+            PositionerContext?.ArrowUncentered ?? false);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            PositionerContext?.SetArrowElement(currentElement);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["aria-hidden"] = "true",
+            ["data-side"] = state.Side.ToDataAttributeString()!,
+            ["data-align"] = state.Align.ToDataAttributeString()!,
+            ["data-uncentered"] = state.Uncentered
+        };
+    }
+}
