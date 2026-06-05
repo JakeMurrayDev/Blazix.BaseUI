@@ -1,0 +1,379 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+@if (Store is not null)
+{
+    <CascadingValue Value="rootContext">
+        <RenderElement TState="ToastRootState"
+                       Tag="div"
+                       State="state"
+                       Render="Render"
+                       ClassValue="ClassValue"
+                       StyleValue="StyleValue"
+                       ComponentAttributes="componentAttributes"
+                       ChildContent="ChildContent"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+    </CascadingValue>
+}
+
+@code {
+    private readonly string rootId = Guid.NewGuid().ToIdString();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<ToastRoot>? dotNetRef;
+    private ToastRootState state = new(TransitionStatus.Undefined, false, false, null, false, null);
+    private ToastRootContext rootContext = null!;
+    private RenderElement<ToastRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool hasRendered;
+    private bool swiping;
+    private ToastSwipeDirection? swipeDirection;
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/BlazorBaseUI/blazor-baseui-toast.min.js").AsTask());
+
+    [CascadingParameter]
+    private ToastStore? Store { get; set; }
+
+    /// <summary>
+    /// Gets or sets the toast object to render.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public ToastObject Toast { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the directions in which the toast can be swiped to dismiss.
+    /// Defaults to down and right.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<ToastSwipeDirection> SwipeDirection { get; set; } =
+        [ToastSwipeDirection.Down, ToastSwipeDirection.Right];
+
+    /// <summary>
+    /// Gets or sets a custom render template for the root element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToastRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Store is null)
+        {
+            throw new InvalidOperationException("ToastRoot must be used within a ToastProvider.");
+        }
+
+        rootContext = new ToastRootContext
+        {
+            Toast = Toast,
+            SetTitleId = SetTitleId,
+            SetDescriptionId = SetDescriptionId,
+            SetSwipeState = SetSwipeState,
+            RecalculateHeight = RecalculateHeight
+        };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        UpdateContextAndState();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Element.HasValue)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync(
+                    "initializeRoot",
+                    rootId,
+                    Element.Value,
+                    dotNetRef,
+                    IsSwipeEnabled(),
+                    SwipeDirection.Select(direction => direction.ToDataAttributeString()).ToArray());
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            Store?.SetToastElement(Toast.Id, currentElement);
+        }
+
+        if (hasRendered && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync(
+                    "updateRoot",
+                    rootId,
+                    Element.Value,
+                    Toast.TransitionStatus == TransitionStatus.Ending,
+                    IsSwipeEnabled(),
+                    SwipeDirection.Select(direction => direction.ToDataAttributeString()).ToArray());
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeRoot", rootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public void OnMeasuredHeight(double height)
+    {
+        RecalculateHeight(height, true);
+    }
+
+    [JSInvokable]
+    public void OnSwipeStateChanged(bool nextSwiping, string? direction)
+    {
+        if (nextSwiping)
+        {
+            Store?.PauseTimers();
+            Store?.SetHovering(true);
+        }
+        else if (direction is null && Store is not null)
+        {
+            Store.SetHovering(false);
+            if (!Store.ExpandedOrOutOfFocus)
+            {
+                Store.ResumeTimers();
+            }
+        }
+
+        SetSwipeState(nextSwiping, ParseSwipeDirection(direction));
+    }
+
+    [JSInvokable]
+    public void OnSwipeDismissed()
+    {
+        Store?.CloseToast(Toast.Id);
+    }
+
+    [JSInvokable]
+    public void OnTransitionComplete()
+    {
+        if (Toast.TransitionStatus == TransitionStatus.Ending)
+        {
+            Store?.RemoveToast(Toast.Id);
+        }
+    }
+
+    private void UpdateContextAndState()
+    {
+        var index = Store?.GetToastIndex(Toast.Id) ?? -1;
+        var visibleIndex = Store?.GetToastVisibleIndex(Toast.Id) ?? -1;
+        var expanded = Store?.Expanded ?? false;
+
+        rootContext.Toast = Toast;
+        rootContext.Index = index;
+        rootContext.VisibleIndex = visibleIndex;
+        rootContext.Expanded = expanded;
+        rootContext.Swiping = swiping;
+        rootContext.SwipeDirection = swipeDirection;
+
+        state = new ToastRootState(
+            Toast.TransitionStatus,
+            expanded,
+            Toast.Limited,
+            Toast.Type,
+            swiping,
+            swipeDirection);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var isHighPriority = Toast.Priority == ToastPriority.High;
+        var domIndex = Store?.GetToastIndex(Toast.Id) ?? -1;
+        var visibleIndex = Store?.GetToastVisibleIndex(Toast.Id) ?? -1;
+        var cssIndex = Toast.TransitionStatus == TransitionStatus.Ending ? domIndex : visibleIndex;
+        var offsetY = Store?.GetToastOffsetY(Toast.Id) ?? 0;
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = isHighPriority ? "alertdialog" : "dialog",
+            ["tabindex"] = 0,
+            ["aria-modal"] = "false",
+            ["data-blazor-base-ui-toast-root"] = true,
+            ["data-toast-id"] = Toast.Id,
+            ["data-expanded"] = Store?.Expanded ?? false,
+            ["data-limited"] = Toast.Limited,
+            ["data-swiping"] = swiping,
+            ["data-starting-style"] = Toast.TransitionStatus == TransitionStatus.Starting,
+            ["data-ending-style"] = Toast.TransitionStatus == TransitionStatus.Ending,
+            ["style"] = string.Join("; ", new[]
+            {
+                "--toast-swipe-movement-x: 0px",
+                "--toast-swipe-movement-y: 0px",
+                $"--toast-index: {cssIndex}",
+                $"--toast-offset-y: {offsetY}px",
+                Toast.Height > 0 ? $"--toast-height: {Toast.Height}px" : null
+            }.Where(part => !string.IsNullOrWhiteSpace(part)))
+        };
+
+        if (!string.IsNullOrWhiteSpace(rootContext.TitleId))
+        {
+            attrs["aria-labelledby"] = rootContext.TitleId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(rootContext.DescriptionId))
+        {
+            attrs["aria-describedby"] = rootContext.DescriptionId;
+        }
+
+        if (isHighPriority && !(Store?.Focused ?? false))
+        {
+            attrs["aria-hidden"] = "true";
+        }
+
+        if (!string.IsNullOrWhiteSpace(Toast.Type))
+        {
+            attrs["data-type"] = Toast.Type;
+        }
+
+        if (swipeDirection.HasValue)
+        {
+            attrs["data-swipe-direction"] = swipeDirection.Value.ToDataAttributeString();
+        }
+
+        if (Toast.Limited)
+        {
+            attrs["inert"] = true;
+        }
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Store?.CloseToast(Toast.Id);
+        }
+
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private void SetTitleId(string? id)
+    {
+        if (rootContext.TitleId == id)
+        {
+            return;
+        }
+
+        rootContext.TitleId = id;
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void SetDescriptionId(string? id)
+    {
+        if (rootContext.DescriptionId == id)
+        {
+            return;
+        }
+
+        rootContext.DescriptionId = id;
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void SetSwipeState(bool nextSwiping, ToastSwipeDirection? nextDirection)
+    {
+        if (swiping == nextSwiping && swipeDirection == nextDirection)
+        {
+            return;
+        }
+
+        swiping = nextSwiping;
+        swipeDirection = nextDirection;
+        UpdateContextAndState();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void RecalculateHeight(double height, bool clearStartingStatus)
+    {
+        Store?.UpdateToastHeight(Toast.Id, height);
+    }
+
+    private bool IsSwipeEnabled() => Toast.PositionerProps?.Anchor is null && SwipeDirection.Count > 0;
+
+    private static ToastSwipeDirection? ParseSwipeDirection(string? direction) =>
+        direction switch
+        {
+            "up" => ToastSwipeDirection.Up,
+            "down" => ToastSwipeDirection.Down,
+            "left" => ToastSwipeDirection.Left,
+            "right" => ToastSwipeDirection.Right,
+            _ => null
+        };
+}

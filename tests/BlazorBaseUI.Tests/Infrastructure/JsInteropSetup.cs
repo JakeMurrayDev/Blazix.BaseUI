@@ -227,6 +227,33 @@ public static class JsInteropSetup
         }
     }
 
+    private const string ToastModule = "./_content/BlazorBaseUI/blazor-baseui-toast.js";
+    private const string ToastMinModule = "./_content/BlazorBaseUI/blazor-baseui-toast.min.js";
+
+    public static void SetupToastModule(BunitJSInterop jsInterop)
+    {
+        SetupToastModulePath(ToastModule);
+        SetupToastModulePath(ToastMinModule);
+
+        void SetupToastModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("updateViewport", _ => true).SetVoidResult();
+            module.SetupVoid("disposeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("handleFocusAfterClose", _ => true).SetVoidResult();
+            module.SetupVoid("handleFocusGuard", _ => true).SetVoidResult();
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("updateRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("initializeContent", _ => true).SetVoidResult();
+            module.SetupVoid("disposeContent", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+        }
+    }
+
     private const string FieldModule = "./_content/BlazorBaseUI/blazor-baseui-field.js";
 
     public static void SetupFieldModule(BunitJSInterop jsInterop)

@@ -1,0 +1,368 @@
+@using BlazorBaseUI.FocusGuard
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+@if (Store is not null)
+{
+    @if (!Store.IsEmpty && hasPreviousFocusElement)
+    {
+        <FocusGuard OnFocus="HandleFocusGuardAsync" />
+    }
+    <RenderElement TState="ToastViewportState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+    @if (!Store.Focused && Store.Toasts.Any(toast => toast.Priority == ToastPriority.High))
+    {
+        <div style="@VisuallyHiddenStyle">
+            @foreach (var toast in Store.Toasts.Where(toast => toast.Priority == ToastPriority.High))
+            {
+                <div role="alert" aria-atomic="true">
+                    <div>@RenderToastValue(toast.Title)</div>
+                    <div>@RenderToastValue(toast.Description)</div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private const string VisuallyHiddenStyle = "position:absolute;border:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;word-wrap:normal";
+
+    private readonly string viewportId = Guid.NewGuid().ToIdString();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<ToastViewport>? dotNetRef;
+    private ToastViewportState state = new(false);
+    private RenderElement<ToastViewportState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool hasRendered;
+    private bool hasPreviousFocusElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/BlazorBaseUI/blazor-baseui-toast.min.js").AsTask());
+
+    [CascadingParameter]
+    private ToastStore? Store { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the viewport element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToastViewportState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastViewportState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastViewportState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Store is null)
+        {
+            throw new InvalidOperationException("ToastViewport must be used within a ToastProvider.");
+        }
+
+        Store.FocusManagementRequested += HandleFocusManagementRequestedAsync;
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var expanded = Store?.Expanded ?? false;
+        state = new ToastViewportState(expanded);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Element.HasValue)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("initializeViewport", viewportId, Element.Value, dotNetRef);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        if (hasRendered && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("updateViewport", viewportId, Store?.IsEmpty ?? true);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (Store is not null)
+        {
+            Store.FocusManagementRequested -= HandleFocusManagementRequestedAsync;
+        }
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeViewport", viewportId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public void OnGlobalFocusHotkey()
+    {
+        if (Store is null || Store.IsEmpty)
+        {
+            return;
+        }
+
+        hasPreviousFocusElement = true;
+        Store.PauseTimers();
+        Store.SetFocused(true);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnViewportFocus(bool focusVisible)
+    {
+        if (Store is null || Store.Focused || !focusVisible)
+        {
+            return;
+        }
+
+        Store.SetFocused(true);
+        Store.PauseTimers();
+    }
+
+    [JSInvokable]
+    public void OnViewportBlur(bool focusInside)
+    {
+        if (Store is null || !Store.Focused || focusInside)
+        {
+            return;
+        }
+
+        Store.SetFocused(false);
+        Store.ResumeTimers();
+    }
+
+    [JSInvokable]
+    public void OnWindowBlur()
+    {
+        Store?.SetIsWindowFocused(false);
+        Store?.PauseTimers();
+    }
+
+    [JSInvokable]
+    public void OnWindowFocus(bool shouldResumeTimers)
+    {
+        if (shouldResumeTimers)
+        {
+            Store?.ResumeTimers();
+        }
+
+        Store?.SetIsWindowFocused(true);
+    }
+
+    [JSInvokable]
+    public void OnDocumentTouchPointerDownOutside()
+    {
+        Store?.ResumeTimers();
+        Store?.SetHovering(false);
+        Store?.SetFocused(false);
+    }
+
+    [JSInvokable]
+    public void OnTouchActiveChanged(bool active)
+    {
+        if (!active)
+        {
+            FlushMouseLeave();
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["tabindex"] = -1,
+            ["role"] = "region",
+            ["aria-live"] = "polite",
+            ["aria-atomic"] = "false",
+            ["aria-relevant"] = "additions text",
+            ["aria-label"] = "Notifications",
+            ["data-expanded"] = Store?.Expanded ?? false,
+            ["style"] = $"--toast-frontmost-height: {Store?.GetFrontmostHeight() ?? 0}px"
+        };
+
+        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
+        attrs["onpointerup"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEndAsync);
+        attrs["onpointercancel"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEndAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private Task HandleMouseEnterAsync(MouseEventArgs e)
+    {
+        Store?.PauseTimers();
+        Store?.SetHovering(true);
+        return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleMouseLeaveAsync(MouseEventArgs e)
+    {
+        Store?.ResumeTimers();
+        Store?.SetHovering(false);
+        return EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleFocusAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlurAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Tab" && e.ShiftKey)
+        {
+            Store?.ResumeTimers();
+        }
+
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleClickAsync(MouseEventArgs e)
+    {
+        return EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        return EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandlePointerEndAsync(PointerEventArgs e)
+    {
+        FlushMouseLeave();
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleFocusManagementRequestedAsync(string? toastId)
+    {
+        if (!Element.HasValue || moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("handleFocusAfterClose", viewportId, toastId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task HandleFocusGuardAsync()
+    {
+        if (!Element.HasValue || moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("handleFocusGuard", viewportId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private void FlushMouseLeave()
+    {
+        var hasEndingToasts = Store?.Toasts.Any(toast => toast.TransitionStatus == TransitionStatus.Ending) ?? false;
+        if (hasEndingToasts || Store?.IsWindowFocused == false)
+        {
+            return;
+        }
+
+        Store?.ResumeTimers();
+        Store?.SetHovering(false);
+    }
+
+    private static RenderFragment? RenderToastValue(object? value) =>
+        ToastRenderFragmentUtilities.ToRenderFragment(value);
+}

@@ -1,0 +1,150 @@
+@using Microsoft.AspNetCore.Components.Web
+
+@if (RootContext is not null && shouldRender)
+{
+    <RenderElement TState="ToastActionState"
+                   Tag="button"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="computedChildContent"
+                   @attributes="MergedAdditionalAttributes"
+                   @ref="renderElementReference" />
+}
+
+@code {
+    private ToastActionState state = new(null);
+    private RenderElement<ToastActionState>? renderElementReference;
+    private RenderFragment? computedChildContent;
+    private Dictionary<string, object> componentAttributes = new();
+    private IReadOnlyDictionary<string, object>? mergedAdditionalAttributes;
+    private bool shouldRender;
+
+    private IReadOnlyDictionary<string, object>? MergedAdditionalAttributes => mergedAdditionalAttributes;
+
+    [CascadingParameter]
+    private ToastRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the action is disabled.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders native button attributes.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a custom render template for the action element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToastActionState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastActionState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<ToastActionState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var actionProps = RootContext?.Toast.ActionProps;
+        computedChildContent = actionProps?.ChildContent ?? ChildContent;
+        shouldRender = computedChildContent is not null;
+        state = new ToastActionState(RootContext?.Toast.Type);
+        mergedAdditionalAttributes = MergeAdditionalAttributes(actionProps?.AdditionalAttributes, AdditionalAttributes);
+        BuildComponentAttributes(actionProps);
+    }
+
+    private void BuildComponentAttributes(ToastActionOptions? actionProps)
+    {
+        var attrs = new Dictionary<string, object>();
+        var disabled = Disabled || (actionProps?.Disabled ?? false);
+        var nativeButton = actionProps?.NativeButton ?? NativeButton;
+
+        if (nativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, false, 0);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, false, 0);
+        }
+
+        if (!string.IsNullOrWhiteSpace(state.Type))
+        {
+            attrs["data-type"] = state.Type;
+        }
+
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, async e =>
+        {
+            if (disabled)
+            {
+                return;
+            }
+
+            await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+
+            if (actionProps?.OnClick.HasDelegate == true)
+            {
+                await actionProps.OnClick.InvokeAsync(e);
+            }
+
+            await EventUtilities.InvokeOnClickAsync(actionProps?.AdditionalAttributes, e);
+        });
+
+        componentAttributes = attrs;
+    }
+
+    private static IReadOnlyDictionary<string, object>? MergeAdditionalAttributes(
+        IReadOnlyDictionary<string, object>? actionAttributes,
+        IReadOnlyDictionary<string, object>? componentAttributes)
+    {
+        if (actionAttributes is null)
+        {
+            return componentAttributes;
+        }
+
+        if (componentAttributes is null)
+        {
+            return actionAttributes;
+        }
+
+        var result = new Dictionary<string, object>(componentAttributes, StringComparer.OrdinalIgnoreCase);
+        foreach (var kvp in actionAttributes)
+        {
+            result[kvp.Key] = kvp.Value;
+        }
+
+        return result;
+    }
+}
