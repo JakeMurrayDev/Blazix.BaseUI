@@ -711,7 +711,7 @@ internal sealed class ToastStore : IDisposable
 
             if (shouldInvoke)
             {
-                timer.Callback();
+                InvokeTimerCallbackIfActive(timer.Callback);
             }
         });
     }
@@ -726,6 +726,19 @@ internal sealed class ToastStore : IDisposable
         timer.CancellationTokenSource?.Cancel();
         timer.CancellationTokenSource?.Dispose();
         timer.CancellationTokenSource = null;
+    }
+
+    private void InvokeTimerCallbackIfActive(Action callback)
+    {
+        lock (syncRoot)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            callback();
+        }
     }
 
     private async Task RequestFocusManagementAsync(string? toastId)
