@@ -6,12 +6,23 @@ namespace BlazorBaseUI.Toast;
 public sealed class ToastManager
 {
     private readonly HashSet<Action<ToastManagerEvent>> listeners = [];
+    private readonly object listenersLock = new();
 
     /// <summary>Subscribes to manager events.</summary>
     internal Action Subscribe(Action<ToastManagerEvent> listener)
     {
-        listeners.Add(listener);
-        return () => listeners.Remove(listener);
+        lock (listenersLock)
+        {
+            listeners.Add(listener);
+        }
+
+        return () =>
+        {
+            lock (listenersLock)
+            {
+                listeners.Remove(listener);
+            }
+        };
     }
 
     /// <summary>Adds a toast and returns its identifier.</summary>
@@ -50,7 +61,13 @@ public sealed class ToastManager
 
     private void Emit(ToastManagerEvent evt)
     {
-        foreach (var listener in listeners.ToArray())
+        Action<ToastManagerEvent>[] snapshot;
+        lock (listenersLock)
+        {
+            snapshot = listeners.ToArray();
+        }
+
+        foreach (var listener in snapshot)
         {
             listener(evt);
         }

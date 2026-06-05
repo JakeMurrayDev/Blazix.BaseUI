@@ -134,13 +134,18 @@ public abstract class ToastTestsBase : TestBase
         var startY = box.Y + 20;
         await Page.Mouse.MoveAsync(startX, startY);
         await Page.Mouse.DownAsync();
-        await Page.Mouse.MoveAsync(startX + 96, startY, new MouseMoveOptions { Steps = 8 });
+        try
+        {
+            await Page.Mouse.MoveAsync(startX + 96, startY, new MouseMoveOptions { Steps = 8 });
 
-        await Page.WaitForFunctionAsync(
-            "() => { const toast = document.querySelector('[data-testid=\"toast-low\"]'); return toast?.hasAttribute('data-swiping') === true && toast?.getAttribute('data-swipe-direction') === 'right' && toast?.style.getPropertyValue('--toast-swipe-movement-x') !== '0px'; }",
-            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
-
-        await Page.Mouse.UpAsync();
+            await Page.WaitForFunctionAsync(
+                "() => { const toast = document.querySelector('[data-testid=\"toast-low\"]'); return toast?.hasAttribute('data-swiping') === true && toast?.getAttribute('data-swipe-direction') === 'right' && toast?.style.getPropertyValue('--toast-swipe-movement-x') !== '0px'; }",
+                new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+        }
+        finally
+        {
+            await Page.Mouse.UpAsync();
+        }
 
         await Assertions.Expect(GetByTestId("closed-count")).ToHaveTextAsync("1");
         await Assertions.Expect(GetByTestId("removed-count")).ToHaveTextAsync("1");

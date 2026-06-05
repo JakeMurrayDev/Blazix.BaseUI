@@ -1,3 +1,5 @@
+@implements IDisposable
+
 @if (RootContext is not null && shouldRender)
 {
     <RenderElement TState="ToastDescriptionState"
@@ -72,6 +74,12 @@
         state = new ToastDescriptionState(RootContext?.Toast.Type);
         BuildComponentAttributes();
         RootContext?.SetDescriptionId(shouldRender ? ResolvedId : null);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        RootContext?.SetDescriptionId(null);
     }
 
     private string ResolvedId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId);

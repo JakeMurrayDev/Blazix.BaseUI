@@ -198,6 +198,14 @@
             Store?.PauseTimers();
             Store?.SetHovering(true);
         }
+        else if (direction is null && Store is not null)
+        {
+            Store.SetHovering(false);
+            if (!Store.ExpandedOrOutOfFocus)
+            {
+                Store.ResumeTimers();
+            }
+        }
 
         SetSwipeState(nextSwiping, ParseSwipeDirection(direction));
     }

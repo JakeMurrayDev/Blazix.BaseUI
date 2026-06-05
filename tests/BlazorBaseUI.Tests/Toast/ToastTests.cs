@@ -1,5 +1,6 @@
 using BlazorBaseUI.Toast;
 using BlazorBaseUI.Tests.Infrastructure;
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.Components.Web;
@@ -172,6 +173,120 @@ public class ToastTests : BunitContext
             var toast = cut.Find("[data-type='error']");
             toast.TextContent.ShouldContain("Failed boom");
         });
+    }
+
+    [Fact]
+    public Task TitleAndDescriptionRegistrationsAreClearedWhenPartsUnmount()
+    {
+        var manager = new ToastManager();
+        var renderParts = true;
+        var cut = RenderProvider(manager, shouldRenderLabelParts: () => renderParts);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "mutable-parts",
+            Title = "Mutable title",
+            Description = "Mutable description",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='mutable-parts']");
+            root.GetAttribute("aria-labelledby").ShouldBe("title-mutable-parts");
+            root.GetAttribute("aria-describedby").ShouldBe("description-mutable-parts");
+        });
+
+        renderParts = false;
+        cut.Render();
+
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='mutable-parts']");
+            root.HasAttribute("aria-labelledby").ShouldBeFalse();
+            root.HasAttribute("aria-describedby").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task CanceledSwipeClearsHoverExpansion()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "swipe-cancel",
+            Description = "Swipe cancel",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-toast-id='swipe-cancel']").ShouldNotBeNull();
+        });
+
+        var rootComponent = cut.FindComponent<ToastRoot>();
+        rootComponent.Instance.OnSwipeStateChanged(true, "right");
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue();
+        });
+
+        rootComponent.Instance.OnSwipeStateChanged(false, null);
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ManagerSubscribeAndEmitCanRunConcurrently()
+    {
+        var manager = new ToastManager();
+        var errors = new ConcurrentBag<Exception>();
+        var observed = 0;
+
+        var tasks = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
+        {
+            for (var index = 0; index < 2_000; index++)
+            {
+                try
+                {
+                    if (worker % 2 == 0)
+                    {
+                        manager.Add(new ToastManagerAddOptions
+                        {
+                            Description = $"Toast {worker}-{index}",
+                            Timeout = 0
+                        });
+                    }
+                    else
+                    {
+                        var unsubscribe = manager.Subscribe(_ => Interlocked.Increment(ref observed));
+                        manager.Update("missing", new ToastManagerUpdateOptions
+                        {
+                            Description = "No-op"
+                        });
+                        unsubscribe();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(ex);
+                }
+            }
+        }));
+
+        await Task.WhenAll(tasks);
+
+        errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -349,7 +464,8 @@ public class ToastTests : BunitContext
         ToastManager manager,
         int limit = 3,
         bool renderPositioner = false,
-        IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null)
+        IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null,
+        Func<bool>? shouldRenderLabelParts = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -383,7 +499,12 @@ public class ToastTests : BunitContext
                         }
                         else
                         {
-                            RenderToast(viewportBuilder, toast, closeAdditionalAttributes, includeArrow: false);
+                            RenderToast(
+                                viewportBuilder,
+                                toast,
+                                closeAdditionalAttributes,
+                                includeArrow: false,
+                                shouldRenderLabelParts);
                         }
                     }
                 }));
@@ -395,7 +516,8 @@ public class ToastTests : BunitContext
         RenderTreeBuilder builder,
         ToastObject toast,
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes,
-        bool includeArrow)
+        bool includeArrow,
+        Func<bool>? shouldRenderLabelParts = null)
     {
         var sequence = 0;
 
@@ -416,13 +538,16 @@ public class ToastTests : BunitContext
             });
             rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(contentBuilder =>
             {
-                contentBuilder.OpenComponent<ToastTitle>(0);
-                contentBuilder.AddAttribute(1, "Id", $"title-{toast.Id}");
-                contentBuilder.CloseComponent();
+                if (shouldRenderLabelParts?.Invoke() ?? true)
+                {
+                    contentBuilder.OpenComponent<ToastTitle>(0);
+                    contentBuilder.AddAttribute(1, "Id", $"title-{toast.Id}");
+                    contentBuilder.CloseComponent();
 
-                contentBuilder.OpenComponent<ToastDescription>(10);
-                contentBuilder.AddAttribute(11, "Id", $"description-{toast.Id}");
-                contentBuilder.CloseComponent();
+                    contentBuilder.OpenComponent<ToastDescription>(10);
+                    contentBuilder.AddAttribute(11, "Id", $"description-{toast.Id}");
+                    contentBuilder.CloseComponent();
+                }
 
                 contentBuilder.OpenComponent<ToastAction>(20);
                 contentBuilder.AddAttribute(21, "AdditionalAttributes", new Dictionary<string, object>

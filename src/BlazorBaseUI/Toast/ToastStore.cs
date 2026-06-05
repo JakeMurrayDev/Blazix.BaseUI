@@ -6,259 +6,390 @@ internal sealed class ToastStore : IDisposable
     private readonly Dictionary<string, TimerInfo> timers = new(StringComparer.Ordinal);
     private List<ToastObject> toasts = [];
     private bool areTimersPaused;
+    private int timeout;
+    private int limit;
+    private bool hovering;
+    private bool focused;
+    private bool isWindowFocused = true;
     private bool disposed;
 
     public event Action? Changed;
 
     public event Func<string?, Task>? FocusManagementRequested;
 
-    public IReadOnlyList<ToastObject> Toasts => toasts;
+    public IReadOnlyList<ToastObject> Toasts
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return toasts.ToArray();
+            }
+        }
+    }
 
-    public bool Hovering { get; private set; }
+    public bool Hovering
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return hovering;
+            }
+        }
+    }
 
-    public bool Focused { get; private set; }
+    public bool Focused
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return focused;
+            }
+        }
+    }
 
-    public bool IsWindowFocused { get; private set; } = true;
+    public bool IsWindowFocused
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return isWindowFocused;
+            }
+        }
+    }
 
-    public int Timeout { get; set; }
+    public int Timeout
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return timeout;
+            }
+        }
+        set
+        {
+            lock (syncRoot)
+            {
+                timeout = value;
+            }
+        }
+    }
 
-    public int Limit { get; set; }
+    public int Limit
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return limit;
+            }
+        }
+        set
+        {
+            lock (syncRoot)
+            {
+                limit = value;
+            }
+        }
+    }
 
-    public bool Expanded => Hovering || Focused;
+    public bool Expanded
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return hovering || focused;
+            }
+        }
+    }
 
-    public bool ExpandedOrOutOfFocus => Hovering || Focused || !IsWindowFocused;
+    public bool ExpandedOrOutOfFocus
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return hovering || focused || !isWindowFocused;
+            }
+        }
+    }
 
-    public bool IsEmpty => toasts.Count == 0;
+    public bool IsEmpty
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return toasts.Count == 0;
+            }
+        }
+    }
 
     public ToastStore(int timeout, int limit)
     {
-        Timeout = timeout;
-        Limit = limit;
+        this.timeout = timeout;
+        this.limit = limit;
     }
 
     public void SetFocused(bool focused)
     {
-        if (Focused == focused)
+        lock (syncRoot)
         {
-            return;
+            if (this.focused == focused)
+            {
+                return;
+            }
+
+            this.focused = focused;
         }
 
-        Focused = focused;
         NotifyChanged();
     }
 
     public void SetHovering(bool hovering)
     {
-        if (Hovering == hovering)
+        lock (syncRoot)
         {
-            return;
+            if (this.hovering == hovering)
+            {
+                return;
+            }
+
+            this.hovering = hovering;
         }
 
-        Hovering = hovering;
         NotifyChanged();
     }
 
     public void SetIsWindowFocused(bool isWindowFocused)
     {
-        if (IsWindowFocused == isWindowFocused)
+        lock (syncRoot)
         {
-            return;
+            if (this.isWindowFocused == isWindowFocused)
+            {
+                return;
+            }
+
+            this.isWindowFocused = isWindowFocused;
         }
 
-        IsWindowFocused = isWindowFocused;
         NotifyChanged();
     }
 
     public string AddToast(ToastManagerAddOptions options)
     {
-        ThrowIfDisposed();
-
-        var id = string.IsNullOrWhiteSpace(options.Id)
-            ? GenerateId()
-            : options.Id!;
-
-        if (!string.IsNullOrWhiteSpace(options.Id))
+        lock (syncRoot)
         {
-            var existing = GetToast(id);
-            if (existing is not null)
+            ThrowIfDisposed();
+
+            var id = string.IsNullOrWhiteSpace(options.Id)
+                ? GenerateId()
+                : options.Id!;
+
+            if (!string.IsNullOrWhiteSpace(options.Id))
             {
-                if (existing.TransitionStatus == TransitionStatus.Ending)
+                var existing = GetToast(id);
+                if (existing is not null)
                 {
-                    RemoveToast(id, skipOnRemove: true);
-                }
-                else
-                {
-                    UpdateToastInternal(id, ToUpdateOptions(options), resetTimer: true, markUpdated: true);
-                    return id;
+                    if (existing.TransitionStatus == TransitionStatus.Ending)
+                    {
+                        RemoveToast(id, skipOnRemove: true);
+                    }
+                    else
+                    {
+                        UpdateToastInternal(id, ToUpdateOptions(options), resetTimer: true, markUpdated: true);
+                        return id;
+                    }
                 }
             }
+
+            var toast = ToToastObject(id, options);
+            var updatedToasts = new List<ToastObject>(toasts.Count + 1) { toast };
+            updatedToasts.AddRange(toasts);
+            ApplyLimit(updatedToasts);
+            SetToasts(updatedToasts);
+
+            var duration = toast.Timeout ?? timeout;
+            if (!string.Equals(toast.Type, "loading", StringComparison.Ordinal) && duration > 0)
+            {
+                ScheduleTimer(id, duration, () => CloseToast(id));
+            }
+
+            if (hovering || focused || !isWindowFocused)
+            {
+                PauseTimers();
+            }
+
+            return id;
         }
-
-        var toast = ToToastObject(id, options);
-        var updatedToasts = new List<ToastObject>(toasts.Count + 1) { toast };
-        updatedToasts.AddRange(toasts);
-        ApplyLimit(updatedToasts);
-        SetToasts(updatedToasts);
-
-        var duration = toast.Timeout ?? Timeout;
-        if (!string.Equals(toast.Type, "loading", StringComparison.Ordinal) && duration > 0)
-        {
-            ScheduleTimer(id, duration, () => CloseToast(id));
-        }
-
-        if (ExpandedOrOutOfFocus)
-        {
-            PauseTimers();
-        }
-
-        return id;
     }
 
     public void UpdateToast(string id, ToastManagerUpdateOptions updates)
     {
-        UpdateToastInternal(id, updates, resetTimer: false, markUpdated: true);
+        lock (syncRoot)
+        {
+            UpdateToastInternal(id, updates, resetTimer: false, markUpdated: true);
+        }
     }
 
     public void UpdateToastHeight(string id, double height)
     {
-        UpdateToastInternal(
-            id,
-            new ToastManagerUpdateOptions(),
-            resetTimer: false,
-            markUpdated: false,
-            height: height,
-            clearStartingStatus: true);
+        lock (syncRoot)
+        {
+            UpdateToastInternal(
+                id,
+                new ToastManagerUpdateOptions(),
+                resetTimer: false,
+                markUpdated: false,
+                height: height,
+                clearStartingStatus: true);
+        }
     }
 
     public void SetToastElement(string id, Microsoft.AspNetCore.Components.ElementReference? element)
     {
-        var toast = GetToast(id);
-        if (toast is null || Nullable.Equals(toast.Element, element))
+        lock (syncRoot)
         {
-            return;
-        }
-
-        toast.Element = element;
-    }
-
-    public void CloseToast(string? toastId = null)
-    {
-        ThrowIfDisposed();
-
-        var closeAll = toastId is null;
-        var toastsToClose = new List<ToastObject>();
-
-        if (closeAll)
-        {
-            toastsToClose.AddRange(toasts);
-            foreach (var timer in timers.Values)
-            {
-                timer.CancellationTokenSource?.Cancel();
-                timer.CancellationTokenSource?.Dispose();
-            }
-            timers.Clear();
-        }
-        else
-        {
-            var toast = GetToast(toastId);
-            if (toast is null)
+            var toast = GetToast(id);
+            if (toast is null || Nullable.Equals(toast.Element, element))
             {
                 return;
             }
 
-            toastsToClose.Add(toast);
-            ClearTimer(toastId!);
+            toast.Element = element;
         }
+    }
 
-        var activeIndex = 0;
-        var changed = false;
-        var newToasts = new List<ToastObject>(toasts.Count);
-        foreach (var item in toasts)
+    public void CloseToast(string? toastId = null)
+    {
+        lock (syncRoot)
         {
-            if (closeAll || item.Id == toastId)
+            ThrowIfDisposed();
+
+            var closeAll = toastId is null;
+            var toastsToClose = new List<ToastObject>();
+
+            if (closeAll)
             {
-                if (item.TransitionStatus != TransitionStatus.Ending || item.Height != 0)
+                toastsToClose.AddRange(toasts);
+                foreach (var timer in timers.Values)
                 {
-                    var closed = item.Clone();
-                    closed.TransitionStatus = TransitionStatus.Ending;
-                    closed.Height = 0;
-                    newToasts.Add(closed);
+                    timer.CancellationTokenSource?.Cancel();
+                    timer.CancellationTokenSource?.Dispose();
+                    timer.CancellationTokenSource = null;
+                }
+                timers.Clear();
+            }
+            else
+            {
+                var toast = GetToast(toastId);
+                if (toast is null)
+                {
+                    return;
+                }
+
+                toastsToClose.Add(toast);
+                ClearTimer(toastId!);
+            }
+
+            var activeIndex = 0;
+            var changed = false;
+            var newToasts = new List<ToastObject>(toasts.Count);
+            foreach (var item in toasts)
+            {
+                if (closeAll || item.Id == toastId)
+                {
+                    if (item.TransitionStatus != TransitionStatus.Ending || item.Height != 0)
+                    {
+                        var closed = item.Clone();
+                        closed.TransitionStatus = TransitionStatus.Ending;
+                        closed.Height = 0;
+                        newToasts.Add(closed);
+                        changed = true;
+                    }
+                    else
+                    {
+                        newToasts.Add(item);
+                    }
+
+                    continue;
+                }
+
+                if (item.TransitionStatus == TransitionStatus.Ending)
+                {
+                    newToasts.Add(item);
+                    continue;
+                }
+
+                var limited = activeIndex >= limit;
+                activeIndex++;
+                if (item.Limited != limited)
+                {
+                    var next = item.Clone();
+                    next.Limited = limited;
+                    newToasts.Add(next);
                     changed = true;
                 }
                 else
                 {
                     newToasts.Add(item);
                 }
-
-                continue;
             }
 
-            if (item.TransitionStatus == TransitionStatus.Ending)
+            if (!changed)
             {
-                newToasts.Add(item);
-                continue;
+                return;
             }
 
-            var limited = activeIndex >= Limit;
-            activeIndex++;
-            if (item.Limited != limited)
+            toasts = newToasts;
+            if (closeAll || toasts.Count == 1)
             {
-                var next = item.Clone();
-                next.Limited = limited;
-                newToasts.Add(next);
-                changed = true;
+                hovering = false;
+                focused = false;
             }
-            else
+
+            NotifyChanged();
+
+            foreach (var toast in toastsToClose)
             {
-                newToasts.Add(item);
+                if (toast.TransitionStatus != TransitionStatus.Ending)
+                {
+                    toast.OnClose?.Invoke();
+                    InvokeEventCallback(toast.OnCloseCallback);
+                }
             }
+
+            _ = RequestFocusManagementAsync(toastId);
         }
-
-        if (!changed)
-        {
-            return;
-        }
-
-        toasts = newToasts;
-        if (closeAll || toasts.Count == 1)
-        {
-            Hovering = false;
-            Focused = false;
-        }
-
-        NotifyChanged();
-
-        foreach (var toast in toastsToClose)
-        {
-            if (toast.TransitionStatus != TransitionStatus.Ending)
-            {
-                toast.OnClose?.Invoke();
-                InvokeEventCallback(toast.OnCloseCallback);
-            }
-        }
-
-        _ = RequestFocusManagementAsync(toastId);
     }
 
     public void RemoveToast(string toastId, bool skipOnRemove = false)
     {
-        var index = toasts.FindIndex(toast => toast.Id == toastId);
-        if (index < 0)
+        lock (syncRoot)
         {
-            return;
-        }
+            var index = toasts.FindIndex(toast => toast.Id == toastId);
+            if (index < 0)
+            {
+                return;
+            }
 
-        var toast = toasts[index];
-        if (!skipOnRemove)
-        {
-            toast.OnRemove?.Invoke();
-            InvokeEventCallback(toast.OnRemoveCallback);
-        }
+            var toast = toasts[index];
+            if (!skipOnRemove)
+            {
+                toast.OnRemove?.Invoke();
+                InvokeEventCallback(toast.OnRemoveCallback);
+            }
 
-        var newToasts = toasts.ToList();
-        newToasts.RemoveAt(index);
-        ApplyLimit(newToasts);
-        SetToasts(newToasts);
+            var newToasts = toasts.ToList();
+            newToasts.RemoveAt(index);
+            ApplyLimit(newToasts);
+            SetToasts(newToasts);
+        }
     }
 
     public Task<TValue> PromiseToast<TValue>(Task<TValue> task, ToastManagerPromiseOptions<TValue> options)
@@ -272,96 +403,124 @@ internal sealed class ToastStore : IDisposable
 
     public void PauseTimers()
     {
-        if (areTimersPaused)
+        lock (syncRoot)
         {
-            return;
-        }
-
-        areTimersPaused = true;
-        foreach (var timer in timers.Values)
-        {
-            if (timer.CancellationTokenSource is null)
+            if (areTimersPaused)
             {
-                continue;
+                return;
             }
 
-            timer.CancellationTokenSource.Cancel();
-            timer.CancellationTokenSource.Dispose();
-            timer.CancellationTokenSource = null;
+            areTimersPaused = true;
+            foreach (var timer in timers.Values)
+            {
+                if (timer.CancellationTokenSource is null)
+                {
+                    continue;
+                }
 
-            var elapsed = (int)Math.Max(0, (DateTimeOffset.UtcNow - timer.StartedAt).TotalMilliseconds);
-            timer.Remaining = Math.Max(0, timer.Delay - elapsed);
+                timer.CancellationTokenSource.Cancel();
+                timer.CancellationTokenSource.Dispose();
+                timer.CancellationTokenSource = null;
+
+                var elapsed = (int)Math.Max(0, (DateTimeOffset.UtcNow - timer.StartedAt).TotalMilliseconds);
+                timer.Remaining = Math.Max(0, timer.Delay - elapsed);
+            }
         }
     }
 
     public void ResumeTimers()
     {
-        if (!areTimersPaused)
+        lock (syncRoot)
         {
-            return;
-        }
+            if (!areTimersPaused)
+            {
+                return;
+            }
 
-        areTimersPaused = false;
-        foreach (var (id, timer) in timers.ToArray())
-        {
-            timer.Remaining = timer.Remaining > 0 ? timer.Remaining : timer.Delay;
-            StartTimer(id, timer, timer.Remaining);
+            areTimersPaused = false;
+            foreach (var (id, timer) in timers.ToArray())
+            {
+                timer.Remaining = timer.Remaining > 0 ? timer.Remaining : timer.Delay;
+                StartTimer(id, timer, timer.Remaining);
+            }
         }
     }
 
-    public int GetToastIndex(string id) => toasts.FindIndex(toast => toast.Id == id);
+    public int GetToastIndex(string id)
+    {
+        lock (syncRoot)
+        {
+            return toasts.FindIndex(toast => toast.Id == id);
+        }
+    }
 
     public int GetToastVisibleIndex(string id)
     {
-        var visibleIndex = 0;
-        foreach (var toast in toasts)
+        lock (syncRoot)
         {
-            if (toast.Id == id)
+            var visibleIndex = 0;
+            foreach (var toast in toasts)
             {
-                return toast.TransitionStatus == TransitionStatus.Ending ? -1 : visibleIndex;
+                if (toast.Id == id)
+                {
+                    return toast.TransitionStatus == TransitionStatus.Ending ? -1 : visibleIndex;
+                }
+
+                if (toast.TransitionStatus != TransitionStatus.Ending)
+                {
+                    visibleIndex++;
+                }
             }
 
-            if (toast.TransitionStatus != TransitionStatus.Ending)
-            {
-                visibleIndex++;
-            }
+            return -1;
         }
-
-        return -1;
     }
 
     public double GetToastOffsetY(string id)
     {
-        double offsetY = 0;
-        foreach (var toast in toasts)
+        lock (syncRoot)
         {
-            if (toast.Id == id)
+            double offsetY = 0;
+            foreach (var toast in toasts)
             {
-                return offsetY;
+                if (toast.Id == id)
+                {
+                    return offsetY;
+                }
+
+                offsetY += toast.Height;
             }
 
-            offsetY += toast.Height;
+            return 0;
         }
-
-        return 0;
     }
 
-    public double GetFrontmostHeight() => toasts.FirstOrDefault()?.Height ?? 0;
+    public double GetFrontmostHeight()
+    {
+        lock (syncRoot)
+        {
+            return toasts.FirstOrDefault()?.Height ?? 0;
+        }
+    }
 
     public void Dispose()
     {
-        if (disposed)
+        lock (syncRoot)
         {
-            return;
-        }
+            if (disposed)
+            {
+                return;
+            }
 
-        disposed = true;
-        foreach (var timer in timers.Values)
-        {
-            timer.CancellationTokenSource?.Cancel();
-            timer.CancellationTokenSource?.Dispose();
+            disposed = true;
+            foreach (var timer in timers.Values)
+            {
+                timer.CancellationTokenSource?.Cancel();
+                timer.CancellationTokenSource?.Dispose();
+                timer.CancellationTokenSource = null;
+            }
+            timers.Clear();
         }
-        timers.Clear();
     }
 
     private void UpdateToastInternal(
@@ -372,7 +531,7 @@ internal sealed class ToastStore : IDisposable
         double? height = null,
         bool clearStartingStatus = false)
     {
-        var index = GetToastIndex(id);
+        var index = toasts.FindIndex(toast => toast.Id == id);
         if (index < 0)
         {
             return;
@@ -407,8 +566,8 @@ internal sealed class ToastStore : IDisposable
         toasts = newToasts;
         NotifyChanged();
 
-        var nextTimeout = nextToast.Timeout ?? Timeout;
-        var prevTimeout = prevToast.Timeout ?? Timeout;
+        var nextTimeout = nextToast.Timeout ?? timeout;
+        var prevTimeout = prevToast.Timeout ?? timeout;
         var timeoutUpdated = updates.HasTimeout;
         var shouldHaveTimer = nextToast.TransitionStatus != TransitionStatus.Ending
                               && !string.Equals(nextToast.Type, "loading", StringComparison.Ordinal)
@@ -428,7 +587,7 @@ internal sealed class ToastStore : IDisposable
             ClearTimer(id);
             ScheduleTimer(id, nextTimeout, () => CloseToast(id));
 
-            if (ExpandedOrOutOfFocus)
+            if (hovering || focused || !isWindowFocused)
             {
                 PauseTimers();
             }
@@ -440,8 +599,8 @@ internal sealed class ToastStore : IDisposable
         toasts = newToasts;
         if (newToasts.Count == 0)
         {
-            Hovering = false;
-            Focused = false;
+            hovering = false;
+            focused = false;
         }
 
         NotifyChanged();
@@ -453,9 +612,9 @@ internal sealed class ToastStore : IDisposable
             .Where(toast => toast.TransitionStatus != TransitionStatus.Ending)
             .ToList();
 
-        if (activeToasts.Count > Limit)
+        if (activeToasts.Count > limit)
         {
-            var excessCount = activeToasts.Count - Limit;
+            var excessCount = activeToasts.Count - limit;
             var limitedIds = activeToasts
                 .TakeLast(excessCount)
                 .Select(toast => toast.Id)
@@ -503,7 +662,7 @@ internal sealed class ToastStore : IDisposable
 
         timers[id] = timer;
 
-        if (!ExpandedOrOutOfFocus)
+        if (!hovering && !focused && isWindowFocused)
         {
             StartTimer(id, timer, delay);
         }
@@ -520,6 +679,7 @@ internal sealed class ToastStore : IDisposable
 
         _ = Task.Run(async () =>
         {
+            var shouldInvoke = false;
             try
             {
                 await Task.Delay(delay, cts.Token).ConfigureAwait(false);
@@ -528,11 +688,30 @@ internal sealed class ToastStore : IDisposable
                     return;
                 }
 
-                timers.Remove(id);
-                timer.Callback();
+                lock (syncRoot)
+                {
+                    if (timers.Remove(id))
+                    {
+                        if (ReferenceEquals(timer.CancellationTokenSource, cts))
+                        {
+                            timer.CancellationTokenSource = null;
+                        }
+
+                        shouldInvoke = true;
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
+            }
+            finally
+            {
+                cts.Dispose();
+            }
+
+            if (shouldInvoke)
+            {
+                timer.Callback();
             }
         });
     }
@@ -546,6 +725,7 @@ internal sealed class ToastStore : IDisposable
 
         timer.CancellationTokenSource?.Cancel();
         timer.CancellationTokenSource?.Dispose();
+        timer.CancellationTokenSource = null;
     }
 
     private async Task RequestFocusManagementAsync(string? toastId)
@@ -588,10 +768,18 @@ internal sealed class ToastStore : IDisposable
 
     private void NotifyChanged()
     {
-        if (!disposed)
+        Action? changed;
+        lock (syncRoot)
         {
-            Changed?.Invoke();
+            if (disposed)
+            {
+                return;
+            }
+
+            changed = Changed;
         }
+
+        changed?.Invoke();
     }
 
     private void ThrowIfDisposed()
