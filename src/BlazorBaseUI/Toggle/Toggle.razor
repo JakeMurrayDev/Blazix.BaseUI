@@ -39,8 +39,12 @@
     private string? defaultId;
     private string resolvedValue = null!;
     private RenderElement<ToggleState>? renderElementReference;
+    private IToggleGroupContext? registeredGroupContext;
+    private ElementReference? registeredGroupElement;
+    private ElementReference? registeredGroupToggleElement;
     private ElementReference? registeredToolbarElement;
     private ToolbarRootContext? registeredToolbarContext;
+    private ElementReference? initializedGroupItemElement;
     private ToggleState state = ToggleState.Default;
     private Dictionary<string, object> componentAttributes = new();
     private IReadOnlyDictionary<string, object>? forwardedAdditionalAttributes;
@@ -280,14 +284,20 @@
                 await InitializeJsAsync();
             }
         }
-        else if (IsInGroup && !IsInToolbarGroup && Element.HasValue && resolvedValue != previousResolvedValue)
+        else if (!IsInGroup || IsInToolbarGroup)
         {
-            previousResolvedValue = resolvedValue;
-            await RegisterWithGroupAsync();
-            await UpdateGroupTabIndexesAsync();
+            await UnregisterFromGroupAsync();
+            await DisposeGroupItemAsync();
         }
         else if (IsInGroup && !IsInToolbarGroup && Element.HasValue)
         {
+            await InitializeGroupItemAsync();
+
+            if (ShouldRegisterWithGroup())
+            {
+                await RegisterWithGroupAsync();
+            }
+
             await UpdateGroupTabIndexesAsync();
         }
 
@@ -300,26 +310,18 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (IsInGroup)
-        {
-            GroupContext?.UnregisterItem(itemId);
-        }
-
+        UnregisterFromGroupContext();
         UnregisterFromToolbar();
 
-        if (moduleTask.IsValueCreated && Element.HasValue)
+        if (moduleTask.IsValueCreated)
         {
             try
             {
                 await UnregisterFromGroupAsync();
+                await DisposeGroupItemAsync();
                 var module = await moduleTask.Value;
 
-                if (IsInGroup)
-                {
-                    await module.InvokeVoidAsync("disposeGroupItem", Element.Value);
-                }
-
-                if (!NativeButton)
+                if (!NativeButton && Element.HasValue)
                 {
                     await module.InvokeVoidAsync("dispose", Element.Value);
                 }
@@ -407,18 +409,50 @@
     {
         if (!IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
         {
+            await UnregisterFromGroupAsync();
             return;
+        }
+
+        var groupElement = GroupContext.GroupElement.Value;
+        var toggleElement = Element.Value;
+
+        if (registeredGroupElement.HasValue != registeredGroupToggleElement.HasValue ||
+            (registeredGroupElement.HasValue &&
+             registeredGroupToggleElement.HasValue &&
+             (!registeredGroupElement.Value.Equals(groupElement) ||
+              !registeredGroupToggleElement.Value.Equals(toggleElement))))
+        {
+            await UnregisterFromGroupAsync();
         }
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("registerToggle", GroupContext.GroupElement.Value, Element.Value, resolvedValue);
+            await module.InvokeVoidAsync("registerToggle", groupElement, toggleElement, resolvedValue);
+            registeredGroupElement = groupElement;
+            registeredGroupToggleElement = toggleElement;
+            previousResolvedValue = resolvedValue;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private bool ShouldRegisterWithGroup()
+    {
+        var groupElement = GroupContext?.GroupElement;
+
+        if (!Element.HasValue || !groupElement.HasValue)
+        {
+            return false;
+        }
+
+        return !registeredGroupElement.HasValue ||
+               !registeredGroupToggleElement.HasValue ||
+               !registeredGroupElement.Value.Equals(groupElement.Value) ||
+               !registeredGroupToggleElement.Value.Equals(Element.Value) ||
+               resolvedValue != previousResolvedValue;
     }
 
     private void RegisterWithToolbar()
@@ -475,20 +509,28 @@
 
     private async Task UnregisterFromGroupAsync()
     {
-        if (!IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
+        if (!registeredGroupElement.HasValue || !registeredGroupToggleElement.HasValue)
         {
+            registeredGroupElement = null;
+            registeredGroupToggleElement = null;
             return;
         }
+
+        var groupElement = registeredGroupElement.Value;
+        var toggleElement = registeredGroupToggleElement.Value;
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("unregisterToggle", GroupContext.GroupElement.Value, Element.Value);
+            await module.InvokeVoidAsync("unregisterToggle", groupElement, toggleElement);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+
+        registeredGroupElement = null;
+        registeredGroupToggleElement = null;
     }
 
     private async Task InitializeJsAsync()
@@ -513,19 +555,50 @@
     {
         if (!Element.HasValue)
         {
+            await DisposeGroupItemAsync();
             return;
         }
+
+        if (initializedGroupItemElement.HasValue && initializedGroupItemElement.Value.Equals(Element.Value))
+        {
+            return;
+        }
+
+        await DisposeGroupItemAsync();
 
         try
         {
             var module = await moduleTask.Value;
             var orientationString = CurrentOrientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync("initializeGroupItem", Element.Value, orientationString);
+            initializedGroupItemElement = Element;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private async Task DisposeGroupItemAsync()
+    {
+        if (!initializedGroupItemElement.HasValue)
+        {
+            return;
+        }
+
+        var groupItemElement = initializedGroupItemElement.Value;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("disposeGroupItem", groupItemElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+
+        initializedGroupItemElement = null;
     }
 
     private async Task UpdateJsStateAsync()
@@ -690,12 +763,7 @@
     {
         if (!IsInGroup)
         {
-            if (isRegisteredWithContext)
-            {
-                GroupContext?.UnregisterItem(itemId);
-                isRegisteredWithContext = false;
-            }
-
+            UnregisterFromGroupContext();
             return;
         }
 
@@ -706,15 +774,33 @@
             hasLoggedMissingGroupValue = true;
         }
 
+        if (isRegisteredWithContext &&
+            (registeredGroupContext is null || !ReferenceEquals(registeredGroupContext, GroupContext)))
+        {
+            UnregisterFromGroupContext();
+        }
+
         if (!isRegisteredWithContext)
         {
             GroupContext!.RegisterItem(itemId, ResolvedDisabled);
+            registeredGroupContext = GroupContext;
             isRegisteredWithContext = true;
         }
         else
         {
-            GroupContext!.UpdateItem(itemId, ResolvedDisabled);
+            registeredGroupContext!.UpdateItem(itemId, ResolvedDisabled);
         }
+    }
+
+    private void UnregisterFromGroupContext()
+    {
+        if (isRegisteredWithContext && registeredGroupContext is not null)
+        {
+            registeredGroupContext.UnregisterItem(itemId);
+        }
+
+        registeredGroupContext = null;
+        isRegisteredWithContext = false;
     }
 
     private IReadOnlyDictionary<string, object>? BuildForwardedAdditionalAttributes()

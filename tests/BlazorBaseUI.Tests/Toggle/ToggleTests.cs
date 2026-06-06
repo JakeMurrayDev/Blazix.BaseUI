@@ -560,6 +560,37 @@ public class ToggleTests : BunitContext, IToggleContract
 
         cut.WaitForAssertion(() => cut.Instance.UnregisterCount.ShouldBe(1));
     }
+
+    [Fact]
+    public async Task GroupedToggle_UnregistersFromRegisteredGroupWhenContextChangesOrClears()
+    {
+        var cut = Render<ToggleGroupContextSwitchHost>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Instance.FirstGroup.RegisterCount.ShouldBe(1);
+            JSInterop.Invocations.Count(invocation => invocation.Identifier == "registerToggle").ShouldBe(1);
+        });
+
+        await cut.InvokeAsync(cut.Instance.SwitchGroupContext);
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Instance.FirstGroup.UnregisterCount.ShouldBe(1);
+            cut.Instance.SecondGroup.RegisterCount.ShouldBe(1);
+            JSInterop.Invocations.Count(invocation => invocation.Identifier == "unregisterToggle").ShouldBe(1);
+            JSInterop.Invocations.Count(invocation => invocation.Identifier == "registerToggle").ShouldBe(2);
+        });
+
+        await cut.InvokeAsync(cut.Instance.ClearGroupContext);
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Instance.SecondGroup.UnregisterCount.ShouldBe(1);
+            JSInterop.Invocations.Count(invocation => invocation.Identifier == "unregisterToggle").ShouldBe(2);
+            JSInterop.Invocations.Count(invocation => invocation.Identifier == "disposeGroupItem").ShouldBe(1);
+        });
+    }
 }
 
 internal sealed class ToggleToolbarContextClearHost : ComponentBase
@@ -625,4 +656,106 @@ internal sealed class ToggleToolbarContextClearHost : ComponentBase
         groupContext.IsInToolbar = false;
         StateHasChanged();
     }
+}
+
+internal sealed class ToggleGroupContextSwitchHost : ComponentBase
+{
+    private IToggleGroupContext? groupContext;
+
+    public CountingToggleGroupContext FirstGroup { get; } = new("group-one");
+
+    public CountingToggleGroupContext SecondGroup { get; } = new("group-two");
+
+    public ToggleGroupContextSwitchHost()
+    {
+        groupContext = FirstGroup;
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CascadingValue<IToggleGroupContext?>>(0);
+        builder.AddAttribute(1, "Value", groupContext);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+        {
+            groupBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+            groupBuilder.AddAttribute(1, "Value", "one");
+            groupBuilder.AddAttribute(
+                2,
+                "ChildContent",
+                (RenderFragment)(contentBuilder => contentBuilder.AddContent(0, "One")));
+            groupBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+
+    public void SwitchGroupContext()
+    {
+        groupContext = SecondGroup;
+        StateHasChanged();
+    }
+
+    public void ClearGroupContext()
+    {
+        groupContext = null;
+        StateHasChanged();
+    }
+}
+
+internal sealed class CountingToggleGroupContext : IToggleGroupContext
+{
+    private readonly IReadOnlyList<string> value = [];
+    private readonly ElementReference groupElement;
+
+    public CountingToggleGroupContext(string groupElementId)
+    {
+        groupElement = new ElementReference(groupElementId);
+    }
+
+    public int RegisterCount { get; private set; }
+
+    public int UpdateCount { get; private set; }
+
+    public int UnregisterCount { get; private set; }
+
+    public IReadOnlyList<string> Value => value;
+
+    public bool Disabled { get; set; }
+
+    public Orientation Orientation { get; set; } = Orientation.Horizontal;
+
+    public bool LoopFocus { get; set; } = true;
+
+    public Direction Direction { get; set; } = Direction.Ltr;
+
+    public bool IsValueInitialized { get; set; } = true;
+
+    public bool IsInToolbar { get; set; }
+
+    public ElementReference? GroupElement => groupElement;
+
+    public Task<ToggleGroupValueChangeEventArgs> SetGroupValueAsync(
+        string toggleValue,
+        bool nextPressed,
+        MouseEventArgs? eventArgs)
+    {
+        IReadOnlyList<string> nextValue = nextPressed ? [toggleValue] : [];
+        return Task.FromResult(new ToggleGroupValueChangeEventArgs(nextValue, eventArgs));
+    }
+
+    public void RegisterItem(string itemId, bool disabled)
+    {
+        RegisterCount++;
+    }
+
+    public void UpdateItem(string itemId, bool disabled)
+    {
+        UpdateCount++;
+    }
+
+    public void UnregisterItem(string itemId)
+    {
+        UnregisterCount++;
+    }
+
+    public int GetTabIndex(string itemId) => 0;
 }
