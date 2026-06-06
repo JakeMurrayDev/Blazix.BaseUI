@@ -17,6 +17,7 @@ public interface IToggleContract
 
     // Native button attributes
     Task NativeButton_HasTypeButton();
+    Task NativeButton_OverridesUserTypeAndOmitsForm();
     Task NativeButton_HasDisabledWhenDisabled();
     Task NativeButton_DoesNotHaveAriaDisabled();
     Task NativeButton_DoesNotHaveRoleButton();
@@ -51,6 +52,9 @@ public interface IToggleContract
 
     // OnPressedChange
     Task OnPressedChange_FiresOnClick();
+    Task GroupedToggle_OnPressedChangeFiresOnClick();
+    Task GroupedNativeToggle_ExposesAriaDisabledState();
+    Task GroupedEmptyStringValues_AreResolvedToUniqueGeneratedValues();
     Task Disabled_OnPressedChangeDoesNotFire();
 
     // Element reference

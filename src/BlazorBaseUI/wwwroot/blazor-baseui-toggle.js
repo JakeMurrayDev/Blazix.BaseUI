@@ -87,7 +87,7 @@ export function dispose(element) {
     }
 }
 
-export function initializeGroup(element, orientation, loopFocus) {
+export function initializeGroup(element, orientation, loopFocus, direction = 'ltr') {
     if (!element) {
         return;
     }
@@ -96,13 +96,16 @@ export function initializeGroup(element, orientation, loopFocus) {
         element,
         orientation,
         loopFocus,
+        direction,
+        highlightedElement: null,
+        hasUserHighlighted: false,
         items: new Set()
     };
 
     groupStateMap.set(element, state);
 }
 
-export function updateGroup(element, orientation, loopFocus) {
+export function updateGroup(element, orientation, loopFocus, direction = 'ltr') {
     if (!element) {
         return;
     }
@@ -111,12 +114,23 @@ export function updateGroup(element, orientation, loopFocus) {
     if (state) {
         state.orientation = orientation;
         state.loopFocus = loopFocus;
+        state.direction = direction;
+        updateToggleTabIndexes(element);
     }
 }
 
 export function disposeGroup(element) {
     if (!element) {
         return;
+    }
+
+    const state = groupStateMap.get(element);
+    if (state) {
+        for (const item of state.items) {
+            if (item.focusHandler) {
+                item.element.removeEventListener('focus', item.focusHandler);
+            }
+        }
     }
 
     groupStateMap.delete(element);
@@ -140,7 +154,25 @@ export function registerToggle(groupElement, toggleElement, value) {
         }
     }
 
-    state.items.add({ element: toggleElement, value });
+    const item = {
+        element: toggleElement,
+        value,
+        focusHandler: null
+    };
+
+    item.focusHandler = () => {
+        const currentState = groupStateMap.get(groupElement);
+        if (!currentState || isToggleDisabled(toggleElement)) {
+            return;
+        }
+
+        currentState.highlightedElement = toggleElement;
+        currentState.hasUserHighlighted = true;
+        updateToggleTabIndexes(groupElement);
+    };
+
+    toggleElement.addEventListener('focus', item.focusHandler);
+    state.items.add(item);
     updateToggleTabIndexes(groupElement);
 }
 
@@ -156,7 +188,14 @@ export function unregisterToggle(groupElement, toggleElement) {
 
     for (const item of state.items) {
         if (item.element === toggleElement) {
+            if (item.focusHandler) {
+                item.element.removeEventListener('focus', item.focusHandler);
+            }
             state.items.delete(item);
+            if (state.highlightedElement === toggleElement) {
+                state.highlightedElement = null;
+                state.hasUserHighlighted = false;
+            }
             updateToggleTabIndexes(groupElement);
             return;
         }
@@ -180,32 +219,47 @@ function getOrderedToggles(groupElement) {
 }
 
 function isToggleDisabled(toggleElement) {
-    return toggleElement.hasAttribute('data-disabled') || toggleElement.disabled;
+    return toggleElement.hasAttribute('data-disabled') ||
+        toggleElement.disabled ||
+        toggleElement.getAttribute('aria-disabled') === 'true';
 }
 
 function updateToggleTabIndexes(groupElement) {
+    const state = groupStateMap.get(groupElement);
+    if (!state) {
+        return;
+    }
+
     const items = getOrderedToggles(groupElement);
     if (items.length === 0) {
         return;
     }
 
-    const hasPressed = items.some(item => item.element.getAttribute('aria-pressed') === 'true');
     const firstEnabled = items.find(item => !isToggleDisabled(item.element));
+    const highlightedItem = state.hasUserHighlighted
+        ? items.find(item => item.element === state.highlightedElement)
+        : null;
+    const targetItem = highlightedItem && !isToggleDisabled(highlightedItem.element)
+        ? highlightedItem
+        : firstEnabled;
+
+    state.highlightedElement = targetItem?.element ?? null;
 
     for (const item of items) {
-        const isPressed = item.element.getAttribute('aria-pressed') === 'true';
         const isDisabled = isToggleDisabled(item.element);
 
         if (isDisabled) {
             item.element.tabIndex = -1;
-        } else if (isPressed) {
-            item.element.tabIndex = 0;
-        } else if (!hasPressed && item === firstEnabled) {
+        } else if (item === targetItem) {
             item.element.tabIndex = 0;
         } else {
             item.element.tabIndex = -1;
         }
     }
+}
+
+export function syncGroupTabIndexes(groupElement) {
+    updateToggleTabIndexes(groupElement);
 }
 
 export function navigateToPrevious(groupElement, currentElement) {
@@ -293,6 +347,12 @@ export function navigateToLast(groupElement) {
 }
 
 function setFocusedToggle(groupElement, toggleElement) {
+    const state = groupStateMap.get(groupElement);
+    if (state) {
+        state.highlightedElement = toggleElement;
+        state.hasUserHighlighted = true;
+    }
+
     const items = getOrderedToggles(groupElement);
     for (const item of items) {
         item.element.tabIndex = item.element === toggleElement ? 0 : -1;

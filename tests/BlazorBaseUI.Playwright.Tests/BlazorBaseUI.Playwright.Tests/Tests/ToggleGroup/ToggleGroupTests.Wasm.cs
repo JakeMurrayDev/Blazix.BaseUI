@@ -33,5 +33,23 @@ public class ToggleGroupTestsWasm : ToggleGroupTestsBase, IClassFixture<Playwrig
     public override Task VerticalOrientation_ArrowDownUp() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
-    public override Task Tab_FocusesPressedOrFirstToggle() => Task.CompletedTask;
+    public override Task HorizontalOrientation_IgnoresVerticalArrowKeys() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task HomeEnd_MoveFocusToFirstAndLastToggle() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task LoopFocusFalse_DoesNotWrapPastLastToggle() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task ArrowNavigation_SkipsDisabledToggle() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task RtlHorizontal_ArrowLeftMovesToNextToggle() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task ToolbarMode_ArrowNavigationUsesToolbarRoot() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Tab_FocusesFirstEnabledToggle() => Task.CompletedTask;
 }
