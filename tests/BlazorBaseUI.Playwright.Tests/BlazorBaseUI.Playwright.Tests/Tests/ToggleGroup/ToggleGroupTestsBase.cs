@@ -312,7 +312,6 @@ public abstract class ToggleGroupTestsBase : TestBase
             .WithToggleGroupDefaultValue("one"));
 
         await WaitForToggleGroupJsAsync();
-        await WaitForDelayAsync(500);
 
         var toggle = GetToggle("one");
         await toggle.FocusAsync();
@@ -329,7 +328,6 @@ public abstract class ToggleGroupTestsBase : TestBase
             .WithToggleGroupDefaultValue("two"));
 
         await WaitForToggleGroupJsAsync();
-        await WaitForDelayAsync(500);
 
         var toggleTwo = GetToggle("two");
         await toggleTwo.FocusAsync();
@@ -352,7 +350,6 @@ public abstract class ToggleGroupTestsBase : TestBase
             .WithLoopFocus(false));
 
         await WaitForToggleGroupJsAsync();
-        await WaitForDelayAsync(500);
 
         var toggleThree = GetToggle("three");
         await toggleThree.FocusAsync();

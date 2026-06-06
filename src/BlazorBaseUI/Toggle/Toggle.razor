@@ -40,6 +40,7 @@
     private string resolvedValue = null!;
     private RenderElement<ToggleState>? renderElementReference;
     private ElementReference? registeredToolbarElement;
+    private ToolbarRootContext? registeredToolbarContext;
     private ToggleState state = ToggleState.Default;
     private Dictionary<string, object> componentAttributes = new();
     private IReadOnlyDictionary<string, object>? forwardedAdditionalAttributes;
@@ -214,6 +215,11 @@
 
         RegisterWithContext();
 
+        if (!IsInToolbarGroup)
+        {
+            UnregisterFromToolbar();
+        }
+
         if (state.Pressed != currentPressed || state.Disabled != resolvedDisabled)
         {
             state = new ToggleState(currentPressed, resolvedDisabled);
@@ -299,11 +305,7 @@
             GroupContext?.UnregisterItem(itemId);
         }
 
-        if (registeredToolbarElement.HasValue && ToolbarContext is not null)
-        {
-            ToolbarContext.UnregisterItem(registeredToolbarElement.Value);
-            registeredToolbarElement = null;
-        }
+        UnregisterFromToolbar();
 
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
@@ -426,16 +428,31 @@
             return;
         }
 
-        if (registeredToolbarElement.HasValue && !registeredToolbarElement.Value.Equals(Element.Value))
+        if (registeredToolbarElement.HasValue &&
+            (!registeredToolbarElement.Value.Equals(Element.Value) ||
+             registeredToolbarContext is null ||
+             !ReferenceEquals(registeredToolbarContext, ToolbarContext)))
         {
-            ToolbarContext.UnregisterItem(registeredToolbarElement.Value);
+            UnregisterFromToolbar();
         }
 
         if (!registeredToolbarElement.HasValue || !registeredToolbarElement.Value.Equals(Element.Value))
         {
             ToolbarContext.RegisterItem(Element.Value);
             registeredToolbarElement = Element;
+            registeredToolbarContext = ToolbarContext;
         }
+    }
+
+    private void UnregisterFromToolbar()
+    {
+        if (registeredToolbarElement.HasValue && registeredToolbarContext is not null)
+        {
+            registeredToolbarContext.UnregisterItem(registeredToolbarElement.Value);
+        }
+
+        registeredToolbarElement = null;
+        registeredToolbarContext = null;
     }
 
     private async Task UpdateGroupTabIndexesAsync()

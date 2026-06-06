@@ -548,4 +548,81 @@ public class ToggleTests : BunitContext, IToggleContract
         component!.Element.HasValue.ShouldBeTrue();
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task ToolbarGroup_UnregistersFromRegisteredToolbarWhenCascadeClears()
+    {
+        var cut = Render<ToggleToolbarContextClearHost>();
+
+        cut.WaitForAssertion(() => cut.Instance.RegisterCount.ShouldBe(1));
+
+        await cut.InvokeAsync(cut.Instance.ClearToolbarContext);
+
+        cut.WaitForAssertion(() => cut.Instance.UnregisterCount.ShouldBe(1));
+    }
+}
+
+internal sealed class ToggleToolbarContextClearHost : ComponentBase
+{
+    private readonly ToggleGroupContext groupContext;
+    private ToolbarRootContext? toolbarContext;
+
+    public int RegisterCount { get; private set; }
+
+    public int UnregisterCount { get; private set; }
+
+    public ToggleToolbarContextClearHost()
+    {
+        groupContext = new ToggleGroupContext
+        {
+            Disabled = false,
+            Orientation = Orientation.Horizontal,
+            LoopFocus = true,
+            Direction = Direction.Ltr,
+            IsValueInitialized = true,
+            IsInToolbar = true,
+            GetValueFunc = Array.Empty<string>,
+            SetGroupValueFunc = (_, _, eventArgs) =>
+                Task.FromResult(new ToggleGroupValueChangeEventArgs(Array.Empty<string>(), eventArgs)),
+            GetGroupElementFunc = () => null
+        };
+
+        toolbarContext = new ToolbarRootContext
+        {
+            Disabled = false,
+            Orientation = Orientation.Horizontal,
+            RegisterItem = _ => RegisterCount++,
+            UnregisterItem = _ => UnregisterCount++
+        };
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CascadingValue<IToggleGroupContext>>(0);
+        builder.AddAttribute(1, "Value", groupContext);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+        {
+            groupBuilder.OpenComponent<CascadingValue<ToolbarRootContext?>>(0);
+            groupBuilder.AddAttribute(1, "Value", toolbarContext);
+            groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(toolbarBuilder =>
+            {
+                toolbarBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                toolbarBuilder.AddAttribute(1, "Value", "one");
+                toolbarBuilder.AddAttribute(
+                    2,
+                    "ChildContent",
+                    (RenderFragment)(contentBuilder => contentBuilder.AddContent(0, "One")));
+                toolbarBuilder.CloseComponent();
+            }));
+            groupBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+
+    public void ClearToolbarContext()
+    {
+        toolbarContext = null;
+        groupContext.IsInToolbar = false;
+        StateHasChanged();
+    }
 }
