@@ -883,6 +883,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithToggleGroupToolbar(bool value)
+    {
+        queryParams["toolbar"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     // Toolbar-specific parameters
     public TestPageUrlBuilder WithShowGroup(bool value)
     {

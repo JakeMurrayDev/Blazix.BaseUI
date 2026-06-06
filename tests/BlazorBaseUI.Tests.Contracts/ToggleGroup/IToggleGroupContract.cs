@@ -18,6 +18,8 @@ public interface IToggleGroupContract
     Task DoesNotHaveDataMultipleByDefault();
     Task HasDataOrientationHorizontal();
     Task HasDataOrientationVertical();
+    Task HasAriaOrientationHorizontal();
+    Task HasAriaOrientationVertical();
 
     // Disabled
     Task DisabledGroup_PropagatesDataDisabledToToggles();
@@ -47,5 +49,6 @@ public interface IToggleGroupContract
     Task StyleValueReceivesCorrectState();
 
     // TabIndex
-    Task PressedToggle_HasTabIndexZero_OthersMinusOne();
+    Task InitialRovingTabIndex_UsesFirstEnabledToggleNotPressedToggle();
+    Task ToolbarDisabled_DisablesToggleGroupAndChildren();
 }

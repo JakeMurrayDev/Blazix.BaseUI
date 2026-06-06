@@ -1,9 +1,12 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Logging
 @using Microsoft.JSInterop
+@using BlazorBaseUI.Toolbar
 @using BlazorBaseUI.ToggleGroup
 
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
+@inject ILogger<Toggle> Logger
 
 <RenderElement TState="ToggleState"
                Tag="@DefaultTag"
@@ -13,7 +16,7 @@
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
                ChildContent="ChildContent"
-               @attributes="AdditionalAttributes"
+               @attributes="forwardedAdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
@@ -21,21 +24,29 @@
     private const string JsModulePath = "./_content/BlazorBaseUI/blazor-baseui-toggle.min.js";
 
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private readonly string itemId = Guid.NewGuid().ToIdString();
 
     private bool hasRendered;
     private bool isPressed;
     private bool previousPressed;
     private bool previousDisabled;
     private Orientation previousOrientation;
+    private Direction previousDirection;
+    private bool hasValueParameter;
+    private bool isRegisteredWithContext;
+    private bool hasLoggedMissingGroupValue;
     private string previousResolvedValue = null!;
     private string? defaultId;
     private string resolvedValue = null!;
     private RenderElement<ToggleState>? renderElementReference;
+    private ElementReference? registeredToolbarElement;
     private ToggleState state = ToggleState.Default;
     private Dictionary<string, object> componentAttributes = new();
+    private IReadOnlyDictionary<string, object>? forwardedAdditionalAttributes;
 
     private bool IsControlled => Pressed.HasValue;
     private bool IsInGroup => GroupContext is not null;
+    private bool IsInToolbarGroup => GroupContext?.IsInToolbar == true && ToolbarContext is not null;
 
     private bool CurrentPressed
     {
@@ -52,8 +63,13 @@
 
     private Orientation CurrentOrientation => GroupContext?.Orientation ?? Orientation.Horizontal;
 
+    private Direction CurrentDirection => GroupContext?.Direction ?? Direction.Ltr;
+
     [CascadingParameter]
     private IToggleGroupContext? GroupContext { get; set; }
+
+    [CascadingParameter]
+    private ToolbarRootContext? ToolbarContext { get; set; }
 
     /// <summary>
     /// Gets or sets whether the toggle button is currently pressed.
@@ -146,9 +162,26 @@
     }
 
     /// <inheritdoc />
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        hasValueParameter = false;
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Name == nameof(Value))
+            {
+                hasValueParameter = true;
+                break;
+            }
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
     protected override void OnInitialized()
     {
-        resolvedValue = Value ?? (defaultId ??= Guid.NewGuid().ToIdString());
+        resolvedValue = ResolveValue();
         previousResolvedValue = resolvedValue;
 
         if (!IsInGroup && !IsControlled)
@@ -159,15 +192,17 @@
         previousPressed = CurrentPressed;
         previousDisabled = ResolvedDisabled;
         previousOrientation = CurrentOrientation;
+        previousDirection = CurrentDirection;
 
         state = new ToggleState(CurrentPressed, ResolvedDisabled);
+        RegisterWithContext();
         BuildComponentAttributes();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var newValue = Value ?? defaultId!;
+        var newValue = ResolveValue();
         if (newValue != resolvedValue)
         {
             resolvedValue = newValue;
@@ -175,6 +210,9 @@
 
         var currentPressed = CurrentPressed;
         var resolvedDisabled = ResolvedDisabled;
+        var currentDirection = CurrentDirection;
+
+        RegisterWithContext();
 
         if (state.Pressed != currentPressed || state.Disabled != resolvedDisabled)
         {
@@ -194,10 +232,16 @@
                 _ = UpdateJsStateAsync();
             }
 
-            if (IsInGroup && CurrentOrientation != previousOrientation)
+            if (IsInGroup && !IsInToolbarGroup && CurrentOrientation != previousOrientation)
             {
                 previousOrientation = CurrentOrientation;
                 _ = UpdateGroupItemOrientationAsync();
+            }
+
+            if (IsInGroup && !IsInToolbarGroup && currentDirection != previousDirection)
+            {
+                previousDirection = currentDirection;
+                _ = UpdateGroupTabIndexesAsync();
             }
         }
 
@@ -213,8 +257,16 @@
 
             if (IsInGroup && Element.HasValue)
             {
-                await InitializeGroupItemAsync();
-                await RegisterWithGroupAsync();
+                if (IsInToolbarGroup)
+                {
+                    RegisterWithToolbar();
+                }
+                else
+                {
+                    await InitializeGroupItemAsync();
+                    await RegisterWithGroupAsync();
+                    await UpdateGroupTabIndexesAsync();
+                }
             }
 
             if (!NativeButton)
@@ -222,16 +274,37 @@
                 await InitializeJsAsync();
             }
         }
-        else if (IsInGroup && Element.HasValue && resolvedValue != previousResolvedValue)
+        else if (IsInGroup && !IsInToolbarGroup && Element.HasValue && resolvedValue != previousResolvedValue)
         {
             previousResolvedValue = resolvedValue;
             await RegisterWithGroupAsync();
+            await UpdateGroupTabIndexesAsync();
+        }
+        else if (IsInGroup && !IsInToolbarGroup && Element.HasValue)
+        {
+            await UpdateGroupTabIndexesAsync();
+        }
+
+        if (!firstRender && IsInToolbarGroup)
+        {
+            RegisterWithToolbar();
         }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (IsInGroup)
+        {
+            GroupContext?.UnregisterItem(itemId);
+        }
+
+        if (registeredToolbarElement.HasValue && ToolbarContext is not null)
+        {
+            ToolbarContext.UnregisterItem(registeredToolbarElement.Value);
+            registeredToolbarElement = null;
+        }
+
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
             try
@@ -270,14 +343,18 @@
         {
             attrs["type"] = "button";
 
+            if (IsInGroup)
+            {
+                attrs["aria-disabled"] = resolvedDisabled ? "true" : "false";
+            }
+
             if (resolvedDisabled)
             {
                 attrs["disabled"] = true;
             }
             else if (IsInGroup)
             {
-                var anyPressed = GroupContext!.Value.Count > 0;
-                attrs["tabindex"] = currentPressed ? 0 : (!anyPressed ? 0 : -1);
+                attrs["tabindex"] = IsInToolbarGroup ? 0 : GroupContext!.GetTabIndex(itemId);
             }
             else
             {
@@ -295,8 +372,7 @@
             }
             else if (IsInGroup)
             {
-                var anyPressed = GroupContext!.Value.Count > 0;
-                attrs["tabindex"] = currentPressed ? 0 : (!anyPressed ? 0 : -1);
+                attrs["tabindex"] = IsInToolbarGroup ? 0 : GroupContext!.GetTabIndex(itemId);
             }
             else
             {
@@ -306,15 +382,23 @@
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
 
-        if (IsInGroup)
+        if (IsInGroup && !IsInToolbarGroup)
         {
             attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
         }
 
-        attrs["data-pressed"] = currentPressed;
-        attrs["data-disabled"] = resolvedDisabled;
+        if (currentPressed)
+        {
+            attrs["data-pressed"] = true;
+        }
+
+        if (resolvedDisabled)
+        {
+            attrs["data-disabled"] = true;
+        }
 
         componentAttributes = attrs;
+        forwardedAdditionalAttributes = BuildForwardedAdditionalAttributes();
     }
 
     private async Task RegisterWithGroupAsync()
@@ -328,6 +412,43 @@
         {
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("registerToggle", GroupContext.GroupElement.Value, Element.Value, resolvedValue);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void RegisterWithToolbar()
+    {
+        if (!Element.HasValue || ToolbarContext is null)
+        {
+            return;
+        }
+
+        if (registeredToolbarElement.HasValue && !registeredToolbarElement.Value.Equals(Element.Value))
+        {
+            ToolbarContext.UnregisterItem(registeredToolbarElement.Value);
+        }
+
+        if (!registeredToolbarElement.HasValue || !registeredToolbarElement.Value.Equals(Element.Value))
+        {
+            ToolbarContext.RegisterItem(Element.Value);
+            registeredToolbarElement = Element;
+        }
+    }
+
+    private async Task UpdateGroupTabIndexesAsync()
+    {
+        if (!hasRendered || !IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("syncGroupTabIndexes", GroupContext.GroupElement.Value);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -438,12 +559,32 @@
 
         if (IsInGroup)
         {
-            await GroupContext!.SetGroupValueAsync(resolvedValue, nextPressed);
+            var groupEventArgs = await GroupContext!.SetGroupValueAsync(resolvedValue, nextPressed, e);
+            var toggleEventArgs = new TogglePressedChangeEventArgs(
+                nextPressed,
+                e,
+                groupEventArgs.IsCanceled,
+                groupEventArgs.IsPropagationAllowed);
+
+            if (OnPressedChange.HasDelegate)
+            {
+                await OnPressedChange.InvokeAsync(toggleEventArgs);
+            }
+
+            if (!toggleEventArgs.IsCanceled && PressedChanged.HasDelegate)
+            {
+                await PressedChanged.InvokeAsync(nextPressed);
+            }
+
             await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
             return;
         }
 
-        var eventArgs = new TogglePressedChangeEventArgs(nextPressed);
+        var eventArgs = new TogglePressedChangeEventArgs(
+            nextPressed,
+            e,
+            isCanceled: false,
+            isPropagationAllowed: false);
 
         if (OnPressedChange.HasDelegate)
         {
@@ -480,13 +621,14 @@
         var orientation = GroupContext.Orientation;
         var isHorizontal = orientation == Orientation.Horizontal;
         var isVertical = orientation == Orientation.Vertical;
+        var isRtl = GroupContext.Direction == Direction.Rtl;
 
         var shouldNavigatePrevious =
-            (isHorizontal && e.Key == "ArrowLeft") ||
+            (isHorizontal && e.Key == (isRtl ? "ArrowRight" : "ArrowLeft")) ||
             (isVertical && e.Key == "ArrowUp");
 
         var shouldNavigateNext =
-            (isHorizontal && e.Key == "ArrowRight") ||
+            (isHorizontal && e.Key == (isRtl ? "ArrowLeft" : "ArrowRight")) ||
             (isVertical && e.Key == "ArrowDown");
 
         try
@@ -515,5 +657,71 @@
         }
 
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private string ResolveValue()
+    {
+        if (!string.IsNullOrEmpty(Value))
+        {
+            return Value;
+        }
+
+        return defaultId ??= Guid.NewGuid().ToIdString();
+    }
+
+    private void RegisterWithContext()
+    {
+        if (!IsInGroup)
+        {
+            if (isRegisteredWithContext)
+            {
+                GroupContext?.UnregisterItem(itemId);
+                isRegisteredWithContext = false;
+            }
+
+            return;
+        }
+
+        if (!hasValueParameter && GroupContext!.IsValueInitialized && !hasLoggedMissingGroupValue)
+        {
+            Logger.LogError(
+                "A <Toggle> component rendered in a <ToggleGroup> has no explicit value prop. This will cause issues between the Toggle Group and Toggle values. Provide the <Toggle> with a value prop matching the <ToggleGroup> values prop type.");
+            hasLoggedMissingGroupValue = true;
+        }
+
+        if (!isRegisteredWithContext)
+        {
+            GroupContext!.RegisterItem(itemId, ResolvedDisabled);
+            isRegisteredWithContext = true;
+        }
+        else
+        {
+            GroupContext!.UpdateItem(itemId, ResolvedDisabled);
+        }
+    }
+
+    private IReadOnlyDictionary<string, object>? BuildForwardedAdditionalAttributes()
+    {
+        if (AdditionalAttributes is null)
+        {
+            return null;
+        }
+
+        if (!AdditionalAttributes.Any(attribute =>
+                string.Equals(attribute.Key, "form", StringComparison.OrdinalIgnoreCase)))
+        {
+            return AdditionalAttributes;
+        }
+
+        var attrs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in AdditionalAttributes)
+        {
+            if (!string.Equals(key, "form", StringComparison.OrdinalIgnoreCase))
+            {
+                attrs[key] = value;
+            }
+        }
+
+        return attrs;
     }
 }

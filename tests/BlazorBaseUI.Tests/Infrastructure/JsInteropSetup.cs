@@ -453,6 +453,7 @@ public static class JsInteropSetup
         module.SetupVoid("navigateToNext", _ => true).SetVoidResult();
         module.SetupVoid("navigateToFirst", _ => true).SetVoidResult();
         module.SetupVoid("navigateToLast", _ => true).SetVoidResult();
+        module.SetupVoid("syncGroupTabIndexes", _ => true).SetVoidResult();
         module.SetupVoid("initializeGroupItem", _ => true).SetVoidResult();
         module.SetupVoid("updateGroupItemOrientation", _ => true).SetVoidResult();
         module.SetupVoid("disposeGroupItem", _ => true).SetVoidResult();

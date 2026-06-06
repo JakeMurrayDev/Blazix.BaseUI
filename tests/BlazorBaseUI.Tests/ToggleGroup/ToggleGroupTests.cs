@@ -6,6 +6,7 @@ public class ToggleGroupTests : BunitContext, IToggleGroupContract
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupToggleModule(JSInterop);
+        JsInteropSetup.SetupToolbarModule(JSInterop);
     }
 
     private RenderFragment CreateToggleGroup(
@@ -255,6 +256,24 @@ public class ToggleGroupTests : BunitContext, IToggleGroupContract
         var cut = Render(CreateToggleGroup(orientation: Orientation.Vertical));
         var group = cut.Find("[role='group']");
         group.GetAttribute("data-orientation").ShouldBe("vertical");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasAriaOrientationHorizontal()
+    {
+        var cut = Render(CreateToggleGroup(orientation: Orientation.Horizontal));
+        var group = cut.Find("[role='group']");
+        group.GetAttribute("aria-orientation").ShouldBe("horizontal");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasAriaOrientationVertical()
+    {
+        var cut = Render(CreateToggleGroup(orientation: Orientation.Vertical));
+        var group = cut.Find("[role='group']");
+        group.GetAttribute("aria-orientation").ShouldBe("vertical");
         return Task.CompletedTask;
     }
 
@@ -526,17 +545,47 @@ public class ToggleGroupTests : BunitContext, IToggleGroupContract
     // TabIndex
 
     [Fact]
-    public Task PressedToggle_HasTabIndexZero_OthersMinusOne()
+    public Task InitialRovingTabIndex_UsesFirstEnabledToggleNotPressedToggle()
     {
         var cut = Render(CreateToggleGroupWithToggles(defaultValue: ["two"]));
         var toggles = cut.FindAll("button[aria-pressed]");
 
-        // Pressed toggle "two" should have tabindex=0
-        toggles[1].GetAttribute("tabindex").ShouldBe("0");
-
-        // Unpressed toggles should have tabindex=-1
-        toggles[0].GetAttribute("tabindex").ShouldBe("-1");
+        toggles[0].GetAttribute("tabindex").ShouldBe("0");
+        toggles[1].GetAttribute("tabindex").ShouldBe("-1");
         toggles[2].GetAttribute("tabindex").ShouldBe("-1");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ToolbarDisabled_DisablesToggleGroupAndChildren()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.Toolbar.ToolbarRoot>(0);
+            builder.AddAttribute(1, "Disabled", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(toolbarBuilder =>
+            {
+                toolbarBuilder.OpenComponent<BlazorBaseUI.ToggleGroup.ToggleGroup>(0);
+                toolbarBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+                {
+                    groupBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                    groupBuilder.AddAttribute(1, "Value", "one");
+                    groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                    groupBuilder.CloseComponent();
+                }));
+                toolbarBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var groups = cut.FindAll("[role='group']");
+        var toggleGroup = groups.Single(group => group.QuerySelector("button[aria-pressed]") is not null);
+        toggleGroup.HasAttribute("data-disabled").ShouldBeTrue();
+        toggleGroup.HasAttribute("aria-orientation").ShouldBeFalse();
+
+        var toggle = cut.Find("button[aria-pressed]");
+        toggle.HasAttribute("data-disabled").ShouldBeTrue();
+        toggle.GetAttribute("aria-disabled").ShouldBe("true");
         return Task.CompletedTask;
     }
 

@@ -171,6 +171,22 @@ public class ToggleTests : BunitContext, IToggleContract
     }
 
     [Fact]
+    public Task NativeButton_OverridesUserTypeAndOmitsForm()
+    {
+        var cut = Render(CreateToggle(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                ["type"] = "submit",
+                ["form"] = "external-form"
+            }));
+
+        var button = cut.Find("button");
+        button.GetAttribute("type").ShouldBe("button");
+        button.HasAttribute("form").ShouldBeFalse();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task NativeButton_HasDisabledWhenDisabled()
     {
         var cut = Render(CreateToggle(disabled: true));
@@ -402,6 +418,101 @@ public class ToggleTests : BunitContext, IToggleContract
 
         receivedValue.ShouldNotBeNull();
         receivedValue.ShouldBe(true);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task GroupedToggle_OnPressedChangeFiresOnClick()
+    {
+        bool? receivedValue = null;
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.ToggleGroup.ToggleGroup>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                innerBuilder.AddAttribute(1, "Value", "one");
+                innerBuilder.AddAttribute(2, "OnPressedChange",
+                    EventCallback.Factory.Create<TogglePressedChangeEventArgs>(
+                        this,
+                        args => receivedValue = args.Pressed));
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var button = cut.Find("button[aria-pressed]");
+        button.Click();
+
+        receivedValue.ShouldBe(true);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task GroupedNativeToggle_ExposesAriaDisabledState()
+    {
+        var enabledCut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.ToggleGroup.ToggleGroup>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                innerBuilder.AddAttribute(1, "Value", "one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        enabledCut.Find("button[aria-pressed]").GetAttribute("aria-disabled").ShouldBe("false");
+
+        var disabledCut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.ToggleGroup.ToggleGroup>(0);
+            builder.AddAttribute(1, "Disabled", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                innerBuilder.AddAttribute(1, "Value", "one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        disabledCut.Find("button[aria-pressed]").GetAttribute("aria-disabled").ShouldBe("true");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task GroupedEmptyStringValues_AreResolvedToUniqueGeneratedValues()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<BlazorBaseUI.ToggleGroup.ToggleGroup>(0);
+            builder.AddAttribute(1, "Multiple", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(0);
+                innerBuilder.AddAttribute(1, "Value", "");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "First")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<BlazorBaseUI.Toggle.Toggle>(10);
+                innerBuilder.AddAttribute(11, "Value", "");
+                innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Second")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var toggles = cut.FindAll("button[aria-pressed]");
+        toggles[0].Click();
+
+        toggles = cut.FindAll("button[aria-pressed]");
+        toggles[0].GetAttribute("aria-pressed").ShouldBe("true");
+        toggles[1].GetAttribute("aria-pressed").ShouldBe("false");
         return Task.CompletedTask;
     }
 

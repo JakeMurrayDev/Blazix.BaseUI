@@ -45,6 +45,19 @@ public abstract class ToggleGroupTestsBase : TestBase
         }", new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
+    protected async Task WaitForToolbarJsAsync()
+    {
+        await Page.WaitForFunctionAsync(@"() => {
+            const el = document.querySelector('[data-testid=""toolbar-root""]');
+            if (!el) return false;
+            const stateKey = Symbol.for('BlazorBaseUI.Toolbar.State');
+            const map = window[stateKey];
+            if (!map || !map.has(el)) return false;
+            const state = map.get(el);
+            return state?.items?.size >= 3;
+        }", new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
     private async Task PerformArrowNavigationAsync(string fromToggle, string key, string expectedFocusToggle)
     {
         await WaitForTogglePressedAsync(fromToggle, true);
@@ -292,6 +305,105 @@ public abstract class ToggleGroupTestsBase : TestBase
         await PerformArrowNavigationAsync("one", "ArrowDown", "two");
     }
 
+    [Fact]
+    public virtual async Task HorizontalOrientation_IgnoresVerticalArrowKeys()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithToggleGroupDefaultValue("one"));
+
+        await WaitForToggleGroupJsAsync();
+        await WaitForDelayAsync(500);
+
+        var toggle = GetToggle("one");
+        await toggle.FocusAsync();
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(toggle).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task HomeEnd_MoveFocusToFirstAndLastToggle()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithToggleGroupDefaultValue("two"));
+
+        await WaitForToggleGroupJsAsync();
+        await WaitForDelayAsync(500);
+
+        var toggleTwo = GetToggle("two");
+        await toggleTwo.FocusAsync();
+        await Page.Keyboard.PressAsync("End");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetToggle("three")).ToBeFocusedAsync();
+
+        await Page.Keyboard.PressAsync("Home");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetToggle("one")).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task LoopFocusFalse_DoesNotWrapPastLastToggle()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithToggleGroupDefaultValue("three")
+            .WithLoopFocus(false));
+
+        await WaitForToggleGroupJsAsync();
+        await WaitForDelayAsync(500);
+
+        var toggleThree = GetToggle("three");
+        await toggleThree.FocusAsync();
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(toggleThree).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task ArrowNavigation_SkipsDisabledToggle()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithToggleGroupDefaultValue("one")
+            .WithToggleItem2Disabled(true));
+
+        await WaitForToggleGroupJsAsync();
+        await PerformArrowNavigationAsync("one", "ArrowRight", "three");
+    }
+
+    [Fact]
+    public virtual async Task RtlHorizontal_ArrowLeftMovesToNextToggle()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithDirection("rtl")
+            .WithToggleGroupDefaultValue("one"));
+
+        await WaitForToggleGroupJsAsync();
+        await PerformArrowNavigationAsync("one", "ArrowLeft", "two");
+    }
+
+    [Fact]
+    public virtual async Task ToolbarMode_ArrowNavigationUsesToolbarRoot()
+    {
+        await NavigateAsync(CreateUrl("/tests/togglegroup")
+            .WithToggleGroupToolbar(true)
+            .WithToggleGroupDefaultValue("one"));
+
+        await WaitForToolbarJsAsync();
+
+        var ariaOrientation = await GetToggleGroup().GetAttributeAsync("aria-orientation");
+        Assert.Null(ariaOrientation);
+
+        var toggleOne = GetToggle("one");
+        await toggleOne.FocusAsync();
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetToggle("two")).ToBeFocusedAsync();
+    }
+
     #endregion
 
     #region Keyboard Toggle
@@ -391,7 +503,7 @@ public abstract class ToggleGroupTestsBase : TestBase
     #region Focus Management
 
     [Fact]
-    public virtual async Task Tab_FocusesPressedOrFirstToggle()
+    public virtual async Task Tab_FocusesFirstEnabledToggle()
     {
         await NavigateAsync(CreateUrl("/tests/togglegroup")
             .WithToggleGroupDefaultValue("two"));
@@ -405,9 +517,8 @@ public abstract class ToggleGroupTestsBase : TestBase
         await Page.Keyboard.PressAsync("Tab");
         await WaitForDelayAsync(200);
 
-        // Should focus the pressed toggle ("two"), not the first one
-        var toggleTwo = GetToggle("two");
-        await Assertions.Expect(toggleTwo).ToBeFocusedAsync(
+        var toggleOne = GetToggle("one");
+        await Assertions.Expect(toggleOne).ToBeFocusedAsync(
             new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
     }
 
