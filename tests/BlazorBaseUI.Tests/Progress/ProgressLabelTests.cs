@@ -18,24 +18,22 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressLabel>(0);
-                var labelAttrIndex = 1;
 
                 if (labelClassValue is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "ClassValue", labelClassValue);
+                    innerBuilder.AddAttribute(1, "ClassValue", labelClassValue);
                 if (labelStyleValue is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "StyleValue", labelStyleValue);
+                    innerBuilder.AddAttribute(2, "StyleValue", labelStyleValue);
                 if (labelRender is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "Render", labelRender);
+                    innerBuilder.AddAttribute(3, "Render", labelRender);
 
                 var attrs = new Dictionary<string, object>
                 {
@@ -46,10 +44,10 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
                     foreach (var kvp in labelAttributes)
                         attrs[kvp.Key] = kvp.Value;
                 }
-                innerBuilder.AddAttribute(labelAttrIndex++, "AdditionalAttributes",
+                innerBuilder.AddAttribute(4, "AdditionalAttributes",
                     (IReadOnlyDictionary<string, object>)attrs);
 
-                innerBuilder.AddAttribute(labelAttrIndex++, "ChildContent", (RenderFragment)(contentBuilder =>
+                innerBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(contentBuilder =>
                 {
                     contentBuilder.AddContent(0, labelText);
                 }));
