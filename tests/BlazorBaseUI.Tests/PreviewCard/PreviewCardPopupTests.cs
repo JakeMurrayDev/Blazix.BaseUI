@@ -41,16 +41,15 @@ public class PreviewCardPopupTests : BunitContext, IPreviewCardPopupContract
                     portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
                     {
                         posBuilder.OpenComponent<PreviewCardPopup>(0);
-                        var attrIndex = 1;
                         if (render is not null)
-                            posBuilder.AddAttribute(attrIndex++, "Render", render);
+                            posBuilder.AddAttribute(1, "Render", render);
                         if (classValue is not null)
-                            posBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                            posBuilder.AddAttribute(2, "ClassValue", classValue);
                         if (styleValue is not null)
-                            posBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                            posBuilder.AddAttribute(3, "StyleValue", styleValue);
                         if (additionalAttributes is not null)
-                            posBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                        posBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                            posBuilder.AddMultipleAttributes(4, additionalAttributes);
+                        posBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
                         posBuilder.CloseComponent();
                     }));
                     portalBuilder.CloseComponent();
@@ -154,6 +153,30 @@ public class PreviewCardPopupTests : BunitContext, IPreviewCardPopupContract
         popup.HasAttribute("data-closed").ShouldBeTrue();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasFloatingFocusableAttributes()
+    {
+        var cut = Render(CreatePopupInRoot(defaultOpen: true));
+
+        var popup = cut.Find("div[data-side][id]");
+        popup.GetAttribute("tabindex").ShouldBe("-1");
+        popup.GetAttribute("data-floating-ui-focusable").ShouldBe("");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DoesNotSetInstantDismissOnOutsidePressClose()
+    {
+        var cut = Render(CreatePopupInRoot(defaultOpen: true));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, PreviewCardOpenChangeReason.OutsidePress, null));
+
+        var popup = cut.Find("div[data-side][id]");
+        popup.HasAttribute("data-instant").ShouldBeFalse();
     }
 
     [Fact]

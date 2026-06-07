@@ -19,9 +19,13 @@
 @code {
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hoverInitialized;
+    private string? hoverRootId;
+    private Task hoverRebindTask = Task.CompletedTask;
+    private bool hasRendered;
     private string triggerId = null!;
     private PreviewCardTriggerState state;
     private PreviewCardHandle<TPayload>? registeredHandle;
+    private PreviewCardHandle<TPayload>? subscribedHandleRootId;
     private RenderElement<PreviewCardTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
@@ -29,6 +33,7 @@
     private int lastEffectiveDelay = -1;
     private int lastEffectiveCloseDelay = -1;
     private bool lastUseJsHover;
+    private PreviewCardRootContext? subscribedRootContext;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -65,9 +70,10 @@
     /// When true, uses JavaScript-based hover interaction with safePolygon support,
     /// allowing the user to move their cursor from the trigger to the preview card popup
     /// without it closing. When false, uses C# Task.Delay for hover handling.
+    /// Defaults to <see langword="true"/>.
     /// </summary>
     [Parameter]
-    public bool UseJsHover { get; set; }
+    public bool UseJsHover { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the ID of the trigger. In addition to being forwarded to the rendered element,
@@ -126,19 +132,61 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        if (!ReferenceEquals(RootContext, subscribedRootContext))
+        {
+            if (subscribedRootContext is not null)
+            {
+                subscribedRootContext.StateChanged -= HandleRootContextStateChanged;
+            }
+
+            subscribedRootContext = RootContext;
+            if (subscribedRootContext is not null)
+            {
+                subscribedRootContext.StateChanged += HandleRootContextStateChanged;
+            }
+        }
+
+        var triggerIdChanged = false;
+
         // Handle Id change - unregister old trigger ID
         if (Id is not null && Id != triggerId)
         {
-            UnregisterFromCurrentStore(triggerId);
+            var previousTriggerId = triggerId;
+            UnregisterFromCurrentStore(previousTriggerId);
             triggerId = Id;
+            triggerIdChanged = true;
+
+            if (hoverInitialized)
+            {
+                QueueHoverRebind(previousTriggerId, triggerId);
+            }
         }
 
         // Handle change of handle parameter
         if (Handle != registeredHandle)
         {
-            registeredHandle?.UnregisterTrigger(triggerId);
+            if (!triggerIdChanged)
+            {
+                registeredHandle?.UnregisterTrigger(triggerId);
+            }
+
+            if (subscribedHandleRootId is not null)
+            {
+                subscribedHandleRootId.RootIdChanged -= HandleRootIdChanged;
+            }
+
             registeredHandle = Handle;
-            Handle?.RegisterTrigger(triggerId, Element, Payload);
+            subscribedHandleRootId = Handle;
+            if (subscribedHandleRootId is not null)
+            {
+                subscribedHandleRootId.RootIdChanged += HandleRootIdChanged;
+            }
+
+            RegisterWithCurrentStore();
+        }
+        else if (triggerIdChanged)
+        {
+            RegisterWithCurrentStore();
         }
         else if (HasHandle)
         {
@@ -159,7 +207,7 @@
         // Handle UseJsHover parameter changes
         if (UseJsHover != lastUseJsHover)
         {
-            if (UseJsHover && !hoverInitialized && !HasHandle && RootContext is not null && Element.HasValue)
+            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
             {
                 _ = InitializeHoverInteractionAsync();
             }
@@ -171,13 +219,11 @@
             lastUseJsHover = UseJsHover;
         }
         // Re-initialize JS hover if effective delays changed
-        else if (UseJsHover && hoverInitialized && !HasHandle && RootContext is not null && Element.HasValue)
+        else if (UseJsHover && hoverInitialized && CanInitializeHoverInteraction())
         {
-            var effectiveDelay = Delay;
-            var effectiveCloseDelay = CloseDelay;
-            if (effectiveDelay != lastEffectiveDelay || effectiveCloseDelay != lastEffectiveCloseDelay)
+            if (Delay != lastEffectiveDelay || CloseDelay != lastEffectiveCloseDelay)
             {
-                _ = InitializeHoverInteractionAsync();
+                _ = UpdateHoverInteractionDelaysAsync();
             }
         }
     }
@@ -187,6 +233,8 @@
     {
         if (firstRender)
         {
+            hasRendered = true;
+
             if (HasHandle)
             {
                 Handle!.RegisterTrigger(triggerId, Element, Payload);
@@ -199,7 +247,7 @@
 
             lastUseJsHover = UseJsHover;
 
-            if (UseJsHover && !hoverInitialized && !HasHandle)
+            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
             {
                 _ = InitializeHoverInteractionAsync();
             }
@@ -221,7 +269,11 @@
 
         attrs["id"] = triggerId;
 
-        attrs["data-popup-open"] = open;
+        if (open)
+        {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
+            attrs["data-popup-open"] = "";
+        }
 
         attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
         attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
@@ -237,18 +289,19 @@
         CancelHoverDelay();
         UnregisterFromCurrentStore(triggerId);
 
-        if (hoverInitialized && moduleTask?.IsValueCreated == true && RootContext is not null && Element.HasValue)
+        if (subscribedRootContext is not null)
         {
-            try
-            {
-                var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("disposeHoverInteraction", RootContext.RootId);
-            }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
+            subscribedRootContext.StateChanged -= HandleRootContextStateChanged;
+            subscribedRootContext = null;
         }
+
+        if (subscribedHandleRootId is not null)
+        {
+            subscribedHandleRootId.RootIdChanged -= HandleRootIdChanged;
+            subscribedHandleRootId = null;
+        }
+
+        await DisposeHoverInteractionAsync();
 
         if (moduleTask?.IsValueCreated == true)
         {
@@ -274,6 +327,61 @@
         {
             RootContext?.RegisterTriggerElement(triggerId, Element);
         }
+    }
+
+    private void RegisterWithCurrentStore()
+    {
+        if (HasHandle)
+        {
+            Handle!.RegisterTrigger(triggerId, Element, Payload);
+        }
+        else
+        {
+            RootContext?.RegisterTriggerElement(triggerId, Element);
+            RootContext?.SetTriggerPayload(triggerId, Payload);
+        }
+    }
+
+    private void HandleRootContextStateChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                if (UseJsHover && hoverInitialized && CanInitializeHoverInteraction())
+                {
+                    await UpdateHoverInteractionDelaysAsync();
+                }
+                else if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
+                {
+                    await InitializeHoverInteractionAsync();
+                }
+            }
+            finally
+            {
+                RefreshStateAndAttributes();
+                StateHasChanged();
+            }
+        });
+    }
+
+    private void HandleRootIdChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
+            {
+                await InitializeHoverInteractionAsync();
+            }
+            RefreshStateAndAttributes();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshStateAndAttributes()
+    {
+        state = new PreviewCardTriggerState(IsOpenedByThisTrigger());
+        BuildComponentAttributes();
     }
 
     private void UnregisterFromCurrentStore(string id)
@@ -329,6 +437,7 @@
 
         if (!HasRootContext && !HasHandle)
         {
+            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -336,6 +445,7 @@
 
         if (IsOpenedByThisTrigger())
         {
+            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -378,6 +488,7 @@
 
         if (!HasRootContext && !HasHandle)
         {
+            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -385,6 +496,7 @@
 
         if (!IsOpenedByThisTrigger())
         {
+            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -420,6 +532,7 @@
     {
         if (!HasRootContext && !HasHandle)
         {
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -427,10 +540,33 @@
 
         if (IsOpenedByThisTrigger())
         {
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
             return;
         }
 
-        await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus);
+        if (IsAnyPreviewCardOpen() || Delay <= 0)
+        {
+            await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus);
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        hoverCts = new CancellationTokenSource();
+        var token = hoverCts.Token;
+
+        try
+        {
+            await Task.Delay(Delay, token);
+            if (!token.IsCancellationRequested)
+            {
+                await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus);
+            }
+        }
+        catch (TaskCanceledException ex)
+        {
+            _ = ex; // Expected during task cancellation - safe to ignore.
+        }
+
         await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
     }
 
@@ -438,6 +574,7 @@
     {
         if (!HasRootContext && !HasHandle)
         {
+            await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -445,10 +582,33 @@
 
         if (!IsOpenedByThisTrigger())
         {
+            await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
             return;
         }
 
-        await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerFocus);
+        if (CloseDelay <= 0)
+        {
+            await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerFocus);
+            await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        hoverCts = new CancellationTokenSource();
+        var token = hoverCts.Token;
+
+        try
+        {
+            await Task.Delay(CloseDelay, token);
+            if (!token.IsCancellationRequested)
+            {
+                await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerFocus);
+            }
+        }
+        catch (TaskCanceledException ex)
+        {
+            _ = ex; // Expected during task cancellation - safe to ignore.
+        }
+
         await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
     }
 
@@ -462,9 +622,21 @@
         }
     }
 
-    private async Task InitializeHoverInteractionAsync()
+    private bool CanInitializeHoverInteraction()
     {
-        if (RootContext is null || !Element.HasValue)
+        return hasRendered && !string.IsNullOrEmpty(GetHoverRootId()) && Element.HasValue;
+    }
+
+    private string? GetHoverRootId()
+    {
+        return RootContext?.RootId ?? Handle?.RootId;
+    }
+
+    private async Task InitializeHoverInteractionAsync(string? interactionTriggerId = null)
+    {
+        var rootId = GetHoverRootId();
+        var id = interactionTriggerId ?? triggerId;
+        if (string.IsNullOrEmpty(rootId) || !Element.HasValue || string.IsNullOrEmpty(id))
         {
             return;
         }
@@ -472,8 +644,9 @@
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, Delay, CloseDelay);
+            await module.InvokeVoidAsync("initializeHoverInteraction", rootId, id, Element.Value, Delay, CloseDelay);
             hoverInitialized = true;
+            hoverRootId = rootId;
             lastEffectiveDelay = Delay;
             lastEffectiveCloseDelay = CloseDelay;
         }
@@ -483,27 +656,94 @@
         }
     }
 
-    private async Task DisposeHoverInteractionAsync()
+    private async Task DisposeHoverInteractionAsync(string? interactionTriggerId = null)
     {
-        if (!hoverInitialized || moduleTask?.IsValueCreated != true || RootContext is null)
+        var rootId = hoverRootId;
+        var id = interactionTriggerId ?? triggerId;
+        if (!hoverInitialized ||
+            !hasRendered ||
+            moduleTask?.IsValueCreated != true ||
+            string.IsNullOrEmpty(rootId) ||
+            string.IsNullOrEmpty(id))
         {
-            hoverInitialized = false;
+            ResetHoverInteractionState();
             return;
         }
 
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("disposeHoverInteraction", RootContext.RootId);
+            await module.InvokeVoidAsync("disposeHoverInteraction", rootId, id);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+
+        ResetHoverInteractionState();
+    }
+
+    private void QueueHoverRebind(string previousTriggerId, string desiredTriggerId)
+    {
+        var previousTask = hoverRebindTask;
+        hoverRebindTask = RebindHoverInteractionAsync(previousTask, previousTriggerId, desiredTriggerId);
+    }
+
+    private async Task RebindHoverInteractionAsync(Task previousTask, string previousTriggerId, string desiredTriggerId)
+    {
+        try
+        {
+            await previousTask;
+            await DisposeHoverInteractionAsync(previousTriggerId);
+
+            if (UseJsHover && CanInitializeHoverInteraction())
+            {
+                await InitializeHoverInteractionAsync(desiredTriggerId);
+            }
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
+    }
+
+    private void ResetHoverInteractionState()
+    {
+        hoverInitialized = false;
+        hoverRootId = null;
+        lastEffectiveDelay = -1;
+        lastEffectiveCloseDelay = -1;
+    }
+
+    private async Task UpdateHoverInteractionDelaysAsync()
+    {
+        if (!hoverInitialized)
+        {
+            return;
+        }
+
+        if (Delay == lastEffectiveDelay && CloseDelay == lastEffectiveCloseDelay)
+        {
+            return;
+        }
+
+        var rootId = GetHoverRootId();
+        if (string.IsNullOrEmpty(rootId))
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("updateHoverInteractionDelays", rootId, triggerId, Delay, CloseDelay);
+            lastEffectiveDelay = Delay;
+            lastEffectiveCloseDelay = CloseDelay;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
-
-        hoverInitialized = false;
-        lastEffectiveDelay = -1;
-        lastEffectiveCloseDelay = -1;
     }
 
     private Task RequestOpenAsync(bool open, PreviewCardOpenChangeReason reason)
@@ -527,5 +767,15 @@
         }
 
         return Task.CompletedTask;
+    }
+
+    private bool IsAnyPreviewCardOpen()
+    {
+        if (HasHandle)
+        {
+            return Handle!.IsOpen;
+        }
+
+        return RootContext?.GetOpen() == true;
     }
 }

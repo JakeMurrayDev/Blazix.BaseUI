@@ -38,15 +38,14 @@ public class PreviewCardBackdropTests : BunitContext, IPreviewCardBackdropContra
                 innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
                 {
                     portalBuilder.OpenComponent<PreviewCardBackdrop>(0);
-                    var attrIndex = 1;
                     if (render is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "Render", render);
+                        portalBuilder.AddAttribute(1, "Render", render);
                     if (classValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                        portalBuilder.AddAttribute(2, "ClassValue", classValue);
                     if (styleValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                        portalBuilder.AddAttribute(3, "StyleValue", styleValue);
                     if (additionalAttributes is not null)
-                        portalBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
+                        portalBuilder.AddMultipleAttributes(4, additionalAttributes);
                     portalBuilder.CloseComponent();
 
                     portalBuilder.OpenComponent<PreviewCardPositioner>(10);
@@ -146,6 +145,20 @@ public class PreviewCardBackdropTests : BunitContext, IPreviewCardBackdropContra
         var backdrops = cut.FindAll("[role='presentation']");
         var backdrop = backdrops.First(e => !e.HasAttribute("data-side"));
         backdrop.GetAttribute("style")!.ShouldContain("pointer-events: none");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HasNonSelectablePresentationStyles()
+    {
+        var cut = Render(CreateBackdropInRoot());
+
+        var backdrops = cut.FindAll("[role='presentation']");
+        var backdrop = backdrops.First(e => !e.HasAttribute("data-side"));
+        var style = backdrop.GetAttribute("style")!;
+        style.ShouldContain("user-select: none");
+        style.ShouldContain("-webkit-user-select: none");
 
         return Task.CompletedTask;
     }

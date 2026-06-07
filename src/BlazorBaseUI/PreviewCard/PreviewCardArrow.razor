@@ -66,8 +66,7 @@
         var side = PositionerContext?.Side ?? Side.Bottom;
         var align = PositionerContext?.Align ?? Align.Center;
         var uncentered = PositionerContext?.ArrowUncentered ?? false;
-        var instant = RootContext?.InstantType ?? PreviewCardInstantType.None;
-        state = new PreviewCardArrowState(open, side, align, uncentered, instant);
+        state = new PreviewCardArrowState(open, side, align, uncentered);
         BuildComponentAttributes();
     }
 
@@ -94,12 +93,6 @@
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
         attrs["data-uncentered"] = state.Uncentered;
-
-        var instantAttr = state.Instant.ToDataAttributeString();
-        if (!string.IsNullOrEmpty(instantAttr))
-        {
-            attrs["data-instant"] = instantAttr;
-        }
 
         componentAttributes = attrs;
     }

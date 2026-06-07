@@ -16,6 +16,7 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
 
     private RenderFragment CreateTriggerInRoot(
         bool defaultOpen = false,
+        string? id = null,
         RenderFragment<RenderProps<PreviewCardTriggerState>>? render = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         Func<PreviewCardTriggerState, string>? classValue = null,
@@ -29,18 +30,19 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
             builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<PreviewCardTrigger>(0);
-                var attrIndex = 1;
-                innerBuilder.AddAttribute(attrIndex++, "Delay", 0);
-                innerBuilder.AddAttribute(attrIndex++, "CloseDelay", 0);
+                innerBuilder.AddAttribute(1, "Delay", 0);
+                innerBuilder.AddAttribute(2, "CloseDelay", 0);
+                if (id is not null)
+                    innerBuilder.AddAttribute(3, "Id", id);
                 if (render is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "Render", render);
+                    innerBuilder.AddAttribute(4, "Render", render);
                 if (classValue is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                    innerBuilder.AddAttribute(5, "ClassValue", classValue);
                 if (styleValue is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                    innerBuilder.AddAttribute(6, "StyleValue", styleValue);
                 if (additionalAttributes is not null)
-                    innerBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                innerBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                    innerBuilder.AddMultipleAttributes(7, additionalAttributes);
+                innerBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
                 innerBuilder.CloseComponent();
 
                 if (includePositioner)
@@ -122,6 +124,19 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
 
         var trigger = cut.Find("a");
         trigger.HasAttribute("data-popup-open").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitializesJsHoverByDefaultWithTriggerId()
+    {
+        var cut = Render(CreateTriggerInRoot(id: "trigger-one"));
+
+        cut.WaitForAssertion(() => JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            invocation.Arguments.Count >= 2 &&
+            Equals(invocation.Arguments[1], "trigger-one")).ShouldBeTrue());
 
         return Task.CompletedTask;
     }

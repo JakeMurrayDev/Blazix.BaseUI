@@ -23,7 +23,6 @@
     private RenderElement<PreviewCardPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
-    private CancellationTokenSource? hoverCts;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -113,26 +112,18 @@
         var align = PositionerContext?.Align ?? Align.Center;
         attrs["data-side"] = side.ToDataAttributeString()!;
         attrs["data-align"] = align.ToDataAttributeString()!;
+        attrs["tabindex"] = -1;
+        // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
+        attrs["data-floating-ui-focusable"] = "";
 
         var isOpen = RootContext?.GetOpen() ?? false;
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
 
-        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
-        var instantAttr = instantType.ToDataAttributeString();
-        if (!string.IsNullOrEmpty(instantAttr))
-        {
-            attrs["data-instant"] = instantAttr;
-        }
-
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
         TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
-
-        // Hover interaction always enabled for preview card (no DisableHoverablePopup)
-        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
 
         componentAttributes = attrs;
     }
@@ -169,60 +160,9 @@
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 
-    private Task HandleMouseEnterAsync(MouseEventArgs e)
-    {
-        CancelHoverDelay();
-        return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-    }
-
-    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
-    {
-        if (RootContext is null)
-        {
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (!RootContext.GetOpen())
-        {
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(100, token);
-            if (!token.IsCancellationRequested)
-            {
-                await RootContext.SetOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover, null);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            _ = ex; // Expected during task cancellation - safe to ignore.
-        }
-
-        await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-    }
-
-    private void CancelHoverDelay()
-    {
-        if (hoverCts is not null)
-        {
-            hoverCts.Cancel();
-            hoverCts.Dispose();
-            hoverCts = null;
-        }
-    }
-
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        CancelHoverDelay();
-
         if (moduleTask?.IsValueCreated == true && hasRendered && Element.HasValue)
         {
             try

@@ -11,7 +11,7 @@
                @ref="renderElementReference" />
 
 @code {
-    private const string ForcedStyle = "pointer-events: none;";
+    private const string ForcedStyle = "pointer-events: none; user-select: none; -webkit-user-select: none;";
 
     private PreviewCardBackdropState state;
     private RenderElement<PreviewCardBackdropState>? renderElementReference;

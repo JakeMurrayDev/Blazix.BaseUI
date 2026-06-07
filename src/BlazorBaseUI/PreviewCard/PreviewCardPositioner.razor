@@ -10,7 +10,7 @@
                        State="state"
                        Render="Render"
                        ClassValue="ClassValue"
-                       StyleValue="StyleValue"
+                       StyleValue="ResolvedStyleValue"
                        ComponentAttributes="componentAttributes"
                        ChildContent="ChildContent"
                        @attributes="AdditionalAttributes"
@@ -21,11 +21,17 @@
 @code {
     private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
+    private DotNetObjectReference<PreviewCardPositioner>? positionerDotNetRef;
     private PreviewCardPositionerState state;
     private PreviewCardPositionerContext positionerContext = null!;
     private RenderElement<PreviewCardPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
+    private bool previousMounted;
 
     [CascadingParameter]
     private PreviewCardRootContext? RootContext { get; set; }
@@ -148,6 +154,45 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    private Func<PreviewCardPositionerState, string>? ResolvedStyleValue
+    {
+        get
+        {
+            var open = RootContext?.GetOpen() ?? false;
+            var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+            var needsPointerEventsNone = !open;
+            var needsTransitionNone = transitionStatus == TransitionStatus.Starting;
+
+            if (!needsPointerEventsNone && !needsTransitionNone)
+            {
+                return StyleValue;
+            }
+
+            return s =>
+            {
+                var parts = new List<string>(3);
+
+                var userStyle = StyleValue?.Invoke(s);
+                if (!string.IsNullOrEmpty(userStyle))
+                {
+                    parts.Add(userStyle);
+                }
+
+                if (needsPointerEventsNone)
+                {
+                    parts.Add("pointer-events: none");
+                }
+
+                if (needsTransitionNone)
+                {
+                    parts.Add("transition: none");
+                }
+
+                return string.Join("; ", parts);
+            };
+        }
+    }
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -155,12 +200,17 @@
             JSRuntime,
             "./_content/BlazorBaseUI/blazor-baseui-preview-card.min.js");
 
+        computedSide = Side;
+        computedAlign = Align;
+        computedAnchorHidden = false;
+        computedArrowUncentered = false;
+
         positionerContext = new PreviewCardPositionerContext
         {
-            Side = Side,
-            Align = Align,
-            AnchorHidden = false,
-            ArrowUncentered = false,
+            Side = computedSide,
+            Align = computedAlign,
+            AnchorHidden = computedAnchorHidden,
+            ArrowUncentered = computedArrowUncentered,
             GetArrowElement = () => arrowElement,
             SetArrowElement = SetArrowElement
         };
@@ -169,12 +219,18 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        // Reset computed values when parameters change.
+        computedSide = Side;
+        computedAlign = Align;
+
         var open = RootContext?.GetOpen() ?? false;
         var instant = RootContext?.InstantType ?? PreviewCardInstantType.None;
-        state = new PreviewCardPositionerState(open, Side, Align, false, instant);
+        state = new PreviewCardPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
 
-        positionerContext.Side = Side;
-        positionerContext.Align = Align;
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
 
         BuildComponentAttributes();
     }
@@ -185,6 +241,7 @@
         if (firstRender)
         {
             positionerInterop.MarkRendered();
+            positionerDotNetRef = DotNetObjectReference.Create(this);
         }
 
         var currentElement = Element;
@@ -196,6 +253,7 @@
 
         if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
         {
+            previousMounted = true;
             if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
@@ -203,6 +261,20 @@
             else
             {
                 await UpdatePositionAsync();
+            }
+        }
+        else if (previousMounted && positionerInterop.IsInitialized && RootContext?.GetMounted() == false)
+        {
+            previousMounted = false;
+            try
+            {
+                var module = await positionerInterop.GetModuleAsync();
+                await module.InvokeVoidAsync("disposePositioner", positionerInterop.PositionerId);
+                positionerInterop.SetPositionerId(null);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
     }
@@ -219,20 +291,13 @@
             attrs["hidden"] = true;
         }
 
-        attrs["data-side"] = Side.ToDataAttributeString()!;
-        attrs["data-align"] = Align.ToDataAttributeString()!;
+        attrs["data-side"] = computedSide.ToDataAttributeString()!;
+        attrs["data-align"] = computedAlign.ToDataAttributeString()!;
 
         var isOpen = RootContext?.GetOpen() ?? false;
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
-        attrs["data-anchor-hidden"] = state.AnchorHidden;
-
-        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
-        var instantAttr = instantType.ToDataAttributeString();
-        if (!string.IsNullOrEmpty(instantAttr))
-        {
-            attrs["data-instant"] = instantAttr;
-        }
+        attrs["data-anchor-hidden"] = computedAnchorHidden;
 
         componentAttributes = attrs;
     }
@@ -252,6 +317,34 @@
         }
     }
 
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var physicalSide = BlazorBaseUI.Extensions.ParseSide(side);
+        var newAlign = BlazorBaseUI.Extensions.ParseAlign(align);
+
+        if (physicalSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            return;
+        }
+
+        computedSide = physicalSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+
+        var open = RootContext?.GetOpen() ?? false;
+        var instant = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        state = new PreviewCardPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
     private async Task InitializePositionerAsync()
     {
         if (!Element.HasValue || RootContext is null)
@@ -265,23 +358,36 @@
             return;
         }
 
-        var config = new PositionerConfig
+        try
         {
-            Side = Side,
-            Align = Align,
-            SideOffset = SideOffset,
-            AlignOffset = AlignOffset,
-            CollisionPadding = CollisionPadding,
-            CollisionBoundary = CollisionBoundary,
-            ArrowPadding = ArrowPadding,
-            Sticky = Sticky,
-            PositionMethod = PositionMethod,
-            DisableAnchorTracking = DisableAnchorTracking,
-            CollisionAvoidance = CollisionAvoidance
-        };
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
 
-        await positionerInterop.InitializeAsync(
-            Element.Value, anchorElement.Value, config, arrowElement);
+            positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
+                "initializePositioner",
+                Element.Value,
+                anchorElement.Value,
+                Side.ToDataAttributeString(),
+                Align.ToDataAttributeString(),
+                SideOffset,
+                AlignOffset,
+                CollisionPadding,
+                CollisionBoundary.ToDataAttributeString(),
+                ArrowPadding,
+                arrowElement,
+                Sticky,
+                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
+                DisableAnchorTracking,
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                positionerDotNetRef,
+                RootContext.HasViewport));
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 
     private async Task UpdatePositionAsync()
@@ -297,26 +403,41 @@
             return;
         }
 
-        var config = new PositionerConfig
+        try
         {
-            Side = Side,
-            Align = Align,
-            SideOffset = SideOffset,
-            AlignOffset = AlignOffset,
-            CollisionPadding = CollisionPadding,
-            CollisionBoundary = CollisionBoundary,
-            ArrowPadding = ArrowPadding,
-            Sticky = Sticky,
-            PositionMethod = PositionMethod,
-            CollisionAvoidance = CollisionAvoidance
-        };
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
 
-        await positionerInterop.UpdateAsync(anchorElement.Value, config, arrowElement);
+            await module.InvokeVoidAsync(
+                "updatePosition",
+                positionerInterop.PositionerId,
+                anchorElement.Value,
+                Side.ToDataAttributeString(),
+                Align.ToDataAttributeString(),
+                SideOffset,
+                AlignOffset,
+                CollisionPadding,
+                CollisionBoundary.ToDataAttributeString(),
+                ArrowPadding,
+                arrowElement,
+                Sticky,
+                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
+                DisableAnchorTracking,
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                RootContext.HasViewport);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
     }
 }

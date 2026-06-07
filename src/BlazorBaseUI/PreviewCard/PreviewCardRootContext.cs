@@ -8,6 +8,11 @@ namespace BlazorBaseUI.PreviewCard;
 internal sealed class PreviewCardRootContext
 {
     /// <summary>
+    /// Occurs when the root state changes and children should re-render.
+    /// </summary>
+    public event Action? StateChanged;
+
+    /// <summary>
     /// Gets or sets the unique identifier of the preview card root.
     /// </summary>
     public string RootId { get; set; } = string.Empty;
@@ -78,6 +83,11 @@ internal sealed class PreviewCardRootContext
     public Func<ElementReference?> GetTriggerElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the delegate that returns a trigger element by ID.
+    /// </summary>
+    public Func<string?, ElementReference?> GetTriggerElementById { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets the delegate that registers a trigger element.
     /// </summary>
     public Action<string, ElementReference?> RegisterTriggerElement { get; set; } = null!;
@@ -98,6 +108,16 @@ internal sealed class PreviewCardRootContext
     public Action<ElementReference?> SetPopupElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the delegate that returns the current popup element reference.
+    /// </summary>
+    public Func<ElementReference?> GetPopupElement { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the delegate that returns the current positioner element reference.
+    /// </summary>
+    public Func<ElementReference?> GetPositionerElement { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets the delegate that sets the preview card's open state.
     /// </summary>
     public Func<bool, PreviewCardOpenChangeReason, string?, Task> SetOpenAsync { get; set; } = null!;
@@ -116,4 +136,12 @@ internal sealed class PreviewCardRootContext
     /// Gets or sets the delegate that sets whether a viewport component is present.
     /// </summary>
     public Action<bool> SetHasViewport { get; set; } = null!;
+
+    /// <summary>
+    /// Notifies children that the root state changed.
+    /// </summary>
+    public void NotifyStateChanged()
+    {
+        StateChanged?.Invoke();
+    }
 }

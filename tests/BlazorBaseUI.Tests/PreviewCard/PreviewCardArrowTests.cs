@@ -50,15 +50,14 @@ public class PreviewCardArrowTests : BunitContext, IPreviewCardArrowContract
                         posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                         {
                             popupBuilder.OpenComponent<PreviewCardArrow>(0);
-                            var attrIndex = 1;
                             if (render is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "Render", render);
+                                popupBuilder.AddAttribute(1, "Render", render);
                             if (classValue is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                                popupBuilder.AddAttribute(2, "ClassValue", classValue);
                             if (styleValue is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                                popupBuilder.AddAttribute(3, "StyleValue", styleValue);
                             if (additionalAttributes is not null)
-                                popupBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
+                                popupBuilder.AddMultipleAttributes(4, additionalAttributes);
                             popupBuilder.CloseComponent();
 
                             popupBuilder.AddContent(10, "Content");
@@ -174,6 +173,18 @@ public class PreviewCardArrowTests : BunitContext, IPreviewCardArrowContract
         arrow.HasAttribute("data-closed").ShouldBeTrue();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DoesNotRenderDataInstant()
+    {
+        var cut = Render(CreateArrowInRoot(defaultOpen: false));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
+
+        var arrow = cut.Find("[aria-hidden='true'][data-side]");
+        arrow.HasAttribute("data-instant").ShouldBeFalse();
     }
 
     [Fact]

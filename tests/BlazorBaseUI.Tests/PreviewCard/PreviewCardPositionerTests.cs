@@ -42,18 +42,17 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
                 innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
                 {
                     portalBuilder.OpenComponent<PreviewCardPositioner>(0);
-                    var attrIndex = 1;
-                    portalBuilder.AddAttribute(attrIndex++, "Side", side);
-                    portalBuilder.AddAttribute(attrIndex++, "Align", align);
+                    portalBuilder.AddAttribute(1, "Side", side);
+                    portalBuilder.AddAttribute(2, "Align", align);
                     if (render is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "Render", render);
+                        portalBuilder.AddAttribute(3, "Render", render);
                     if (classValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                        portalBuilder.AddAttribute(4, "ClassValue", classValue);
                     if (styleValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                        portalBuilder.AddAttribute(5, "StyleValue", styleValue);
                     if (additionalAttributes is not null)
-                        portalBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                    portalBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(posBuilder =>
+                        portalBuilder.AddMultipleAttributes(6, additionalAttributes);
+                    portalBuilder.AddAttribute(7, "ChildContent", (RenderFragment)(posBuilder =>
                     {
                         posBuilder.OpenComponent<PreviewCardPopup>(0);
                         posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
@@ -173,6 +172,18 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
     }
 
     [Fact]
+    public async Task DoesNotRenderDataInstant()
+    {
+        var cut = Render(CreatePositionerInRoot(defaultOpen: false));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
+
+        var positioner = cut.Find("[role='presentation']");
+        positioner.HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task HasHiddenWhenNotMounted()
     {
         var cut = Render(CreatePositionerInRoot(defaultOpen: false));
@@ -205,6 +216,17 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
 
         var positioner = cut.Find("[role='presentation']");
         positioner.GetAttribute("style")!.ShouldContain("z-index: 100");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AppliesPointerEventsNoneWhenClosed()
+    {
+        var cut = Render(CreatePositionerInRoot(defaultOpen: false));
+
+        var positioner = cut.Find("[role='presentation']");
+        positioner.GetAttribute("style")!.ShouldContain("pointer-events: none");
 
         return Task.CompletedTask;
     }

@@ -481,24 +481,40 @@ public static class JsInteropSetup
     }
 
     private const string PreviewCardModule = "./_content/BlazorBaseUI/blazor-baseui-preview-card.js";
+    private const string PreviewCardMinModule = "./_content/BlazorBaseUI/blazor-baseui-preview-card.min.js";
 
     public static void SetupPreviewCardModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(PreviewCardModule);
-        module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
-        module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
-        module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
-        module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
-        module.SetupVoid("updateHoverInteractionFloatingElement", _ => true).SetVoidResult();
-        module.SetupVoid("setHoverInteractionOpen", _ => true).SetVoidResult();
-        module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
-        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
-        module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
-        module.SetupVoid("initializePopup", _ => true).SetVoidResult();
-        module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+        SetupPreviewCardModulePath(PreviewCardModule);
+        SetupPreviewCardModulePath(PreviewCardMinModule);
+
+        void SetupPreviewCardModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
+            module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("updateHoverInteractionFloatingElement", _ => true).SetVoidResult();
+            module.SetupVoid("setHoverInteractionOpen", _ => true).SetVoidResult();
+            module.SetupVoid("updateHoverInteractionDelays", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+            module.SetupVoid("initializePopup", _ => true).SetVoidResult();
+            module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+            module.SetupVoid("initializeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("disposeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("initializeViewportAutoResize", _ => true).SetVoidResult();
+            module.SetupVoid("disposeViewportAutoResize", _ => true).SetVoidResult();
+            module.SetupVoid("onViewportTriggerChange", _ => true).SetVoidResult();
+            module.SetupVoid("notifyViewportContentChanged", _ => true).SetVoidResult();
+        }
     }
 
     private const string ContextMenuModule = "./_content/BlazorBaseUI/blazor-baseui-context-menu.js";

@@ -19,6 +19,11 @@ public interface IPreviewCardHandle
     string? ActiveTriggerId { get; }
 
     /// <summary>
+    /// Gets the root ID associated with the subscribed preview card.
+    /// </summary>
+    internal string? RootId { get; }
+
+    /// <summary>
     /// Opens the preview card and associates it with the trigger with the given ID.
     /// </summary>
     /// <param name="triggerId">ID of the trigger to associate with the preview card.</param>
@@ -53,6 +58,11 @@ public interface IPreviewCardHandle
     /// Called by root to sync state back to handle after processing.
     /// </summary>
     internal void SyncState(bool open, string? triggerId, object? payload);
+
+    /// <summary>
+    /// Called by root to expose its JavaScript root ID to detached triggers.
+    /// </summary>
+    internal void SyncRootId(string? rootId);
 }
 
 /// <summary>
@@ -62,6 +72,19 @@ public interface IPreviewCardHandle
 /// <typeparam name="TPayload">The type of payload to pass to the preview card.</typeparam>
 public class PreviewCardHandle<TPayload> : ComponentHandleBase<TPayload, PreviewCardOpenChangeReason>, IPreviewCardHandle
 {
+    /// <summary>
+    /// Occurs when the subscribed root ID changes.
+    /// </summary>
+    internal event Action? RootIdChanged;
+
+    /// <summary>
+    /// Gets the root ID associated with the subscribed preview card.
+    /// </summary>
+    internal string? RootId { get; private set; }
+
+    /// <inheritdoc />
+    string? IPreviewCardHandle.RootId => RootId;
+
     /// <inheritdoc />
     protected override PreviewCardOpenChangeReason ImperativeActionReason => PreviewCardOpenChangeReason.ImperativeAction;
 
@@ -83,6 +106,19 @@ public class PreviewCardHandle<TPayload> : ComponentHandleBase<TPayload, Preview
     /// <inheritdoc />
     void IPreviewCardHandle.SyncState(bool open, string? triggerId, object? payload)
         => SyncState(open, triggerId, payload is TPayload typedPayload ? typedPayload : default);
+
+    /// <inheritdoc />
+    void IPreviewCardHandle.SyncRootId(string? rootId)
+    {
+        if (RootId == rootId)
+        {
+            return;
+        }
+
+        RootId = rootId;
+        RootIdChanged?.Invoke();
+        NotifyStateChanged();
+    }
 }
 
 /// <summary>
