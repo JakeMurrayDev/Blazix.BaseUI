@@ -173,30 +173,51 @@ public static class JsInteropSetup
     }
 
     private const string PopoverModule = "./_content/BlazorBaseUI/blazor-baseui-popover.js";
+    private const string PopoverMinModule = "./_content/BlazorBaseUI/blazor-baseui-popover.min.js";
 
-    public static void SetupPopoverModule(BunitJSInterop jsInterop)
+    public static BunitJSModuleInterop SetupPopoverModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(PopoverModule);
-        module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
-        module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
-        module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
-        module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
-        module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
-        module.SetupVoid("updateHoverInteractionFloatingElement", _ => true).SetVoidResult();
-        module.SetupVoid("setHoverInteractionOpen", _ => true).SetVoidResult();
-        module.SetupVoid("updateScrollLock", _ => true).SetVoidResult();
-        module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
-        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
-        module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
-        module.SetupVoid("initializePopup", _ => true).SetVoidResult();
-        module.SetupVoid("disposePopup", _ => true).SetVoidResult();
-        module.SetupVoid("focusElement", _ => true).SetVoidResult();
-        module.SetupVoid("initializeViewport", _ => true).SetVoidResult();
-        module.SetupVoid("disposeViewport", _ => true).SetVoidResult();
-        module.SetupVoid("onViewportTriggerChange", _ => true).SetVoidResult();
+        SetupPopoverModulePath(PopoverModule);
+        var minModule = SetupPopoverModulePath(PopoverMinModule);
+        return minModule;
+
+        BunitJSModuleInterop SetupPopoverModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("hydrateRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("registerTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setBackdropElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
+            module.SetupVoid("initializeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
+            module.SetupVoid("updateHoverInteractionFloatingElement", _ => true).SetVoidResult();
+            module.SetupVoid("setHoverInteractionOpen", _ => true).SetVoidResult();
+            module.SetupVoid("updateScrollLock", _ => true).SetVoidResult();
+            module.SetupVoid("setInternalBackdrop", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+            module.SetupVoid("initializePopup", _ => true).SetVoidResult();
+            module.SetupVoid("setInitialFocusElement", _ => true).SetVoidResult();
+            module.SetupVoid("setFinalFocusElement", _ => true).SetVoidResult();
+            module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+            module.SetupVoid("focusElement", _ => true).SetVoidResult();
+            module.Setup<string>("handleTriggerPreGuardFocus", _ => true).SetResult("close-previous");
+            module.Setup<string>("handleTriggerPostGuardFocus", _ => true).SetResult("handled");
+            module.SetupVoid("initializeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("disposeViewport", _ => true).SetVoidResult();
+            module.SetupVoid("initializeAutoResize", _ => true).SetVoidResult();
+            module.SetupVoid("disposeAutoResize", _ => true).SetVoidResult();
+            module.SetupVoid("onViewportTriggerChange", _ => true).SetVoidResult();
+            return module;
+        }
     }
 
     private const string TooltipModule = "./_content/BlazorBaseUI/blazor-baseui-tooltip.js";
@@ -497,29 +518,56 @@ public static class JsInteropSetup
 
     public static void SetupFocusGuardSafari(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(FloatingModule);
-        module.Setup<bool>("isSafari").SetResult(true);
+        SetupFocusGuardSafariPath(FloatingModule);
+        SetupFocusGuardSafariPath(FloatingMinModule);
+
+        void SetupFocusGuardSafariPath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.Setup<bool>("isSafari").SetResult(true);
+        }
     }
 
     public static void SetupFocusGuardNonSafari(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(FloatingModule);
-        module.Setup<bool>("isSafari").SetResult(false);
+        SetupFocusGuardNonSafariPath(FloatingModule);
+        SetupFocusGuardNonSafariPath(FloatingMinModule);
+
+        void SetupFocusGuardNonSafariPath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.Setup<bool>("isSafari").SetResult(false);
+        }
     }
 
     public static void SetupFloatingTreeModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(FloatingModule);
-        module.SetupVoid("getFloatingTree", _ => true).SetVoidResult();
-        module.SetupVoid("disposeFloatingTree", _ => true).SetVoidResult();
+        SetupFloatingTreeModulePath(FloatingModule);
+        SetupFloatingTreeModulePath(FloatingMinModule);
+
+        void SetupFloatingTreeModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("getFloatingTree", _ => true).SetVoidResult();
+            module.SetupVoid("disposeFloatingTree", _ => true).SetVoidResult();
+        }
     }
 
     public static void SetupFloatingFocusManagerModule(BunitJSInterop jsInterop, string managerId = "fm-1")
     {
-        var module = jsInterop.SetupModule(FloatingModule);
-        module.Setup<string>("createFloatingFocusManager", _ => true).SetResult(managerId);
-        module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
-        module.SetupVoid("updateFloatingFocusManager", _ => true).SetVoidResult();
+        SetupFloatingFocusManagerModulePath(FloatingModule, managerId);
+        SetupFloatingFocusManagerModulePath(FloatingMinModule, managerId);
+
+        void SetupFloatingFocusManagerModulePath(string path, string id)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.Setup<bool>("isSafari").SetResult(false);
+            module.Setup<string>("createFloatingFocusManager", _ => true).SetResult(id);
+            module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
+            module.SetupVoid("updateFloatingFocusManager", _ => true).SetVoidResult();
+            module.Setup<string>("initializeFloatingPortal", _ => true).SetResult("portal-id");
+            module.SetupVoid("disposeFloatingPortal", _ => true).SetVoidResult();
+        }
     }
 
     public static void SetupFloatingDelayGroupModule(BunitJSInterop jsInterop, string groupId = "dg-1")

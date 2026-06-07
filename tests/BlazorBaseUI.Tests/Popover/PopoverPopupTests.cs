@@ -171,6 +171,17 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
     }
 
     [Fact]
+    public Task HasDataBaseUiFocusableAttribute()
+    {
+        var cut = Render(CreatePopupInPopover());
+
+        var popup = cut.Find("[role='dialog']");
+        popup.HasAttribute("data-base-ui-focusable").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasDataOpenWhenOpen()
     {
         var cut = Render(CreatePopupInPopover(defaultOpen: true));

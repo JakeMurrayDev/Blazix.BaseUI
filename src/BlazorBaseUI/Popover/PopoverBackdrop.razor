@@ -91,7 +91,8 @@
 
         attrs["role"] = "presentation";
 
-        if (!(RootContext?.GetMounted() ?? false))
+        if (!(RootContext?.GetMounted() ?? false) ||
+            RootContext?.PopoverOpenChangeReason == PopoverOpenChangeReason.TriggerHover)
         {
             attrs["hidden"] = true;
         }

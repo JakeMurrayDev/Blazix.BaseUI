@@ -10,10 +10,12 @@ namespace BlazorBaseUI.Tests.Popover;
 
 public class PopoverRootTests : BunitContext, IPopoverRootContract
 {
+    private readonly BunitJSModuleInterop popoverModule;
+
     public PopoverRootTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupPopoverModule(JSInterop);
+        popoverModule = JsInteropSetup.SetupPopoverModule(JSInterop);
         JsInteropSetup.SetupFloatingTreeModule(JSInterop);
         JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
@@ -35,6 +37,30 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
 
         cut.Find("[role='dialog']").ShouldNotBeNull();
         cut.Find("[role='dialog']").TextContent.ShouldContain("Content");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HydratesJsRootWhenDefaultOpenTrue()
+    {
+        Render(CreatePopover(defaultOpen: true));
+
+        popoverModule.Invocations.Any(invocation => invocation.Identifier == "hydrateRootOpen").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DefaultOpenWithDefaultTriggerIdResolvesContainedTriggerPayload()
+    {
+        var cut = Render(CreatePayloadPopover(defaultOpen: true, defaultTriggerId: "trigger-b"));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='payload']").TextContent.ShouldBe("Payload B");
+            cut.Find("#trigger-b").HasAttribute("data-popup-open").ShouldBeTrue();
+        });
 
         return Task.CompletedTask;
     }
@@ -276,6 +302,46 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     }
 
     [Fact]
+    public async Task AlreadyOpenTriggerPressTracksTriggerPressReason()
+    {
+        var cut = Render(CreateMultiTriggerPopover());
+        var root = cut.FindComponent<PopoverRoot>().Instance;
+
+        await cut.InvokeAsync(async () => await root.SetOpenAsync(true, PopoverOpenChangeReason.TriggerPress, "trigger-a"));
+        cut.WaitForAssertion(() => cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("true"));
+        cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("false");
+
+        await cut.InvokeAsync(async () => await root.SetOpenAsync(true, PopoverOpenChangeReason.TriggerPress, "trigger-b"));
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("false");
+            cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("true");
+            cut.Find("#trigger-b").HasAttribute("data-pressed").ShouldBeTrue();
+        });
+    }
+
+    [Fact]
+    public async Task UnregisteringActiveTriggerRepointsActiveTriggerToSurvivor()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<PopoverDynamicTriggersHost>(0);
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() => cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("true"));
+
+        cut.Find("[data-testid='remove-a']").Click();
+        await Task.Delay(100);
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("#trigger-a").Count.ShouldBe(0);
+            cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("true");
+        });
+    }
+
+    [Fact]
     public Task Handle_OpensAndClosesImperatively()
     {
         var handle = new PopoverHandle<string>();
@@ -497,6 +563,51 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
         };
     }
 
+    private static RenderFragment CreatePayloadPopover(bool defaultOpen, string defaultTriggerId)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<PopoverRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", defaultOpen);
+            builder.AddAttribute(2, "DefaultTriggerId", defaultTriggerId);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(context => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverTypedTrigger<string>>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-a");
+                innerBuilder.AddAttribute(2, "Payload", "Payload A");
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger A")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PopoverTypedTrigger<string>>(10);
+                innerBuilder.AddAttribute(11, "Id", "trigger-b");
+                innerBuilder.AddAttribute(12, "Payload", "Payload B");
+                innerBuilder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger B")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PopoverPortal>(20);
+                innerBuilder.AddAttribute(21, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenElement(0, "span");
+                            popupBuilder.AddAttribute(1, "data-testid", "payload");
+                            popupBuilder.AddContent(2, context.Payload?.ToString() ?? "none");
+                            popupBuilder.CloseElement();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     private RenderFragment CreateMultiTriggerPopover()
     {
         return builder =>
@@ -572,5 +683,53 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
             }));
             builder.CloseComponent();
         };
+    }
+}
+
+internal sealed class PopoverDynamicTriggersHost : ComponentBase
+{
+    private bool showTriggerA = true;
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PopoverRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-a");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+        {
+            if (showTriggerA)
+            {
+                innerBuilder.OpenComponent<PopoverTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-a");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger A")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<PopoverTrigger>(10);
+            innerBuilder.AddAttribute(11, "Id", "trigger-b");
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger B")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenElement(20, "button");
+            innerBuilder.AddAttribute(21, "data-testid", "remove-a");
+            innerBuilder.AddAttribute(22, "onclick", EventCallback.Factory.Create(this, () => showTriggerA = false));
+            innerBuilder.AddContent(23, "Remove A");
+            innerBuilder.CloseElement();
+
+            innerBuilder.OpenComponent<PopoverPortal>(30);
+            innerBuilder.AddAttribute(31, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PopoverPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PopoverPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

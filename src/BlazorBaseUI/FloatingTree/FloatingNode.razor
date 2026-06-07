@@ -121,11 +121,26 @@
         try
         {
             var module = await TreeContext!.ModuleTask!.Value;
-            await module.InvokeVoidAsync("updateTreeNodeContext", TreeContext.TreeId, node.Id, context);
+            await module.InvokeVoidAsync("updateTreeNodeContext", TreeContext.TreeId, node.Id, ToJsContext(context));
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex;
         }
+    }
+
+    private object? ToJsContext(IFloatingRootContext? context)
+    {
+        if (context is null)
+        {
+            return null;
+        }
+
+        return new
+        {
+            open = Open ?? context.GetOpen(),
+            domReference = context.GetTriggerElement(),
+            floatingElement = context.GetPopupElement()
+        };
     }
 }

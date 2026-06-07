@@ -1,6 +1,7 @@
 using BlazorBaseUI.Popover;
 using BlazorBaseUI.Tests.Contracts.Popover;
 using BlazorBaseUI.Tests.Infrastructure;
+using AngleSharp.Dom;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
@@ -68,13 +69,22 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         };
     }
 
+    private static IElement FindViewportElement(IElement popup)
+    {
+        var currentContainer = popup.QuerySelector("[data-current]");
+        currentContainer.ShouldNotBeNull();
+        var viewport = currentContainer.ParentElement;
+        viewport.ShouldNotBeNull();
+        return viewport!;
+    }
+
     [Fact]
     public Task RendersAsDivByDefault()
     {
         var cut = Render(CreateViewportInPopover());
 
         var popup = cut.Find("[role='dialog']");
-        var viewport = popup.FirstElementChild;
+        var viewport = FindViewportElement(popup);
         viewport!.TagName.ShouldBe("DIV");
 
         return Task.CompletedTask;
@@ -136,7 +146,7 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         var cut = Render(CreateViewportInPopover());
 
         var popup = cut.Find("[role='dialog']");
-        var viewport = popup.FirstElementChild;
+        var viewport = FindViewportElement(popup);
         // Viewport does not have data-open; it uses data-transitioning instead
         viewport!.HasAttribute("data-open").ShouldBeFalse();
         viewport!.HasAttribute("data-transitioning").ShouldBeFalse();
@@ -166,7 +176,7 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         var cut = Render(CreateViewportInPopover());
 
         var popup = cut.Find("[role='dialog']");
-        var viewport = popup.FirstElementChild;
+        var viewport = FindViewportElement(popup);
 
         // By default, PopoverInstantType is None so data-instant should not be rendered
         viewport!.HasAttribute("data-instant").ShouldBeFalse();
@@ -184,7 +194,7 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         await cut.InvokeAsync(() => viewport.Instance.OnViewportTransitionStart("right down"));
 
         var popup = cut.Find("[role='dialog']");
-        var viewportEl = popup.FirstElementChild;
+        var viewportEl = FindViewportElement(popup);
         viewportEl!.GetAttribute("data-activation-direction").ShouldBe("right down");
         viewportEl!.HasAttribute("data-transitioning").ShouldBeTrue();
     }
@@ -195,7 +205,7 @@ public class PopoverViewportTests : BunitContext, IPopoverViewportContract
         var cut = Render(CreateViewportInPopover());
 
         var popup = cut.Find("[role='dialog']");
-        var viewport = popup.FirstElementChild;
+        var viewport = FindViewportElement(popup);
 
         // data-current should NOT be on the viewport element itself
         viewport!.HasAttribute("data-current").ShouldBeFalse();

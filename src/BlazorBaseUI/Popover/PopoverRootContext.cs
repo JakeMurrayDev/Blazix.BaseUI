@@ -124,6 +124,31 @@ internal sealed class PopoverRootContext
     public Action<ElementReference?> SetTriggerFocusTarget { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets a delegate that registers a trigger by ID with its element, focus target, and payload.
+    /// </summary>
+    public Action<string, ElementReference?, ElementReference?, object?> RegisterTrigger { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that unregisters a trigger by ID.
+    /// </summary>
+    public Action<string> UnregisterTrigger { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that updates a registered trigger element by ID.
+    /// </summary>
+    public Action<string, ElementReference?> SetTriggerElementById { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that updates a registered trigger focus target by ID.
+    /// </summary>
+    public Action<string, ElementReference?> SetTriggerFocusTargetById { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that updates a registered trigger payload by ID.
+    /// </summary>
+    public Action<string, object?> SetTriggerPayload { get; set; } = null!;
+
+    /// <summary>
     /// Gets or sets a delegate that sets the positioner element reference.
     /// </summary>
     public Action<ElementReference?> SetPositionerElement { get; set; } = null!;

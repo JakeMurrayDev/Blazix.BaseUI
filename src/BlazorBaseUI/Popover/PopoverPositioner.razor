@@ -7,9 +7,7 @@
     @if (ShouldRenderInternalBackdrop())
     {
         <div @ref="internalBackdropElement"
-             role="presentation"
-             data-blazor-base-ui-inert
-             style="position:fixed;inset:0;pointer-events:auto;user-select:none"
+             @attributes="InternalBackdropAttributes"
              inert="@(!RootContext?.GetOpen() ?? true)" />
     }
     <CascadingValue Value="positionerContext" IsFixed="true">
@@ -28,6 +26,16 @@
 }
 
 @code {
+    private static readonly IReadOnlyDictionary<string, object> InternalBackdropAttributes = new Dictionary<string, object>
+    {
+        ["role"] = "presentation",
+        // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity marker.
+        ["data-base-ui-inert"] = string.Empty,
+        // lint-ignore:RULE-06 Internal inert marker.
+        ["data-blazor-base-ui-inert"] = string.Empty,
+        ["style"] = "position:fixed;inset:0;pointer-events:auto;user-select:none"
+    };
+
     private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
     private ElementReference? internalBackdropElement;
@@ -433,7 +441,7 @@
             };
 
             var ca = config.CollisionAvoidance ?? new CollisionAvoidance();
-            positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
+            var positionerId = await module.InvokeAsync<string>(
                 "initializePositioner",
                 Element.Value,
                 anchorElement.Value,
@@ -454,11 +462,14 @@
                 positionerDotNetRef,
                 SideOffsetFunction is not null,
                 AlignOffsetFunction is not null,
-                RootContext.HasViewport));
+                RootContext.HasViewport,
+                RootContext.RootId);
+
+            positionerInterop.SetPositionerId(positionerId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
-            _ = ex; // Expected during circuit disconnect - safe to ignore.
+            _ = ex; // Expected during circuit disconnect or portal teardown.
         }
     }
 

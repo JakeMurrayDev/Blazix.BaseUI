@@ -40,6 +40,16 @@ BlazorBaseUI/
 - Put all `tmpclaude-*-cwd` files in `/.claude/tmp-files`
 - **`gh api` on Windows**: Omit the leading `/` from endpoint paths. Windows shells rewrite `/repos/...` as filesystem paths (e.g., `F:/Git/repos/...`). Use `gh api repos/owner/repo/...` instead of `gh api /repos/owner/repo/...`
 
+### Documentation and Audit Artifact Placement
+
+- Place durable audit reports in `docs/audits/` using the component name, for example `docs/audits/toolbar-functional-audit.md`. These are local-only working artifacts and must not be committed.
+- Store durable parity matrices in `docs/audits/` using the component name, for example `docs/audits/toolbar-parity-matrix.md`. These are local-only working artifacts and must not be committed.
+- Keep durable audit logs under `docs/audits/logs/` with the component name as a prefix, for example `docs/audits/logs/toolbar-playwright-server.log`. These are local-only working artifacts and must not be committed.
+- Source documentation comparison reports belong in `docs/audits/`, for example `docs/audits/toggle-toggle-group-source-docs-comparison.md`. These are local-only working artifacts and must not be committed.
+- Temporary/generated run output belongs in `output/` only while work is in progress. Before finishing an audit, move durable local-only reports and logs to `docs/audits/` and `docs/audits/logs/`.
+- Framework-agnostic behavioral specs belong in `../base-ui-specs/<component>/`, not in this repository's `docs/` or `output/` folders, and are the audit artifacts intended to be committed.
+- Do not commit `.DS_Store` files or other local filesystem metadata.
+
 ---
 
 ## Build and Test Commands
