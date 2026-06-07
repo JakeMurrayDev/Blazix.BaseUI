@@ -312,11 +312,12 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
         cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("false");
 
         await cut.InvokeAsync(async () => await root.SetOpenAsync(true, PopoverOpenChangeReason.TriggerPress, "trigger-b"));
-        await Task.Delay(50);
-
-        cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("false");
-        cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("true");
-        cut.Find("#trigger-b").HasAttribute("data-pressed").ShouldBeTrue();
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("false");
+            cut.Find("#trigger-b").GetAttribute("aria-expanded").ShouldBe("true");
+            cut.Find("#trigger-b").HasAttribute("data-pressed").ShouldBeTrue();
+        });
     }
 
     [Fact]
