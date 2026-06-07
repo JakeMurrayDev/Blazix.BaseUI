@@ -181,7 +181,11 @@
             attrs["data-activation-direction"] = state.ActivationDirection;
         }
 
-        attrs["data-transitioning"] = state.Transitioning;
+        if (state.Transitioning)
+        {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
+            attrs["data-transitioning"] = "";
+        }
 
         var instantAttr = state.Instant.ToDataAttributeString();
         if (!string.IsNullOrEmpty(instantAttr))

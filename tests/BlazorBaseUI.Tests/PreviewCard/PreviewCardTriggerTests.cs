@@ -30,20 +30,19 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
             builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<PreviewCardTrigger>(0);
-                var attrIndex = 1;
-                innerBuilder.AddAttribute(attrIndex++, "Delay", 0);
-                innerBuilder.AddAttribute(attrIndex++, "CloseDelay", 0);
+                innerBuilder.AddAttribute(1, "Delay", 0);
+                innerBuilder.AddAttribute(2, "CloseDelay", 0);
                 if (id is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "Id", id);
+                    innerBuilder.AddAttribute(3, "Id", id);
                 if (render is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "Render", render);
+                    innerBuilder.AddAttribute(4, "Render", render);
                 if (classValue is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                    innerBuilder.AddAttribute(5, "ClassValue", classValue);
                 if (styleValue is not null)
-                    innerBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                    innerBuilder.AddAttribute(6, "StyleValue", styleValue);
                 if (additionalAttributes is not null)
-                    innerBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                innerBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                    innerBuilder.AddMultipleAttributes(7, additionalAttributes);
+                innerBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
                 innerBuilder.CloseComponent();
 
                 if (includePositioner)

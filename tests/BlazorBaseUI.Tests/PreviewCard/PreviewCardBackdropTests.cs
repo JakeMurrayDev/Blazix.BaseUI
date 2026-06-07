@@ -38,15 +38,14 @@ public class PreviewCardBackdropTests : BunitContext, IPreviewCardBackdropContra
                 innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
                 {
                     portalBuilder.OpenComponent<PreviewCardBackdrop>(0);
-                    var attrIndex = 1;
                     if (render is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "Render", render);
+                        portalBuilder.AddAttribute(1, "Render", render);
                     if (classValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                        portalBuilder.AddAttribute(2, "ClassValue", classValue);
                     if (styleValue is not null)
-                        portalBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                        portalBuilder.AddAttribute(3, "StyleValue", styleValue);
                     if (additionalAttributes is not null)
-                        portalBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
+                        portalBuilder.AddMultipleAttributes(4, additionalAttributes);
                     portalBuilder.CloseComponent();
 
                     portalBuilder.OpenComponent<PreviewCardPositioner>(10);

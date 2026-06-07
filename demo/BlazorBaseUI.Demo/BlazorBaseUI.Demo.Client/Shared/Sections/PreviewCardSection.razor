@@ -245,7 +245,7 @@
                     </PreviewCardRoot>
                 </div>
 
-                <div class="preview-card-demo__checks" aria-label="Hero coverage">
+                <div class="preview-card-demo__checks" role="group" aria-label="Hero coverage">
                     <span>Contained trigger</span>
                     <span>Arrow</span>
                     <span>Rich content</span>
@@ -333,7 +333,7 @@
         <DemoSection Title="Controlled Mode with Multiple Triggers"
                      Description="Open state and active trigger are controlled externally, while hover and focus still report the initiating trigger through OnOpenChange.">
             <div class="preview-card-demo preview-card-demo--controlled">
-                <div class="preview-card-demo__command-row" aria-label="Controlled preview card commands">
+                <div class="preview-card-demo__command-row" role="group" aria-label="Controlled preview card commands">
                     @foreach (var card in previewCards)
                     {
                         <button type="button"
@@ -510,7 +510,7 @@
                     </PreviewCardRoot>
                 </div>
 
-                <div class="preview-card-demo__command-row" aria-label="State lab commands">
+                <div class="preview-card-demo__command-row" role="group" aria-label="State lab commands">
                     <button type="button"
                             class="preview-card-demo-command"
                             @onclick="@(() => actionsRef.Open?.Invoke())">

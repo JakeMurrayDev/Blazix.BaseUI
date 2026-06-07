@@ -662,7 +662,7 @@
                 await module.InvokeVoidAsync("setPositionerElement", rootId, positionerElement.Value);
             }
 
-            var triggerElement = GetTriggerElement();
+            var triggerElement = GetTriggerElementById(activeTriggerId);
             if (activeTriggerId is not null && triggerElement.HasValue)
             {
                 await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);
@@ -783,7 +783,7 @@
 
             if (nextOpen && activeTriggerId is not null)
             {
-                var triggerElement = GetTriggerElement();
+                var triggerElement = GetTriggerElementById(activeTriggerId);
                 if (triggerElement.HasValue)
                 {
                     await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);

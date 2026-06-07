@@ -44,16 +44,15 @@ public class PreviewCardViewportTests : BunitContext, IPreviewCardViewportContra
                         posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                         {
                             popupBuilder.OpenComponent<PreviewCardViewport>(0);
-                            var attrIndex = 1;
                             if (render is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "Render", render);
+                                popupBuilder.AddAttribute(1, "Render", render);
                             if (classValue is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                                popupBuilder.AddAttribute(2, "ClassValue", classValue);
                             if (styleValue is not null)
-                                popupBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                                popupBuilder.AddAttribute(3, "StyleValue", styleValue);
                             if (additionalAttributes is not null)
-                                popupBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                            popupBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Viewport Content")));
+                                popupBuilder.AddMultipleAttributes(4, additionalAttributes);
+                            popupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Viewport Content")));
                             popupBuilder.CloseComponent();
                         }));
                         posBuilder.CloseComponent();
@@ -74,6 +73,17 @@ public class PreviewCardViewportTests : BunitContext, IPreviewCardViewportContra
         // The viewport renders a div with a data-current child
         var currentContainer = cut.Find("[data-current]");
         currentContainer.ParentElement!.TagName.ShouldBe("DIV");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OmitsDataTransitioningWhenNotTransitioning()
+    {
+        var cut = Render(CreateViewportInRoot());
+
+        var currentContainer = cut.Find("[data-current]");
+        currentContainer.ParentElement!.HasAttribute("data-transitioning").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

@@ -41,16 +41,15 @@ public class PreviewCardPopupTests : BunitContext, IPreviewCardPopupContract
                     portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
                     {
                         posBuilder.OpenComponent<PreviewCardPopup>(0);
-                        var attrIndex = 1;
                         if (render is not null)
-                            posBuilder.AddAttribute(attrIndex++, "Render", render);
+                            posBuilder.AddAttribute(1, "Render", render);
                         if (classValue is not null)
-                            posBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                            posBuilder.AddAttribute(2, "ClassValue", classValue);
                         if (styleValue is not null)
-                            posBuilder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                            posBuilder.AddAttribute(3, "StyleValue", styleValue);
                         if (additionalAttributes is not null)
-                            posBuilder.AddMultipleAttributes(attrIndex++, additionalAttributes);
-                        posBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                            posBuilder.AddMultipleAttributes(4, additionalAttributes);
+                        posBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
                         posBuilder.CloseComponent();
                     }));
                     portalBuilder.CloseComponent();
