@@ -1,14 +1,21 @@
 @if (RootContext is not null && (RootContext.GetMounted() || KeepMounted))
 {
     <CascadingValue Value="portalContext" IsFixed="true">
-        <BlazorBaseUI.Portal.Portal Target="@Container">
+        <BlazorBaseUI.Portal.FloatingPortal Container="@Container"
+                                             RenderGuards="@ShouldRenderFocusGuards"
+                                             Render="@Render"
+                                             @attributes="AdditionalAttributes">
             @ChildContent
-        </BlazorBaseUI.Portal.Portal>
+        </BlazorBaseUI.Portal.FloatingPortal>
     </CascadingValue>
 }
 
 @code {
     private PopoverPortalContext portalContext = null!;
+
+    private bool ShouldRenderFocusGuards =>
+        RootContext?.GetOpen() == true &&
+        RootContext.FocusManagerModal == false;
 
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
@@ -28,10 +35,22 @@
     public string Container { get; set; } = "body";
 
     /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default portal element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<object>>? Render { get; set; }
+
+    /// <summary>
     /// Defines the child components of this instance.
     /// </summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the portal element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
     /// <inheritdoc />
     protected override void OnInitialized()

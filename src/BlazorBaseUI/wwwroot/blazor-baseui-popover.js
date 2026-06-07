@@ -13,6 +13,7 @@ import {
     TABBABLE_SELECTOR,
     getTabbableElements,
     getPreviousTabbable,
+    enableFocusInside,
     createHoverInteraction,
     checkForTransitionOrAnimation,
     setupTransitionEndListener,
@@ -40,6 +41,7 @@ const state = window[STATE_KEY];
 
 // Track where the pointer press started for intentional-mode drag-out suppression
 let pointerDownTarget = null;
+let pointerDownTime = 0;
 
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
@@ -70,17 +72,19 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
         if (!rootState) return;
     }
 
+    // Clean up existing hover interaction before replacing the trigger element.
+    if (rootState.hoverInteraction) {
+        rootState.hoverInteraction.cleanup();
+    }
+    rootState.triggerHoverStickCleanup?.();
+    rootState.triggerHoverStickCleanup = null;
+
     // Store the trigger element if provided
     if (triggerElement) {
         rootState.triggerElement = triggerElement;
     }
 
     if (!rootState.triggerElement) return;
-
-    // Clean up existing hover interaction
-    if (rootState.hoverInteraction) {
-        rootState.hoverInteraction.cleanup();
-    }
 
     // Use callback dotnet ref if provided, otherwise fall back to root dotnet ref
     const dotNetRef = callbackDotNetRef || rootState.dotNetRef;
@@ -105,9 +109,26 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
             }
         }
     });
+
+    const handleTriggerReEnter = () => {
+        if (rootState.isOpen) {
+            startPatientClickProtection(rootState);
+        }
+    };
+    const triggerElementForCleanup = rootState.triggerElement;
+    triggerElementForCleanup.addEventListener('mouseenter', handleTriggerReEnter);
+    rootState.triggerHoverStickCleanup = () => {
+        triggerElementForCleanup.removeEventListener('mouseenter', handleTriggerReEnter);
+    };
 }
 
 export function disposeHoverInteraction(rootId) {
+    const rootState = state.roots.get(rootId);
+    rootState?.triggerHoverStickCleanup?.();
+    if (rootState) {
+        rootState.triggerHoverStickCleanup = null;
+    }
+
     disposeHoverInteractionOnRoot(state.roots, rootId);
 }
 
@@ -132,6 +153,140 @@ export function focusPreviousTabbable(guardElement) {
     if (prev) prev.focus();
 }
 
+function isFocusGuard(element) {
+    return element instanceof HTMLElement && element.hasAttribute('data-blazor-base-ui-focus-guard');
+}
+
+function isOutsideFocusGuard(element) {
+    return isFocusGuard(element) && element.getAttribute('data-blazor-base-ui-focus-guard-type') === 'outside';
+}
+
+function isInsideRootElementsTarget(target, rootState) {
+    if (!(target instanceof Node)) return false;
+    return (rootState.positionerElement && rootState.positionerElement.contains(target))
+        || (rootState.popupElement && rootState.popupElement.contains(target));
+}
+
+function isVisibleTabStop(element) {
+    if (!(element instanceof HTMLElement)) return false;
+    if (element.disabled) return false;
+    if (element.getAttribute('tabindex') !== null && parseInt(element.getAttribute('tabindex'), 10) < 0 && !isFocusGuard(element)) {
+        return false;
+    }
+    return element.offsetParent !== null || getComputedStyle(element).position === 'fixed';
+}
+
+function getDocumentTabOrder() {
+    return Array.from(document.body.querySelectorAll(`${TABBABLE_SELECTOR}, [data-blazor-base-ui-focus-guard]`))
+        .filter(isVisibleTabStop);
+}
+
+function getNextDocumentTabStop(element) {
+    const order = getDocumentTabOrder();
+    const index = order.indexOf(element);
+    if (index === -1 || index >= order.length - 1) return null;
+    return order[index + 1];
+}
+
+function getPreviousDocumentTabStop(element) {
+    const order = getDocumentTabOrder();
+    const index = order.indexOf(element);
+    if (index <= 0) return null;
+    return order[index - 1];
+}
+
+function getProgrammaticPopupFocusables(rootState) {
+    const container = rootState.positionerElement || rootState.popupElement;
+    if (!container) return [];
+
+    return Array.from(container.querySelectorAll(TABBABLE_SELECTOR))
+        .filter((element) => element instanceof HTMLElement)
+        .filter((element) => !isFocusGuard(element))
+        .filter((element) => !element.disabled)
+        .filter((element) => element.offsetParent !== null || getComputedStyle(element).position === 'fixed');
+}
+
+function focusLastPopoverContent(rootState) {
+    const focusables = getProgrammaticPopupFocusables(rootState);
+    const last = focusables[focusables.length - 1] || rootState.popupElement || rootState.positionerElement;
+    if (last?.focus) {
+        last.focus();
+        return true;
+    }
+    return false;
+}
+
+function focusNextAfterPopoverSource(rootState, fallbackElement) {
+    const order = getDocumentTabOrder();
+    const index = order.indexOf(fallbackElement);
+    if (index === -1) return false;
+
+    let sawOutsideGuard = false;
+    for (let i = index + 1; i < order.length; i += 1) {
+        const candidate = order[i];
+        if (isInsideRootElementsTarget(candidate, rootState)) {
+            continue;
+        }
+
+        if (isOutsideFocusGuard(candidate)) {
+            sawOutsideGuard = true;
+            continue;
+        }
+
+        if (isFocusGuard(candidate)) {
+            continue;
+        }
+
+        if (sawOutsideGuard) {
+            candidate.focus();
+            return true;
+        }
+    }
+
+    for (let i = index + 1; i < order.length; i += 1) {
+        const candidate = order[i];
+        if (!isFocusGuard(candidate) && !isInsideRootElementsTarget(candidate, rootState)) {
+            candidate.focus();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export function handleTriggerPreGuardFocus(rootId, guardElement) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !guardElement) return 'close-previous';
+
+    const previous = getPreviousDocumentTabStop(guardElement);
+    if (isOutsideFocusGuard(previous)) {
+        return focusLastPopoverContent(rootState) ? 'handled' : 'close-previous';
+    }
+
+    return 'close-previous';
+}
+
+export function handleTriggerPostGuardFocus(rootId, guardElement) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !guardElement) return 'handled';
+
+    if (rootState.lastFocusOutTarget === guardElement) {
+        rootState.lastFocusOutTarget = null;
+        rootState.lastFocusOutFromPopover = false;
+        focusNextAfterPopoverSource(rootState, guardElement);
+        return 'close';
+    }
+
+    const next = getNextDocumentTabStop(guardElement);
+    if (next && !isFocusGuard(next) && !isInsideRootElementsTarget(next, rootState)) {
+        next.focus();
+        return 'close';
+    }
+
+    focusPopoverContent(rootId);
+    return 'handled';
+}
+
 /**
  * Redirects focus into the popover content.
  * Finds the FloatingFocusManager's before-content guard inside the positioner
@@ -142,16 +297,15 @@ export function focusPopoverContent(rootId) {
     const rootState = state.roots.get(rootId);
     if (!rootState?.positionerElement) return;
 
-    const beforeContentGuard = rootState.positionerElement.querySelector(
-        '[data-blazor-base-ui-focus-guard-type="inside"]'
-    );
-    if (beforeContentGuard) {
-        beforeContentGuard.focus();
+    enableFocusInside(rootState.positionerElement);
+
+    const focusables = getProgrammaticPopupFocusables(rootState);
+    if (focusables.length > 0) {
+        focusables[0].focus();
         return;
     }
 
-    const tabbable = getTabbableElements(rootState.positionerElement);
-    if (tabbable.length > 0) tabbable[0].focus();
+    rootState.popupElement?.focus();
 }
 
 function handleGlobalKeyDown(e) {
@@ -174,10 +328,87 @@ function handleGlobalKeyDown(e) {
 }
 
 function isInsideRootElements(target, rootState) {
-    const { triggerElement, popupElement, positionerElement } = rootState;
+    return isInsideRootOwnedElements(target, rootState) || isInsideDescendantRootElements(target, rootState);
+}
+
+function isInsideRootOwnedElements(target, rootState) {
+    const { triggerElement, popupElement, positionerElement, triggerElements } = rootState;
     return (positionerElement && positionerElement.contains(target))
         || (popupElement && popupElement.contains(target))
-        || (triggerElement && triggerElement.contains(target));
+        || (triggerElement && triggerElement.contains(target))
+        || (triggerElements && Array.from(triggerElements.values()).some((element) => element && element.contains(target)));
+}
+
+function getRootTriggerElements(rootState) {
+    const elements = [];
+    if (rootState.triggerElement) {
+        elements.push(rootState.triggerElement);
+    }
+
+    if (rootState.triggerElements) {
+        for (const trigger of rootState.triggerElements.values()) {
+            if (trigger && !elements.includes(trigger)) {
+                elements.push(trigger);
+            }
+        }
+    }
+
+    return elements;
+}
+
+function isRootDirectChildOf(parentRootState, childRootState) {
+    return getRootTriggerElements(childRootState).some((trigger) => isInsideRootOwnedElements(trigger, parentRootState));
+}
+
+function isRootDescendantOf(parentRootState, childRootState, visited = new Set()) {
+    if (!parentRootState || !childRootState || parentRootState === childRootState || visited.has(childRootState)) {
+        return false;
+    }
+
+    if (isRootDirectChildOf(parentRootState, childRootState)) {
+        return true;
+    }
+
+    visited.add(childRootState);
+
+    for (const candidateParent of state.roots.values()) {
+        if (candidateParent === childRootState) {
+            continue;
+        }
+
+        if (isRootDirectChildOf(candidateParent, childRootState) && isRootDescendantOf(parentRootState, candidateParent, visited)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function isInsideDescendantRootElements(target, rootState) {
+    for (const candidateRootState of state.roots.values()) {
+        if (candidateRootState === rootState) {
+            continue;
+        }
+
+        if (isRootDescendantOf(rootState, candidateRootState) && isInsideRootOwnedElements(target, candidateRootState)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function closeDescendantRoots(rootState) {
+    for (const candidateRootState of state.roots.values()) {
+        if (
+            candidateRootState !== rootState &&
+            candidateRootState.isOpen &&
+            candidateRootState.dotNetRef &&
+            isRootDescendantOf(rootState, candidateRootState)
+        ) {
+            candidateRootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
+        }
+    }
 }
 
 /**
@@ -188,8 +419,16 @@ function isInsideRootElements(target, rootState) {
  */
 function processOutsidePressForRoots(e, rootFilter, checkDragOut) {
     const openRoots = [];
+    const now = performance.now();
     for (const [id, rootState] of state.roots) {
-        if (rootState.isOpen && rootState.dotNetRef && rootFilter(rootState)) {
+        const openedAfterCurrentPointerDown = checkDragOut && pointerDownTime > 0 && rootState.openedAt >= pointerDownTime;
+        if (
+            rootState.isOpen &&
+            rootState.dotNetRef &&
+            rootFilter(rootState) &&
+            !openedAfterCurrentPointerDown &&
+            (!rootState.ignoreOutsidePressUntil || now > rootState.ignoreOutsidePressUntil)
+        ) {
             openRoots.push({ id, rootState });
         }
     }
@@ -228,6 +467,7 @@ function processOutsidePressForRoots(e, rootFilter, checkDragOut) {
  */
 function handleGlobalPointerDown(e) {
     pointerDownTarget = e.target;
+    pointerDownTime = performance.now();
 
     const isTouchOrPen = e.pointerType === 'touch' || e.pointerType === 'pen';
     processOutsidePressForRoots(e,
@@ -246,6 +486,7 @@ function handleGlobalClick(e) {
         true
     );
     pointerDownTarget = null;
+    pointerDownTime = 0;
 }
 
 // ============================================================================
@@ -260,24 +501,36 @@ export function initializeRoot(rootId, dotNetRef, modal) {
         isOpen: false,
         modal: modal || 'false',
         triggerElement: null,
+        triggerElements: new Map(),
         positionerElement: null,
+        backdropElement: null,
         popupElement: null,
         internalBackdropElement: null,
         hoverInteraction: null,
+        triggerHoverStickCleanup: null,
         focusTrapCleanup: null,
         focusManagerId: null,
         focusOutCleanup: null,
+        popupFocusOutCleanup: null,
         releaseScrollLock: null,
+        positionerId: null,
+        initialFocusMode: null,
         initialFocusElement: null,
+        finalFocusMode: null,
         finalFocusElement: null,
         transitionCleanup: null,
         fallbackTimeoutId: null,
         pendingOpen: false,
         openReason: null,
         interactionType: null,
+        openedAt: 0,
         openOrderStamp: 0,
         stickIfOpen: false,
         patientClickTimeout: null,
+        patientClickObserver: null,
+        patientClickArmTimeout: null,
+        patientClickFrame: null,
+        ignoreOutsidePressUntil: 0,
         compositeKeyCleanup: null,
         viewportElement: null,
         viewportDotNetRef: null,
@@ -292,6 +545,8 @@ export function disposeRoot(rootId) {
         if (rootState.hoverInteraction) {
             rootState.hoverInteraction.cleanup();
         }
+        rootState.triggerHoverStickCleanup?.();
+        rootState.triggerHoverStickCleanup = null;
 
         // Clean up patient click timeout
         clearPatientClickTimeout(rootState);
@@ -299,6 +554,7 @@ export function disposeRoot(rootId) {
         // Clean up focus management
         cleanupFocusTrap(rootState);
         cleanupFocusOutListener(rootState);
+        cleanupPopupFocusOutListener(rootState);
 
         // Clean up composite key suppression
         rootState.compositeKeyCleanup?.();
@@ -336,6 +592,54 @@ export function updateScrollLock(rootId, modal) {
     }
 }
 
+export function hydrateRootOpen(rootId, isOpen, reason, interactionType) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    rootState.isOpen = isOpen;
+    rootState.pendingOpen = isOpen;
+    rootState.openReason = reason || null;
+    rootState.interactionType = interactionType || null;
+
+    if (isOpen) {
+        rootState.openedAt = performance.now();
+        rootState.openOrderStamp = ++state.openOrderCounter;
+        if (reason === 'imperative-action') {
+            rootState.ignoreOutsidePressUntil = performance.now() + 100;
+        }
+    } else {
+        rootState.openedAt = 0;
+        rootState.ignoreOutsidePressUntil = 0;
+    }
+
+    if (rootState.hoverInteraction) {
+        rootState.hoverInteraction.setOpen(isOpen);
+    }
+
+    syncBackdropHidden(rootState);
+
+    if (isOpen) {
+        if (rootState.modal === 'true' && reason !== 'trigger-hover' && rootState.interactionType !== 'touch' && !rootState.releaseScrollLock) {
+            rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
+        }
+
+        if (rootState.internalBackdropElement) {
+            setupBackdropCutoutTracking(rootState);
+        }
+    } else {
+        clearPatientClickTimeout(rootState);
+        cleanupBackdropCutout(rootState);
+
+        if (rootState.releaseScrollLock) {
+            rootState.releaseScrollLock();
+            rootState.releaseScrollLock = null;
+        }
+
+        cleanupFocusTrap(rootState);
+        cleanupFocusOutListener(rootState);
+    }
+}
+
 export function setRootOpen(rootId, isOpen, reason, interactionType) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
@@ -346,7 +650,14 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
     rootState.interactionType = interactionType || null;
 
     if (isOpen) {
+        rootState.openedAt = performance.now();
         rootState.openOrderStamp = ++state.openOrderCounter;
+        if (reason === 'imperative-action') {
+            rootState.ignoreOutsidePressUntil = performance.now() + 100;
+        }
+    } else {
+        rootState.openedAt = 0;
+        rootState.ignoreOutsidePressUntil = 0;
     }
 
     // Sync with hover interaction
@@ -354,15 +665,12 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
         rootState.hoverInteraction.setOpen(isOpen);
     }
 
+    syncBackdropHidden(rootState);
+
     if (isOpen) {
         // Start patient click protection when hover-opened
         if (reason === 'trigger-hover') {
-            clearPatientClickTimeout(rootState);
-            rootState.stickIfOpen = true;
-            rootState.patientClickTimeout = setTimeout(() => {
-                rootState.stickIfOpen = false;
-                rootState.patientClickTimeout = null;
-            }, PATIENT_CLICK_THRESHOLD);
+            startPatientClickProtection(rootState);
         }
 
         // Acquire scroll lock for modal popovers (skip for hover-opened and touch)
@@ -377,6 +685,8 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
 
         waitForPopupAndStartTransition(rootState, isOpen);
     } else {
+        closeDescendantRoots(rootState);
+
         // Clear patient click protection on close
         clearPatientClickTimeout(rootState);
 
@@ -392,6 +702,8 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
         // Clean up focus management
         cleanupFocusTrap(rootState);
         cleanupFocusOutListener(rootState);
+        focusFinalElementWhenReady(rootState);
+        focusDefaultFinalElementWhenReady(rootState);
 
         startTransition(rootState, isOpen);
     }
@@ -402,7 +714,95 @@ function clearPatientClickTimeout(rootState) {
         clearTimeout(rootState.patientClickTimeout);
         rootState.patientClickTimeout = null;
     }
+
+    if (rootState.patientClickArmTimeout !== null) {
+        clearTimeout(rootState.patientClickArmTimeout);
+        rootState.patientClickArmTimeout = null;
+    }
+
+    if (rootState.patientClickFrame !== null) {
+        cancelAnimationFrame(rootState.patientClickFrame);
+        rootState.patientClickFrame = null;
+    }
+
+    if (rootState.patientClickObserver !== null) {
+        rootState.patientClickObserver.disconnect();
+        rootState.patientClickObserver = null;
+    }
+
     rootState.stickIfOpen = false;
+}
+
+function startPatientClickProtection(rootState) {
+    clearPatientClickTimeout(rootState);
+    rootState.stickIfOpen = true;
+
+    const startCountdown = () => {
+        if (!rootState.stickIfOpen || rootState.patientClickTimeout !== null) {
+            return;
+        }
+
+        rootState.patientClickTimeout = setTimeout(() => {
+            rootState.stickIfOpen = false;
+            rootState.patientClickTimeout = null;
+        }, PATIENT_CLICK_THRESHOLD);
+    };
+
+    const startCountdownOnNextFrame = () => {
+        if (rootState.patientClickFrame !== null) {
+            return;
+        }
+
+        rootState.patientClickFrame = requestAnimationFrame(() => {
+            rootState.patientClickFrame = null;
+            startCountdown();
+        });
+    };
+
+    const triggerElement = rootState.triggerElement;
+    if (!triggerElement || triggerElement.hasAttribute('data-popup-open')) {
+        startCountdownOnNextFrame();
+        return;
+    }
+
+    rootState.patientClickObserver = new MutationObserver(() => {
+        if (!triggerElement.hasAttribute('data-popup-open')) {
+            return;
+        }
+
+        if (rootState.patientClickObserver !== null) {
+            rootState.patientClickObserver.disconnect();
+            rootState.patientClickObserver = null;
+        }
+
+        if (rootState.patientClickArmTimeout !== null) {
+            clearTimeout(rootState.patientClickArmTimeout);
+            rootState.patientClickArmTimeout = null;
+        }
+
+        startCountdownOnNextFrame();
+    });
+
+    rootState.patientClickObserver.observe(triggerElement, {
+        attributes: true,
+        attributeFilter: ['data-popup-open'],
+    });
+
+    rootState.patientClickArmTimeout = setTimeout(() => {
+        if (rootState.patientClickObserver !== null) {
+            rootState.patientClickObserver.disconnect();
+            rootState.patientClickObserver = null;
+        }
+
+        rootState.patientClickArmTimeout = null;
+        startCountdownOnNextFrame();
+    }, PATIENT_CLICK_THRESHOLD * 2);
+}
+
+function syncBackdropHidden(rootState) {
+    if (!rootState.backdropElement) return;
+
+    rootState.backdropElement.hidden = !rootState.isOpen || rootState.openReason === 'trigger-hover';
 }
 
 /**
@@ -428,6 +828,10 @@ export function consumeStickIfOpen(rootId) {
 
 function handleTabIndex(popupElement) {
     if (!popupElement) return;
+
+    if (popupElement.hasAttribute('tabindex') && !popupElement.hasAttribute('data-tabindex')) {
+        return;
+    }
 
     const role = popupElement.getAttribute('role') || '';
     if (!role.includes('dialog')) return;
@@ -460,22 +864,107 @@ function cleanupFocusOutListener(rootState) {
     }
 }
 
-export function setInitialFocusElement(rootId, element) {
+function cleanupPopupFocusOutListener(rootState) {
+    if (rootState.popupFocusOutCleanup) {
+        rootState.popupFocusOutCleanup();
+        rootState.popupFocusOutCleanup = null;
+    }
+    rootState.lastFocusOutTarget = null;
+    rootState.lastFocusOutFromPopover = false;
+}
+
+function focusInitialElementWhenReady(rootState) {
+    const element = rootState.initialFocusElement;
+    if (!(rootState.isOpen && element instanceof HTMLElement)) return;
+
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    const applyFocus = () => {
+        if (!rootState.isOpen || rootState.initialFocusElement !== element) return;
+
+        attempts += 1;
+        if (document.contains(element)) {
+            element.focus();
+            if (document.activeElement === element || attempts >= maxAttempts) return;
+        }
+
+        if (attempts < maxAttempts) {
+            requestAnimationFrame(applyFocus);
+        }
+    };
+
+    requestAnimationFrame(applyFocus);
+}
+
+function focusFinalElementWhenReady(rootState) {
+    const element = rootState.finalFocusElement;
+    if (!(!rootState.isOpen && element instanceof HTMLElement)) return;
+
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    const applyFocus = () => {
+        if (rootState.isOpen || rootState.finalFocusElement !== element) return;
+
+        attempts += 1;
+        if (document.contains(element)) {
+            element.focus();
+            if (document.activeElement === element || attempts >= maxAttempts) return;
+        }
+
+        if (attempts < maxAttempts) {
+            requestAnimationFrame(applyFocus);
+        }
+    };
+
+    requestAnimationFrame(applyFocus);
+}
+
+function focusDefaultFinalElementWhenReady(rootState) {
+    if (rootState.isOpen) return;
+    if (rootState.finalFocusMode === 'none' || rootState.finalFocusMode === 'element') return;
+    if (rootState.openReason === 'focus-out' || rootState.openReason === 'outside-press' || rootState.openReason === 'trigger-hover') return;
+
+    const element = rootState.triggerElement;
+    if (!(element instanceof HTMLElement)) return;
+
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    const applyFocus = () => {
+        if (rootState.isOpen) return;
+
+        attempts += 1;
+        if (document.contains(element)) {
+            element.focus();
+            if (document.activeElement === element || attempts >= maxAttempts) return;
+        }
+
+        if (attempts < maxAttempts) {
+            requestAnimationFrame(applyFocus);
+        }
+    };
+
+    requestAnimationFrame(applyFocus);
+}
+
+export function setInitialFocusElement(rootId, mode, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
-        rootState.initialFocusElement = element;
+        rootState.initialFocusMode = mode || null;
+        rootState.initialFocusElement = resolveFocusMode(mode, element);
 
-        // If popup is already open, focus the element now
-        if (rootState.isOpen && element) {
-            element.focus();
-        }
+        focusInitialElementWhenReady(rootState);
     }
 }
 
-export function setFinalFocusElement(rootId, element) {
+export function setFinalFocusElement(rootId, mode, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
-        rootState.finalFocusElement = element;
+        rootState.finalFocusMode = mode || null;
+        rootState.finalFocusElement = resolveFocusMode(mode, element);
+        focusFinalElementWhenReady(rootState);
     }
 }
 
@@ -571,17 +1060,82 @@ export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.triggerElement = element;
+        updateRootPositioner(rootState);
     }
+}
+
+function updateRootPositioner(rootState) {
+    if (!rootState.positionerId) return;
+
+    floatingUpdatePositioner(rootState.positionerId, {
+        triggerElement: rootState.triggerElement ?? null
+    }).catch(() => { });
+}
+
+export function registerTriggerElement(rootId, triggerId, element) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !triggerId) return;
+
+    if (!rootState.triggerElements) {
+        rootState.triggerElements = new Map();
+    }
+
+    if (element) {
+        rootState.triggerElements.set(triggerId, element);
+    } else {
+        rootState.triggerElements.delete(triggerId);
+    }
+}
+
+export function unregisterTriggerElement(rootId, triggerId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState?.triggerElements || !triggerId) return;
+
+    rootState.triggerElements.delete(triggerId);
 }
 
 export function setPopupElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.popupElement = element;
+        cleanupPopupFocusOutListener(rootState);
+        if (element) {
+            const handleFocusOut = (event) => {
+                rootState.lastFocusOutTarget = event.relatedTarget;
+                rootState.lastFocusOutFromPopover = true;
+                window.setTimeout(() => {
+                    if (rootState.lastFocusOutTarget === event.relatedTarget) {
+                        rootState.lastFocusOutTarget = null;
+                        rootState.lastFocusOutFromPopover = false;
+                    }
+                }, 250);
+            };
+            element.addEventListener('focusout', handleFocusOut, true);
+            rootState.popupFocusOutCleanup = () => element.removeEventListener('focusout', handleFocusOut, true);
+        }
         // Update hover interaction with the new popup element
         if (rootState.hoverInteraction && element) {
             rootState.hoverInteraction.setFloatingElement(element);
         }
+    }
+}
+
+export function setBackdropElement(rootId, element) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    rootState.backdropElement = element || null;
+    syncBackdropHidden(rootState);
+}
+
+export function setPositionerElement(rootId, element) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    rootState.positionerElement = element;
+
+    if (rootState.isOpen && rootState.modal === 'true' && rootState.openReason !== 'trigger-hover' && rootState.interactionType !== 'touch' && !rootState.releaseScrollLock) {
+        rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
     }
 }
 
@@ -597,7 +1151,7 @@ function buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign
     };
 }
 
-export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
+export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasSideOffsetFn, hasAlignOffsetFn, hasViewport, rootId) {
     // Build optional position update callback when dotNetRef is provided
     let onPositionUpdated = null;
     if (dotNetRef) {
@@ -630,6 +1184,11 @@ export async function initializePositioner(positionerElement, triggerElement, si
 
     if (positionerId) {
         state.positioners.set(positionerId, { positionerId });
+        const rootState = state.roots.get(rootId);
+        if (rootState) {
+            rootState.positionerId = positionerId;
+            rootState.positionerElement = positionerElement;
+        }
     }
 
     return positionerId;
@@ -758,7 +1317,9 @@ export function initializePopup(rootId, popupElement, dotNetRef, modal, initialM
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.modal = modal || 'false';
+        rootState.initialFocusMode = initialMode || null;
         rootState.initialFocusElement = resolveFocusMode(initialMode, initialElement);
+        rootState.finalFocusMode = finalMode || null;
         rootState.finalFocusElement = resolveFocusMode(finalMode, finalElement);
 
         // Set up composite key suppression only when inside a Toolbar
@@ -798,6 +1359,9 @@ export function disposePopup(rootId, popupElement) {
 
     // Clean up composite key suppression
     const rootState = rootId ? state.roots.get(rootId) : null;
+    if (rootState) {
+        cleanupPopupFocusOutListener(rootState);
+    }
     if (rootState?.compositeKeyCleanup) {
         rootState.compositeKeyCleanup();
         rootState.compositeKeyCleanup = null;

@@ -494,8 +494,17 @@ export async function updatePositioner(positionerId, options) {
     const positionerState = state.positioners.get(positionerId);
     if (!positionerState) return;
 
+    const previousTriggerElement = positionerState.triggerElement;
+    const previousDisableAnchorTracking = positionerState.disableAnchorTracking;
     Object.assign(positionerState, options);
     await updatePositionInternal(positionerState);
+
+    const triggerElementChanged = Object.prototype.hasOwnProperty.call(options, 'triggerElement')
+        && options.triggerElement !== previousTriggerElement;
+    if (triggerElementChanged
+        || (options.disableAnchorTracking !== undefined && options.disableAnchorTracking !== previousDisableAnchorTracking)) {
+        await setupAutoUpdate(positionerState);
+    }
 }
 
 export function disposePositioner(positionerId) {
@@ -511,9 +520,8 @@ export function disposePositioner(positionerId) {
 
 async function setupAutoUpdate(positionerState) {
     const { positionerElement, triggerElement } = positionerState;
-    if (!positionerElement || !triggerElement) return;
-
     cleanupAutoUpdate(positionerState);
+    if (!positionerElement || !triggerElement) return;
 
     try {
         const FloatingUI = await ensureFloatingUI();
@@ -1764,6 +1772,19 @@ export function createHoverInteraction(options) {
         pointerType = event.pointerType;
     }
 
+    function handlePointerEnter(event) {
+        pointerType = event.pointerType;
+        handleMouseEnter(event);
+    }
+
+    function handleMouseOver(event) {
+        if (event.target !== triggerElement && contains(triggerElement, event.relatedTarget)) {
+            return;
+        }
+
+        handleMouseEnter(event);
+    }
+
     function closeWithDelay() {
         if (currentCloseDelay > 0) {
             closeTimeout.start(currentCloseDelay, () => {
@@ -1787,6 +1808,8 @@ export function createHoverInteraction(options) {
 
     // Attach event listeners to trigger
     triggerElement.addEventListener('mouseenter', handleMouseEnter);
+    triggerElement.addEventListener('pointerenter', handlePointerEnter);
+    triggerElement.addEventListener('mouseover', handleMouseOver);
     triggerElement.addEventListener('mouseleave', handleMouseLeave);
     triggerElement.addEventListener('pointerdown', handlePointerDown);
 
@@ -1842,6 +1865,8 @@ export function createHoverInteraction(options) {
             cleanupChildCloseListener();
 
             triggerElement.removeEventListener('mouseenter', handleMouseEnter);
+            triggerElement.removeEventListener('pointerenter', handlePointerEnter);
+            triggerElement.removeEventListener('mouseover', handleMouseOver);
             triggerElement.removeEventListener('mouseleave', handleMouseLeave);
             triggerElement.removeEventListener('pointerdown', handlePointerDown);
 
@@ -1856,6 +1881,13 @@ export function createHoverInteraction(options) {
     };
 
     state.interactions.set(interactionId, interaction);
+
+    queueMicrotask(() => {
+        if (triggerElement.matches(':hover')) {
+            handleMouseEnter({ relatedTarget: null });
+        }
+    });
+
     return interaction;
 }
 
@@ -2591,6 +2623,8 @@ function applyAttributeToOthers(avoidElements, body, ariaHidden, inert) {
                 if (controlAttribute) {
                     child.setAttribute(controlAttribute, controlAttribute === 'aria-hidden' ? 'true' : '');
                 }
+                // lint-ignore:RULE-05 React Base UI parity marker.
+                child.setAttribute('data-base-ui-inert', '');
                 child.setAttribute('data-blazor-base-ui-inert', '');
             }
             counterMap.set(child, currentCount + 1);
@@ -2623,6 +2657,8 @@ function applyAttributeToOthers(avoidElements, body, ariaHidden, inert) {
             const newMarkerCount = markerCount - 1;
             if (newMarkerCount <= 0) {
                 markerMap.delete(child);
+                // lint-ignore:RULE-05 React Base UI parity marker.
+                child.removeAttribute('data-base-ui-inert');
                 child.removeAttribute('data-blazor-base-ui-inert');
             } else {
                 markerMap.set(child, newMarkerCount);
@@ -2693,6 +2729,7 @@ function createFocusOutHandler(mgr, interactionCtx) {
             for (const el of (mgr.insideElements || [])) {
                 if (contains(el, relatedTarget)) return;
             }
+            if (isDescendantFloatingTarget(mgr, relatedTarget)) return;
 
             // Tree-aware checks: don't close if focus moved to a child/ancestor floating element
             const mgrTreeId = mgr.treeId;
@@ -2742,6 +2779,31 @@ function createFocusOutHandler(mgr, interactionCtx) {
             mgr.onClose?.();
         });
     };
+}
+
+function isDescendantFloatingTarget(mgr, target) {
+    if (!mgr.floatingElement || !(target instanceof Node)) return false;
+
+    for (const candidate of focusManagers.values()) {
+        if (candidate === mgr) continue;
+        if (candidate.floatingElement
+            && candidate.triggerElement
+            && contains(candidate.floatingElement, target)
+            && contains(mgr.floatingElement, candidate.triggerElement)) {
+            return true;
+        }
+    }
+
+    let descendantPopup = null;
+    if (target instanceof Element) {
+        // lint-ignore:RULE-05 React Base UI parity marker.
+        descendantPopup = target.closest('[data-base-ui-focusable], [role="dialog"]');
+    }
+    const popupId = descendantPopup?.id;
+    if (!popupId) return false;
+
+    const escapeCss = window.CSS?.escape ?? ((value) => String(value).replace(/"/g, '\\"'));
+    return mgr.floatingElement.querySelector(`[aria-controls="${escapeCss(popupId)}"]`) !== null;
 }
 
 const PREVIOUSLY_FOCUSED_LIMIT = 20;
@@ -2858,8 +2920,10 @@ export function createFloatingFocusManager(options) {
         }
     }
     function handleDocPointerUpOrCancel() {
-        isPointerDown = false;
-        pointerDownOutside = false;
+        setTimeout(() => {
+            isPointerDown = false;
+            pointerDownOutside = false;
+        }, 0);
     }
     function handleDocKeyDown() {
         lastInteractionType = 'keyboard';
@@ -2911,7 +2975,7 @@ export function createFloatingFocusManager(options) {
     }
 
     // Handle initial focus
-    function setInitialFocus() {
+    function getInitialFocusTarget() {
         if (initialFocus === false) return;
 
         // Touch interaction suppression — don't focus first tabbable on touch
@@ -2921,30 +2985,41 @@ export function createFloatingFocusManager(options) {
         if (typeof initialFocusSelector === 'string' && initialFocusSelector) {
             const target = floatingElement.querySelector(initialFocusSelector);
             if (target) {
-                target.focus();
-                return;
+                return target;
             }
         }
 
         if (initialFocus instanceof HTMLElement) {
-            initialFocus.focus();
-            return;
+            return initialFocus;
         }
 
         if (isTouchInteraction) {
             // Focus the container itself to maintain focus context
             // without triggering virtual keyboard
-            floatingElement.focus();
-            return;
+            return floatingElement;
         }
 
         // Default: focus first tabbable element
         const tabbable = getTabbableElements(floatingElement);
         if (tabbable.length > 0) {
-            tabbable[0].focus();
-        } else {
-            floatingElement.focus();
+            return tabbable[0];
         }
+        return floatingElement;
+    }
+
+    function setInitialFocus(attempt = 0) {
+        const target = getInitialFocusTarget();
+        if (!(target instanceof HTMLElement)) return;
+
+        if (document.contains(target)) {
+            target.focus();
+        }
+
+        if (activeElement(doc) === target || attempt >= 5) {
+            return;
+        }
+
+        requestAnimationFrame(() => setInitialFocus(attempt + 1));
     }
 
     // Delay initial focus to next frame to ensure DOM is ready
@@ -3046,6 +3121,9 @@ export function createFloatingFocusManager(options) {
     // Dynamic handleTabIndex (F7/F9)
     function handleTabIndex(floatingEl, orderOption) {
         if (!floatingEl) return;
+        if (floatingEl.hasAttribute('tabindex') && !floatingEl.hasAttribute('data-tabindex')) {
+            return;
+        }
         if (
             (!orderOption || !orderOption.includes('floating')) &&
             !floatingEl.getAttribute('role')?.includes('dialog')
@@ -4068,8 +4146,8 @@ export function isThirdPartyElement(target, floatingElement) {
     // If the root is not the document element, it's detached — treat as third-party
     if (root !== document.documentElement && root !== document) return true;
 
-    // Check if the target's root contains any data-blazor-base-ui-inert markers
-    const inertMarkers = document.querySelectorAll('[data-blazor-base-ui-inert]');
+    // Check if the target's root contains any Base UI inert markers
+    const inertMarkers = document.querySelectorAll('[data-base-ui-inert], [data-blazor-base-ui-inert]');
     if (inertMarkers.length === 0) return false;
 
     // If target is a direct ancestor of the floating element (e.g., overlay), not third-party
@@ -4079,7 +4157,7 @@ export function isThirdPartyElement(target, floatingElement) {
     // If they don't, and inert markers exist, this element was injected after markOthers ran
     let current = target;
     while (current && current !== document.body) {
-        if (current.hasAttribute('data-blazor-base-ui-inert')) return false;
+        if (current.hasAttribute('data-base-ui-inert') || current.hasAttribute('data-blazor-base-ui-inert')) return false;
         current = current.parentElement;
     }
 

@@ -9,10 +9,12 @@ namespace BlazorBaseUI.Tests.Popover;
 
 public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
 {
+    private readonly BunitJSModuleInterop popoverModule;
+
     public PopoverTriggerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupPopoverModule(JSInterop);
+        popoverModule = JsInteropSetup.SetupPopoverModule(JSInterop);
         JsInteropSetup.SetupFloatingTreeModule(JSInterop);
         JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
@@ -316,7 +318,7 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
         var cut = Render(CreateTriggerInRoot());
 
         var trigger = cut.Find("button");
-        trigger.HasAttribute("data-blazor-base-ui-click-trigger").ShouldBeTrue();
+        trigger.HasAttribute("data-base-ui-click-trigger").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -398,5 +400,134 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
         hasTriggerPostGuard.ShouldBeFalse();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RegistersReplacementTriggerIdAfterIdChanges()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<PopoverTriggerIdChangeRegistrationHost>(0);
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() => cut.Find("#trigger-a").ShouldNotBeNull());
+        var invocationCount = popoverModule.Invocations.Count;
+
+        cut.Find("[data-testid='change-id']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#trigger-b").ShouldNotBeNull();
+            popoverModule.Invocations.Skip(invocationCount).ShouldContain(invocation =>
+                invocation.Identifier == "registerTriggerElement" &&
+                invocation.Arguments.Count >= 2 &&
+                Equals(invocation.Arguments[1], "trigger-b"));
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RegistersRootTriggerAfterHandleIsCleared()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<PopoverTriggerHandleSwitchRegistrationHost>(0);
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() => cut.Find("#switching-trigger").ShouldNotBeNull());
+        var invocationCount = popoverModule.Invocations.Count;
+
+        cut.Find("[data-testid='clear-handle']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            popoverModule.Invocations.Skip(invocationCount).ShouldContain(invocation =>
+                invocation.Identifier == "registerTriggerElement" &&
+                invocation.Arguments.Count >= 2 &&
+                Equals(invocation.Arguments[1], "switching-trigger"));
+        });
+
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class PopoverTriggerIdChangeRegistrationHost : ComponentBase
+{
+    private string triggerId = "trigger-a";
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PopoverRoot>(0);
+        builder.AddAttribute(1, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+        {
+            innerBuilder.OpenComponent<PopoverTrigger>(0);
+            innerBuilder.AddAttribute(1, "Id", triggerId);
+            innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenElement(10, "button");
+            innerBuilder.AddAttribute(11, "data-testid", "change-id");
+            innerBuilder.AddAttribute(12, "onclick", EventCallback.Factory.Create(this, () => triggerId = "trigger-b"));
+            innerBuilder.AddContent(13, "Change Id");
+            innerBuilder.CloseElement();
+
+            innerBuilder.OpenComponent<PopoverPortal>(20);
+            innerBuilder.AddAttribute(21, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PopoverPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PopoverPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class PopoverTriggerHandleSwitchRegistrationHost : ComponentBase
+{
+    private readonly PopoverHandle handle = new();
+    private bool useHandle = true;
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PopoverRoot>(0);
+        builder.AddAttribute(1, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+        {
+            innerBuilder.OpenComponent<PopoverTrigger>(0);
+            innerBuilder.AddAttribute(1, "Id", "switching-trigger");
+            innerBuilder.AddAttribute(2, "Handle", useHandle ? handle : null);
+            innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenElement(10, "button");
+            innerBuilder.AddAttribute(11, "data-testid", "clear-handle");
+            innerBuilder.AddAttribute(12, "onclick", EventCallback.Factory.Create(this, () => useHandle = false));
+            innerBuilder.AddContent(13, "Clear Handle");
+            innerBuilder.CloseElement();
+
+            innerBuilder.OpenComponent<PopoverPortal>(20);
+            innerBuilder.AddAttribute(21, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PopoverPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PopoverPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

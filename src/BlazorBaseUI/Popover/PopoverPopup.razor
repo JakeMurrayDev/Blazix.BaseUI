@@ -19,6 +19,7 @@
                           Disabled="@(!isMounted || openedByHover)"
                           InitialFocus="@ComputeInitialFocus()"
                           ReturnFocus="@ComputeReturnFocus()"
+                          FinalFocus="@ComputeFinalFocusTarget()"
                           InteractionType="@(RootContext?.InteractionType)"
                           RestoreFocus="true"
                           RestoreFocusMode="popup"
@@ -39,6 +40,9 @@
     private RenderElement<PopoverPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
+    private FocusTarget? previousInitialFocus;
+    private FocusTarget? previousFinalFocus;
+    private bool deferredInitialFocusApplied;
     private DotNetObjectReference<PopoverPopup>? dotNetRef;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
@@ -126,8 +130,30 @@
             RootContext.FocusManagerModal = isModal;
         }
 
+        if (!open)
+        {
+            deferredInitialFocusApplied = false;
+        }
+
         state = new PopoverPopupState(open, side, align, instant, transitionStatus);
         BuildComponentAttributes();
+
+        if (hasRendered && RootContext is not null)
+        {
+            if (!Equals(InitialFocus, previousInitialFocus))
+            {
+                previousInitialFocus = InitialFocus;
+                var (mode, element) = ResolveFocusTarget(InitialFocus);
+                _ = SetInitialFocusElementAsync(mode, element);
+            }
+
+            if (!Equals(FinalFocus, previousFinalFocus))
+            {
+                previousFinalFocus = FinalFocus;
+                var (mode, element) = ResolveFocusTarget(FinalFocus);
+                _ = SetFinalFocusElementAsync(mode, element);
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -149,6 +175,15 @@
         if (firstRender)
         {
             await InitializePopupAsync();
+            previousInitialFocus = InitialFocus;
+            previousFinalFocus = FinalFocus;
+        }
+
+        if (!firstRender && RootContext?.GetOpen() == true && !deferredInitialFocusApplied && InitialFocus is not null)
+        {
+            var (mode, element) = ResolveFocusTarget(InitialFocus);
+            await SetInitialFocusElementAsync(mode, element);
+            deferredInitialFocusApplied = true;
         }
     }
 
@@ -159,7 +194,8 @@
         attrs["id"] = popupId;
         attrs["role"] = "dialog";
         attrs["tabindex"] = -1;
-        attrs["data-blazor-base-ui-focusable"] = true;
+        // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity marker.
+        attrs["data-base-ui-focusable"] = "";
 
         var titleId = RootContext?.TitleId;
         if (!string.IsNullOrEmpty(titleId))
@@ -251,9 +287,46 @@
         return result.HasValue ? ("element", result.Value) : ("none", null);
     }
 
+    private async Task SetInitialFocusElementAsync(string? mode, ElementReference? element)
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setInitialFocusElement", RootContext.RootId, mode, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetFinalFocusElementAsync(string? mode, ElementReference? element)
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setFinalFocusElement", RootContext.RootId, mode, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
     private bool ComputeInitialFocus()
     {
         if (InitialFocus is FocusTarget.None) return false;
+        if (InitialFocus is FocusTarget.Element or FocusTarget.Callback) return false;
         return true;
     }
 
@@ -261,6 +334,23 @@
     {
         if (FinalFocus is FocusTarget.None) return false;
         return true;
+    }
+
+    private FinalFocusTarget? ComputeFinalFocusTarget()
+    {
+        return FinalFocus switch
+        {
+            null => (FinalFocusTarget?)null,
+            FocusTarget.Default => FinalFocusTarget.Default,
+            FocusTarget.None => FinalFocusTarget.None,
+            FocusTarget.Element e => FinalFocusTarget.From(e.Ref),
+            FocusTarget.Callback cb => FinalFocusTarget.From(interactionType =>
+            {
+                var result = cb.Fn(interactionType.ToString().ToLowerInvariant());
+                return result.HasValue ? FinalFocusResult.To(result.Value) : FinalFocusResult.None;
+            }),
+            _ => (FinalFocusTarget?)null
+        };
     }
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)

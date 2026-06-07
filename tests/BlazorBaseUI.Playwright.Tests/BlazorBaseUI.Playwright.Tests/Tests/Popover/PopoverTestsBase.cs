@@ -51,6 +51,11 @@ public abstract class PopoverTestsBase : TestBase
         });
     }
 
+    protected Task WaitForSemanticDelayAsync(int milliseconds)
+    {
+        return Page.WaitForTimeoutAsync(milliseconds);
+    }
+
     #endregion
 
     #region Popover Open/Close Interaction Tests
@@ -663,7 +668,7 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         // Now click the trigger - should set data-pressed
         await trigger.ClickAsync();
@@ -1179,7 +1184,7 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
@@ -1205,13 +1210,13 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
         // Wait >500ms (patient click threshold)
-        await WaitForDelayAsync(600);
+        await WaitForSemanticDelayAsync(600);
 
         // Patient click - should close
         await trigger.ClickAsync();
@@ -1233,7 +1238,7 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
@@ -1266,13 +1271,13 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
         // Wait for patient threshold
-        await WaitForDelayAsync(600);
+        await WaitForSemanticDelayAsync(600);
 
         // Patient click - should close
         await trigger.ClickAsync();
@@ -1295,7 +1300,7 @@ public abstract class PopoverTestsBase : TestBase
         await trigger.HoverAsync();
 
         // Click before hover delay (500ms) fires
-        await WaitForDelayAsync(100);
+        await WaitForSemanticDelayAsync(100);
         await trigger.ClickAsync();
 
         var openState = GetByTestId("open-state");
@@ -1323,7 +1328,7 @@ public abstract class PopoverTestsBase : TestBase
 
         // Hover to open
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
         // Impatient click (sticks)
@@ -1340,7 +1345,7 @@ public abstract class PopoverTestsBase : TestBase
 
         // Re-hover trigger
         await trigger.HoverAsync();
-        await WaitForDelayAsync(200);
+        await WaitForSemanticDelayAsync(200);
 
         // Click - should still keep open
         await trigger.ClickAsync();
@@ -1363,7 +1368,7 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(300);
+        await WaitForSemanticDelayAsync(300);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
@@ -1493,7 +1498,7 @@ public abstract class PopoverTestsBase : TestBase
         // Hover the trigger
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(300);
+        await WaitForSemanticDelayAsync(300);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
@@ -1516,7 +1521,7 @@ public abstract class PopoverTestsBase : TestBase
 
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(300);
+        await WaitForSemanticDelayAsync(300);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
@@ -1719,7 +1724,7 @@ public abstract class PopoverTestsBase : TestBase
         // Hover to open
         var trigger = GetByTestId("popover-trigger");
         await trigger.HoverAsync();
-        await WaitForDelayAsync(300);
+        await WaitForSemanticDelayAsync(300);
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
