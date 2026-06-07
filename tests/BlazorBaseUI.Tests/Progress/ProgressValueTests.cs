@@ -11,13 +11,15 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
 
     private RenderFragment CreateProgressWithValue(
         double? value = 50,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null,
         Func<ProgressRootState, string?>? valueClassValue = null,
         Func<ProgressRootState, string?>? valueStyleValue = null,
         IReadOnlyDictionary<string, object>? valueAttributes = null,
         RenderFragment<RenderProps<ProgressRootState>>? valueRender = null,
-        Func<string, double?, RenderFragment>? childContent = null)
+        Func<string?, double?, RenderFragment>? childContent = null)
     {
         return builder =>
         {
@@ -31,6 +33,10 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(attrIndex++, "Locale", locale);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
 
@@ -156,7 +162,7 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
     [Fact]
     public Task RendersCustomFormattedValue()
     {
-        var cut = Render(CreateProgressWithValue(value: 30, format: "F1"));
+        var cut = Render(CreateProgressWithValue(value: 30, formatString: "F1"));
         var valueEl = cut.Find("[data-testid='value']");
         var expected = 30.0.ToString("F1", CultureInfo.CurrentCulture);
         valueEl.TextContent.ShouldBe(expected);
@@ -171,7 +177,7 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
 
         var cut = Render(CreateProgressWithValue(
             value: 30,
-            format: "F1",
+            formatString: "F1",
             childContent: (formatted, val) =>
             {
                 capturedFormatted = formatted;
@@ -227,6 +233,18 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
         var cut = Render(CreateProgressWithValue(value: 50));
         var valueEl = cut.Find("[data-testid='value']");
         valueEl.HasAttribute("data-progressing").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressValue>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
         return Task.CompletedTask;
     }
 }

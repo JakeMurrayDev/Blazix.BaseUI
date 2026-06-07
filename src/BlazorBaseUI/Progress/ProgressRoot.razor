@@ -1,6 +1,7 @@
 @using System.Globalization
+@using BlazorBaseUI.Slider
 
-<CascadingValue Value="context" IsFixed="true">
+<CascadingValue Value="context">
     <RenderElement TState="ProgressRootState"
                    Tag="div"
                    State="state"
@@ -8,19 +9,36 @@
                    ClassValue="ClassValue"
                    StyleValue="StyleValue"
                    ComponentAttributes="componentAttributes"
-                   ChildContent="ChildContent"
+                   ChildContent="RootChildContent"
                    @attributes="AdditionalAttributes"
                    @ref="renderElementReference" />
 </CascadingValue>
 
 @code {
+    private const string VisuallyHiddenStyle = "clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0";
+
     private string? labelId;
     private string ariaValueText = string.Empty;
     private ProgressStatus previousStatus;
-    private ProgressRootContext? context;
+    private ProgressRootContext context = new();
     private ProgressRootState state = new(ProgressStatus.Indeterminate);
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+
+    private RenderFragment RootChildContent => builder =>
+    {
+        builder.AddContent(0, ChildContent);
+        builder.OpenElement(1, "span");
+        builder.AddAttribute(2, "role", "presentation");
+        builder.AddAttribute(3, "style", VisuallyHiddenStyle);
+        builder.AddContent(4, "x");
+        builder.CloseElement();
+    };
+
+    private IFormatProvider ResolvedFormatProvider =>
+        !string.IsNullOrEmpty(Locale)
+            ? CultureInfo.GetCultureInfo(Locale)
+            : FormatProvider ?? CultureInfo.CurrentCulture;
 
     /// <summary>
     /// Gets or sets the current value. The component is indeterminate when value is <see langword="null"/>.
@@ -44,10 +62,23 @@
     public double Max { get; set; } = 100;
 
     /// <summary>
-    /// Gets or sets the format string used to display the value.
+    /// Gets or sets the number format options used to display the value.
     /// </summary>
     [Parameter]
-    public string? Format { get; set; }
+    public NumberFormatOptions? Format { get; set; }
+
+    /// <summary>
+    /// Gets or sets the .NET numeric format string used to display the value.
+    /// </summary>
+    [Parameter]
+    public string? FormatString { get; set; }
+
+    /// <summary>
+    /// Gets or sets the locale used when formatting the value.
+    /// Defaults to the user's runtime locale.
+    /// </summary>
+    [Parameter]
+    public string? Locale { get; set; }
 
     /// <summary>
     /// Gets or sets the format provider used to format the value.
@@ -100,16 +131,17 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
         var status = ComputeStatus();
-        previousStatus = status;
-        state = new ProgressRootState(status);
+        if (status != previousStatus)
+        {
+            previousStatus = status;
+            state = new ProgressRootState(status);
+        }
 
         var formattedValue = FormatValue(Value);
-        ariaValueText = GetAriaValueText is not null
-            ? GetAriaValueText(formattedValue, Value)
-            : GetDefaultAriaValueText(formattedValue, Value);
+        ariaValueText = ComputeAriaValueText(formattedValue, Value);
 
         context = new ProgressRootContext
         {
@@ -125,54 +157,16 @@
         BuildComponentAttributes();
     }
 
-    /// <inheritdoc />
-    protected override void OnParametersSet()
-    {
-        var status = ComputeStatus();
-        if (status != previousStatus)
-        {
-            previousStatus = status;
-            state = new ProgressRootState(status);
-        }
-
-        var formattedValue = FormatValue(Value);
-        ariaValueText = GetAriaValueText is not null
-            ? GetAriaValueText(formattedValue, Value)
-            : GetDefaultAriaValueText(formattedValue, Value);
-
-        if (context is not null)
-        {
-            context.FormattedValue = formattedValue;
-            context.Max = Max;
-            context.Min = Min;
-            context.Value = Value;
-            context.State = state;
-            context.Status = state.Status;
-        }
-
-        BuildComponentAttributes();
-    }
-
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["role"] = "progressbar";
-        attrs["aria-valuemin"] = Min;
-        attrs["aria-valuemax"] = Max;
-
-        if (Value.HasValue)
-        {
-            attrs["aria-valuenow"] = Value.Value;
-        }
-
-        attrs["aria-valuetext"] = ariaValueText;
-
-        if (!string.IsNullOrEmpty(labelId))
-        {
-            attrs["aria-labelledby"] = labelId;
-        }
-
+        SetDefaultAttribute(attrs, "aria-labelledby", labelId);
+        SetDefaultAttribute(attrs, "aria-valuemax", Max);
+        SetDefaultAttribute(attrs, "aria-valuemin", Min);
+        SetDefaultAttribute(attrs, "aria-valuenow", Value);
+        SetDefaultAttribute(attrs, "aria-valuetext", ariaValueText);
+        SetDefaultAttribute(attrs, "role", "progressbar");
         attrs[$"data-{state.Status.ToDataAttributeString()}"] = (object)true;
 
         componentAttributes = attrs;
@@ -188,6 +182,16 @@
         return Value.Value == Max ? ProgressStatus.Complete : ProgressStatus.Progressing;
     }
 
+    private string ComputeAriaValueText(string? formattedValue, double? value)
+    {
+        if (GetAriaValueText is not null)
+        {
+            return GetAriaValueText(formattedValue, value);
+        }
+
+        return GetDefaultAriaValueText(formattedValue, value);
+    }
+
     private string FormatValue(double? value)
     {
         if (!value.HasValue)
@@ -195,15 +199,18 @@
             return string.Empty;
         }
 
-        var provider = FormatProvider ?? CultureInfo.CurrentCulture;
-
-        if (!string.IsNullOrEmpty(Format))
+        if (Format is not null)
         {
-            return value.Value.ToString(Format, provider);
+            return SliderUtilities.FormatNumber(value.Value, Locale, Format);
+        }
+
+        if (!string.IsNullOrEmpty(FormatString))
+        {
+            return value.Value.ToString(FormatString, ResolvedFormatProvider);
         }
 
         var percentage = value.Value / 100.0;
-        return percentage.ToString("P0", provider);
+        return percentage.ToString("P0", ResolvedFormatProvider);
     }
 
     private static string GetDefaultAriaValueText(string? formattedValue, double? value)
@@ -226,5 +233,25 @@
         labelId = id;
         BuildComponentAttributes();
         StateHasChanged();
+    }
+
+    private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object? value)
+    {
+        if (value is null || HasAdditionalAttribute(attribute))
+        {
+            return;
+        }
+
+        attrs[attribute] = value;
+    }
+
+    private bool HasAdditionalAttribute(string attribute)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        return AdditionalAttributes.Keys.Any(key => string.Equals(key, attribute, StringComparison.OrdinalIgnoreCase));
     }
 }

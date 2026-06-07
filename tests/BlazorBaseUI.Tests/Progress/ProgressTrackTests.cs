@@ -128,4 +128,16 @@ public class ProgressTrackTests : BunitContext, IProgressTrackContract
         track.HasAttribute("data-progressing").ShouldBeTrue();
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressTrack>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
+        return Task.CompletedTask;
+    }
 }

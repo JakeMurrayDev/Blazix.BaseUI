@@ -8,6 +8,7 @@ public interface IProgressLabelContract
     Task ForwardsAdditionalAttributes();
     Task AppliesClassValue();
     Task AppliesStyleValue();
+    Task HasRolePresentation();
 
     // ID generation
     Task GeneratesAutoId();
@@ -15,8 +16,12 @@ public interface IProgressLabelContract
 
     // Label-root association
     Task NotifiesParentOfLabelId();
+    Task UpdatesParentWhenIdChanges();
     Task CleansUpLabelIdOnDispose();
 
     // Data attributes
     Task HasDataStatusAttribute();
+
+    // Context
+    Task ThrowsWhenRenderedWithoutRoot();
 }

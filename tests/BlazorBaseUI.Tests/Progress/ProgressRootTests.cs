@@ -13,7 +13,9 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         double? value = 50,
         double min = 0,
         double max = 100,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null,
         Func<string?, double?, string>? getAriaValueText = null,
         RenderFragment<RenderProps<ProgressRootState>>? render = null,
@@ -37,6 +39,10 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(attrIndex++, "Locale", locale);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
             if (getAriaValueText is not null)
@@ -79,7 +85,9 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
 
     private RenderFragment CreateProgressWithValue(
         double? value = 50,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null)
     {
         return builder =>
@@ -94,6 +102,10 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
 
             if (format is not null)
                 builder.AddAttribute(attrIndex++, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(attrIndex++, "Locale", locale);
             if (formatProvider is not null)
                 builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
 
@@ -286,6 +298,42 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AllowsAriaAttributesToOverrideDefaults()
+    {
+        var cut = Render(CreateProgressRoot(
+            value: 30,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "role", "meter" },
+                { "aria-valuemin", "-1" },
+                { "aria-valuemax", "9" },
+                { "aria-valuenow", "manual" },
+                { "aria-valuetext", "Manual value" },
+                { "aria-labelledby", "external-label" }
+            }));
+
+        var element = cut.Find("div");
+        element.GetAttribute("role").ShouldBe("meter");
+        element.GetAttribute("aria-valuemin").ShouldBe("-1");
+        element.GetAttribute("aria-valuemax").ShouldBe("9");
+        element.GetAttribute("aria-valuenow").ShouldBe("manual");
+        element.GetAttribute("aria-valuetext").ShouldBe("Manual value");
+        element.GetAttribute("aria-labelledby").ShouldBe("external-label");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersNvdaPresentationSpan()
+    {
+        var cut = Render(CreateProgressRoot());
+        var hidden = cut.Find("span[role='presentation']");
+        hidden.TextContent.ShouldBe("x");
+        hidden.GetAttribute("style").ShouldContain("clip-path:inset(50%)");
+        hidden.GetAttribute("style").ShouldContain("position:fixed");
+        return Task.CompletedTask;
+    }
+
     // Data attributes
 
     [Fact]
@@ -320,7 +368,7 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
     [Fact]
     public Task FormatsValueWithCustomFormat()
     {
-        var cut = Render(CreateProgressWithValue(value: 30, format: "F1"));
+        var cut = Render(CreateProgressWithValue(value: 30, formatString: "F1"));
         var progressbar = cut.Find("[role='progressbar']");
         var expected = 30.0.ToString("F1", CultureInfo.CurrentCulture);
         progressbar.GetAttribute("aria-valuetext").ShouldBe(expected);
@@ -330,12 +378,32 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
     }
 
     [Fact]
+    public Task FormatsValueWithNumberFormatOptionsAndLocale()
+    {
+        var format = new NumberFormatOptions(
+            Style: "decimal",
+            MinimumFractionDigits: 2,
+            MaximumFractionDigits: 2);
+
+        var cut = Render(CreateProgressWithValue(
+            value: 70.51,
+            format: format,
+            locale: "de-DE"));
+
+        var progressbar = cut.Find("[role='progressbar']");
+        var valueElement = cut.Find("[data-testid='value']");
+        progressbar.GetAttribute("aria-valuetext").ShouldBe("70,51");
+        valueElement.TextContent.ShouldBe("70,51");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task FormatsValueWithFormatProvider()
     {
         var germanCulture = CultureInfo.GetCultureInfo("de-DE");
         var cut = Render(CreateProgressWithValue(
             value: 70.51,
-            format: "F2",
+            formatString: "F2",
             formatProvider: germanCulture));
         var valueElement = cut.Find("[data-testid='value']");
         var expected = 70.51.ToString("F2", germanCulture);

@@ -124,6 +124,15 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task HasRolePresentation()
+    {
+        var cut = Render(CreateProgressWithLabel());
+        var label = cut.Find("[data-testid='label']");
+        label.GetAttribute("role").ShouldBe("presentation");
+        return Task.CompletedTask;
+    }
+
     // ID generation
 
     [Fact]
@@ -160,6 +169,43 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         var label = cut.Find("[data-testid='label']");
         var labelId = label.GetAttribute("id");
         progressbar.GetAttribute("aria-labelledby").ShouldBe(labelId);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UpdatesParentWhenIdChanges()
+    {
+        var labelId = "progress-label-a";
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<ProgressRoot>(0);
+            builder.AddAttribute(1, "Value", 50.0);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<ProgressLabel>(0);
+                innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "id", labelId },
+                        { "data-testid", "label" }
+                    });
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(contentBuilder =>
+                {
+                    contentBuilder.AddContent(0, "Loading");
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label-a");
+
+        labelId = "progress-label-b";
+        cut.Render();
+        cut.FindComponent<ProgressRoot>().Render();
+
+        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label-b");
+        cut.Find("[data-testid='label']").GetAttribute("id").ShouldBe("progress-label-b");
         return Task.CompletedTask;
     }
 
@@ -211,6 +257,18 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         var cut = Render(CreateProgressWithLabel(value: 50));
         var label = cut.Find("[data-testid='label']");
         label.HasAttribute("data-progressing").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressLabel>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
         return Task.CompletedTask;
     }
 }

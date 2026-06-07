@@ -180,6 +180,47 @@ public class ProgressIndicatorTests : BunitContext, IProgressIndicatorContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AdditionalStyleOverridesIndicatorStyle()
+    {
+        var cut = Render(CreateProgressWithIndicator(
+            value: 50,
+            indicatorAttributes: new Dictionary<string, object>
+            {
+                { "style", "width:88%" }
+            }));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+        style.ShouldNotBeNull();
+        style.IndexOf("width:50%", StringComparison.Ordinal)
+            .ShouldBeLessThan(style.IndexOf("width:88%", StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task StyleValueOverridesIndicatorStyle()
+    {
+        var cut = Render(CreateProgressWithIndicator(
+            value: 50,
+            indicatorStyleValue: _ => "width:88%"));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+        style.ShouldNotBeNull();
+        style.IndexOf("width:50%", StringComparison.Ordinal)
+            .ShouldBeLessThan(style.IndexOf("width:88%", StringComparison.Ordinal));
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesSourceValueToPercentWhenMinEqualsMax()
+    {
+        var cut = Render(CreateProgressWithIndicator(value: 50, min: 50, max: 50));
+        var indicator = cut.Find("[data-testid='indicator']");
+        var style = indicator.GetAttribute("style");
+        style.ShouldContain("width:NaN%");
+        return Task.CompletedTask;
+    }
+
     // Data attributes
 
     [Fact]
@@ -188,6 +229,18 @@ public class ProgressIndicatorTests : BunitContext, IProgressIndicatorContract
         var cut = Render(CreateProgressWithIndicator(value: 50));
         var indicator = cut.Find("[data-testid='indicator']");
         indicator.HasAttribute("data-progressing").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressIndicator>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
         return Task.CompletedTask;
     }
 }
