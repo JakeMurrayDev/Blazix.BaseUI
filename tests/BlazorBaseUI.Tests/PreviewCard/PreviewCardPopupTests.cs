@@ -157,6 +157,30 @@ public class PreviewCardPopupTests : BunitContext, IPreviewCardPopupContract
     }
 
     [Fact]
+    public Task HasFloatingFocusableAttributes()
+    {
+        var cut = Render(CreatePopupInRoot(defaultOpen: true));
+
+        var popup = cut.Find("div[data-side][id]");
+        popup.GetAttribute("tabindex").ShouldBe("-1");
+        popup.GetAttribute("data-floating-ui-focusable").ShouldBe("");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DoesNotSetInstantDismissOnOutsidePressClose()
+    {
+        var cut = Render(CreatePopupInRoot(defaultOpen: true));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, PreviewCardOpenChangeReason.OutsidePress, null));
+
+        var popup = cut.Find("div[data-side][id]");
+        popup.HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task AppliesClassValueWithState()
     {
         var cut = Render(CreatePopupInRoot(

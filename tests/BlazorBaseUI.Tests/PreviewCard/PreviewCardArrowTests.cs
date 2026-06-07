@@ -177,6 +177,18 @@ public class PreviewCardArrowTests : BunitContext, IPreviewCardArrowContract
     }
 
     [Fact]
+    public async Task DoesNotRenderDataInstant()
+    {
+        var cut = Render(CreateArrowInRoot(defaultOpen: false));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
+
+        var arrow = cut.Find("[aria-hidden='true'][data-side]");
+        arrow.HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task AppliesClassValueWithState()
     {
         var cut = Render(CreateArrowInRoot(

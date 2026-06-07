@@ -151,6 +151,20 @@ public class PreviewCardBackdropTests : BunitContext, IPreviewCardBackdropContra
     }
 
     [Fact]
+    public Task HasNonSelectablePresentationStyles()
+    {
+        var cut = Render(CreateBackdropInRoot());
+
+        var backdrops = cut.FindAll("[role='presentation']");
+        var backdrop = backdrops.First(e => !e.HasAttribute("data-side"));
+        var style = backdrop.GetAttribute("style")!;
+        style.ShouldContain("user-select: none");
+        style.ShouldContain("-webkit-user-select: none");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task AppliesClassValueWithState()
     {
         var cut = Render(CreateBackdropInRoot(

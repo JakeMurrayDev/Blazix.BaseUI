@@ -9,10 +9,8 @@ namespace BlazorBaseUI.PreviewCard;
 /// <param name="Side">The side of the anchor the preview card is positioned on.</param>
 /// <param name="Align">The alignment of the preview card relative to the anchor.</param>
 /// <param name="Uncentered">Indicates whether the arrow is uncentered relative to the popup.</param>
-/// <param name="Instant">The current instant transition type.</param>
 public readonly record struct PreviewCardArrowState(
     bool Open,
     Side Side,
     Align Align,
-    bool Uncentered,
-    PreviewCardInstantType Instant);
+    bool Uncentered);

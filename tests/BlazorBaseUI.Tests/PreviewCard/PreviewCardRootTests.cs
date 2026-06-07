@@ -68,6 +68,54 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
         };
     }
 
+    private static RenderFragment CreatePayloadSwitchingPreviewCard()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<PreviewCardRoot>(0);
+            builder.AddAttribute(1, "ChildContentWithPayload", (RenderFragment<PreviewCardRootPayloadContext>)(payloadContext => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PreviewCardTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-one");
+                innerBuilder.AddAttribute(2, "Delay", 0);
+                innerBuilder.AddAttribute(3, "CloseDelay", 0);
+                innerBuilder.AddAttribute(4, "Payload", "one");
+                innerBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger one")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PreviewCardTrigger>(10);
+                innerBuilder.AddAttribute(11, "Id", "trigger-two");
+                innerBuilder.AddAttribute(12, "Delay", 0);
+                innerBuilder.AddAttribute(13, "CloseDelay", 0);
+                innerBuilder.AddAttribute(14, "Payload", "two");
+                innerBuilder.AddAttribute(15, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger two")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PreviewCardPortal>(20);
+                innerBuilder.AddAttribute(21, "KeepMounted", true);
+                innerBuilder.AddAttribute(22, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PreviewCardPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PreviewCardPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenElement(0, "span");
+                            popupBuilder.AddAttribute(1, "data-testid", "payload");
+                            popupBuilder.AddContent(2, payloadContext.Payload);
+                            popupBuilder.CloseElement();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersChildren()
     {
@@ -151,20 +199,18 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
     }
 
     [Fact]
-    public Task OpensOnTriggerHover()
+    public async Task OpensOnTriggerHover()
     {
         var cut = Render(CreatePreviewCard());
 
-        var trigger = cut.Find("a");
-        trigger.TriggerEvent("onmouseenter", new MouseEventArgs());
+        var root = cut.FindComponent<PreviewCardRoot>();
+        await cut.InvokeAsync(() => root.Instance.OnHoverOpen(null));
 
         cut.Find("div[data-side][data-open]").ShouldNotBeNull();
-
-        return Task.CompletedTask;
     }
 
     [Fact]
-    public Task ClosesOnTriggerUnhover()
+    public async Task ClosesOnTriggerUnhover()
     {
         var callCount = 0;
         var cut = Render(CreatePreviewCard(
@@ -175,10 +221,9 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
             })
         ));
 
-        cut.Find("a").TriggerEvent("onmouseleave", new MouseEventArgs());
+        var root = cut.FindComponent<PreviewCardRoot>();
+        await cut.InvokeAsync(() => root.Instance.OnHoverClose(null));
         callCount.ShouldBe(1);
-
-        return Task.CompletedTask;
     }
 
     [Fact]
@@ -192,6 +237,21 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
         cut.Find("div[data-side][data-open]").ShouldNotBeNull();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task SwitchesActiveTriggerWhileOpenAndUpdatesPayload()
+    {
+        var cut = Render(CreatePayloadSwitchingPreviewCard());
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, "trigger-one"));
+
+        cut.Find("[data-testid='payload']").TextContent.ShouldBe("one");
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, "trigger-two"));
+
+        cut.Find("[data-testid='payload']").TextContent.ShouldBe("two");
     }
 
     [Fact]

@@ -1,3 +1,8 @@
+@using BlazorBaseUI.Popover
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
 <RenderElement TState="PreviewCardViewportState"
                Tag="div"
                Enabled="RootContext is not null"
@@ -6,20 +11,33 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
+               ChildContent="WrappedChildContent"
                @attributes="AdditionalAttributes"
-               @ref="renderElementReference">
-    <div data-current>
-        @ChildContent
-    </div>
-</RenderElement>
+               @ref="renderElementReference" />
 
 @code {
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private string? activationDirection;
+    private bool transitioning;
     private PreviewCardViewportState state;
     private RenderElement<PreviewCardViewportState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private DotNetObjectReference<PreviewCardViewport>? dotNetRef;
+    private string? lastTriggerId;
+    private object? lastPayload;
+    private bool pendingPayloadUpdate;
+    private int contentKey;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/BlazorBaseUI/blazor-baseui-preview-card.min.js").AsTask());
 
     [CascadingParameter]
     private PreviewCardRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private PreviewCardPositionerContext? PositionerContext { get; set; }
 
     /// <summary>
     /// Gets or sets a custom render template for the viewport element.
@@ -56,6 +74,15 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    private RenderFragment? WrappedChildContent => ChildContent is null ? null : builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.SetKey(contentKey);
+        builder.AddAttribute(1, "data-current", true);
+        builder.AddContent(2, ChildContent);
+        builder.CloseElement();
+    };
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -65,14 +92,96 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        var currentTriggerId = RootContext?.ActiveTriggerId;
+        var currentPayload = RootContext?.Payload;
+        var triggerChanged = lastTriggerId is not null
+            && currentTriggerId is not null
+            && currentTriggerId != lastTriggerId;
+        var payloadChanged = !ReferenceEquals(lastPayload, currentPayload);
+
+        if (triggerChanged)
+        {
+            contentKey++;
+            pendingPayloadUpdate = !payloadChanged;
+        }
+        else if (pendingPayloadUpdate && payloadChanged)
+        {
+            contentKey++;
+            pendingPayloadUpdate = false;
+        }
+
+        lastTriggerId = currentTriggerId;
+        lastPayload = currentPayload;
+
         var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
-        state = new PreviewCardViewportState(instantType);
+        state = new PreviewCardViewportState(activationDirection, transitioning, instantType);
         BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            if (RootContext is not null && Element.HasValue)
+            {
+                try
+                {
+                    var module = await ModuleTask.Value;
+                    await module.InvokeVoidAsync("initializeViewport", RootContext.RootId, Element.Value, dotNetRef);
+                    var side = PositionerContext?.Side ?? Side.Bottom;
+                    await module.InvokeVoidAsync("initializeViewportAutoResize", RootContext.RootId, side.ToDataAttributeString(), "ltr");
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a viewport content transition starts.
+    /// </summary>
+    /// <param name="direction">The computed activation direction.</param>
+    [JSInvokable]
+    public void OnViewportTransitionStart(string direction)
+    {
+        activationDirection = direction;
+        transitioning = true;
+        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        state = new PreviewCardViewportState(activationDirection, transitioning, instantType);
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a viewport content transition ends.
+    /// </summary>
+    [JSInvokable]
+    public void OnViewportTransitionEnd()
+    {
+        activationDirection = null;
+        transitioning = false;
+        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        state = new PreviewCardViewportState(activationDirection, transitioning, instantType);
+        BuildComponentAttributes();
+        StateHasChanged();
     }
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
+
+        if (!string.IsNullOrEmpty(state.ActivationDirection))
+        {
+            attrs["data-activation-direction"] = state.ActivationDirection;
+        }
+
+        attrs["data-transitioning"] = state.Transitioning;
 
         var instantAttr = state.Instant.ToDataAttributeString();
         if (!string.IsNullOrEmpty(instantAttr))
@@ -81,5 +190,28 @@
         }
 
         componentAttributes = attrs;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        RootContext?.SetHasViewport(false);
+
+        if (moduleTask?.IsValueCreated == true && hasRendered && RootContext is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeViewportAutoResize", RootContext.RootId);
+                await module.InvokeVoidAsync("disposeViewport", RootContext.RootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
     }
 }

@@ -16,6 +16,7 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
 
     private RenderFragment CreateTriggerInRoot(
         bool defaultOpen = false,
+        string? id = null,
         RenderFragment<RenderProps<PreviewCardTriggerState>>? render = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         Func<PreviewCardTriggerState, string>? classValue = null,
@@ -32,6 +33,8 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
                 var attrIndex = 1;
                 innerBuilder.AddAttribute(attrIndex++, "Delay", 0);
                 innerBuilder.AddAttribute(attrIndex++, "CloseDelay", 0);
+                if (id is not null)
+                    innerBuilder.AddAttribute(attrIndex++, "Id", id);
                 if (render is not null)
                     innerBuilder.AddAttribute(attrIndex++, "Render", render);
                 if (classValue is not null)
@@ -122,6 +125,19 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
 
         var trigger = cut.Find("a");
         trigger.HasAttribute("data-popup-open").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitializesJsHoverByDefaultWithTriggerId()
+    {
+        var cut = Render(CreateTriggerInRoot(id: "trigger-one"));
+
+        cut.WaitForAssertion(() => JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            invocation.Arguments.Count >= 2 &&
+            Equals(invocation.Arguments[1], "trigger-one")).ShouldBeTrue());
 
         return Task.CompletedTask;
     }

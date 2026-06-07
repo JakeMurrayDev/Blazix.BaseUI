@@ -173,6 +173,18 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
     }
 
     [Fact]
+    public async Task DoesNotRenderDataInstant()
+    {
+        var cut = Render(CreatePositionerInRoot(defaultOpen: false));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
+
+        var positioner = cut.Find("[role='presentation']");
+        positioner.HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task HasHiddenWhenNotMounted()
     {
         var cut = Render(CreatePositionerInRoot(defaultOpen: false));
@@ -205,6 +217,17 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
 
         var positioner = cut.Find("[role='presentation']");
         positioner.GetAttribute("style")!.ShouldContain("z-index: 100");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AppliesPointerEventsNoneWhenClosed()
+    {
+        var cut = Render(CreatePositionerInRoot(defaultOpen: false));
+
+        var positioner = cut.Find("[role='presentation']");
+        positioner.GetAttribute("style")!.ShouldContain("pointer-events: none");
 
         return Task.CompletedTask;
     }
