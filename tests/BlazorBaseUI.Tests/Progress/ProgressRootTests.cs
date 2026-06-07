@@ -27,36 +27,35 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
-            builder.AddAttribute(attrIndex++, "Min", min);
-            builder.AddAttribute(attrIndex++, "Max", max);
+            builder.AddAttribute(3, "Min", min);
+            builder.AddAttribute(4, "Max", max);
 
             if (format is not null)
-                builder.AddAttribute(attrIndex++, "Format", format);
+                builder.AddAttribute(5, "Format", format);
             if (formatString is not null)
-                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+                builder.AddAttribute(6, "FormatString", formatString);
             if (locale is not null)
-                builder.AddAttribute(attrIndex++, "Locale", locale);
+                builder.AddAttribute(7, "Locale", locale);
             if (formatProvider is not null)
-                builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
+                builder.AddAttribute(8, "FormatProvider", formatProvider);
             if (getAriaValueText is not null)
-                builder.AddAttribute(attrIndex++, "GetAriaValueText", getAriaValueText);
+                builder.AddAttribute(9, "GetAriaValueText", getAriaValueText);
             if (render is not null)
-                builder.AddAttribute(attrIndex++, "Render", render);
+                builder.AddAttribute(10, "Render", render);
             if (classValue is not null)
-                builder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                builder.AddAttribute(11, "ClassValue", classValue);
             if (styleValue is not null)
-                builder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                builder.AddAttribute(12, "StyleValue", styleValue);
             if (additionalAttributes is not null)
-                builder.AddAttribute(attrIndex++, "AdditionalAttributes", additionalAttributes);
+                builder.AddAttribute(13, "AdditionalAttributes", additionalAttributes);
             if (childContent is not null)
-                builder.AddAttribute(attrIndex++, "ChildContent", childContent);
+                builder.AddAttribute(14, "ChildContent", childContent);
 
             builder.CloseComponent();
         };
@@ -93,23 +92,22 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
             if (format is not null)
-                builder.AddAttribute(attrIndex++, "Format", format);
+                builder.AddAttribute(3, "Format", format);
             if (formatString is not null)
-                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+                builder.AddAttribute(4, "FormatString", formatString);
             if (locale is not null)
-                builder.AddAttribute(attrIndex++, "Locale", locale);
+                builder.AddAttribute(5, "Locale", locale);
             if (formatProvider is not null)
-                builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
+                builder.AddAttribute(6, "FormatProvider", formatProvider);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(7, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressValue>(0);
                 innerBuilder.AddAttribute(1, "AdditionalAttributes",

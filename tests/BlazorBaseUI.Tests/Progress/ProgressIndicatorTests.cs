@@ -192,6 +192,8 @@ public class ProgressIndicatorTests : BunitContext, IProgressIndicatorContract
         var indicator = cut.Find("[data-testid='indicator']");
         var style = indicator.GetAttribute("style");
         style.ShouldNotBeNull();
+        style.ShouldContain("width:50%");
+        style.ShouldContain("width:88%");
         style.IndexOf("width:50%", StringComparison.Ordinal)
             .ShouldBeLessThan(style.IndexOf("width:88%", StringComparison.Ordinal));
         return Task.CompletedTask;
@@ -206,6 +208,8 @@ public class ProgressIndicatorTests : BunitContext, IProgressIndicatorContract
         var indicator = cut.Find("[data-testid='indicator']");
         var style = indicator.GetAttribute("style");
         style.ShouldNotBeNull();
+        style.ShouldContain("width:50%");
+        style.ShouldContain("width:88%");
         style.IndexOf("width:50%", StringComparison.Ordinal)
             .ShouldBeLessThan(style.IndexOf("width:88%", StringComparison.Ordinal));
         return Task.CompletedTask;

@@ -210,6 +210,19 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
     }
 
     [Fact]
+    public async Task RegistersLabelIdWhenContextCallbackChanges()
+    {
+        var cut = Render<ProgressLabelContextSwitchHost>();
+
+        cut.Instance.FirstRegisteredId.ShouldBe("progress-label");
+        cut.Instance.SecondRegisteredId.ShouldBeNull();
+
+        await cut.InvokeAsync(cut.Instance.SwitchContext);
+
+        cut.Instance.SecondRegisteredId.ShouldBe("progress-label");
+    }
+
+    [Fact]
     public Task CleansUpLabelIdOnDispose()
     {
         // Render with label present
@@ -270,5 +283,53 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         }));
         exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class ProgressLabelContextSwitchHost : ComponentBase
+{
+    private bool useSecondContext;
+
+    public string? FirstRegisteredId { get; private set; }
+
+    public string? SecondRegisteredId { get; private set; }
+
+    public void SwitchContext()
+    {
+        useSecondContext = true;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CascadingValue<ProgressRootContext>>(0);
+        builder.AddAttribute(1, "Value", CreateContext());
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            innerBuilder.OpenComponent<ProgressLabel>(0);
+            innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                {
+                    { "id", "progress-label" }
+                });
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+
+    private ProgressRootContext CreateContext()
+    {
+        return new ProgressRootContext
+        {
+            FormattedValue = "50%",
+            Max = 100,
+            Min = 0,
+            Value = 50,
+            State = new ProgressRootState(ProgressStatus.Progressing),
+            Status = ProgressStatus.Progressing,
+            SetLabelIdAction = useSecondContext
+                ? id => SecondRegisteredId = id
+                : id => FirstRegisteredId = id
+        };
     }
 }

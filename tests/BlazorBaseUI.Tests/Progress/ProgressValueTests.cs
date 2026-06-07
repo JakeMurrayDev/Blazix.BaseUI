@@ -24,35 +24,33 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
             if (format is not null)
-                builder.AddAttribute(attrIndex++, "Format", format);
+                builder.AddAttribute(3, "Format", format);
             if (formatString is not null)
-                builder.AddAttribute(attrIndex++, "FormatString", formatString);
+                builder.AddAttribute(4, "FormatString", formatString);
             if (locale is not null)
-                builder.AddAttribute(attrIndex++, "Locale", locale);
+                builder.AddAttribute(5, "Locale", locale);
             if (formatProvider is not null)
-                builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
+                builder.AddAttribute(6, "FormatProvider", formatProvider);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(7, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressValue>(0);
-                var valueAttrIndex = 1;
 
                 if (valueClassValue is not null)
-                    innerBuilder.AddAttribute(valueAttrIndex++, "ClassValue", valueClassValue);
+                    innerBuilder.AddAttribute(1, "ClassValue", valueClassValue);
                 if (valueStyleValue is not null)
-                    innerBuilder.AddAttribute(valueAttrIndex++, "StyleValue", valueStyleValue);
+                    innerBuilder.AddAttribute(2, "StyleValue", valueStyleValue);
                 if (valueRender is not null)
-                    innerBuilder.AddAttribute(valueAttrIndex++, "Render", valueRender);
+                    innerBuilder.AddAttribute(3, "Render", valueRender);
                 if (childContent is not null)
-                    innerBuilder.AddAttribute(valueAttrIndex++, "ChildContent", childContent);
+                    innerBuilder.AddAttribute(4, "ChildContent", childContent);
 
                 var attrs = new Dictionary<string, object>
                 {
@@ -63,7 +61,7 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
                     foreach (var kvp in valueAttributes)
                         attrs[kvp.Key] = kvp.Value;
                 }
-                innerBuilder.AddAttribute(valueAttrIndex++, "AdditionalAttributes",
+                innerBuilder.AddAttribute(5, "AdditionalAttributes",
                     (IReadOnlyDictionary<string, object>)attrs);
 
                 innerBuilder.CloseComponent();

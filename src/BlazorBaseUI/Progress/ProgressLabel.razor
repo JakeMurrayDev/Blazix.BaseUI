@@ -15,6 +15,7 @@
 @code {
     private string? defaultId;
     private string? registeredLabelId;
+    private Action<string?>? registeredSetLabelIdAction;
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -75,10 +76,11 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        if (registeredLabelId is not null)
+        if (registeredSetLabelIdAction is not null)
         {
-            Context?.SetLabelIdAction(null);
+            registeredSetLabelIdAction(null);
             registeredLabelId = null;
+            registeredSetLabelIdAction = null;
         }
     }
 
@@ -96,13 +98,21 @@
     private void RegisterLabelId()
     {
         var id = ResolvedId;
-        if (registeredLabelId == id)
+        var setLabelIdAction = Context!.SetLabelIdAction;
+
+        if (registeredLabelId == id && registeredSetLabelIdAction == setLabelIdAction)
         {
             return;
         }
 
+        if (registeredSetLabelIdAction is not null && registeredSetLabelIdAction != setLabelIdAction)
+        {
+            registeredSetLabelIdAction(null);
+        }
+
         registeredLabelId = id;
-        Context!.SetLabelIdAction(id);
+        registeredSetLabelIdAction = setLabelIdAction;
+        setLabelIdAction(id);
     }
 
     private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
