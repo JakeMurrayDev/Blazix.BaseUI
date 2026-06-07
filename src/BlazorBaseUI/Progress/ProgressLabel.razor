@@ -14,6 +14,8 @@
 
 @code {
     private string? defaultId;
+    private string? registeredLabelId;
+    private Action<string?>? registeredSetLabelIdAction;
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -60,20 +62,26 @@
     public ElementReference? Element => renderElementReference?.Element;
 
     /// <inheritdoc />
-    protected override void OnInitialized()
-    {
-        Context?.SetLabelIdAction(ResolvedId);
-    }
-
-    /// <inheritdoc />
     protected override void OnParametersSet()
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(ProgressRootContext.MissingContextMessage);
         }
 
         BuildComponentAttributes();
+        RegisterLabelId();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (registeredSetLabelIdAction is not null)
+        {
+            registeredSetLabelIdAction(null);
+            registeredLabelId = null;
+            registeredSetLabelIdAction = null;
+        }
     }
 
     private void BuildComponentAttributes()
@@ -81,14 +89,49 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["id"] = ResolvedId;
+        SetDefaultAttribute(attrs, "role", "presentation");
         attrs[$"data-{Context!.State.Status.ToDataAttributeString()}"] = (object)true;
 
         componentAttributes = attrs;
     }
 
-    /// <inheritdoc />
-    public void Dispose()
+    private void RegisterLabelId()
     {
-        Context?.SetLabelIdAction(null);
+        var id = ResolvedId;
+        var setLabelIdAction = Context!.SetLabelIdAction;
+
+        if (registeredLabelId == id && registeredSetLabelIdAction == setLabelIdAction)
+        {
+            return;
+        }
+
+        if (registeredSetLabelIdAction is not null && registeredSetLabelIdAction != setLabelIdAction)
+        {
+            registeredSetLabelIdAction(null);
+        }
+
+        registeredLabelId = id;
+        registeredSetLabelIdAction = setLabelIdAction;
+        setLabelIdAction(id);
+    }
+
+    private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
+    {
+        if (HasAdditionalAttribute(attribute))
+        {
+            return;
+        }
+
+        attrs[attribute] = value;
+    }
+
+    private bool HasAdditionalAttribute(string attribute)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        return AdditionalAttributes.Keys.Any(key => string.Equals(key, attribute, StringComparison.OrdinalIgnoreCase));
     }
 }

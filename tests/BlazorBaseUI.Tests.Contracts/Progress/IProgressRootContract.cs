@@ -20,6 +20,8 @@ public interface IProgressRootContract
     Task UpdatesAriaValueNowWhenValueChanges();
     Task DoesNotSetAriaValueNowWhenIndeterminate();
     Task SetsIndeterminateAriaValueText();
+    Task AllowsAriaAttributesToOverrideDefaults();
+    Task RendersNvdaPresentationSpan();
 
     // Data attributes
     Task HasDataProgressingWhenInProgress();
@@ -29,6 +31,7 @@ public interface IProgressRootContract
     // Formatting
     Task FormatsValueWithCustomFormat();
     Task FormatsValueWithFormatProvider();
+    Task FormatsValueWithNumberFormatOptionsAndLocale();
     Task GetAriaValueTextCallbackOverridesDefault();
 
     // Context cascading

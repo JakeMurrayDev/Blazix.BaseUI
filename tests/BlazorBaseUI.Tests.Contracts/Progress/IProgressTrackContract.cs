@@ -11,4 +11,7 @@ public interface IProgressTrackContract
 
     // Data attributes
     Task HasDataStatusAttribute();
+
+    // Context
+    Task ThrowsWhenRenderedWithoutRoot();
 }

@@ -14,7 +14,13 @@ public interface IProgressIndicatorContract
     Task SetsZeroWidthWhenValueIsZero();
     Task NoIndicatorStyleForIndeterminateValue();
     Task CombinesUserStyleWithIndicatorStyle();
+    Task AdditionalStyleOverridesIndicatorStyle();
+    Task StyleValueOverridesIndicatorStyle();
+    Task UsesSourceValueToPercentWhenMinEqualsMax();
 
     // Data attributes
     Task HasDataStatusAttribute();
+
+    // Context
+    Task ThrowsWhenRenderedWithoutRoot();
 }

@@ -7,6 +7,11 @@ namespace BlazorBaseUI.Progress;
 internal sealed class ProgressRootContext
 {
     /// <summary>
+    /// Error thrown when a progress part is rendered outside of a <see cref="ProgressRoot"/>.
+    /// </summary>
+    public const string MissingContextMessage = "Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.";
+
+    /// <summary>
     /// Gets or sets the formatted value of the component.
     /// </summary>
     public string FormattedValue { get; set; } = string.Empty;
@@ -40,5 +45,5 @@ internal sealed class ProgressRootContext
     /// Gets or sets the callback used by <see cref="ProgressLabel"/> to register its id
     /// with the root for <c>aria-labelledby</c> association.
     /// </summary>
-    public Action<string?> SetLabelIdAction { get; set; } = null!;
+    public Action<string?> SetLabelIdAction { get; set; } = _ => { };
 }

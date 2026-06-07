@@ -13,7 +13,9 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         double? value = 50,
         double min = 0,
         double max = 100,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null,
         Func<string?, double?, string>? getAriaValueText = null,
         RenderFragment<RenderProps<ProgressRootState>>? render = null,
@@ -25,32 +27,35 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
-            builder.AddAttribute(attrIndex++, "Min", min);
-            builder.AddAttribute(attrIndex++, "Max", max);
+            builder.AddAttribute(3, "Min", min);
+            builder.AddAttribute(4, "Max", max);
 
             if (format is not null)
-                builder.AddAttribute(attrIndex++, "Format", format);
+                builder.AddAttribute(5, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(6, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(7, "Locale", locale);
             if (formatProvider is not null)
-                builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
+                builder.AddAttribute(8, "FormatProvider", formatProvider);
             if (getAriaValueText is not null)
-                builder.AddAttribute(attrIndex++, "GetAriaValueText", getAriaValueText);
+                builder.AddAttribute(9, "GetAriaValueText", getAriaValueText);
             if (render is not null)
-                builder.AddAttribute(attrIndex++, "Render", render);
+                builder.AddAttribute(10, "Render", render);
             if (classValue is not null)
-                builder.AddAttribute(attrIndex++, "ClassValue", classValue);
+                builder.AddAttribute(11, "ClassValue", classValue);
             if (styleValue is not null)
-                builder.AddAttribute(attrIndex++, "StyleValue", styleValue);
+                builder.AddAttribute(12, "StyleValue", styleValue);
             if (additionalAttributes is not null)
-                builder.AddAttribute(attrIndex++, "AdditionalAttributes", additionalAttributes);
+                builder.AddAttribute(13, "AdditionalAttributes", additionalAttributes);
             if (childContent is not null)
-                builder.AddAttribute(attrIndex++, "ChildContent", childContent);
+                builder.AddAttribute(14, "ChildContent", childContent);
 
             builder.CloseComponent();
         };
@@ -79,25 +84,30 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
 
     private RenderFragment CreateProgressWithValue(
         double? value = 50,
-        string? format = null,
+        NumberFormatOptions? format = null,
+        string? formatString = null,
+        string? locale = null,
         IFormatProvider? formatProvider = null)
     {
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
             if (format is not null)
-                builder.AddAttribute(attrIndex++, "Format", format);
+                builder.AddAttribute(3, "Format", format);
+            if (formatString is not null)
+                builder.AddAttribute(4, "FormatString", formatString);
+            if (locale is not null)
+                builder.AddAttribute(5, "Locale", locale);
             if (formatProvider is not null)
-                builder.AddAttribute(attrIndex++, "FormatProvider", formatProvider);
+                builder.AddAttribute(6, "FormatProvider", formatProvider);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(7, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressValue>(0);
                 innerBuilder.AddAttribute(1, "AdditionalAttributes",
@@ -286,6 +296,42 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task AllowsAriaAttributesToOverrideDefaults()
+    {
+        var cut = Render(CreateProgressRoot(
+            value: 30,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "role", "meter" },
+                { "aria-valuemin", "-1" },
+                { "aria-valuemax", "9" },
+                { "aria-valuenow", "manual" },
+                { "aria-valuetext", "Manual value" },
+                { "aria-labelledby", "external-label" }
+            }));
+
+        var element = cut.Find("div");
+        element.GetAttribute("role").ShouldBe("meter");
+        element.GetAttribute("aria-valuemin").ShouldBe("-1");
+        element.GetAttribute("aria-valuemax").ShouldBe("9");
+        element.GetAttribute("aria-valuenow").ShouldBe("manual");
+        element.GetAttribute("aria-valuetext").ShouldBe("Manual value");
+        element.GetAttribute("aria-labelledby").ShouldBe("external-label");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task RendersNvdaPresentationSpan()
+    {
+        var cut = Render(CreateProgressRoot());
+        var hidden = cut.Find("span[role='presentation']");
+        hidden.TextContent.ShouldBe("x");
+        hidden.GetAttribute("style").ShouldContain("clip-path:inset(50%)");
+        hidden.GetAttribute("style").ShouldContain("position:fixed");
+        return Task.CompletedTask;
+    }
+
     // Data attributes
 
     [Fact]
@@ -320,7 +366,7 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
     [Fact]
     public Task FormatsValueWithCustomFormat()
     {
-        var cut = Render(CreateProgressWithValue(value: 30, format: "F1"));
+        var cut = Render(CreateProgressWithValue(value: 30, formatString: "F1"));
         var progressbar = cut.Find("[role='progressbar']");
         var expected = 30.0.ToString("F1", CultureInfo.CurrentCulture);
         progressbar.GetAttribute("aria-valuetext").ShouldBe(expected);
@@ -330,12 +376,32 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
     }
 
     [Fact]
+    public Task FormatsValueWithNumberFormatOptionsAndLocale()
+    {
+        var format = new NumberFormatOptions(
+            Style: "decimal",
+            MinimumFractionDigits: 2,
+            MaximumFractionDigits: 2);
+
+        var cut = Render(CreateProgressWithValue(
+            value: 70.51,
+            format: format,
+            locale: "de-DE"));
+
+        var progressbar = cut.Find("[role='progressbar']");
+        var valueElement = cut.Find("[data-testid='value']");
+        progressbar.GetAttribute("aria-valuetext").ShouldBe("70,51");
+        valueElement.TextContent.ShouldBe("70,51");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task FormatsValueWithFormatProvider()
     {
         var germanCulture = CultureInfo.GetCultureInfo("de-DE");
         var cut = Render(CreateProgressWithValue(
             value: 70.51,
-            format: "F2",
+            formatString: "F2",
             formatProvider: germanCulture));
         var valueElement = cut.Find("[data-testid='value']");
         var expected = 70.51.ToString("F2", germanCulture);

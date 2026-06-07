@@ -17,24 +17,22 @@ public class ProgressTrackTests : BunitContext, IProgressTrackContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressTrack>(0);
-                var trackAttrIndex = 1;
 
                 if (trackClassValue is not null)
-                    innerBuilder.AddAttribute(trackAttrIndex++, "ClassValue", trackClassValue);
+                    innerBuilder.AddAttribute(1, "ClassValue", trackClassValue);
                 if (trackStyleValue is not null)
-                    innerBuilder.AddAttribute(trackAttrIndex++, "StyleValue", trackStyleValue);
+                    innerBuilder.AddAttribute(2, "StyleValue", trackStyleValue);
                 if (trackRender is not null)
-                    innerBuilder.AddAttribute(trackAttrIndex++, "Render", trackRender);
+                    innerBuilder.AddAttribute(3, "Render", trackRender);
 
                 var attrs = new Dictionary<string, object>
                 {
@@ -45,7 +43,7 @@ public class ProgressTrackTests : BunitContext, IProgressTrackContract
                     foreach (var kvp in trackAttributes)
                         attrs[kvp.Key] = kvp.Value;
                 }
-                innerBuilder.AddAttribute(trackAttrIndex++, "AdditionalAttributes",
+                innerBuilder.AddAttribute(4, "AdditionalAttributes",
                     (IReadOnlyDictionary<string, object>)attrs);
 
                 innerBuilder.CloseComponent();
@@ -126,6 +124,18 @@ public class ProgressTrackTests : BunitContext, IProgressTrackContract
         var cut = Render(CreateProgressWithTrack(value: 50));
         var track = cut.Find("[data-testid='track']");
         track.HasAttribute("data-progressing").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressTrack>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
         return Task.CompletedTask;
     }
 }

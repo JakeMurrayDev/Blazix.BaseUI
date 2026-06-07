@@ -6,12 +6,11 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="resolvedContent"
+               ChildContent="GetResolvedContent()"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
-    private RenderFragment? resolvedContent;
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -43,7 +42,7 @@
     /// allowing custom rendering of the progress value.
     /// </summary>
     [Parameter]
-    public Func<string, double?, RenderFragment>? ChildContent { get; set; }
+    public Func<string?, double?, RenderFragment>? ChildContent { get; set; }
 
     /// <summary>
     /// Gets or sets a collection of additional attributes that will be applied to the created element.
@@ -61,30 +60,52 @@
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(ProgressRootContext.MissingContextMessage);
         }
 
         BuildComponentAttributes();
-        BuildResolvedContent();
     }
 
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["aria-hidden"] = "true";
+        SetDefaultAttribute(attrs, "aria-hidden", "true");
         attrs[$"data-{Context!.State.Status.ToDataAttributeString()}"] = (object)true;
 
         componentAttributes = attrs;
     }
 
-    private void BuildResolvedContent()
+    private RenderFragment GetResolvedContent()
     {
         var formattedValueArg = !Context!.Value.HasValue ? "indeterminate" : Context.FormattedValue;
         var formattedValueDisplay = !Context.Value.HasValue ? null : Context.FormattedValue;
 
-        resolvedContent = ChildContent is not null
-            ? ChildContent(formattedValueArg, Context.Value)
-            : (RenderFragment)(b => b.AddContent(0, formattedValueDisplay));
+        if (ChildContent is not null)
+        {
+            return ChildContent(formattedValueArg, Context.Value);
+        }
+
+        return b => b.AddContent(0, formattedValueDisplay);
+    }
+
+    private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
+    {
+        if (HasAdditionalAttribute(attribute))
+        {
+            return;
+        }
+
+        attrs[attribute] = value;
+    }
+
+    private bool HasAdditionalAttribute(string attribute)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        return AdditionalAttributes.Keys.Any(key => string.Equals(key, attribute, StringComparison.OrdinalIgnoreCase));
     }
 }

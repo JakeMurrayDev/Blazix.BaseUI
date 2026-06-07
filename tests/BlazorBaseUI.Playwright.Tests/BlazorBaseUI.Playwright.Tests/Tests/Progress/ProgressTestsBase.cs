@@ -7,8 +7,8 @@ namespace BlazorBaseUI.Playwright.Tests.Tests.Progress;
 /// <summary>
 /// Playwright tests for Progress component - focused on browser-specific behavior.
 /// Static rendering, attribute forwarding, and basic state tests are handled by bUnit.
-/// These tests cover: indicator computed styles, dynamic value updates, ARIA attributes
-/// in a real browser, data attribute transitions, and label associations.
+    /// These tests cover: indicator computed styles, dynamic value updates, ARIA attributes,
+    /// presentation helpers, data attribute transitions, and label associations in a real browser.
 /// </summary>
 public abstract class ProgressTestsBase : TestBase
 {
@@ -96,6 +96,22 @@ public abstract class ProgressTestsBase : TestBase
         var ariaValueText = await root.GetAttributeAsync("aria-valuetext");
         Assert.NotNull(ariaValueText);
         Assert.NotEmpty(ariaValueText);
+    }
+
+    [Fact]
+    public virtual async Task Root_RendersNvdaPresentationSpan()
+    {
+        await NavigateAsync(CreateUrl("/tests/progress")
+            .WithProgressValue(50)
+            .WithShowProgressLabel(false));
+
+        var hidden = GetProgressRoot().Locator("> span[role='presentation']");
+        await Assertions.Expect(hidden).ToHaveTextAsync("x");
+
+        var style = await hidden.GetAttributeAsync("style");
+        Assert.NotNull(style);
+        Assert.Contains("clip-path:inset(50%)", style);
+        Assert.Contains("position:fixed", style);
     }
 
     #endregion
@@ -190,6 +206,7 @@ public abstract class ProgressTestsBase : TestBase
 
         await Assertions.Expect(root).ToHaveAttributeAsync("aria-labelledby", labelId!);
         await Assertions.Expect(label).ToHaveTextAsync("Downloading");
+        await Assertions.Expect(label).ToHaveAttributeAsync("role", "presentation");
     }
 
     #endregion
@@ -204,6 +221,8 @@ public abstract class ProgressTestsBase : TestBase
             .WithShowProgressValue(true));
 
         var value = GetProgressValue();
+        await Assertions.Expect(value).ToHaveAttributeAsync("aria-hidden", "true");
+
         var text = await value.TextContentAsync();
         Assert.NotNull(text);
         Assert.NotEmpty(text);

@@ -9,13 +9,15 @@
                StyleValue="computedStyleValue"
                ComponentAttributes="componentAttributes"
                ChildContent="ChildContent"
-               @attributes="AdditionalAttributes"
+               @attributes="filteredAdditionalAttributes"
                @ref="renderElementReference" />
 
 @code {
     private Func<ProgressRootState, string?>? computedStyleValue;
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private IReadOnlyDictionary<string, object>? filteredAdditionalAttributes;
+    private string? additionalStyleValue;
 
     [CascadingParameter]
     private ProgressRootContext? Context { get; set; }
@@ -62,14 +64,17 @@
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(ProgressRootContext.MissingContextMessage);
         }
+
+        ResolveAdditionalAttributes();
 
         computedStyleValue = s =>
         {
             var userStyle = StyleValue?.Invoke(s);
             var indicatorStyle = GetIndicatorStyle();
-            return CombineWithIndicatorStyle(userStyle, indicatorStyle);
+            var styleWithAdditionalAttributes = AppendStyle(indicatorStyle, additionalStyleValue);
+            return AppendStyle(styleWithAdditionalAttributes, userStyle);
         };
 
         BuildComponentAttributes();
@@ -105,24 +110,43 @@
 
     private static double ValueToPercent(double value, double min, double max)
     {
-        if (max - min == 0)
-        {
-            return 0;
-        }
-
-        return ((value - min) / (max - min)) * 100;
+        return ((value - min) * 100) / (max - min);
     }
 
-    private static string? CombineWithIndicatorStyle(string? baseStyle, string? indicatorStyle)
+    private void ResolveAdditionalAttributes()
     {
-        if (string.IsNullOrEmpty(indicatorStyle))
+        additionalStyleValue = AttributeUtilities.GetAttributeStringValue(AdditionalAttributes, "style");
+
+        if (AdditionalAttributes is null || additionalStyleValue is null)
+        {
+            filteredAdditionalAttributes = AdditionalAttributes;
+            return;
+        }
+
+        var attrs = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kvp in AdditionalAttributes)
+        {
+            if (string.Equals(kvp.Key, "style", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            attrs[kvp.Key] = kvp.Value;
+        }
+
+        filteredAdditionalAttributes = attrs;
+    }
+
+    private static string? AppendStyle(string? baseStyle, string? overridingStyle)
+    {
+        if (string.IsNullOrEmpty(overridingStyle))
         {
             return baseStyle;
         }
 
         if (string.IsNullOrEmpty(baseStyle))
         {
-            return indicatorStyle;
+            return overridingStyle;
         }
 
         var trimmed = baseStyle.TrimEnd();
@@ -131,6 +155,6 @@
             trimmed += ";";
         }
 
-        return trimmed + indicatorStyle;
+        return trimmed + overridingStyle;
     }
 }

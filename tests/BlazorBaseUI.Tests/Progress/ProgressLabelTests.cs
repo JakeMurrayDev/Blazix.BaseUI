@@ -18,24 +18,22 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         return builder =>
         {
             builder.OpenComponent<ProgressRoot>(0);
-            var attrIndex = 1;
 
             if (value.HasValue)
-                builder.AddAttribute(attrIndex++, "Value", value.Value);
+                builder.AddAttribute(1, "Value", value.Value);
             else
-                builder.AddAttribute(attrIndex++, "Value", (double?)null);
+                builder.AddAttribute(2, "Value", (double?)null);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(innerBuilder =>
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<ProgressLabel>(0);
-                var labelAttrIndex = 1;
 
                 if (labelClassValue is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "ClassValue", labelClassValue);
+                    innerBuilder.AddAttribute(1, "ClassValue", labelClassValue);
                 if (labelStyleValue is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "StyleValue", labelStyleValue);
+                    innerBuilder.AddAttribute(2, "StyleValue", labelStyleValue);
                 if (labelRender is not null)
-                    innerBuilder.AddAttribute(labelAttrIndex++, "Render", labelRender);
+                    innerBuilder.AddAttribute(3, "Render", labelRender);
 
                 var attrs = new Dictionary<string, object>
                 {
@@ -46,10 +44,10 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
                     foreach (var kvp in labelAttributes)
                         attrs[kvp.Key] = kvp.Value;
                 }
-                innerBuilder.AddAttribute(labelAttrIndex++, "AdditionalAttributes",
+                innerBuilder.AddAttribute(4, "AdditionalAttributes",
                     (IReadOnlyDictionary<string, object>)attrs);
 
-                innerBuilder.AddAttribute(labelAttrIndex++, "ChildContent", (RenderFragment)(contentBuilder =>
+                innerBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(contentBuilder =>
                 {
                     contentBuilder.AddContent(0, labelText);
                 }));
@@ -124,6 +122,15 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task HasRolePresentation()
+    {
+        var cut = Render(CreateProgressWithLabel());
+        var label = cut.Find("[data-testid='label']");
+        label.GetAttribute("role").ShouldBe("presentation");
+        return Task.CompletedTask;
+    }
+
     // ID generation
 
     [Fact]
@@ -161,6 +168,56 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         var labelId = label.GetAttribute("id");
         progressbar.GetAttribute("aria-labelledby").ShouldBe(labelId);
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UpdatesParentWhenIdChanges()
+    {
+        var labelId = "progress-label-a";
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<ProgressRoot>(0);
+            builder.AddAttribute(1, "Value", 50.0);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<ProgressLabel>(0);
+                innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                    {
+                        { "id", labelId },
+                        { "data-testid", "label" }
+                    });
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(contentBuilder =>
+                {
+                    contentBuilder.AddContent(0, "Loading");
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label-a");
+
+        labelId = "progress-label-b";
+        cut.Render();
+        cut.FindComponent<ProgressRoot>().Render();
+
+        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label-b");
+        cut.Find("[data-testid='label']").GetAttribute("id").ShouldBe("progress-label-b");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task RegistersLabelIdWhenContextCallbackChanges()
+    {
+        var cut = Render<ProgressLabelContextSwitchHost>();
+
+        cut.Instance.FirstRegisteredId.ShouldBe("progress-label");
+        cut.Instance.SecondRegisteredId.ShouldBeNull();
+
+        await cut.InvokeAsync(cut.Instance.SwitchContext);
+
+        cut.Instance.SecondRegisteredId.ShouldBe("progress-label");
     }
 
     [Fact]
@@ -212,5 +269,65 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
         var label = cut.Find("[data-testid='label']");
         label.HasAttribute("data-progressing").ShouldBeTrue();
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ThrowsWhenRenderedWithoutRoot()
+    {
+        var exception = Should.Throw<InvalidOperationException>(() => Render(builder =>
+        {
+            builder.OpenComponent<ProgressLabel>(0);
+            builder.CloseComponent();
+        }));
+        exception.Message.ShouldBe("Base UI: ProgressRootContext is missing. Progress parts must be placed within <Progress.Root>.");
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class ProgressLabelContextSwitchHost : ComponentBase
+{
+    private bool useSecondContext;
+
+    public string? FirstRegisteredId { get; private set; }
+
+    public string? SecondRegisteredId { get; private set; }
+
+    public void SwitchContext()
+    {
+        useSecondContext = true;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<CascadingValue<ProgressRootContext>>(0);
+        builder.AddAttribute(1, "Value", CreateContext());
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            innerBuilder.OpenComponent<ProgressLabel>(0);
+            innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                {
+                    { "id", "progress-label" }
+                });
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+
+    private ProgressRootContext CreateContext()
+    {
+        return new ProgressRootContext
+        {
+            FormattedValue = "50%",
+            Max = 100,
+            Min = 0,
+            Value = 50,
+            State = new ProgressRootState(ProgressStatus.Progressing),
+            Status = ProgressStatus.Progressing,
+            SetLabelIdAction = useSecondContext
+                ? id => SecondRegisteredId = id
+                : id => FirstRegisteredId = id
+        };
     }
 }

@@ -59,7 +59,7 @@
     {
         if (Context is null)
         {
-            return;
+            throw new InvalidOperationException(ProgressRootContext.MissingContextMessage);
         }
 
         BuildComponentAttributes();
