@@ -33,10 +33,16 @@ public class ToolbarTestsWasm : ToolbarTestsBase, IClassFixture<PlaywrightFixtur
     public override Task Horizontal_ArrowDown_DoesNotMoveFocus() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
-    public override Task Horizontal_Home_MovesFocusToFirstItem() => Task.CompletedTask;
+    public override Task Horizontal_Home_DoesNotMoveFocus() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
-    public override Task Horizontal_End_MovesFocusToLastItem() => Task.CompletedTask;
+    public override Task Horizontal_End_DoesNotMoveFocus() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Horizontal_Rtl_ArrowLeft_MovesFocusToNextItem() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Horizontal_Rtl_ArrowRight_MovesFocusToPreviousItem() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
     public override Task Vertical_ArrowDown_MovesFocusToNextItem() => Task.CompletedTask;
@@ -57,6 +63,9 @@ public class ToolbarTestsWasm : ToolbarTestsBase, IClassFixture<PlaywrightFixtur
     public override Task Tab_MovesFocusIntoToolbar() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Tab_SkipsFirstDisabledNonFocusableItem() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
     public override Task LoopDisabled_ArrowRight_StopsAtLastItem() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
@@ -69,7 +78,22 @@ public class ToolbarTestsWasm : ToolbarTestsBase, IClassFixture<PlaywrightFixtur
     public override Task FocusesDisabledFocusableItems() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task DisabledFocusableButton_DoesNotInvokeActivationHandlers() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Vertical_DisabledFocusableInput_SuppressesArrowUpDown() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
     public override Task NavigatesThroughButtonsLinksAndInputs() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Horizontal_InputArrowRight_UsesTextCursorUntilEnd() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Horizontal_InputArrowLeft_UsesTextCursorUntilStart() => Task.CompletedTask;
+
+    [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
+    public override Task Vertical_InputArrowKeys_UseTextCursorBoundary() => Task.CompletedTask;
 
     [Fact(Skip = "WASM JIT warmup causes unreliable keyboard event processing")]
     public override Task NavigatesThroughGroups() => Task.CompletedTask;

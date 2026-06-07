@@ -920,6 +920,18 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithToolbarButton1Disabled(bool value)
+    {
+        queryParams["button1Disabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithToolbarInputDisabled(bool value)
+    {
+        queryParams["inputDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithToolbarFocusableWhenDisabled(bool value)
     {
         queryParams["focusableWhenDisabled"] = value.ToString().ToLowerInvariant();

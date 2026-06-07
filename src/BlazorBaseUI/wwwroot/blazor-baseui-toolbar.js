@@ -4,90 +4,293 @@ if (!window[STATE_KEY]) {
 }
 const state = window[STATE_KEY];
 
+const ARROW_UP = 'ArrowUp';
+const ARROW_DOWN = 'ArrowDown';
+const ARROW_LEFT = 'ArrowLeft';
+const ARROW_RIGHT = 'ArrowRight';
+const TAB = 'Tab';
+
 function getItems(element) {
     const toolbarState = state.get(element);
-    if (!toolbarState) return [];
-    const items = Array.from(toolbarState.items).filter(item => document.contains(item));
+    if (!toolbarState) {
+        return [];
+    }
+
+    const items = Array.from(toolbarState.items).filter(item => item.isConnected && element.contains(item));
     items.sort((a, b) => {
         const position = a.compareDocumentPosition(b);
-        if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-        if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+        if (position & Node.DOCUMENT_POSITION_FOLLOWING) {
+            return -1;
+        }
+        if (position & Node.DOCUMENT_POSITION_PRECEDING) {
+            return 1;
+        }
         return 0;
     });
     return items;
 }
 
-function getFocusableItems(element) {
-    return getItems(element).filter(item => {
-        if (item.hasAttribute('data-disabled') && !item.hasAttribute('data-focusable')) {
-            return false;
-        }
-        return true;
-    });
+function isItemDisabled(item) {
+    return item.hasAttribute('data-disabled') ||
+        item.getAttribute('aria-disabled') === 'true' ||
+        item.disabled === true;
 }
 
-function focusItem(item) {
-    if (item) {
-        item.tabIndex = 0;
-        item.focus();
+function isItemFocusable(item) {
+    if (item.hasAttribute('disabled')) {
+        return false;
     }
+
+    if (item.hasAttribute('data-disabled') && !item.hasAttribute('data-focusable')) {
+        return false;
+    }
+
+    if (item.getAttribute('aria-disabled') === 'true' && !item.hasAttribute('data-focusable')) {
+        return false;
+    }
+
+    return true;
+}
+
+function getFocusableItems(element) {
+    return getItems(element).filter(isItemFocusable);
+}
+
+function getItemFromTarget(toolbarElement, target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+
+    return getItems(toolbarElement).find(item => item === target || item.contains(target)) ?? null;
+}
+
+function updateTabIndexes(element, activeItem = null) {
+    const items = getItems(element);
+    const focusableItems = items.filter(isItemFocusable);
+    const targetItem = activeItem && focusableItems.includes(activeItem)
+        ? activeItem
+        : focusableItems[0] ?? null;
+
+    for (const item of items) {
+        item.tabIndex = item === targetItem ? 0 : -1;
+    }
+
+    return targetItem;
+}
+
+function focusItem(element, item) {
+    if (!item) {
+        return;
+    }
+
+    updateTabIndexes(element, item);
+    item.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    item.focus();
+}
+
+function getDirection(element) {
+    const dirAttribute = element.getAttribute('dir') || element.closest('[dir]')?.getAttribute('dir');
+    if (dirAttribute) {
+        return dirAttribute.toLowerCase() === 'rtl' ? 'rtl' : 'ltr';
+    }
+
+    return getComputedStyle(element).direction === 'rtl' ? 'rtl' : 'ltr';
+}
+
+function getNavigationKeys(element, orientation) {
+    const isRtl = getDirection(element) === 'rtl';
+    const horizontalForwardKey = isRtl ? ARROW_LEFT : ARROW_RIGHT;
+    const horizontalBackwardKey = isRtl ? ARROW_RIGHT : ARROW_LEFT;
+
+    return {
+        forwardKey: orientation === 'vertical' ? ARROW_DOWN : horizontalForwardKey,
+        backwardKey: orientation === 'vertical' ? ARROW_UP : horizontalBackwardKey
+    };
+}
+
+function isModifierKeySet(event) {
+    return event.shiftKey || event.ctrlKey || event.altKey || event.metaKey;
+}
+
+function isNativeInput(target) {
+    if (!(target instanceof HTMLElement)) {
+        return false;
+    }
+
+    if (target.tagName === 'TEXTAREA') {
+        return true;
+    }
+
+    if (target.tagName !== 'INPUT') {
+        return false;
+    }
+
+    try {
+        return target.selectionStart !== null;
+    } catch {
+        return false;
+    }
+}
+
+function shouldUseNativeInputNavigation(event, target, forwardKey, backwardKey) {
+    if (!isNativeInput(target) || isItemDisabled(target)) {
+        return false;
+    }
+
+    const selectionStart = target.selectionStart;
+    const selectionEnd = target.selectionEnd;
+    const textContent = target.value ?? '';
+
+    if (selectionStart == null || event.shiftKey || selectionStart !== selectionEnd) {
+        return true;
+    }
+
+    if (event.key !== backwardKey && selectionStart < textContent.length) {
+        return true;
+    }
+
+    if (event.key !== forwardKey && selectionStart > 0) {
+        return true;
+    }
+
+    return false;
+}
+
+function shouldStopDisabledInputKeyDown(event, target) {
+    return isNativeInput(target) &&
+        isItemDisabled(target) &&
+        event.key !== TAB &&
+        event.key !== ARROW_LEFT &&
+        event.key !== ARROW_RIGHT;
+}
+
+function stopDisabledEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+}
+
+function handleFocusIn(event) {
+    const element = event.currentTarget;
+    const item = getItemFromTarget(element, event.target);
+
+    if (item && isItemFocusable(item)) {
+        updateTabIndexes(element, item);
+    }
+
+    if (isNativeInput(event.target)) {
+        try {
+            event.target.setSelectionRange(0, event.target.value?.length ?? 0);
+        } catch {
+            // Ignore input types that expose selectionStart but reject selection updates.
+        }
+    }
+}
+
+function handleDisabledPointerEvent(event) {
+    const element = event.currentTarget;
+    const item = getItemFromTarget(element, event.target);
+
+    if (!item || !isItemDisabled(item)) {
+        return;
+    }
+
+    stopDisabledEvent(event);
+}
+
+function handleDisabledKeyUp(event) {
+    const element = event.currentTarget;
+    const item = getItemFromTarget(element, event.target);
+
+    if (!item || !isItemDisabled(item) || event.key === TAB) {
+        return;
+    }
+
+    stopDisabledEvent(event);
 }
 
 function handleKeyDown(event) {
     const element = event.currentTarget;
     const toolbarState = state.get(element);
-    if (!toolbarState) return;
+    if (!toolbarState) {
+        return;
+    }
 
     const { orientation, loopFocus } = toolbarState;
-    const isHorizontal = orientation === 'horizontal';
+    const { forwardKey, backwardKey } = getNavigationKeys(element, orientation);
+    const item = getItemFromTarget(element, event.target);
+    const disabledTarget = item && isItemDisabled(item);
+    const isNavigationKey = event.key === forwardKey || event.key === backwardKey;
+
+    if (shouldStopDisabledInputKeyDown(event, event.target)) {
+        stopDisabledEvent(event);
+        return;
+    }
+
+    if (disabledTarget && event.key !== TAB && !isNavigationKey) {
+        stopDisabledEvent(event);
+        return;
+    }
+
+    if (!isNavigationKey || isModifierKeySet(event)) {
+        return;
+    }
+
+    if (shouldUseNativeInputNavigation(event, event.target, forwardKey, backwardKey)) {
+        return;
+    }
+
     const items = getFocusableItems(element);
+    if (items.length === 0) {
+        if (disabledTarget) {
+            stopDisabledEvent(event);
+        }
+        return;
+    }
 
-    if (items.length === 0) return;
-
-    const currentIndex = items.indexOf(document.activeElement);
-    if (currentIndex === -1) return;
+    const activeItem = item && items.includes(item) ? item : document.activeElement;
+    const currentIndex = items.indexOf(activeItem);
+    if (currentIndex === -1) {
+        if (disabledTarget) {
+            stopDisabledEvent(event);
+        }
+        return;
+    }
 
     let nextIndex = -1;
-    let handled = false;
 
-    const prevKey = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
-    const nextKey = isHorizontal ? 'ArrowRight' : 'ArrowDown';
-
-    if (event.key === nextKey) {
+    if (event.key === forwardKey) {
         if (currentIndex < items.length - 1) {
             nextIndex = currentIndex + 1;
         } else if (loopFocus) {
             nextIndex = 0;
         }
-        handled = true;
-    } else if (event.key === prevKey) {
+    } else if (event.key === backwardKey) {
         if (currentIndex > 0) {
             nextIndex = currentIndex - 1;
         } else if (loopFocus) {
             nextIndex = items.length - 1;
         }
-        handled = true;
-    } else if (event.key === 'Home') {
-        nextIndex = 0;
-        handled = true;
-    } else if (event.key === 'End') {
-        nextIndex = items.length - 1;
-        handled = true;
     }
 
-    if (handled) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (nextIndex !== -1 && nextIndex !== currentIndex) {
-            items[currentIndex].tabIndex = -1;
-            focusItem(items[nextIndex]);
+    if (nextIndex === -1 || nextIndex === currentIndex) {
+        if (disabledTarget) {
+            stopDisabledEvent(event);
         }
+        return;
     }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const nextItem = items[nextIndex];
+    updateTabIndexes(element, nextItem);
+    queueMicrotask(() => focusItem(element, nextItem));
 }
 
 export function initToolbar(element, orientation, loopFocus) {
-    if (!element) return;
+    if (!element) {
+        return;
+    }
 
     const toolbarState = {
         orientation,
@@ -96,64 +299,70 @@ export function initToolbar(element, orientation, loopFocus) {
     };
 
     state.set(element, toolbarState);
+    element.addEventListener('focusin', handleFocusIn);
     element.addEventListener('keydown', handleKeyDown);
+    element.addEventListener('keyup', handleDisabledKeyUp);
+    element.addEventListener('click', handleDisabledPointerEvent);
+    element.addEventListener('mousedown', handleDisabledPointerEvent);
+    element.addEventListener('pointerdown', handleDisabledPointerEvent);
 }
 
 export function updateToolbar(element, orientation, loopFocus) {
-    if (!element) return;
+    if (!element) {
+        return;
+    }
 
     const toolbarState = state.get(element);
     if (toolbarState) {
         toolbarState.orientation = orientation;
         toolbarState.loopFocus = loopFocus;
+        updateTabIndexes(element, document.activeElement);
     }
 }
 
 export function disposeToolbar(element) {
-    if (!element) return;
+    if (!element) {
+        return;
+    }
 
+    element.removeEventListener('focusin', handleFocusIn);
     element.removeEventListener('keydown', handleKeyDown);
+    element.removeEventListener('keyup', handleDisabledKeyUp);
+    element.removeEventListener('click', handleDisabledPointerEvent);
+    element.removeEventListener('mousedown', handleDisabledPointerEvent);
+    element.removeEventListener('pointerdown', handleDisabledPointerEvent);
     state.delete(element);
 }
 
 export function registerItem(toolbarElement, itemElement) {
-    if (!toolbarElement || !itemElement) return;
+    if (!toolbarElement || !itemElement) {
+        return;
+    }
 
     const toolbarState = state.get(toolbarElement);
-    if (!toolbarState) return;
-
-    const items = toolbarState.items;
-    items.add(itemElement);
-
-    const sortedItems = getItems(toolbarElement);
-    const firstItem = sortedItems[0];
-
-    for (const item of sortedItems) {
-        item.tabIndex = item === firstItem ? 0 : -1;
+    if (!toolbarState) {
+        return;
     }
+
+    toolbarState.items.add(itemElement);
+    updateTabIndexes(toolbarElement, document.activeElement);
 }
 
 export function unregisterItem(toolbarElement, itemElement) {
-    if (!toolbarElement || !itemElement) return;
+    if (!toolbarElement || !itemElement) {
+        return;
+    }
 
     const toolbarState = state.get(toolbarElement);
-    if (!toolbarState) return;
+    if (!toolbarState) {
+        return;
+    }
 
-    const items = toolbarState.items;
     const hadFocus = document.activeElement === itemElement;
-    const sortedBefore = getItems(toolbarElement);
-    const wasFirst = sortedBefore[0] === itemElement;
+    toolbarState.items.delete(itemElement);
+    const nextItem = updateTabIndexes(toolbarElement, document.activeElement);
 
-    items.delete(itemElement);
-
-    if (items.size > 0 && (hadFocus || wasFirst)) {
-        const sortedAfter = getItems(toolbarElement);
-        const firstItem = sortedAfter[0];
-        if (firstItem) {
-            firstItem.tabIndex = 0;
-            if (hadFocus) {
-                firstItem.focus();
-            }
-        }
+    if (hadFocus && nextItem) {
+        nextItem.focus();
     }
 }

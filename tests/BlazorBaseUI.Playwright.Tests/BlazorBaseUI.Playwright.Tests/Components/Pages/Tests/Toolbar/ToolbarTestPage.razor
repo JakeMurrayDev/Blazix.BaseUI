@@ -11,10 +11,11 @@
         Disabled="@IsDisabled"
         Orientation="@ResolvedOrientation"
         LoopFocus="@IsLoopFocus"
+        dir="@ResolvedDirection"
         data-testid="toolbar"
         aria-label="Toolbar">
 
-        <ToolbarButton data-testid="toolbar-button-1">Button 1</ToolbarButton>
+        <ToolbarButton Disabled="@IsButton1Disabled" FocusableWhenDisabled="@IsFocusableWhenDisabled" data-testid="toolbar-button-1">Button 1</ToolbarButton>
 
         @if (IsShowGroup)
         {
@@ -24,7 +25,7 @@
             </ToolbarGroup>
         }
 
-        <ToolbarButton Disabled="@IsButton2Disabled" FocusableWhenDisabled="@IsFocusableWhenDisabled" data-testid="toolbar-button-2">Button 2</ToolbarButton>
+        <ToolbarButton Disabled="@IsButton2Disabled" FocusableWhenDisabled="@IsFocusableWhenDisabled" data-testid="toolbar-button-2" @onclick="OnToolbarButton2Click">Button 2</ToolbarButton>
 
         @if (IsShowSeparator)
         {
@@ -40,11 +41,12 @@
 
         @if (IsShowInput)
         {
-            <ToolbarInput placeholder="Search..." data-testid="toolbar-input" />
+            <ToolbarInput Disabled="@IsInputDisabled" DefaultValue="abcd" placeholder="Search..." data-testid="toolbar-input" />
         }
     </ToolbarRoot>
 
     <button data-testid="after-button" type="button" style="margin-top: 10px;">After Button</button>
+    <output data-testid="toolbar-button-2-click-count">@Button2ClickCount</output>
 
     <div style="margin-top: 20px;">
         <button data-testid="toggle-disabled" type="button" @onclick="ToggleDisabled">Toggle Disabled</button>
@@ -80,8 +82,17 @@
     [SupplyParameterFromQuery(Name = "button2Disabled")]
     public bool? QueryButton2Disabled { get; set; }
 
+    [SupplyParameterFromQuery(Name = "inputDisabled")]
+    public bool? QueryInputDisabled { get; set; }
+
     [SupplyParameterFromQuery(Name = "focusableWhenDisabled")]
     public bool? QueryFocusableWhenDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "button1Disabled")]
+    public bool? QueryButton1Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string? QueryDirection { get; set; }
 
     private bool IsDisabled { get; set; }
     private bool IsShowGroup => QueryShowGroup ?? false;
@@ -90,8 +101,12 @@
     private bool IsShowInput => QueryShowInput ?? false;
     private bool IsShowSeparator => QueryShowSeparator ?? false;
     private bool IsGroupDisabled => QueryGroupDisabled ?? false;
+    private bool IsButton1Disabled => QueryButton1Disabled ?? false;
     private bool IsButton2Disabled => QueryButton2Disabled ?? false;
+    private bool IsInputDisabled => QueryInputDisabled ?? false;
     private bool IsFocusableWhenDisabled => QueryFocusableWhenDisabled ?? true;
+    private int Button2ClickCount { get; set; }
+    private string ResolvedDirection => QueryDirection?.ToLowerInvariant() == "rtl" ? "rtl" : "ltr";
 
     private Orientation ResolvedOrientation { get; set; }
 
@@ -113,5 +128,10 @@
         ResolvedOrientation = ResolvedOrientation == Orientation.Horizontal
             ? Orientation.Vertical
             : Orientation.Horizontal;
+    }
+
+    private void OnToolbarButton2Click()
+    {
+        Button2ClickCount++;
     }
 }

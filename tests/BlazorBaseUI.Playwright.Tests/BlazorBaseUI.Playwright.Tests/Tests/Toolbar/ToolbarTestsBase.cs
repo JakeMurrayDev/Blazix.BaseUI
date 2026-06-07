@@ -122,21 +122,55 @@ public abstract class ToolbarTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task Horizontal_Home_MovesFocusToFirstItem()
+    public virtual async Task Horizontal_Home_DoesNotMoveFocus()
     {
         await NavigateAsync(CreateUrl("/tests/toolbar"));
         await WaitForToolbarJsAsync();
 
-        await PerformArrowNavigationAsync("toolbar-button-3", "Home", "toolbar-button-1");
+        var button3 = GetButton("3");
+        await button3.FocusAsync();
+        await WaitForDelayAsync(200);
+        await Page.Keyboard.PressAsync("Home");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(button3).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
     }
 
     [Fact]
-    public virtual async Task Horizontal_End_MovesFocusToLastItem()
+    public virtual async Task Horizontal_End_DoesNotMoveFocus()
     {
         await NavigateAsync(CreateUrl("/tests/toolbar"));
         await WaitForToolbarJsAsync();
 
-        await PerformArrowNavigationAsync("toolbar-button-1", "End", "toolbar-button-3");
+        var button1 = GetButton("1");
+        await button1.FocusAsync();
+        await WaitForDelayAsync(200);
+        await Page.Keyboard.PressAsync("End");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(button1).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
+    }
+
+    [Fact]
+    public virtual async Task Horizontal_Rtl_ArrowLeft_MovesFocusToNextItem()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithDirection("rtl"));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-1", "ArrowLeft", "toolbar-button-2");
+    }
+
+    [Fact]
+    public virtual async Task Horizontal_Rtl_ArrowRight_MovesFocusToPreviousItem()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithDirection("rtl"));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-2", "ArrowRight", "toolbar-button-1");
     }
 
     #endregion
@@ -229,6 +263,24 @@ public abstract class ToolbarTestsBase : TestBase
 
         var button1 = GetButton("1");
         await Assertions.Expect(button1).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    [Fact]
+    public virtual async Task Tab_SkipsFirstDisabledNonFocusableItem()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithToolbarButton1Disabled(true)
+            .WithToolbarFocusableWhenDisabled(false));
+        await WaitForToolbarJsAsync();
+
+        var beforeButton = GetByTestId("before-button");
+        await beforeButton.FocusAsync();
+        await WaitForDelayAsync(200);
+        await Page.Keyboard.PressAsync("Tab");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetButton("2")).ToBeFocusedAsync(
             new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
@@ -347,6 +399,51 @@ public abstract class ToolbarTestsBase : TestBase
         await PerformArrowNavigationAsync("toolbar-button-1", "ArrowRight", "toolbar-button-2");
     }
 
+    [Fact]
+    public virtual async Task DisabledFocusableButton_DoesNotInvokeActivationHandlers()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithToolbarButton2Disabled(true)
+            .WithToolbarFocusableWhenDisabled(true));
+        await WaitForToolbarJsAsync();
+
+        var button2 = GetButton("2");
+        var clickCount = GetByTestId("toolbar-button-2-click-count");
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+
+        await button2.EvaluateAsync("el => el.click()");
+        await button2.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Page.Keyboard.PressAsync("Space");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+    }
+
+    [Fact]
+    public virtual async Task Vertical_DisabledFocusableInput_SuppressesArrowUpDown()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithOrientation("vertical")
+            .WithShowInput(true)
+            .WithToolbarInputDisabled(true)
+            .WithToolbarFocusableWhenDisabled(true));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-3", "ArrowDown", "toolbar-input");
+
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await WaitForDelayAsync(200);
+        await Assertions.Expect(GetInput()).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
+
+        await Page.Keyboard.PressAsync("ArrowUp");
+        await WaitForDelayAsync(200);
+        await Assertions.Expect(GetInput()).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
+    }
+
     #endregion
 
     #region Mixed Item Types
@@ -364,6 +461,72 @@ public abstract class ToolbarTestsBase : TestBase
         await PerformArrowNavigationAsync("toolbar-button-2", "ArrowRight", "toolbar-button-3");
         await PerformArrowNavigationAsync("toolbar-button-3", "ArrowRight", "toolbar-link");
         await PerformArrowNavigationAsync("toolbar-link", "ArrowRight", "toolbar-input");
+    }
+
+    [Fact]
+    public virtual async Task Horizontal_InputArrowRight_UsesTextCursorUntilEnd()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithShowInput(true));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-3", "ArrowRight", "toolbar-input");
+
+        await Assertions.Expect(GetInput()).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        var selectedText = await GetInput().EvaluateAsync<string>(
+            "el => el.value.substring(el.selectionStart, el.selectionEnd)");
+        Assert.Equal("abcd", selectedText);
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await Assertions.Expect(GetInput()).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await Assertions.Expect(GetButton("1")).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    [Fact]
+    public virtual async Task Horizontal_InputArrowLeft_UsesTextCursorUntilStart()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithShowInput(true));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-3", "ArrowRight", "toolbar-input");
+
+        await Page.Keyboard.PressAsync("ArrowLeft");
+        await Assertions.Expect(GetInput()).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 3000 * TimeoutMultiplier });
+
+        await Page.Keyboard.PressAsync("ArrowLeft");
+        await Assertions.Expect(GetButton("3")).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    [Fact]
+    public virtual async Task Vertical_InputArrowKeys_UseTextCursorBoundary()
+    {
+        await NavigateAsync(CreateUrl("/tests/toolbar")
+            .WithOrientation("vertical")
+            .WithShowInput(true));
+        await WaitForToolbarJsAsync();
+
+        await PerformArrowNavigationAsync("toolbar-button-3", "ArrowDown", "toolbar-input");
+
+        await Page.Keyboard.PressAsync("ArrowRight");
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await Assertions.Expect(GetButton("1")).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await PerformArrowNavigationAsync("toolbar-button-3", "ArrowDown", "toolbar-input");
+
+        await Page.Keyboard.PressAsync("ArrowLeft");
+        await Page.Keyboard.PressAsync("ArrowUp");
+        await Assertions.Expect(GetButton("3")).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     [Fact]
