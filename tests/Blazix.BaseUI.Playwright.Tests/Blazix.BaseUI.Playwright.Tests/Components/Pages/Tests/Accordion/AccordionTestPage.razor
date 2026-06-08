@@ -1,0 +1,319 @@
+@page "/tests/accordion/server"
+@using Blazix.BaseUI.Accordion
+@using Blazix.BaseUI
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Accordion Test Page (Server)</PageTitle>
+
+@if (Animated)
+{
+    <style>
+        .animated-panel {
+            overflow: hidden;
+            transition: @(Horizontal ? "width" : "height") @(AnimationDuration)ms ease-out, opacity @(AnimationDuration)ms ease-out;
+        }
+
+        .animated-panel[data-closed] {
+            @(Horizontal ? "width: 0;" : "height: 0;")
+            opacity: 0;
+        }
+
+        .animated-panel[data-open] {
+            @(Horizontal ? "width: var(--accordion-panel-width);" : "height: var(--accordion-panel-height);")
+            opacity: 1;
+        }
+
+        .animated-panel[data-starting-style] {
+            @(Horizontal ? "width: 0;" : "height: 0;")
+            opacity: 0;
+        }
+
+        .animated-panel[data-ending-style] {
+            @(Horizontal ? "width: 0;" : "height: 0;")
+            opacity: 0;
+        }
+    </style>
+}
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    @if (Multiple)
+    {
+        <AccordionRoot TValue="string"
+            @bind-Value="openValues"
+            DefaultValue="@(DefaultOpen ? new[] { UseCustomValues ? "first" : "0" } : Array.Empty<string>())"
+            Disabled="@RootDisabled"
+            Orientation="@(Horizontal ? Orientation.Horizontal : Orientation.Vertical)"
+            LoopFocus="@(LoopFocus ?? true)"
+            HiddenUntilFound="@HiddenUntilFound"
+            Multiple="true"
+            OnValueChange="HandleValueChange"
+            data-testid="accordion-root">
+            <AccordionItem TValue="string"
+                Value="@(UseCustomValues ? "first" : null)"
+                Disabled="@Item1Disabled"
+                data-testid="accordion-item-1">
+                <AccordionHeader data-testid="accordion-header-1">
+                    <AccordionTrigger data-testid="accordion-trigger-1">
+                        Trigger 1
+                    </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel
+                    id="@(UseCustomPanelId ? "custom-panel-id-1" : null)"
+                    data-testid="accordion-panel-1"
+                    KeepMounted="@KeepMounted"
+                    ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                    <div data-testid="panel-content-1" style="padding: 16px;">
+                        <p>Panel contents 1</p>
+                        @if (ShowInput)
+                        {
+                            <input type="text" data-testid="panel-input-1" value="abcd" />
+                        }
+                    </div>
+                </AccordionPanel>
+            </AccordionItem>
+            <AccordionItem TValue="string"
+                Value="@(UseCustomValues ? "second" : null)"
+                Disabled="@Item2Disabled"
+                data-testid="accordion-item-2">
+                <AccordionHeader data-testid="accordion-header-2">
+                    <AccordionTrigger data-testid="accordion-trigger-2">
+                        Trigger 2
+                    </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel
+                    id="@(UseCustomPanelId ? "custom-panel-id-2" : null)"
+                    data-testid="accordion-panel-2"
+                    KeepMounted="@KeepMounted"
+                    ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                    <div data-testid="panel-content-2" style="padding: 16px;">
+                        <p>Panel contents 2</p>
+                    </div>
+                </AccordionPanel>
+            </AccordionItem>
+            @if (ShowThirdItem)
+            {
+                <AccordionItem TValue="string"
+                    Value="@(UseCustomValues ? "third" : null)"
+                    Disabled="@Item3Disabled"
+                    data-testid="accordion-item-3">
+                    <AccordionHeader data-testid="accordion-header-3">
+                        <AccordionTrigger data-testid="accordion-trigger-3">
+                            Trigger 3
+                        </AccordionTrigger>
+                    </AccordionHeader>
+                    <AccordionPanel
+                        data-testid="accordion-panel-3"
+                        KeepMounted="@KeepMounted"
+                        ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                        <div data-testid="panel-content-3" style="padding: 16px;">
+                            <p>Panel contents 3</p>
+                        </div>
+                    </AccordionPanel>
+                </AccordionItem>
+            }
+            @if (ShowFourthItem)
+            {
+                <AccordionItem TValue="string"
+                    Value="@(UseCustomValues ? "fourth" : null)"
+                    data-testid="accordion-item-4">
+                    <AccordionHeader data-testid="accordion-header-4">
+                        <AccordionTrigger data-testid="accordion-trigger-4">
+                            Trigger 4
+                        </AccordionTrigger>
+                    </AccordionHeader>
+                    <AccordionPanel
+                        data-testid="accordion-panel-4"
+                        KeepMounted="@KeepMounted"
+                        ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                        <div data-testid="panel-content-4" style="padding: 16px;">
+                            <p>Panel contents 4</p>
+                        </div>
+                    </AccordionPanel>
+                </AccordionItem>
+            }
+        </AccordionRoot>
+    }
+    else
+    {
+        <AccordionRoot TValue="string"
+            @bind-Value="openValues"
+            DefaultValue="@(DefaultOpen ? new[] { UseCustomValues ? "first" : "0" } : Array.Empty<string>())"
+            Disabled="@RootDisabled"
+            Orientation="@(Horizontal ? Orientation.Horizontal : Orientation.Vertical)"
+            LoopFocus="@(LoopFocus ?? true)"
+            HiddenUntilFound="@HiddenUntilFound"
+            Multiple="false"
+            OnValueChange="HandleValueChange"
+            data-testid="accordion-root">
+            <AccordionItem TValue="string"
+                Value="@(UseCustomValues ? "first" : null)"
+                Disabled="@Item1Disabled"
+                data-testid="accordion-item-1">
+                <AccordionHeader data-testid="accordion-header-1">
+                    <AccordionTrigger data-testid="accordion-trigger-1">
+                        Trigger 1
+                    </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel
+                    id="@(UseCustomPanelId ? "custom-panel-id-1" : null)"
+                    data-testid="accordion-panel-1"
+                    KeepMounted="@KeepMounted"
+                    ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                    <div data-testid="panel-content-1" style="padding: 16px;">
+                        <p>Panel contents 1</p>
+                        @if (ShowInput)
+                        {
+                            <input type="text" data-testid="panel-input-1" value="abcd" />
+                        }
+                    </div>
+                </AccordionPanel>
+            </AccordionItem>
+            <AccordionItem TValue="string"
+                Value="@(UseCustomValues ? "second" : null)"
+                Disabled="@Item2Disabled"
+                data-testid="accordion-item-2">
+                <AccordionHeader data-testid="accordion-header-2">
+                    <AccordionTrigger data-testid="accordion-trigger-2">
+                        Trigger 2
+                    </AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel
+                    id="@(UseCustomPanelId ? "custom-panel-id-2" : null)"
+                    data-testid="accordion-panel-2"
+                    KeepMounted="@KeepMounted"
+                    ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                    <div data-testid="panel-content-2" style="padding: 16px;">
+                        <p>Panel contents 2</p>
+                    </div>
+                </AccordionPanel>
+            </AccordionItem>
+            @if (ShowThirdItem)
+            {
+                <AccordionItem TValue="string"
+                    Value="@(UseCustomValues ? "third" : null)"
+                    Disabled="@Item3Disabled"
+                    data-testid="accordion-item-3">
+                    <AccordionHeader data-testid="accordion-header-3">
+                        <AccordionTrigger data-testid="accordion-trigger-3">
+                            Trigger 3
+                        </AccordionTrigger>
+                    </AccordionHeader>
+                    <AccordionPanel
+                        data-testid="accordion-panel-3"
+                        KeepMounted="@KeepMounted"
+                        ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                        <div data-testid="panel-content-3" style="padding: 16px;">
+                            <p>Panel contents 3</p>
+                        </div>
+                    </AccordionPanel>
+                </AccordionItem>
+            }
+            @if (ShowFourthItem)
+            {
+                <AccordionItem TValue="string"
+                    Value="@(UseCustomValues ? "fourth" : null)"
+                    data-testid="accordion-item-4">
+                    <AccordionHeader data-testid="accordion-header-4">
+                        <AccordionTrigger data-testid="accordion-trigger-4">
+                            Trigger 4
+                        </AccordionTrigger>
+                    </AccordionHeader>
+                    <AccordionPanel
+                        data-testid="accordion-panel-4"
+                        KeepMounted="@KeepMounted"
+                        ClassValue="@(Animated ? _ => "animated-panel" : null)">
+                        <div data-testid="panel-content-4" style="padding: 16px;">
+                            <p>Panel contents 4</p>
+                        </div>
+                    </AccordionPanel>
+                </AccordionItem>
+            }
+        </AccordionRoot>
+    }
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open Values: <span data-testid="open-values">@string.Join(",", openValues ?? Array.Empty<string>())</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Changed Values: <span data-testid="last-changed-values">@string.Join(",", lastChangedValues ?? Array.Empty<string>())</span></div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "keepMounted")]
+    public bool KeepMounted { get; set; }
+
+    [SupplyParameterFromQuery(Name = "animated")]
+    public bool Animated { get; set; }
+
+    [SupplyParameterFromQuery(Name = "animationDuration")]
+    public int AnimationDuration { get; set; } = 200;
+
+    [SupplyParameterFromQuery(Name = "rootDisabled")]
+    public bool RootDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "item1Disabled")]
+    public bool Item1Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "item2Disabled")]
+    public bool Item2Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "item3Disabled")]
+    public bool Item3Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "multiple")]
+    public bool Multiple { get; set; } = true;
+
+    [SupplyParameterFromQuery(Name = "horizontal")]
+    public bool Horizontal { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool? LoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "hiddenUntilFound")]
+    public bool HiddenUntilFound { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useCustomValues")]
+    public bool UseCustomValues { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useCustomPanelId")]
+    public bool UseCustomPanelId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showThirdItem")]
+    public bool ShowThirdItem { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showFourthItem")]
+    public bool ShowFourthItem { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showInput")]
+    public bool ShowInput { get; set; }
+
+    private string[]? openValues;
+    private int changeCount;
+    private string[]? lastChangedValues;
+    private bool initialized;
+
+    protected override void OnParametersSet()
+    {
+        if (!initialized)
+        {
+            initialized = true;
+            if (DefaultOpen)
+            {
+                openValues = UseCustomValues ? new[] { "first" } : new[] { "0" };
+            }
+            else
+            {
+                openValues = Array.Empty<string>();
+            }
+        }
+    }
+
+    private void HandleValueChange(AccordionValueChangeEventArgs<string> args)
+    {
+        changeCount++;
+        lastChangedValues = args.Value?.ToArray();
+    }
+}

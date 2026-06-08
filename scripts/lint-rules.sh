@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# BlazorBaseUI Lint Rules — textual subset
+# Blazix.BaseUI Lint Rules — textual subset
 # Structural rules (R02, R03, R07, R09, R10, R11, R12, R13, R14, R15) live in
-# the Roslyn analyzer project at src/BlazorBaseUI.Analyzers/ and run during
+# the Roslyn analyzer project at src/Blazix.BaseUI.Analyzers/ and run during
 # `dotnet build`. This script enforces the remaining text-only rules that do
 # not benefit from the C# AST: R01, R04, R05, R06.
 #
@@ -21,7 +21,7 @@ else
 fi
 
 REPO_ROOT="$(cd "$(git rev-parse --show-toplevel)" && pwd)"
-SRC_DIR="$REPO_ROOT/src/BlazorBaseUI"
+SRC_DIR="$REPO_ROOT/src/Blazix.BaseUI"
 RULE_FILTER=""
 VIOLATIONS_FILE=$(mktemp)
 trap 'rm -f "$VIOLATIONS_FILE"' EXIT
@@ -133,8 +133,8 @@ check_rule_04() {
 # ============================================================
 check_rule_05() {
   while IFS= read -r -d '' file; do
-    grep -n "data-base-ui-" "$file" 2>/dev/null | grep -v "data-blazor-base-ui-" | while IFS=: read -r line_num _; do
-      report 5 "$file" "$line_num" "Uses 'data-base-ui-' instead of 'data-blazor-base-ui-'"
+    grep -n "data-base-ui-" "$file" 2>/dev/null | grep -v "data-blazix-base-ui-" | while IFS=: read -r line_num _; do
+      report 5 "$file" "$line_num" "Uses 'data-base-ui-' instead of 'data-blazix-base-ui-'"
     done
   done < <(find "$SRC_DIR" \( -name "*.razor" -o -name "*.cs" -o -name "*.js" \) -not -path "*/obj/*" -print0)
 }
@@ -163,7 +163,7 @@ check_rule_06() {
 # Main
 # ============================================================
 echo -e "${CYAN}========================================${NC}"
-echo -e "${CYAN}BlazorBaseUI Lint Rules (textual subset)${NC}"
+echo -e "${CYAN}Blazix.BaseUI Lint Rules (textual subset)${NC}"
 echo -e "${CYAN}========================================${NC}"
 echo ""
 
@@ -196,6 +196,6 @@ if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
 else
   echo -e "${GREEN}Total: 0 violations${NC}"
   echo -e "${YELLOW}Note:${NC} structural rules (R02, R03, R07, R09–R15) are enforced by"
-  echo -e "      src/BlazorBaseUI.Analyzers via 'dotnet build'."
+  echo -e "      src/Blazix.BaseUI.Analyzers via 'dotnet build'."
   exit 0
 fi

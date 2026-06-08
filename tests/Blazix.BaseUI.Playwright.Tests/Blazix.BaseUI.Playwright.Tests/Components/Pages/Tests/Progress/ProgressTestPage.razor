@@ -1,0 +1,134 @@
+@page "/tests/progress/server"
+@using Blazix.BaseUI.Progress
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Progress Test Page (Server)</PageTitle>
+
+<style>
+    .progress-root {
+        width: 300px;
+        height: 20px;
+        position: relative;
+    }
+    .progress-track {
+        width: 100%;
+        height: 100%;
+        background-color: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-indicator {
+        background-color: #4caf50;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+    .progress-indicator[data-complete] {
+        background-color: #2196f3;
+    }
+    .progress-value {
+        font-size: 14px;
+    }
+    .progress-label {
+        font-size: 14px;
+        font-weight: bold;
+    }
+</style>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <ProgressRoot
+        Value="@CurrentValue"
+        Min="@Min"
+        Max="@Max"
+        FormatString="@Format"
+        FormatProvider="@ResolvedFormatProvider"
+        class="progress-root"
+        data-testid="progress-root">
+
+        @if (ShowLabel)
+        {
+            <ProgressLabel class="progress-label" data-testid="progress-label">
+                @ResolvedLabelText
+            </ProgressLabel>
+        }
+
+        @if (ShowValue)
+        {
+            <ProgressValue class="progress-value" data-testid="progress-value" />
+        }
+
+        <ProgressTrack class="progress-track" data-testid="progress-track">
+            <ProgressIndicator class="progress-indicator" data-testid="progress-indicator" />
+        </ProgressTrack>
+    </ProgressRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Value: <span data-testid="current-value">@(CurrentValue?.ToString() ?? "null")</span></div>
+        <div>Min: <span data-testid="current-min">@Min</span></div>
+        <div>Max: <span data-testid="current-max">@Max</span></div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <button data-testid="set-value-25" @onclick="() => SetValue(25)">Set 25%</button>
+        <button data-testid="set-value-50" @onclick="() => SetValue(50)">Set 50%</button>
+        <button data-testid="set-value-100" @onclick="() => SetValue(100)">Set 100%</button>
+        <button data-testid="set-value-null" @onclick="() => SetValueNull()">Set Indeterminate</button>
+        <button data-testid="set-value-0" @onclick="() => SetValue(0)">Set 0%</button>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "value")]
+    public double? InitialValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "min")]
+    public double? QueryMin { get; set; }
+
+    [SupplyParameterFromQuery(Name = "max")]
+    public double? QueryMax { get; set; }
+
+    [SupplyParameterFromQuery(Name = "format")]
+    public string? Format { get; set; }
+
+    [SupplyParameterFromQuery(Name = "locale")]
+    public string? Locale { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showLabel")]
+    public bool? QueryShowLabel { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showValue")]
+    public bool? QueryShowValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "labelText")]
+    public string? LabelText { get; set; }
+
+    [SupplyParameterFromQuery(Name = "indeterminate")]
+    public bool Indeterminate { get; set; }
+
+    private double Min => QueryMin ?? 0;
+    private double Max => QueryMax ?? 100;
+    private bool ShowLabel => QueryShowLabel ?? true;
+    private bool ShowValue => QueryShowValue ?? true;
+    private double? CurrentValue { get; set; }
+
+    private string ResolvedLabelText => LabelText ?? "Loading";
+
+    private IFormatProvider? ResolvedFormatProvider =>
+        !string.IsNullOrEmpty(Locale)
+            ? System.Globalization.CultureInfo.GetCultureInfo(Locale)
+            : null;
+
+    protected override void OnInitialized()
+    {
+        CurrentValue = Indeterminate ? null : (InitialValue ?? 50);
+    }
+
+    private void SetValue(double value)
+    {
+        CurrentValue = value;
+    }
+
+    private void SetValueNull()
+    {
+        CurrentValue = null;
+    }
+}

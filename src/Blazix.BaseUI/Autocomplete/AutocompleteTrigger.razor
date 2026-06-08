@@ -1,0 +1,334 @@
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="AutocompleteTriggerState"
+               Tag="button"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-autocomplete.min.js";
+
+    private string triggerId = null!;
+    private AutocompleteTriggerState state;
+    private RenderElement<AutocompleteTriggerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private ElementReference? previousElement;
+    private bool subscribed;
+
+    private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the component should ignore user interaction.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the rendered element is a native button.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the trigger id.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteTriggerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteTriggerState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteTriggerState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        triggerId = Id ?? RootContext?.RootId ?? Guid.NewGuid().ToIdString();
+        LabelableContext?.SetControlId(triggerId);
+
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Id is not null && Id != triggerId)
+        {
+            triggerId = Id;
+            LabelableContext?.SetControlId(triggerId);
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Element;
+        if (RootContext is not null && !Nullable.Equals(previousElement, current))
+        {
+            previousElement = current;
+            RootContext.SetTriggerElement(current);
+
+            if (current.HasValue)
+            {
+                try
+                {
+                    var module = await ModuleTask;
+                    await module.InvokeVoidAsync("setTriggerElement", RootContext.RootId, current.Value);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        LabelableContext?.SetControlId(null);
+
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        RootContext?.SetTriggerElement(null);
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await ModuleTask;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var disabled = Disabled || (RootContext?.Disabled ?? false);
+        var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
+        var open = RootContext?.Mounted == true;
+
+        state = AutocompleteTriggerState.FromFieldState(
+            fieldState,
+            open,
+            disabled,
+            RootContext?.ReadOnly == true,
+            RootContext?.Required == true,
+            RootContext?.PopupSide,
+            RootContext?.ListEmpty == true);
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = triggerId,
+            ["aria-expanded"] = open ? "true" : "false",
+            ["aria-haspopup"] = RootContext?.InputInsidePopup == true ? "dialog" : "listbox"
+        };
+
+        if (NativeButton)
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
+        }
+
+        if (RootContext?.InputInsidePopup == true)
+        {
+            attrs["role"] = "combobox";
+        }
+        else if (!NativeButton)
+        {
+            attrs["role"] = "button";
+        }
+        attrs["aria-expanded"] = open ? "true" : "false";
+        attrs["aria-haspopup"] = RootContext?.InputInsidePopup == true ? "dialog" : "listbox";
+
+        if (open && RootContext?.ListId is not null)
+        {
+            attrs["aria-controls"] = RootContext.ListId;
+        }
+
+        if (RootContext?.Required == true)
+        {
+            attrs["aria-required"] = "true";
+            attrs["data-required"] = true;
+        }
+
+        if (RootContext?.ReadOnly == true)
+        {
+            attrs["aria-readonly"] = "true";
+            attrs["data-readonly"] = true;
+        }
+
+        if (disabled)
+        {
+            attrs["data-disabled"] = true;
+        }
+
+        var labelledBy = AccessibilityUtilities.ResolveAriaLabelledBy(LabelableContext?.LabelId, RootContext?.LabelId);
+        if (!string.IsNullOrEmpty(labelledBy))
+        {
+            attrs["aria-labelledby"] = labelledBy;
+        }
+
+        ApplyFieldDataAttributes(attrs, fieldState);
+        ApplyPopupDataAttributes(attrs, open);
+
+        attrs["onmousedown"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseDownAsync);
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleMouseDownAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || state.Disabled || RootContext.ReadOnly || e.Button != 0)
+        {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        await RootContext.SetOpenAsync(!RootContext.Mounted, AutocompleteChangeReason.TriggerPress);
+        await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is not null && !state.Disabled && !RootContext.ReadOnly)
+        {
+            if (e.Key == "ArrowDown" || e.Key == "ArrowUp")
+            {
+                await RootContext.SetOpenAsync(true, AutocompleteChangeReason.ListNavigation);
+                await RootContext.HighlightRelativeAsync(e.Key == "ArrowDown" ? 1 : -1, AutocompleteHighlightReason.Keyboard);
+            }
+            else if (IsActivationKey(e.Key))
+            {
+                await RootContext.SetOpenAsync(!RootContext.Mounted, AutocompleteChangeReason.TriggerPress);
+            }
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleFocusAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlurAsync(FocusEventArgs e)
+    {
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private static bool IsActivationKey(string? key)
+    {
+        return key is "Enter" or " " or "Space" or "Spacebar";
+    }
+
+    private void ApplyPopupDataAttributes(Dictionary<string, object> attrs, bool open)
+    {
+        if (open)
+        {
+            attrs["data-popup-open"] = true;
+            if (RootContext?.OpenChangeReason == AutocompleteChangeReason.TriggerPress)
+            {
+                attrs["data-pressed"] = true;
+            }
+        }
+
+        if (RootContext?.PopupSide is { } side)
+        {
+            attrs["data-popup-side"] = side.ToDataAttributeString()!;
+        }
+
+        if (RootContext?.ListEmpty == true)
+        {
+            attrs["data-list-empty"] = true;
+        }
+    }
+
+    private static void ApplyFieldDataAttributes(Dictionary<string, object> attrs, FieldRootState fieldState)
+    {
+        attrs["data-valid"] = fieldState.Valid == true;
+        attrs["data-invalid"] = fieldState.Valid == false;
+        attrs["data-touched"] = fieldState.Touched;
+        attrs["data-dirty"] = fieldState.Dirty;
+        attrs["data-filled"] = fieldState.Filled;
+        attrs["data-focused"] = fieldState.Focused;
+    }
+}

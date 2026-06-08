@@ -1,0 +1,481 @@
+@using Blazix.BaseUI.Toolbar
+@using Blazix.BaseUI.Toggle
+
+<ComponentShowcase ComponentName="Toolbar"
+                   Description="A container for grouping a set of controls, such as buttons, toggle groups, or menus. Supports keyboard navigation with roving tabindex."
+                   BaseRoute="/toolbar"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="ARIA Attributes"
+                 Description="The toolbar renders with role='toolbar' and aria-orientation attribute.">
+        <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+            <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                Button 1
+            </ToolbarButton>
+            <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                Button 2
+            </ToolbarButton>
+            <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                Button 3
+            </ToolbarButton>
+        </ToolbarRoot>
+        <div class="mt-3 rounded bg-gray-100 p-3 font-mono text-xs">
+            <p>Rendered attributes on toolbar:</p>
+            <ul class="mt-1 list-inside list-disc">
+                <li>role="toolbar"</li>
+                <li>aria-orientation="horizontal"</li>
+                <li>data-orientation="horizontal"</li>
+            </ul>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Keyboard Navigation"
+                 Description="Navigate between items using arrow keys. Tab enters/exits the toolbar. Home/End jump to first/last item.">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                               @onfocus="@(() => focusedItem = "Button")">
+                    Button
+                </ToolbarButton>
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))"
+                             @onfocus="@(() => focusedItem = "Link")">
+                    Link
+                </ToolbarLink>
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onfocus="@(() => focusedItem = "Grouped Button 1")">
+                        Grouped 1
+                    </ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onfocus="@(() => focusedItem = "Grouped Button 2")">
+                        Grouped 2
+                    </ToolbarButton>
+                </ToolbarGroup>
+                <ToolbarInput placeholder="Input"
+                              class="w-24 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none"
+                              @onfocus="@(() => focusedItem = "Input")" />
+            </ToolbarRoot>
+            <div class="text-sm text-gray-600">
+                <strong>Focused:</strong> @focusedItem
+            </div>
+            <div class="rounded bg-gray-100 p-3 text-sm text-gray-700">
+                <p class="font-medium">Test keyboard navigation:</p>
+                <ol class="mt-1 list-inside list-decimal space-y-1">
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">Tab</kbd> to focus the toolbar</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd> to move to Link</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd> to move to Grouped 1</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd> to move to Grouped 2</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd> to move to Input</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd> to loop back to Button</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">End</kbd> to jump to Input</li>
+                    <li>Press <kbd class="rounded bg-gray-200 px-1">Home</kbd> to jump to Button</li>
+                </ol>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Orientation: Horizontal vs Vertical"
+                 Description="Keyboard navigation direction changes based on orientation. Horizontal uses Left/Right, Vertical uses Up/Down.">
+        <div class="flex gap-8">
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">Horizontal (default):</span>
+                <ToolbarRoot Orientation="Orientation.Horizontal"
+                             ClassValue="@(_ => ToolbarClass())">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">A</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">B</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">C</ToolbarButton>
+                </ToolbarRoot>
+                <p class="text-xs text-gray-500">Use <kbd class="rounded bg-gray-200 px-1">ArrowLeft</kbd> / <kbd class="rounded bg-gray-200 px-1">ArrowRight</kbd></p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">Vertical:</span>
+                <ToolbarRoot Orientation="Orientation.Vertical"
+                             ClassValue="@(_ => "inline-flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1 shadow-sm")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">A</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">B</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">C</ToolbarButton>
+                </ToolbarRoot>
+                <p class="text-xs text-gray-500">Use <kbd class="rounded bg-gray-200 px-1">ArrowUp</kbd> / <kbd class="rounded bg-gray-200 px-1">ArrowDown</kbd></p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Toolbar"
+                 Description="When the toolbar is disabled, all items become non-interactive except links (which cannot be disabled).">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot Disabled="true"
+                         ClassValue="@(_ => ToolbarClass())">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    Button (disabled)
+                </ToolbarButton>
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))">
+                    Link (not disabled)
+                </ToolbarLink>
+                <ToolbarInput placeholder="Input (disabled)"
+                              class="w-32 rounded border border-gray-300 px-2 py-1 text-sm" />
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                        Grouped (disabled)
+                    </ToolbarButton>
+                    <ToolbarLink href="#"
+                                 ClassValue="@(state => ToolbarLinkClass(state))">
+                        Link (not disabled)
+                    </ToolbarLink>
+                    <ToolbarInput placeholder="Input"
+                                  class="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
+                </ToolbarGroup>
+            </ToolbarRoot>
+            <div class="rounded bg-gray-100 p-3 font-mono text-xs">
+                <p>When toolbar is disabled:</p>
+                <ul class="mt-1 list-inside list-disc">
+                    <li>Buttons and Inputs get <code>aria-disabled="true"</code> and <code>data-disabled</code></li>
+                    <li>Links are NOT disabled (cannot be disabled per spec)</li>
+                    <li>Group also gets <code>data-disabled</code></li>
+                </ul>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Group"
+                 Description="A group can be disabled independently, affecting only items within that group.">
+        <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+            <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    Enabled
+                </ToolbarButton>
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))">
+                    Link
+                </ToolbarLink>
+                <ToolbarInput placeholder="Input"
+                              class="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
+            </ToolbarGroup>
+
+            <ToolbarSeparator class="mx-2 w-px self-stretch bg-gray-300" />
+
+            <ToolbarGroup Disabled="true"
+                          ClassValue="@(_ => "flex gap-1")">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    Disabled
+                </ToolbarButton>
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))">
+                    Link (not disabled)
+                </ToolbarLink>
+                <ToolbarInput placeholder="Input"
+                              class="w-20 rounded border border-gray-300 px-2 py-1 text-sm" />
+            </ToolbarGroup>
+        </ToolbarRoot>
+    </DemoSection>
+
+    <DemoSection Title="FocusableWhenDisabled"
+                 Description="By default, disabled items remain focusable (aria-disabled). Set FocusableWhenDisabled=false to use native disabled attribute.">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+                <ToolbarButton Disabled="true"
+                               ClassValue="@(state => ToolbarButtonClass(state))"
+                               @onfocus="@(() => disabledFocusItem = "Disabled (focusable)")">
+                    Disabled (focusable)
+                </ToolbarButton>
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton Disabled="true"
+                                   ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onfocus="@(() => disabledFocusItem = "Grouped Disabled (focusable)")">
+                        Grouped (focusable)
+                    </ToolbarButton>
+                    <ToolbarButton Disabled="true"
+                                   FocusableWhenDisabled="false"
+                                   ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onfocus="@(() => disabledFocusItem = "Grouped (not focusable)")">
+                        Grouped (not focusable)
+                    </ToolbarButton>
+                </ToolbarGroup>
+                <ToolbarInput Disabled="true"
+                              placeholder="Input (focusable)"
+                              class="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
+                              @onfocus="@(() => disabledFocusItem = "Input (focusable)")" />
+            </ToolbarRoot>
+            <div class="text-sm text-gray-600">
+                <strong>Last focused:</strong> @disabledFocusItem
+            </div>
+            <div class="rounded bg-gray-100 p-3 text-sm text-gray-700">
+                <p class="font-medium">Test navigation:</p>
+                <ol class="mt-1 list-inside list-decimal space-y-1">
+                    <li>Tab to focus first disabled button (it's focusable)</li>
+                    <li>ArrowRight to "Grouped (focusable)"</li>
+                    <li>ArrowRight <strong>skips</strong> "Grouped (not focusable)" and goes to Input</li>
+                    <li>Loop back - the non-focusable button is skipped</li>
+                </ol>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Input Keyboard Behavior"
+                 Description="Inputs allow text editing with arrow keys. Navigation to next toolbar item occurs at text boundaries.">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    Before
+                </ToolbarButton>
+                <ToolbarInput value="@inputValue"
+                              @onchange="@((ChangeEventArgs e) => inputValue = e.Value?.ToString() ?? "")"
+                              class="w-32 rounded border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:outline-none" />
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    After
+                </ToolbarButton>
+            </ToolbarRoot>
+            <div class="rounded bg-gray-100 p-3 text-sm text-gray-700">
+                <p class="font-medium">Test input navigation:</p>
+                <ol class="mt-1 list-inside list-decimal space-y-1">
+                    <li>Focus "Before" button, press ArrowRight to focus input</li>
+                    <li>Text is selected - press ArrowRight to deselect and move cursor to end</li>
+                    <li>Press ArrowRight again to move to "After" button</li>
+                    <li>Press ArrowLeft to return to input (cursor at end)</li>
+                    <li>Press ArrowLeft to move cursor through text</li>
+                    <li>When cursor reaches start, ArrowLeft moves to "Before"</li>
+                </ol>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Focus Looping"
+                 Description="When LoopFocus is true (default), navigation wraps from last item to first and vice versa.">
+        <div class="flex gap-8">
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">LoopFocus=true (default):</span>
+                <ToolbarRoot LoopFocus="true"
+                             ClassValue="@(_ => ToolbarClass())">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">First</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">Middle</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">Last</ToolbarButton>
+                </ToolbarRoot>
+                <p class="text-xs text-gray-500">ArrowRight on "Last" goes to "First"</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">LoopFocus=false:</span>
+                <ToolbarRoot LoopFocus="false"
+                             ClassValue="@(_ => ToolbarClass())">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">First</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">Middle</ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">Last</ToolbarButton>
+                </ToolbarRoot>
+                <p class="text-xs text-gray-500">ArrowRight on "Last" stays on "Last"</p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Button Click Prevention When Disabled"
+                 Description="Disabled buttons prevent click, mouse, pointer, and keyboard events.">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                               @onclick="@(() => clickCount++)">
+                    Enabled (@clickCount clicks)
+                </ToolbarButton>
+                <ToolbarButton Disabled="true"
+                               ClassValue="@(state => ToolbarButtonClass(state))"
+                               @onclick="@(() => disabledClickCount++)">
+                    Disabled (@disabledClickCount clicks)
+                </ToolbarButton>
+            </ToolbarRoot>
+            <div class="rounded bg-gray-100 p-3 text-sm text-gray-700">
+                <p>Try clicking, pressing Enter, or Space on the disabled button - events are blocked.</p>
+                <p class="mt-1">The disabled button uses <code>aria-disabled="true"</code> instead of native <code>disabled</code> attribute, allowing it to remain focusable while preventing interactions.</p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Complete Toolbar Example"
+                 Description="A text editor toolbar demonstrating groups, separators, and various item types.">
+        <div class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <ToolbarRoot ClassValue="@(_ => ToolbarClass())">
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onclick="@(() => editorAction = "Undo")">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                        </svg>
+                    </ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onclick="@(() => editorAction = "Redo")">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+                        </svg>
+                    </ToolbarButton>
+                </ToolbarGroup>
+
+                <ToolbarSeparator class="mx-2 w-px self-stretch bg-gray-300" />
+
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton Render="@BoldToggleRender">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
+                        </svg>
+                    </ToolbarButton>
+                    <ToolbarButton Render="@ItalicToggleRender">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 4h4m-2 0v16m-4 0h8" transform="skewX(-10)" />
+                        </svg>
+                    </ToolbarButton>
+                    <ToolbarButton Render="@UnderlineToggleRender">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 20h12M8 4v8a4 4 0 008 0V4" />
+                        </svg>
+                    </ToolbarButton>
+                </ToolbarGroup>
+
+                <ToolbarSeparator class="mx-2 w-px self-stretch bg-gray-300" />
+
+                <ToolbarGroup ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onclick="@(() => editorAction = "Align Left")">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h12M3 18h18" />
+                        </svg>
+                    </ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onclick="@(() => editorAction = "Align Center")">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M6 12h12M3 18h18" />
+                        </svg>
+                    </ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))"
+                                   @onclick="@(() => editorAction = "Align Right")">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M9 12h12M3 18h18" />
+                        </svg>
+                    </ToolbarButton>
+                </ToolbarGroup>
+
+                <ToolbarSeparator class="mx-2 w-px self-stretch bg-gray-300" />
+
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))">
+                    Help
+                </ToolbarLink>
+            </ToolbarRoot>
+
+            <div class="min-h-[80px] rounded border border-gray-300 bg-white p-3">
+                <p class="text-sm text-gray-500">Editor content area</p>
+                <p class="mt-2 text-sm text-gray-700">Last action: <strong>@(editorAction ?? "None")</strong></p>
+                <div class="mt-2 flex gap-3 text-xs text-gray-500">
+                    <span>Bold: <strong class="@(isBold ? "text-indigo-600" : "")">@(isBold ? "on" : "off")</strong></span>
+                    <span>Italic: <strong class="@(isItalic ? "text-indigo-600" : "")">@(isItalic ? "on" : "off")</strong></span>
+                    <span>Underline: <strong class="@(isUnderline ? "text-indigo-600" : "")">@(isUnderline ? "on" : "off")</strong></span>
+                </div>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Dynamic State Toggle"
+                 Description="Toggle disabled states dynamically to see how the toolbar responds.">
+        <div class="flex flex-col gap-4">
+            <ToolbarRoot Disabled="@toolbarDisabled"
+                         ClassValue="@(_ => ToolbarClass())">
+                <ToolbarGroup Disabled="@groupDisabled"
+                              ClassValue="@(_ => "flex gap-1")">
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                        Group Item 1
+                    </ToolbarButton>
+                    <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                        Group Item 2
+                    </ToolbarButton>
+                </ToolbarGroup>
+                <ToolbarSeparator class="mx-2 w-px self-stretch bg-gray-300" />
+                <ToolbarButton ClassValue="@(state => ToolbarButtonClass(state))">
+                    Outside Group
+                </ToolbarButton>
+                <ToolbarLink href="#"
+                             ClassValue="@(state => ToolbarLinkClass(state))">
+                    Link
+                </ToolbarLink>
+            </ToolbarRoot>
+            <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @bind="toolbarDisabled" class="rounded" />
+                    <span>Disable entire toolbar</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @bind="groupDisabled" class="rounded" />
+                    <span>Disable group only</span>
+                </label>
+            </div>
+        </div>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private string focusedItem = "(none)";
+    private string disabledFocusItem = "(none)";
+    private string? editorAction;
+    private string inputValue = "abcd";
+    private int clickCount;
+    private int disabledClickCount;
+    private bool toolbarDisabled;
+    private bool groupDisabled;
+    private bool isBold;
+    private bool isItalic;
+    private bool isUnderline;
+
+    private static string ToolbarClass()
+    {
+        return "inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1 shadow-sm";
+    }
+
+    private static string ToolbarButtonClass(ToolbarButtonState state)
+    {
+        var baseClass = "inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1";
+
+        if (state.Disabled)
+            return $"{baseClass} text-gray-400 cursor-not-allowed";
+
+        return $"{baseClass} text-gray-700 hover:bg-gray-100 active:bg-gray-200";
+    }
+
+    private static string ToolbarLinkClass(ToolbarLinkState state)
+    {
+        return "inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1";
+    }
+
+    private static string ToolbarToggleClass(ToggleState state)
+    {
+        var baseClass = "inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1";
+
+        if (state.Disabled)
+            return $"{baseClass} text-gray-400 cursor-not-allowed";
+
+        if (state.Pressed)
+            return $"{baseClass} bg-indigo-100 text-indigo-700";
+
+        return $"{baseClass} text-gray-700 hover:bg-gray-100 active:bg-gray-200";
+    }
+
+    private RenderFragment<RenderProps<ToolbarButtonState>> BoldToggleRender =>
+        ctx => @<Toggle Pressed="@isBold"
+                        PressedChanged="@((bool v) => { isBold = v; editorAction = v ? "Bold on" : "Bold off"; })"
+                        ClassValue="@((ToggleState state) => ToolbarToggleClass(state))"
+                        Render="@((RenderFragment<RenderProps<ToggleState>>)(toggleCtx => RenderUtilities.CreateElement("button", toggleCtx, ctx.ElementReferenceCallback)))"
+                        @attributes="ctx.Attributes">@ctx.ChildContent</Toggle>;
+
+    private RenderFragment<RenderProps<ToolbarButtonState>> ItalicToggleRender =>
+        ctx => @<Toggle Pressed="@isItalic"
+                        PressedChanged="@((bool v) => { isItalic = v; editorAction = v ? "Italic on" : "Italic off"; })"
+                        ClassValue="@((ToggleState state) => ToolbarToggleClass(state))"
+                        Render="@((RenderFragment<RenderProps<ToggleState>>)(toggleCtx => RenderUtilities.CreateElement("button", toggleCtx, ctx.ElementReferenceCallback)))"
+                        @attributes="ctx.Attributes">@ctx.ChildContent</Toggle>;
+
+    private RenderFragment<RenderProps<ToolbarButtonState>> UnderlineToggleRender =>
+        ctx => @<Toggle Pressed="@isUnderline"
+                        PressedChanged="@((bool v) => { isUnderline = v; editorAction = v ? "Underline on" : "Underline off"; })"
+                        ClassValue="@((ToggleState state) => ToolbarToggleClass(state))"
+                        Render="@((RenderFragment<RenderProps<ToggleState>>)(toggleCtx => RenderUtilities.CreateElement("button", toggleCtx, ctx.ElementReferenceCallback)))"
+                        @attributes="ctx.Attributes">@ctx.ChildContent</Toggle>;
+
+}

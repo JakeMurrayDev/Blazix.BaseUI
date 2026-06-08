@@ -1,0 +1,289 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Utilities.LabelableProvider
+
+
+<RenderElement TState="NumberFieldRootState"
+               Tag="@DefaultTag"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               UpdatesAttributeName="value"
+               UpdatesAttributeEventName="oninput"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string DefaultTag = "input";
+
+    private bool hasTouchedInput;
+    private RenderElement<NumberFieldRootState>? renderElementReference;
+    private NumberFieldRootState state = NumberFieldRootState.Default;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private NumberFieldRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a user-friendly name for the role of the input.
+    /// Defaults to <c>"Number field"</c>.
+    /// </summary>
+    [Parameter]
+    public string AriaRoledescription { get; set; } = "Number field";
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NumberFieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = RootContext?.State ?? NumberFieldRootState.Default;
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && Element.HasValue)
+        {
+            RootContext?.SetInputElement(Element.Value);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        if (!string.IsNullOrEmpty(RootContext?.Id))
+            attrs["id"] = RootContext!.Id!;
+        attrs["type"] = "text";
+        attrs["inputmode"] = RootContext?.InputMode ?? "numeric";
+        attrs["autocomplete"] = "off";
+        attrs["autocorrect"] = "off";
+        attrs["spellcheck"] = "false";
+        attrs["aria-roledescription"] = AriaRoledescription;
+        if (RootContext?.Invalid == true)
+            attrs["aria-invalid"] = "true";
+        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+            attrs["aria-labelledby"] = LabelableContext!.LabelId!;
+        attrs["value"] = RootContext?.InputValue ?? string.Empty;
+        attrs["disabled"] = RootContext?.Disabled ?? false;
+        attrs["readonly"] = RootContext?.ReadOnly ?? false;
+        attrs["required"] = RootContext?.Required ?? false;
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
+        attrs["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInput);
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDown);
+        attrs["onpaste"] = EventCallback.Factory.Create<ClipboardEventArgs>(this, HandlePaste);
+        attrs["data-scrubbing"] = state.Scrubbing;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-readonly"] = state.ReadOnly;
+        attrs["data-required"] = state.Required;
+        if (state.Valid == true)
+            attrs["data-valid"] = true;
+        else if (state.Valid == false)
+            attrs["data-invalid"] = true;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-filled"] = state.Filled;
+        attrs["data-focused"] = state.Focused;
+        componentAttributes = attrs;
+    }
+
+    private Task HandleFocus(FocusEventArgs e)
+    {
+        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+            return Task.CompletedTask;
+
+        if (!hasTouchedInput)
+        {
+            hasTouchedInput = true;
+        }
+
+        FieldContext?.SetFocused(true);
+        return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlur(FocusEventArgs e)
+    {
+        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+            return Task.CompletedTask;
+
+        FieldContext?.SetTouched(true);
+        FieldContext?.SetFocused(false);
+
+        var inputValue = RootContext?.InputValue ?? string.Empty;
+        var hadManualInput = RootContext?.AllowInputSync == false;
+        var hadPendingProgrammaticChange = RootContext?.HasPendingCommit == true;
+        RootContext?.SetAllowInputSync(true);
+
+        if (string.IsNullOrWhiteSpace(inputValue))
+        {
+            RootContext?.SetValue(null, NumberFieldChangeReason.InputClear, null);
+            RootContext?.OnValueCommitted(null, NumberFieldChangeReason.InputClear);
+            return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+        }
+
+        var parsedValue = ParseNumber(inputValue);
+        if (parsedValue.HasValue)
+        {
+            var format = RootContext?.FormatOptions;
+            var hasExplicitPrecision =
+                format?.MaximumFractionDigits is not null ||
+                format?.MinimumFractionDigits is not null;
+            var maxFrac = format?.MaximumFractionDigits;
+
+            var committed = hasExplicitPrecision && maxFrac.HasValue
+                ? Math.Round(parsedValue.Value, maxFrac.Value, MidpointRounding.AwayFromZero)
+                : parsedValue.Value;
+
+            var validatedValue = RootContext?.GetValidatedValue(committed, NumberFieldChangeReason.InputBlur, null) ?? committed;
+            var currentValue = RootContext?.Value;
+            if (currentValue != committed)
+            {
+                RootContext?.SetValue(committed, NumberFieldChangeReason.InputBlur, null);
+            }
+            if (hadManualInput || currentValue != committed || hadPendingProgrammaticChange)
+            {
+                RootContext?.OnValueCommitted(validatedValue, NumberFieldChangeReason.InputBlur);
+            }
+
+            var formattedValue = FormatNumber(validatedValue);
+            if (inputValue != formattedValue)
+            {
+                RootContext?.SetInputValue(formattedValue);
+            }
+        }
+
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private void HandleInput(ChangeEventArgs e)
+    {
+        var newValue = e.Value?.ToString() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(newValue))
+        {
+            RootContext?.SetAllowInputSync(false);
+            RootContext?.SetInputValue(newValue);
+            RootContext?.SetValue(null, NumberFieldChangeReason.InputClear, null);
+            return;
+        }
+
+        if (!IsValidInputCharacters(newValue))
+            return;
+
+        RootContext?.SetAllowInputSync(false);
+        RootContext?.SetInputValue(newValue);
+
+        var parsedValue = ParseNumber(newValue);
+        if (parsedValue.HasValue)
+        {
+            RootContext?.SetValue(parsedValue.Value, NumberFieldChangeReason.InputChange, null);
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+            return;
+
+        RootContext?.SetAllowInputSync(true);
+        var amount = RootContext?.GetStepAmount(e.AltKey, e.ShiftKey) ?? 1;
+
+        switch (e.Key)
+        {
+            case "ArrowUp":
+                RootContext?.IncrementValue(amount, 1, NumberFieldChangeReason.Keyboard);
+                RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Keyboard);
+                break;
+
+            case "ArrowDown":
+                RootContext?.IncrementValue(amount, -1, NumberFieldChangeReason.Keyboard);
+                RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Keyboard);
+                break;
+
+            case "Home":
+                if (RootContext?.Min.HasValue == true)
+                {
+                    RootContext?.SetValue(RootContext.Min.Value, NumberFieldChangeReason.Keyboard, null);
+                    RootContext?.OnValueCommitted(RootContext.Min.Value, NumberFieldChangeReason.Keyboard);
+                }
+                break;
+
+            case "End":
+                if (RootContext?.Max.HasValue == true)
+                {
+                    RootContext?.SetValue(RootContext.Max.Value, NumberFieldChangeReason.Keyboard, null);
+                    RootContext?.OnValueCommitted(RootContext.Max.Value, NumberFieldChangeReason.Keyboard);
+                }
+                break;
+        }
+    }
+
+    private void HandlePaste(ClipboardEventArgs e)
+    {
+        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+            return;
+    }
+
+    private bool IsValidInputCharacters(string input)
+    {
+        return NumberFieldUtilities.IsValidCharacterString(
+            input,
+            RootContext?.Locale,
+            RootContext?.FormatOptions,
+            RootContext?.MinWithDefault ?? double.MinValue);
+    }
+
+    private double? ParseNumber(string input)
+    {
+        return NumberFieldUtilities.ParseNumber(input, RootContext?.Locale, RootContext?.FormatOptions);
+    }
+
+    private string FormatNumber(double value)
+    {
+        return NumberFieldUtilities.FormatNumber(value, RootContext?.Locale, RootContext?.FormatOptions);
+    }
+}

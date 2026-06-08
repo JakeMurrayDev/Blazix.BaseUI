@@ -1,0 +1,70 @@
+@using Blazix.BaseUI.Separator
+
+<Separator Orientation="InvertedOrientation"
+                                  Render="Render"
+                                  ClassValue="ClassValue"
+                                  StyleValue="StyleValue"
+                                  ChildContent="ChildContent"
+                                  @attributes="AdditionalAttributes"
+                                  @ref="separatorReference" />
+
+@code {
+    private Separator? separatorReference;
+
+    /// <summary>
+    /// Gets the orientation perpendicular to the parent toolbar's orientation.
+    /// </summary>
+    private Orientation InvertedOrientation => RootContext!.Orientation switch
+    {
+        Orientation.Horizontal => Orientation.Vertical,
+        Orientation.Vertical => Orientation.Horizontal,
+        _ => Orientation.Vertical
+    };
+
+    [CascadingParameter]
+    private ToolbarRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SeparatorState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SeparatorState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SeparatorState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => separatorReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("ToolbarSeparator must be placed within a ToolbarRoot.");
+        }
+    }
+}

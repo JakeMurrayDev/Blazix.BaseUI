@@ -1,0 +1,77 @@
+@page "/tests/popover-focus/wasm"
+@using Blazix.BaseUI.Popover
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Popover Focus Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <PopoverRoot
+        @bind-Open="isOpen"
+        DefaultOpen="@DefaultOpen"
+        OnOpenChange="HandleOpenChange">
+        <PopoverTrigger
+            OpenOnHover="@OpenOnHover"
+            Delay="@OpenDelay"
+            CloseDelay="@CloseDelay"
+            data-testid="popover-trigger">
+            Open Popover
+        </PopoverTrigger>
+        <PopoverPortal>
+            <PopoverPositioner data-testid="popover-positioner">
+                <PopoverPopup
+                    InitialFocus="@(DisableInitialFocus ? new FocusTarget.None() : UseInitialFocus ? specificButtonRef : null)"
+                    FinalFocus="@(UseFinalFocus ? finalFocusButtonRef : null)"
+                    data-testid="popover-popup">
+                    <button data-testid="first-button">First Button</button>
+                    <button @ref="specificButtonRef" data-testid="specific-button">Specific Button</button>
+                    <input data-testid="popup-input" type="text" placeholder="Popup input" />
+                    <PopoverClose data-testid="popover-close">Close</PopoverClose>
+                </PopoverPopup>
+            </PopoverPositioner>
+        </PopoverPortal>
+    </PopoverRoot>
+
+    <button @ref="finalFocusButtonRef" data-testid="final-focus-target" style="margin-top: 10px;">Final Focus Target</button>
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+    </div>
+</div>
+
+@code {
+    private ElementReference specificButtonRef;
+    private ElementReference finalFocusButtonRef;
+
+    [SupplyParameterFromQuery(Name = "useInitialFocus")]
+    public bool UseInitialFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useFinalFocus")]
+    public bool UseFinalFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disableInitialFocus")]
+    public bool DisableInitialFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "openOnHover")]
+    public bool OpenOnHover { get; set; }
+
+    [SupplyParameterFromQuery(Name = "openDelay")]
+    public int OpenDelay { get; set; } = 300;
+
+    [SupplyParameterFromQuery(Name = "closeDelay")]
+    public int CloseDelay { get; set; }
+
+    private bool isOpen;
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+    }
+
+    private void HandleOpenChange(PopoverOpenChangeEventArgs args)
+    {
+    }
+}

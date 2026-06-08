@@ -1,0 +1,75 @@
+@using Blazix.BaseUI.Separator
+
+<RenderElement TState="AutocompleteSeparatorState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private AutocompleteSeparatorState state;
+    private Dictionary<string, object> componentAttributes = new();
+
+    /// <summary>
+    /// Gets or sets the separator orientation.
+    /// </summary>
+    [Parameter]
+    public Orientation Orientation { get; set; } = Orientation.Horizontal;
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteSeparatorState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteSeparatorState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteSeparatorState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildStateAndAttributes();
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        state = new AutocompleteSeparatorState(Orientation);
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["role"] = "separator",
+            ["aria-orientation"] = Orientation == Orientation.Vertical ? "vertical" : "horizontal",
+            ["data-orientation"] = Orientation == Orientation.Vertical ? "vertical" : "horizontal"
+        };
+    }
+}

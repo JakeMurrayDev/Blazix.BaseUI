@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectTasksOptions">
+    <TaskOptions isEnabled="true">
+      <option name="arguments" value="dlx @tailwindcss/cli@4.3.0 -i tailwind.css -o ../Blazix.BaseUI.Demo/wwwroot/global.min.css --minify" />
+      <option name="checkSyntaxErrors" value="true" />
+      <option name="description" value="Builds minified demo Tailwind CSS into wwwroot/global.min.css." />
+      <option name="exitCodeBehavior" value="ERROR" />
+      <option name="fileExtension" value="css;razor;cshtml;html" />
+      <option name="immediateSync" value="false" />
+      <option name="name" value="Tailwind CSS" />
+      <option name="output" value="$ProjectFileDir$/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo/wwwroot/global.min.css" />
+      <option name="outputFilters">
+        <array />
+      </option>
+      <option name="outputFromStdout" value="false" />
+      <option name="passParentEnvs" value="true" />
+      <option name="program" value="pnpm" />
+      <option name="runOnExternalChanges" value="false" />
+      <option name="scopeName" value="Tailwind Source Files" />
+      <option name="trackOnlyRoot" value="false" />
+      <option name="workingDir" value="$ProjectFileDir$/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client" />
+      <envs />
+    </TaskOptions>
+    <TaskOptions isEnabled="true">
+      <option name="arguments" value="dlx terser@5.48.0 $FileName$ --compress --mangle --module --output $FileNameWithoutExtension$.min.js" />
+      <option name="checkSyntaxErrors" value="true" />
+      <option name="description" value="Builds minified Blazix.BaseUI JavaScript modules next to their source files." />
+      <option name="exitCodeBehavior" value="ERROR" />
+      <option name="fileExtension" value="js" />
+      <option name="immediateSync" value="false" />
+      <option name="name" value="Terser JavaScript" />
+      <option name="output" value="$FileDir$/$FileNameWithoutExtension$.min.js" />
+      <option name="outputFilters">
+        <array />
+      </option>
+      <option name="outputFromStdout" value="false" />
+      <option name="passParentEnvs" value="true" />
+      <option name="program" value="pnpm" />
+      <option name="runOnExternalChanges" value="false" />
+      <option name="scopeName" value="Blazix.BaseUI JavaScript Source Files" />
+      <option name="trackOnlyRoot" value="false" />
+      <option name="workingDir" value="$FileDir$" />
+      <envs />
+    </TaskOptions>
+  </component>
+</project>

@@ -1,0 +1,634 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+@using Blazix.BaseUI.DirectionProvider
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using Blazix.BaseUI.Form
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Rendering
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<RenderElement TState="SliderThumbState"
+               Tag="div"
+               Enabled="Context is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="computedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="BuildInputContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-slider.min.js";
+
+    private readonly object implicitIndexKey = new();
+
+    private bool hasRendered;
+    private bool hasImplicitThumbIndex;
+    private int implicitIndex;
+    private string inputId = null!;
+    private ElementReference thumbElement;
+    private ElementReference inputElement;
+    private SliderThumbState state = null!;
+    private RenderElement<SliderThumbState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<SliderThumbState, string?>? computedStyleValue;
+    private ElementReference? previousElement;
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<SliderThumb>? dotNetRef;
+    private string inputMin = "0";
+    private string inputMax = "100";
+    private string inputStep = "1";
+    private string inputValue = "0";
+    private string? inputAriaLabel;
+    private string? inputAriaValueText;
+    private string? inputAriaLabelledBy;
+    private string? inputAriaDescribedBy;
+    private string? inputName;
+    private string? inputForm;
+    private string inputAriaOrientation = "horizontal";
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+
+    [CascadingParameter]
+    private SliderRootContext? Context { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the index of the thumb, corresponding to its position in the value array.
+    /// Required for range sliders with multiple thumbs to support server-side rendering.
+    /// </summary>
+    [Parameter]
+    public int? Index { get; set; }
+
+    /// <summary>
+    /// Determines whether the thumb should ignore user interaction.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the tab index forwarded to the hidden range input element.
+    /// </summary>
+    [Parameter]
+    public int? TabIndex { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an <c>aria-label</c> string for the hidden range input.
+    /// </summary>
+    [Parameter]
+    public Func<int, string>? GetAriaLabel { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an <c>aria-valuetext</c> string for the hidden range input.
+    /// This is important for screen reader users.
+    /// </summary>
+    [Parameter]
+    public Func<string, double, int, string>? GetAriaValueText { get; set; }
+
+    /// <summary>
+    /// Gets or sets an explicit <c>aria-label</c> for the hidden range input.
+    /// Used as a fallback when <see cref="GetAriaLabel"/> is not provided.
+    /// </summary>
+    [Parameter]
+    public string? AriaLabel { get; set; }
+
+    /// <summary>
+    /// Gets or sets an explicit <c>aria-labelledby</c> for the hidden range input.
+    /// Takes priority over the label context's label ID.
+    /// </summary>
+    [Parameter]
+    public string? AriaLabelledBy { get; set; }
+
+    /// <summary>
+    /// Gets or sets an explicit <c>aria-describedby</c> for the hidden range input.
+    /// Takes priority over the labelable context's described-by value.
+    /// </summary>
+    [Parameter]
+    public string? AriaDescribedBy { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the hidden range input receives focus.
+    /// </summary>
+    [Parameter]
+    public EventCallback<FocusEventArgs> OnFocus { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the hidden range input loses focus.
+    /// </summary>
+    [Parameter]
+    public EventCallback<FocusEventArgs> OnBlur { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when a key is pressed while the hidden range input is focused.
+    /// </summary>
+    [Parameter]
+    public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SliderThumbState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SliderThumbState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SliderThumbState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    private int ResolvedIndex => Index ?? implicitIndex;
+
+    private bool IsRange => Context?.Values.Length > 1;
+
+    private bool IsVertical => Context?.Orientation == Orientation.Vertical;
+
+    private bool IsRtl => DirectionContext?.Direction == Direction.Rtl;
+
+    private bool ResolvedDisabled => Disabled || (Context?.Disabled ?? false);
+
+    private double ThumbValue => Context?.Values.ElementAtOrDefault(ResolvedIndex) ?? 0;
+
+    private bool IsActive => Context?.ActiveThumbIndex == ResolvedIndex;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        ResolveImplicitIndex();
+
+        inputId = IsRange
+            ? Guid.NewGuid().ToIdString()
+            : (LabelableContext?.ControlId ?? Guid.NewGuid().ToIdString());
+
+        if (!IsRange)
+        {
+            LabelableContext?.SetControlId(inputId);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        ResolveImplicitIndex();
+
+        state = SliderThumbState.FromRootState(
+            Context?.State ?? SliderRootState.Default,
+            ResolvedIndex,
+            IsActive);
+
+        computedStyleValue = s =>
+        {
+            var positionStyle = GetPositionStyle();
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? positionStyle : $"{positionStyle} {userStyle}";
+        };
+
+        ComputeInputAttributes();
+
+        if (Context is not null && hasRendered)
+        {
+            var metadata = new ThumbMetadata(inputId, thumbElement, inputElement);
+            Context.RegisterThumb(ResolvedIndex, metadata);
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var currentElement = renderElementReference?.Element;
+        if (currentElement.HasValue && !currentElement.Equals(previousElement))
+        {
+            previousElement = currentElement;
+            thumbElement = currentElement.Value;
+        }
+
+        if (hasRendered && Context is not null)
+        {
+            var metadata = new ThumbMetadata(inputId, thumbElement, inputElement);
+            Context.RegisterThumb(ResolvedIndex, metadata);
+        }
+
+        if (firstRender && dotNetRef is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("registerThumbInput", inputElement, dotNetRef);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect or disposal — safe to ignore.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        Context?.UnregisterThumb(ResolvedIndex);
+
+        if (hasImplicitThumbIndex)
+        {
+            Context?.UnregisterImplicitThumbIndex(implicitIndexKey);
+            hasImplicitThumbIndex = false;
+        }
+
+        if (!IsRange)
+        {
+            LabelableContext?.SetControlId(null);
+        }
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("unregisterThumbInput", inputElement);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect — safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var orientationStr = state.Orientation.ToDataAttributeString() ?? "horizontal";
+
+        attrs["tabindex"] = -1;
+        attrs["data-index"] = state.Index.ToString();
+
+        attrs["data-dragging"] = state.Dragging;
+        attrs["data-orientation"] = orientationStr;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-valid"] = state.Valid == true;
+        attrs["data-invalid"] = state.Valid == false;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-focused"] = state.Focused;
+
+        componentAttributes = attrs;
+    }
+
+    private void ComputeInputAttributes()
+    {
+        if (Context is null)
+            return;
+
+        var thumbValue = ThumbValue;
+        var formattedValue = SliderUtilities.FormatNumber(thumbValue, Context.Locale, Context.FormatOptions);
+
+        inputMin = Context.Min.ToString(CultureInfo.InvariantCulture);
+        inputMax = Context.Max.ToString(CultureInfo.InvariantCulture);
+        inputStep = Context.Step.ToString(CultureInfo.InvariantCulture);
+        inputValue = thumbValue.ToString(CultureInfo.InvariantCulture);
+        inputAriaOrientation = Context.Orientation.ToDataAttributeString() ?? "horizontal";
+        inputAriaLabel = GetAriaLabel?.Invoke(ResolvedIndex) ?? AriaLabel;
+        inputAriaValueText = GetAriaValueText?.Invoke(formattedValue, thumbValue, ResolvedIndex) ?? GetDefaultAriaValueText(formattedValue);
+        inputAriaLabelledBy = AriaLabelledBy
+            ?? (inputAriaLabel == null && !string.IsNullOrEmpty(Context.LabelId) ? Context.LabelId : null);
+        inputAriaDescribedBy = AriaDescribedBy ?? LabelableContext?.GetAriaDescribedBy();
+        inputName = !string.IsNullOrEmpty(Context.Name)
+            ? Context.Name
+            : null;
+        inputForm = Context.Form;
+    }
+
+    private void BuildInputContent(RenderTreeBuilder builder)
+    {
+        if (Context is not null)
+        {
+            var inputStyle = GetInputStyle();
+
+            builder.OpenElement(0, "input");
+            builder.AddAttribute(1, "type", "range");
+            builder.AddAttribute(2, "id", inputId);
+            builder.AddAttribute(3, "min", inputMin);
+            builder.AddAttribute(4, "max", inputMax);
+            builder.AddAttribute(5, "step", inputStep);
+            builder.AddAttribute(6, "value", inputValue);
+            builder.AddAttribute(7, "tabindex", TabIndex);
+            builder.AddAttribute(8, "disabled", ResolvedDisabled);
+            builder.AddAttribute(9, "required", state.Required);
+            builder.AddAttribute(10, "aria-valuenow", inputValue);
+            builder.AddAttribute(11, "aria-orientation", inputAriaOrientation);
+            builder.AddAttribute(12, "aria-label", inputAriaLabel);
+            builder.AddAttribute(13, "aria-valuetext", inputAriaValueText);
+            builder.AddAttribute(14, "aria-labelledby", inputAriaLabelledBy);
+            builder.AddAttribute(15, "aria-describedby", inputAriaDescribedBy);
+            builder.AddAttribute(16, "name", inputName);
+            builder.AddAttribute(17, "form", inputForm);
+            builder.AddAttribute(18, "style", inputStyle);
+            builder.AddAttribute(19, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange));
+            builder.AddAttribute(20, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus));
+            builder.AddAttribute(21, "onblur", EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur));
+            builder.AddElementReferenceCapture(22, element => inputElement = element);
+            builder.CloseElement();
+        }
+
+        builder.AddContent(23, ChildContent);
+    }
+
+    private string? GetDefaultAriaValueText(string formattedValue)
+    {
+        if (Context is null || ResolvedIndex < 0)
+            return null;
+
+        var values = Context.Values;
+        if (values.Length == 2)
+        {
+            return ResolvedIndex == 0
+                ? $"{formattedValue} start range"
+                : $"{formattedValue} end range";
+        }
+
+        return Context.FormatOptions is not null ? formattedValue : null;
+    }
+
+    private void ResolveImplicitIndex()
+    {
+        if (Index.HasValue)
+        {
+            if (hasImplicitThumbIndex)
+            {
+                Context?.UnregisterImplicitThumbIndex(implicitIndexKey);
+                hasImplicitThumbIndex = false;
+            }
+
+            implicitIndex = Index.Value;
+            return;
+        }
+
+        if (Context is null)
+        {
+            implicitIndex = 0;
+            return;
+        }
+
+        implicitIndex = hasImplicitThumbIndex
+            ? Context.GetImplicitThumbIndex(implicitIndexKey)
+            : Context.RegisterImplicitThumbIndex(implicitIndexKey);
+        hasImplicitThumbIndex = true;
+    }
+
+    private string GetInputStyle()
+    {
+        var baseStyle = "clip: rect(0px, 0px, 0px, 0px); overflow: hidden; white-space: nowrap; position: fixed; top: 0px; left: 0px; border: 0px; padding: 0px; width: 100%; height: 100%; margin: -1px;";
+
+        if (IsVertical)
+        {
+            var writingMode = IsRtl ? "vertical-rl" : "vertical-lr";
+            return $"{baseStyle} writing-mode: {writingMode};";
+        }
+
+        return baseStyle;
+    }
+
+    private string GetPositionStyle()
+    {
+        if (Context is null)
+            return string.Empty;
+
+        var percent = SliderUtilities.ValueToPercent(ThumbValue, Context.Min, Context.Max);
+
+        if (!double.IsFinite(percent))
+        {
+            return "position: absolute; overflow: hidden; width: 0; height: 0; clip: rect(0, 0, 0, 0);";
+        }
+
+        var zIndex = GetThumbZIndex();
+        var zIndexStyle = zIndex.HasValue ? $" z-index: {zIndex.Value};" : string.Empty;
+        var percentStr = percent.ToString("F4", CultureInfo.InvariantCulture);
+
+        if (Context.Inset)
+        {
+            if (IsVertical)
+            {
+                return $"position: absolute; left: 50%; transform: translate(-50%, 50%); visibility: hidden; bottom: {percentStr}%;{zIndexStyle}";
+            }
+            else
+            {
+                var translateX = IsRtl ? "50%" : "-50%";
+                return $"position: absolute; top: 50%; transform: translate({translateX}, -50%); visibility: hidden; inset-inline-start: {percentStr}%;{zIndexStyle}";
+            }
+        }
+
+        if (IsVertical)
+        {
+            return $"position: absolute; bottom: {percentStr}%; left: 50%; transform: translate(-50%, 50%);{zIndexStyle}";
+        }
+        else
+        {
+            var translateX = IsRtl ? "50%" : "-50%";
+            return $"position: absolute; top: 50%; inset-inline-start: {percentStr}%; transform: translate({translateX}, -50%);{zIndexStyle}";
+        }
+    }
+
+    private int? GetThumbZIndex()
+    {
+        if (Context is null)
+            return null;
+
+        var activeIndex = Context.ActiveThumbIndex;
+        var safeLastUsedIndex = Context.LastUsedThumbIndex >= 0 && Context.LastUsedThumbIndex < Context.Values.Length
+            ? Context.LastUsedThumbIndex
+            : -1;
+
+        if (IsRange)
+        {
+            if (activeIndex == ResolvedIndex)
+                return 2;
+            if (safeLastUsedIndex == ResolvedIndex)
+                return 1;
+        }
+        else if (activeIndex == ResolvedIndex)
+        {
+            return 1;
+        }
+
+        return null;
+    }
+
+    private async Task HandleChange(ChangeEventArgs e)
+    {
+        if (Context is null || Context.ReadOnly || ResolvedDisabled)
+            return;
+
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var newValue))
+        {
+            await Context.HandleInputChange(newValue, ResolvedIndex, SliderChangeReason.InputChange);
+        }
+    }
+
+    private async Task HandleFocus(FocusEventArgs e)
+    {
+        if (Context is null)
+            return;
+
+        Context.SetActiveThumbIndex(ResolvedIndex);
+        FieldContext?.SetFocused(true);
+
+        if (OnFocus.HasDelegate)
+        {
+            await OnFocus.InvokeAsync(e);
+        }
+    }
+
+    private async Task HandleBlur(FocusEventArgs e)
+    {
+        if (Context is null)
+            return;
+
+        Context.SetActiveThumbIndex(-1);
+        FieldContext?.SetTouched(true);
+        FieldContext?.SetFocused(false);
+
+        if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
+        {
+            var value = IsRange ? (object)Context.Values : Context.Values[0];
+            _ = FieldContext.Validation.CommitAsync(value);
+        }
+
+        if (OnBlur.HasDelegate)
+        {
+            await OnBlur.InvokeAsync(e);
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a slider key is pressed on the hidden range input.
+    /// </summary>
+    [JSInvokable]
+    public async Task HandleKeyFromJs(string key, bool shiftKey)
+    {
+        if (Context is null || Context.ReadOnly || ResolvedDisabled)
+            return;
+
+        var capturedThumbValue = ThumbValue;
+
+        if (OnKeyDown.HasDelegate)
+        {
+            var args = new KeyboardEventArgs { Key = key, ShiftKey = shiftKey };
+            await OnKeyDown.InvokeAsync(args);
+        }
+
+        var newValue = CalculateNewValueFromKey(key, shiftKey, capturedThumbValue);
+        if (newValue.HasValue)
+        {
+            var newValues = SliderUtilities.GetSliderValue(
+                newValue.Value, ResolvedIndex, Context.Min, Context.Max, IsRange, Context.Values);
+
+            if (SliderUtilities.ValidateMinimumDistance(newValues, Context.Step, Context.MinStepsBetweenValues))
+            {
+                await Context.HandleInputChange(newValue.Value, ResolvedIndex, SliderChangeReason.Keyboard);
+            }
+        }
+    }
+
+    private double? CalculateNewValueFromKey(string key, bool shiftKey, double capturedThumbValue)
+    {
+        if (Context is null)
+            return null;
+
+        var step = shiftKey ? Context.LargeStep : Context.Step;
+        var roundedValue = SliderUtilities.RoundValueToStep(capturedThumbValue, Context.Step, Context.Min);
+
+        return key switch
+        {
+            "ArrowUp" => GetNewValue(roundedValue, step, 1),
+            "ArrowDown" => GetNewValue(roundedValue, step, -1),
+            "ArrowRight" => GetNewValue(roundedValue, step, IsRtl ? -1 : 1),
+            "ArrowLeft" => GetNewValue(roundedValue, step, IsRtl ? 1 : -1),
+            "PageUp" => GetNewValue(roundedValue, Context.LargeStep, 1),
+            "PageDown" => GetNewValue(roundedValue, Context.LargeStep, -1),
+            "Home" => GetHomeValue(),
+            "End" => GetEndValue(),
+            _ => null
+        };
+    }
+
+    private double GetNewValue(double currentValue, double step, int direction)
+    {
+        if (Context is null)
+            return currentValue;
+
+        return SliderUtilities.GetNewValue(currentValue, step, direction, Context.Min, Context.Max);
+    }
+
+    private double GetHomeValue()
+    {
+        if (Context is null)
+            return 0;
+
+        if (IsRange && ResolvedIndex > 0)
+        {
+            var previousValue = Context.Values[ResolvedIndex - 1];
+            return previousValue + Context.Step * Context.MinStepsBetweenValues;
+        }
+
+        return Context.Min;
+    }
+
+    private double GetEndValue()
+    {
+        if (Context is null)
+            return 0;
+
+        if (IsRange && ResolvedIndex < Context.Values.Length - 1)
+        {
+            var nextValue = Context.Values[ResolvedIndex + 1];
+            return nextValue - Context.Step * Context.MinStepsBetweenValues;
+        }
+
+        return Context.Max;
+    }
+}

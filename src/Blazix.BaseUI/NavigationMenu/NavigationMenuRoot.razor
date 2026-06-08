@@ -1,0 +1,784 @@
+@using Blazix.BaseUI.FloatingTree
+@using Blazix.BaseUI.Utilities
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<FloatingTree>
+    <FloatingNode>
+        <CascadingValue TValue="NavigationMenuRootContext" Value="context" IsFixed="true">
+            <RenderElement TState="NavigationMenuRootState"
+                           Tag="@(IsNested ? "div" : "nav")"
+                           State="state"
+                           Render="Render"
+                           ClassValue="ClassValue"
+                           StyleValue="StyleValue"
+                           ComponentAttributes="componentAttributes"
+                           ChildContent="ChildContent"
+                           @attributes="AdditionalAttributes"
+                           @ref="rootElementReference" />
+        </CascadingValue>
+    </FloatingNode>
+</FloatingTree>
+
+@code {
+    private readonly string rootId = Guid.NewGuid().ToIdString();
+    private readonly List<string> registeredItems = new();
+    private readonly Dictionary<string, ElementReference?> triggerElements = new();
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private string? currentValue;
+    private readonly TransitionLifecycleManager transition = new();
+    private ActivationDirection activationDirection = ActivationDirection.None;
+    private ElementReference? positionerElement;
+    private ElementReference? popupElement;
+    private ElementReference? viewportElement;
+    private ElementReference? viewportTargetElement;
+    private NavigationMenuRootState state;
+    private NavigationMenuRootContext context = null!;
+    private RenderElement<NavigationMenuRootState>? rootElementReference;
+    private DotNetObjectReference<NavigationMenuRoot>? dotNetRef;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.min.js").AsTask());
+
+    private bool IsControlled => Value is not null || ValueChanged.HasDelegate;
+
+    private string? CurrentValue => IsControlled ? Value : currentValue;
+
+    private bool IsOpen => CurrentValue is not null;
+
+    private bool IsNested => ParentContext is not null;
+
+    [CascadingParameter]
+    private NavigationMenuRootContext? ParentContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the value of the currently active item.
+    /// When non-null, indicates which item's content is displayed.
+    /// </summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the initial value of the active item for uncontrolled mode.
+    /// </summary>
+    [Parameter]
+    public string? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the delay in milliseconds before opening on hover.
+    /// Defaults to <c>50</c>.
+    /// </summary>
+    [Parameter]
+    public int Delay { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets the delay in milliseconds before closing on hover out.
+    /// Defaults to <c>50</c>.
+    /// </summary>
+    [Parameter]
+    public int CloseDelay { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets the visual orientation of the navigation menu.
+    /// </summary>
+    [Parameter]
+    public NavigationMenuOrientation Orientation { get; set; } = NavigationMenuOrientation.Horizontal;
+
+    /// <summary>
+    /// Gets or sets the callback for two-way binding of the value.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the active value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<NavigationMenuValueChangeEventArgs> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked after any open/close transition animations complete.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnOpenChangeComplete { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NavigationMenuRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        currentValue = DefaultValue;
+
+        if (CurrentValue is not null)
+        {
+            transition.BeginOpen();
+        }
+
+        state = new NavigationMenuRootState(IsOpen, IsNested);
+        context = new NavigationMenuRootContext
+        {
+            RootId = rootId,
+            PopupId = Guid.NewGuid().ToIdString(),
+            ViewportId = Guid.NewGuid().ToIdString(),
+            ViewportTargetId = Guid.NewGuid().ToIdString(),
+            Value = CurrentValue,
+            Mounted = transition.IsMounted,
+            IsNested = IsNested,
+            Orientation = Orientation,
+            ActivationDirection = activationDirection,
+            TransitionStatus = transition.TransitionStatus,
+            GetValue = () => CurrentValue,
+            GetMounted = () => transition.IsMounted,
+            SetValueAsync = SetValueFromContextAsync,
+            SetTriggerElement = SetTriggerElement,
+            GetTriggerElement = GetTriggerElement,
+            SetPositionerElement = SetPositionerElement,
+            SetPopupElement = SetPopupElement,
+            SetViewportElement = SetViewportElement,
+            SetViewportTargetElement = SetViewportTargetElement,
+            SetContentElement = SetContentElement,
+            DisposeContentElement = DisposeContentElement,
+            RegisterItem = RegisterItem,
+            UnregisterItem = UnregisterItem,
+            EmitClose = EmitClose,
+            SetViewportInert = SetViewportInert,
+            EmitLinkCloseAsync = EmitLinkCloseAsync,
+            RequestFocusPrevious = RequestFocusPrevious,
+            RequestFocusInside = RequestFocusInside
+        };
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (context is not null && context.Value != CurrentValue)
+        {
+            ApplyValue(CurrentValue, NavigationMenuCloseReason.None, null);
+
+            if (hasRendered)
+            {
+                _ = SyncRootValueAsync(CurrentValue);
+            }
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            _ = InitializeJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask?.IsValueCreated == true && hasRendered)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeRoot", rootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when a trigger is hovered to open an item.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnHoverOpen(string value, string? direction = null)
+    {
+        var dir = ParseActivationDirection(direction);
+        await SetValueAsync(value, NavigationMenuCloseReason.TriggerHover, dir);
+    }
+
+    private static ActivationDirection? ParseActivationDirection(string? direction) => direction switch
+    {
+        "left" => ActivationDirection.Left,
+        "right" => ActivationDirection.Right,
+        "up" => ActivationDirection.Up,
+        "down" => ActivationDirection.Down,
+        "none" => ActivationDirection.None,
+        _ => null
+    };
+
+    /// <summary>
+    /// Invoked from JavaScript when hover ends to close the menu.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnHoverClose()
+    {
+        await SetValueAsync(null, NavigationMenuCloseReason.TriggerHover);
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when the Escape key is pressed.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnEscapeKey()
+    {
+        await SetValueAsync(null, NavigationMenuCloseReason.EscapeKey);
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when a click occurs outside the menu.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOutsidePress()
+    {
+        await SetValueAsync(null, NavigationMenuCloseReason.OutsidePress);
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when focus leaves the navigation menu.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnFocusOut()
+    {
+        await SetValueAsync(null, NavigationMenuCloseReason.FocusOut);
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when a native trigger key event opens an item.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnKeyboardOpen(string value)
+    {
+        await SetValueAsync(value, NavigationMenuCloseReason.ListNavigation);
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript after the starting transition style has been applied.
+    /// </summary>
+    [JSInvokable]
+    public void OnStartingStyleApplied()
+    {
+        if (transition.HandleStartingStyleApplied())
+        {
+            context.TransitionStatus = transition.TransitionStatus;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when a transition animation completes.
+    /// </summary>
+    [JSInvokable]
+    public void OnTransitionEnd(bool open)
+    {
+        var unmounted = transition.HandleTransitionEnd(open);
+        context.TransitionStatus = transition.TransitionStatus;
+
+        if (unmounted)
+        {
+            context.Mounted = false;
+        }
+
+        _ = InvokeOpenChangeCompleteAsync(open);
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Sets the active item value, computing activation direction and managing transition state.
+    /// </summary>
+    internal async Task SetValueAsync(
+        string? nextValue,
+        NavigationMenuCloseReason reason = NavigationMenuCloseReason.None,
+        ActivationDirection? overrideDirection = null)
+    {
+        var previousValue = context.Value;
+        if (previousValue == nextValue)
+        {
+            return;
+        }
+
+        var args = new NavigationMenuValueChangeEventArgs(nextValue, reason);
+        await OnValueChange.InvokeAsync(args);
+
+        if (args.IsCanceled)
+        {
+            return;
+        }
+
+        // Direction precedence:
+        // 1) JS-supplied geometry direction (rect-based, accurate for animations)
+        // 2) Item registration order fallback (used when JS hasn't reported geometry,
+        //    e.g. keyboard activation paths)
+        if (overrideDirection.HasValue)
+        {
+            activationDirection = overrideDirection.Value;
+        }
+        else if (previousValue is not null && nextValue is not null)
+        {
+            var prevIndex = registeredItems.IndexOf(previousValue);
+            var nextIndex = registeredItems.IndexOf(nextValue);
+            if (prevIndex >= 0 && nextIndex >= 0)
+            {
+                activationDirection = Orientation == NavigationMenuOrientation.Horizontal
+                    ? (nextIndex > prevIndex ? ActivationDirection.Right : ActivationDirection.Left)
+                    : (nextIndex > prevIndex ? ActivationDirection.Down : ActivationDirection.Up);
+            }
+        }
+        else
+        {
+            activationDirection = ActivationDirection.None;
+        }
+
+        ApplyValue(nextValue, reason, activationDirection);
+
+        if (hasRendered)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("setRootValue", rootId, nextValue);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        await ValueChanged.InvokeAsync(nextValue);
+
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            var orientationStr = Orientation.ToDataAttributeString();
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, orientationStr, Delay, CloseDelay, IsNested);
+
+            if (rootElementReference?.Element.HasValue == true)
+            {
+                await module.InvokeVoidAsync("setRootElement", rootId, rootElementReference.Element.Value);
+            }
+
+            foreach (var (itemValue, element) in triggerElements)
+            {
+                if (element.HasValue)
+                {
+                    await module.InvokeVoidAsync("setTriggerElement", rootId, itemValue, element.Value);
+                }
+            }
+
+            if (popupElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value);
+            }
+
+            if (positionerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setPositionerElement", rootId, positionerElement.Value);
+            }
+
+            if (viewportElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setViewportElement", rootId, viewportElement.Value);
+            }
+
+            if (viewportTargetElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setViewportTargetElement", rootId, viewportTargetElement.Value);
+            }
+
+            if (CurrentValue is not null)
+            {
+                await module.InvokeVoidAsync("setRootValue", rootId, CurrentValue);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncRootValueAsync(string? value)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setRootValue", rootId, value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["data-orientation"] = Orientation.ToDataAttributeString()!
+        };
+    }
+
+    private void ApplyValue(
+        string? nextValue,
+        NavigationMenuCloseReason reason,
+        ActivationDirection? direction)
+    {
+        if (direction.HasValue)
+        {
+            activationDirection = direction.Value;
+        }
+        else if (nextValue is null)
+        {
+            activationDirection = ActivationDirection.None;
+        }
+
+        if (nextValue is not null)
+        {
+            transition.BeginOpen();
+        }
+        else if (context.Value is not null || transition.IsMounted)
+        {
+            transition.BeginClose();
+        }
+
+        if (!IsControlled || reason == NavigationMenuCloseReason.None)
+        {
+            currentValue = nextValue;
+        }
+
+        context.Value = nextValue;
+        context.ActivationDirection = activationDirection;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
+        context.ViewportInert = false;
+
+        state = new NavigationMenuRootState(nextValue is not null, IsNested);
+    }
+
+    private void SetTriggerElement(string itemValue, ElementReference? element)
+    {
+        triggerElements[itemValue] = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetTriggerElementAsync(itemValue, element.Value);
+        }
+    }
+
+    private ElementReference? GetTriggerElement(string itemValue)
+    {
+        return triggerElements.TryGetValue(itemValue, out var element) ? element : null;
+    }
+
+    private async Task SetTriggerElementAsync(string itemValue, ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setTriggerElement", rootId, itemValue, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetContentElement(string itemValue, ElementReference? element)
+    {
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetContentElementAsync(itemValue, element.Value);
+        }
+    }
+
+    private async Task SetContentElementAsync(string itemValue, ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setContentElement", rootId, itemValue, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetPopupElement(ElementReference? element)
+    {
+        popupElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetPopupElementAsync(element.Value);
+        }
+    }
+
+    private async Task SetPopupElementAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setPopupElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetViewportElement(ElementReference? element)
+    {
+        viewportElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetViewportElementAsync(element.Value);
+        }
+    }
+
+    private async Task SetViewportElementAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setViewportElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetViewportTargetElement(ElementReference? element)
+    {
+        viewportTargetElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetViewportTargetElementAsync(element.Value);
+        }
+    }
+
+    private async Task SetViewportTargetElementAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setViewportTargetElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void RegisterItem(string itemValue)
+    {
+        if (!registeredItems.Contains(itemValue))
+        {
+            registeredItems.Add(itemValue);
+        }
+    }
+
+    private void UnregisterItem(string itemValue)
+    {
+        registeredItems.Remove(itemValue);
+
+        if (hasRendered)
+        {
+            _ = DisposeTriggerElementAsync(itemValue);
+        }
+    }
+
+    private async Task DisposeTriggerElementAsync(string itemValue)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("disposeTriggerElement", rootId, itemValue);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private Task SetValueFromContextAsync(string? nextValue, NavigationMenuCloseReason reason)
+    {
+        return SetValueAsync(nextValue, reason);
+    }
+
+    private async Task EmitLinkCloseAsync()
+    {
+        await SetValueAsync(null, NavigationMenuCloseReason.LinkPress);
+
+        if (ParentContext is not null)
+        {
+            await ParentContext.EmitLinkCloseAsync();
+        }
+    }
+
+    private void EmitClose(NavigationMenuCloseReason reason)
+    {
+        _ = SetValueAsync(null, reason);
+    }
+
+    private void DisposeContentElement(string itemValue)
+    {
+        if (hasRendered)
+        {
+            _ = DisposeContentElementAsync(itemValue);
+        }
+    }
+
+    private async Task DisposeContentElementAsync(string itemValue)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("disposeContentElement", rootId, itemValue);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetPositionerElement(ElementReference? element)
+    {
+        positionerElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetPositionerElementAsync(element.Value);
+        }
+    }
+
+    private void SetViewportInert(bool inert)
+    {
+        if (context.ViewportInert == inert)
+        {
+            return;
+        }
+
+        context.ViewportInert = inert;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SetPositionerElementAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setPositionerElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void RequestFocusPrevious(ElementReference? guardElement)
+    {
+        if (hasRendered && guardElement.HasValue)
+        {
+            _ = RequestFocusPreviousAsync(guardElement.Value);
+        }
+    }
+
+    private async Task RequestFocusPreviousAsync(ElementReference guardElement)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusPreviousTabbable", guardElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void RequestFocusInside(ElementReference? guardElement, ElementReference? triggerElement)
+    {
+        if (hasRendered && guardElement.HasValue)
+        {
+            _ = RequestFocusInsideAsync(guardElement.Value, triggerElement);
+        }
+    }
+
+    private async Task RequestFocusInsideAsync(ElementReference guardElement, ElementReference? triggerElement)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusNavigationMenuContent", rootId, guardElement, triggerElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task InvokeOpenChangeCompleteAsync(bool open)
+    {
+        try
+        {
+            await OnOpenChangeComplete.InvokeAsync(open);
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
+    }
+}

@@ -1,0 +1,83 @@
+@using Blazix.BaseUI.Dialog
+
+<CascadingValue Value="alertRoleContext" IsFixed="true">
+    <DialogRoot
+        Open="@Open"
+        DefaultOpen="@DefaultOpen"
+        Modal="@(DialogModalMode.True)"
+        DisablePointerDismissal="@true"
+        ActionsRef="@ActionsRef"
+        Handle="@Handle"
+        OpenChanged="@OpenChanged"
+        OnOpenChange="@OnOpenChange"
+        OnOpenChangeComplete="@OnOpenChangeComplete"
+        TriggerId="@TriggerId"
+        DefaultTriggerId="@DefaultTriggerId"
+        ChildContent="@ChildContent" />
+</CascadingValue>
+
+@code {
+    private static readonly DialogRoleContext alertRoleContext = new() { Role = DialogRole.AlertDialog };
+
+    /// <summary>
+    /// Gets or sets whether the dialog is currently open.
+    /// When set, the component operates in controlled mode.
+    /// </summary>
+    [Parameter]
+    public bool? Open { get; set; }
+
+    /// <summary>
+    /// Determines whether the dialog is initially open.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DefaultOpen { get; set; }
+
+    /// <summary>
+    /// Gets or sets a reference to imperative actions for controlling the dialog programmatically.
+    /// </summary>
+    [Parameter]
+    public DialogRootActions? ActionsRef { get; set; }
+
+    /// <summary>
+    /// Gets or sets a handle to associate the dialog with external triggers.
+    /// </summary>
+    [Parameter]
+    public IDialogHandle? Handle { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the open state changes, for two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the dialog is opened or closed.
+    /// </summary>
+    [Parameter]
+    public EventCallback<DialogOpenChangeEventArgs> OnOpenChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked after any animations complete when the dialog is opened or closed.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnOpenChangeComplete { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger that the dialog is associated with.
+    /// </summary>
+    [Parameter]
+    public string? TriggerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger that the dialog is initially associated with.
+    /// </summary>
+    [Parameter]
+    public string? DefaultTriggerId { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<DialogRootPayloadContext>? ChildContent { get; set; }
+}

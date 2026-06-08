@@ -4,6 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # User-specific files
+.DS_Store
 *.rsuser
 *.suo
 *.user
@@ -378,7 +379,7 @@ nul
 .envrc
 
 # Playwright traces
-tests/BlazorBaseUI.Playwright.Tests/traces/
+tests/Blazix.BaseUI.Playwright.Tests/traces/
 .playwright-cli
 .playwright-mcp
 /.mcp.json

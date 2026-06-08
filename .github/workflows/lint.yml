@@ -16,6 +16,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Run analyzer-enforced lint rules (BBUI0002–BBUI0015)
-        run: dotnet build BlazorBaseUI.slnx --configuration Debug /p:TreatWarningsAsErrors=true
+        run: dotnet build Blazix.BaseUI.slnx --configuration Debug /p:TreatWarningsAsErrors=true
       - name: Run textual lint rules (R01, R04, R05, R06)
         run: bash scripts/lint-rules.sh

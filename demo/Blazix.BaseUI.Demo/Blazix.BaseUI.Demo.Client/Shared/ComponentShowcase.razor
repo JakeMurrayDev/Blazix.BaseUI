@@ -1,0 +1,100 @@
+﻿@using Blazix.BaseUI.Tabs
+@inject NavigationManager NavManager
+
+<section class="demo-showcase" aria-labelledby="@HeadingId">
+    <header class="demo-showcase__header">
+        <div class="demo-showcase__title-group">
+            <span class="demo-kicker">Blazix.BaseUI primitive</span>
+            <h1 id="@HeadingId">@ComponentName</h1>
+            <p>@Description</p>
+            <div class="demo-page-toolbar">
+                <div class="demo-chip-row" aria-label="Component metadata">
+                    <span class="demo-chip">
+                        <span class="demo-chip__dot"></span>
+                        @CurrentRenderModeLabel
+                    </span>
+                    <span class="demo-chip">Accessible behavior</span>
+                    <span class="demo-chip">Unstyled API</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-render-mode-card" aria-label="Render mode">
+            <span class="demo-render-mode-card__label">Render mode</span>
+            <TabsRoot TValue="string"
+                      Value="@CurrentRenderMode"
+                      OnValueChange="HandleRenderModeChangeAsync"
+                      ClassValue="@(_ => "demo-render-tabs-root")">
+                <TabsList TValue="string"
+                          ClassValue="@(_ => "demo-render-tabs")"
+                          ActivateOnFocus="true">
+                    <TabsTab TValue="string"
+                             Value="@ServerRenderMode"
+                             ClassValue="GetRenderTabClass"
+                             data-demo-render-mode="server">
+                        Server
+                    </TabsTab>
+                    <TabsTab TValue="string"
+                             Value="@WasmRenderMode"
+                             ClassValue="GetRenderTabClass"
+                             data-demo-render-mode="wasm">
+                        WASM
+                    </TabsTab>
+                </TabsList>
+            </TabsRoot>
+        </div>
+    </header>
+
+    <div class="demo-showcase__content">
+        @ChildContent
+    </div>
+</section>
+
+@code {
+    private const string ServerRenderMode = "server";
+    private const string WasmRenderMode = "wasm";
+
+    private readonly string headingId = $"demo-showcase-{Guid.NewGuid():N}";
+
+    private string HeadingId => headingId;
+
+    private string CurrentRenderMode => IsWasmMode ? WasmRenderMode : ServerRenderMode;
+
+    private string CurrentRenderModeLabel => IsWasmMode ? "InteractiveWebAssembly" : "InteractiveServer";
+
+    [Parameter, EditorRequired]
+    public string ComponentName { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string BaseRoute { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public bool IsWasmMode { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private async Task HandleRenderModeChangeAsync(TabsValueChangeEventArgs<string> args)
+    {
+        if (args.Value is null)
+        {
+            return;
+        }
+
+        var toWasm = args.Value == WasmRenderMode;
+        if (toWasm == IsWasmMode)
+        {
+            return;
+        }
+
+        var route = toWasm ? $"{BaseRoute}/wasm" : BaseRoute;
+        NavManager.NavigateTo(route);
+        await Task.CompletedTask;
+    }
+
+    private string GetRenderTabClass(TabsTabState state) =>
+        state.Active ? "demo-render-tab demo-render-tab--active" : "demo-render-tab";
+}

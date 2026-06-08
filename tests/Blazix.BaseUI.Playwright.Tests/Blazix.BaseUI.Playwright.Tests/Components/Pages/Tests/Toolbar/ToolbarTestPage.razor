@@ -1,0 +1,137 @@
+@page "/tests/toolbar/server"
+@using Blazix.BaseUI.Toolbar
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Toolbar Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="before-button" type="button" style="margin-bottom: 10px;">Before Button</button>
+
+    <ToolbarRoot
+        Disabled="@IsDisabled"
+        Orientation="@ResolvedOrientation"
+        LoopFocus="@IsLoopFocus"
+        dir="@ResolvedDirection"
+        data-testid="toolbar"
+        aria-label="Toolbar">
+
+        <ToolbarButton Disabled="@IsButton1Disabled" FocusableWhenDisabled="@IsFocusableWhenDisabled" data-testid="toolbar-button-1">Button 1</ToolbarButton>
+
+        @if (IsShowGroup)
+        {
+            <ToolbarGroup Disabled="@IsGroupDisabled" data-testid="toolbar-group">
+                <ToolbarButton data-testid="toolbar-group-button-1">Group Button 1</ToolbarButton>
+                <ToolbarButton data-testid="toolbar-group-button-2">Group Button 2</ToolbarButton>
+            </ToolbarGroup>
+        }
+
+        <ToolbarButton Disabled="@IsButton2Disabled" FocusableWhenDisabled="@IsFocusableWhenDisabled" data-testid="toolbar-button-2" @onclick="OnToolbarButton2Click">Button 2</ToolbarButton>
+
+        @if (IsShowSeparator)
+        {
+            <ToolbarSeparator data-testid="toolbar-separator" />
+        }
+
+        <ToolbarButton data-testid="toolbar-button-3">Button 3</ToolbarButton>
+
+        @if (IsShowLink)
+        {
+            <ToolbarLink href="#" data-testid="toolbar-link">Link</ToolbarLink>
+        }
+
+        @if (IsShowInput)
+        {
+            <ToolbarInput Disabled="@IsInputDisabled" DefaultValue="abcd" placeholder="Search..." data-testid="toolbar-input" />
+        }
+    </ToolbarRoot>
+
+    <button data-testid="after-button" type="button" style="margin-top: 10px;">After Button</button>
+    <output data-testid="toolbar-button-2-click-count">@Button2ClickCount</output>
+
+    <div style="margin-top: 20px;">
+        <button data-testid="toggle-disabled" type="button" @onclick="ToggleDisabled">Toggle Disabled</button>
+        <button data-testid="toggle-orientation" type="button" @onclick="ToggleOrientation">Toggle Orientation</button>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool? QueryDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string? QueryOrientation { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool? QueryLoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showGroup")]
+    public bool? QueryShowGroup { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showLink")]
+    public bool? QueryShowLink { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showInput")]
+    public bool? QueryShowInput { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showSeparator")]
+    public bool? QueryShowSeparator { get; set; }
+
+    [SupplyParameterFromQuery(Name = "groupDisabled")]
+    public bool? QueryGroupDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "button2Disabled")]
+    public bool? QueryButton2Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "inputDisabled")]
+    public bool? QueryInputDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "focusableWhenDisabled")]
+    public bool? QueryFocusableWhenDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "button1Disabled")]
+    public bool? QueryButton1Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string? QueryDirection { get; set; }
+
+    private bool IsDisabled { get; set; }
+    private bool IsShowGroup => QueryShowGroup ?? false;
+    private bool IsLoopFocus => QueryLoopFocus ?? true;
+    private bool IsShowLink => QueryShowLink ?? false;
+    private bool IsShowInput => QueryShowInput ?? false;
+    private bool IsShowSeparator => QueryShowSeparator ?? false;
+    private bool IsGroupDisabled => QueryGroupDisabled ?? false;
+    private bool IsButton1Disabled => QueryButton1Disabled ?? false;
+    private bool IsButton2Disabled => QueryButton2Disabled ?? false;
+    private bool IsInputDisabled => QueryInputDisabled ?? false;
+    private bool IsFocusableWhenDisabled => QueryFocusableWhenDisabled ?? true;
+    private int Button2ClickCount { get; set; }
+    private string ResolvedDirection => QueryDirection?.ToLowerInvariant() == "rtl" ? "rtl" : "ltr";
+
+    private Orientation ResolvedOrientation { get; set; }
+
+    protected override void OnInitialized()
+    {
+        IsDisabled = QueryDisabled ?? false;
+        ResolvedOrientation = QueryOrientation?.ToLowerInvariant() == "vertical"
+            ? Orientation.Vertical
+            : Orientation.Horizontal;
+    }
+
+    private void ToggleDisabled()
+    {
+        IsDisabled = !IsDisabled;
+    }
+
+    private void ToggleOrientation()
+    {
+        ResolvedOrientation = ResolvedOrientation == Orientation.Horizontal
+            ? Orientation.Vertical
+            : Orientation.Horizontal;
+    }
+
+    private void OnToolbarButton2Click()
+    {
+        Button2ClickCount++;
+    }
+}

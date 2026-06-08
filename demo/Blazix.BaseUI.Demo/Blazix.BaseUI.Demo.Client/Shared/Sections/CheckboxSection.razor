@@ -1,0 +1,502 @@
+﻿@using Blazix.BaseUI.Checkbox
+@using Blazix.BaseUI.Demo.Client.Shared.Icons
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<ComponentShowcase ComponentName="Checkbox"
+                   Description="A control that indicates whether a value is selected or not."
+                   BaseRoute="/checkbox"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic Checkbox"
+                 Description="Click to toggle. Uses uncontrolled state with DefaultChecked.">
+        <div class="flex items-center gap-4">
+            <CheckboxRoot DefaultChecked="true"
+                          ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <CheckIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <span class="text-gray-700">Notifications</span>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Controlled Checkbox"
+                 Description="State controlled externally. Toggle via button or switch.">
+        <div class="flex items-center gap-4">
+            <CheckboxRoot Checked="@controlledChecked"
+                          CheckedChanged="@(value => controlledChecked = value)"
+                          ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <CheckIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <span class="text-gray-700">Checked: @(controlledChecked ? "On" : "Off")</span>
+            <button type="button"
+                    class="demo-button demo-button--primary"
+                    @onclick="@(() => controlledChecked = !controlledChecked)">
+                Toggle Externally
+            </button>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled State"
+                 Description="Uses aria-disabled. Click has no effect.">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <CheckboxRoot Disabled="true"
+                              DefaultChecked="false"
+                              ClassValue="@(state => CheckboxRootClass(state))">
+                    <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                        <CheckIcon />
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                <span class="text-gray-500">Disabled (Off)</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <CheckboxRoot Disabled="true"
+                              DefaultChecked="true"
+                              ClassValue="@(state => CheckboxRootClass(state))">
+                    <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                        <CheckIcon />
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                <span class="text-gray-500">Disabled (On)</span>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="ReadOnly State"
+                 Description="Has aria-readonly attribute. Click does not change state.">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <CheckboxRoot ReadOnly="true"
+                              DefaultChecked="false"
+                              ClassValue="@(state => CheckboxRootClass(state))">
+                    <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                        <CheckIcon />
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                <span class="text-gray-700">ReadOnly (Off)</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <CheckboxRoot ReadOnly="true"
+                              DefaultChecked="true"
+                              ClassValue="@(state => CheckboxRootClass(state))">
+                    <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                        <CheckIcon />
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                <span class="text-gray-700">ReadOnly (On)</span>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Indeterminate State"
+                 Description="Shows a mixed state (aria-checked='mixed').">
+        <div class="flex items-center gap-4">
+            <CheckboxRoot Indeterminate="true"
+                          ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <MinusIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <span class="text-gray-700">Indeterminate</span>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="OnCheckedChange Callback"
+                 Description="Callback fires with new checked value. Can be canceled.">
+        <div class="flex items-center gap-4">
+            <CheckboxRoot OnCheckedChange="@HandleCheckedChange"
+                          ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <CheckIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <span class="text-gray-700">Change count: @changeCount</span>
+        </div>
+
+        <div class="mt-4 flex items-center gap-4">
+            <CheckboxRoot OnCheckedChange="@HandleCancelableChange"
+                          ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <CheckIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" @bind="preventChange" class="demo-checkbox-native" />
+                <span class="text-sm text-gray-700">Prevent next change (Cancel())</span>
+            </label>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Field Integration"
+                 Description="Checkbox integrates with FieldRoot for labels, descriptions, and validation state.">
+        <div class="space-y-6">
+            <FieldRoot Name="notifications">
+                <div class="flex items-center gap-3">
+                    <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                        <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                            <CheckIcon />
+                        </CheckboxIndicator>
+                    </CheckboxRoot>
+                    <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                        Enable Notifications
+                    </FieldLabel>
+                </div>
+                <FieldDescription ClassValue="@(_ => "text-sm text-gray-500 mt-1 ml-14")">
+                    Receive push notifications for updates.
+                </FieldDescription>
+            </FieldRoot>
+
+            <FieldRoot Name="premium" Disabled="true">
+                <div class="flex items-center gap-3">
+                    <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                        <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                            <CheckIcon />
+                        </CheckboxIndicator>
+                    </CheckboxRoot>
+                    <FieldLabel ClassValue="@(_ => "text-gray-500 cursor-not-allowed")">
+                        Premium Features (Disabled via Field.Root)
+                    </FieldLabel>
+                </div>
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Field State Tracking"
+                 Description="Tracks touched (on blur), dirty (value changed), filled (checked), focused states.">
+        <FieldRoot Name="tracking">
+            <div class="flex items-center gap-3">
+                <CheckboxRoot ClassValue="@(state => CheckboxRootClassWithStates(state))">
+                    <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                        <CheckIcon />
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                    Track my state
+                </FieldLabel>
+            </div>
+            <FieldStateDisplay Context="fieldState">
+                <div class="mt-3 ml-14 space-y-1 text-xs">
+                    <div class="flex gap-4">
+                        <StateIndicator Label="Touched" IsActive="@fieldState.Touched" />
+                        <StateIndicator Label="Dirty" IsActive="@fieldState.Dirty" />
+                        <StateIndicator Label="Filled" IsActive="@fieldState.Filled" />
+                        <StateIndicator Label="Focused" IsActive="@fieldState.Focused" />
+                    </div>
+                </div>
+            </FieldStateDisplay>
+        </FieldRoot>
+    </DemoSection>
+
+    <DemoSection Title="Form Submission"
+                 Description="Checkbox submits like native checkbox. Use UncheckedValue to submit a value when off.">
+        <Form Model="@formModel" OnFormSubmit="@HandleFormSubmit">
+            <div class="space-y-4">
+                <FieldRoot Name="newsletter">
+                    <div class="flex items-center gap-3">
+                        <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                            <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                                <CheckIcon />
+                            </CheckboxIndicator>
+                        </CheckboxRoot>
+                        <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                            Subscribe to newsletter
+                        </FieldLabel>
+                    </div>
+                </FieldRoot>
+
+                <FieldRoot Name="marketing">
+                    <div class="flex items-center gap-3">
+                        <CheckboxRoot UncheckedValue="no"
+                                      ClassValue="@(state => CheckboxRootClass(state))">
+                            <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                                <CheckIcon />
+                            </CheckboxIndicator>
+                        </CheckboxRoot>
+                        <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                            Marketing emails (with UncheckedValue="no")
+                        </FieldLabel>
+                    </div>
+                </FieldRoot>
+
+                <button type="submit"
+                        class="demo-button demo-button--primary">
+                    Submit
+                </button>
+            </div>
+        </Form>
+
+        @if (lastSubmission is not null)
+        {
+            <div class="demo-state-panel mt-4">
+                <strong>Last submission:</strong>
+                <pre class="mt-1 text-xs">@lastSubmission</pre>
+            </div>
+        }
+    </DemoSection>
+
+    <DemoSection Title="Validation"
+                 Description="Supports required validation and custom validate function. Multiple validation modes.">
+        <div class="space-y-6">
+            <Form Model="@(new object())">
+                <FieldRoot Name="terms">
+                    <div class="flex items-center gap-3">
+                        <CheckboxRoot Required="true"
+                                      ClassValue="@(state => CheckboxRootClass(state))">
+                            <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                                <CheckIcon />
+                            </CheckboxIndicator>
+                        </CheckboxRoot>
+                        <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                            I accept the terms and conditions *
+                        </FieldLabel>
+                    </div>
+                    <FieldError Match="true"
+                                MatchValidity="valueMissing"
+                                ClassValue="@(_ => "text-red-600 text-sm mt-1 ml-14")">
+                        You must accept the terms to continue.
+                    </FieldError>
+                </FieldRoot>
+                <button type="submit"
+                        class="demo-button demo-button--primary mt-3">
+                    Submit (Required)
+                </button>
+            </Form>
+
+            <FieldRoot Name="agree"
+                       ValidationMode="ValidationMode.OnChange"
+                       Validate="@ValidateMustBeChecked">
+                <div class="flex items-center gap-3">
+                    <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                        <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                            <CheckIcon />
+                        </CheckboxIndicator>
+                    </CheckboxRoot>
+                    <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                        I agree (validates onChange - must be checked)
+                    </FieldLabel>
+                </div>
+                <FieldError ClassValue="@(_ => "text-red-600 text-sm mt-1 ml-14")" />
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="External Errors"
+                 Description="Errors can be set externally via Form. Cleared on change.">
+        <Form Model="@(new object())" Errors="@externalErrors">
+            <FieldRoot Name="external">
+                <div class="flex items-center gap-3">
+                    <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                        <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                            <CheckIcon />
+                        </CheckboxIndicator>
+                    </CheckboxRoot>
+                    <FieldLabel ClassValue="@(_ => "text-gray-700 cursor-pointer")">
+                        Has external error (click to clear)
+                    </FieldLabel>
+                </div>
+                <FieldError ClassValue="@(_ => "text-red-600 text-sm mt-1 ml-14")" />
+            </FieldRoot>
+        </Form>
+
+        <button type="button"
+                class="demo-button demo-button--danger mt-3"
+                @onclick="@SetExternalError">
+            Set External Error
+        </button>
+    </DemoSection>
+
+    <DemoSection Title="Native Button and External Form Owner"
+                 Description="NativeButton renders a button root while the hidden input remains owned by the specified external form.">
+        <div class="demo-panel demo-panel--wide">
+            <form id="checkbox-external-form"
+                  class="demo-state-panel"
+                  @onsubmit="HandleExternalFormSubmit"
+                  @onsubmit:preventDefault="true">
+                <div class="demo-state-row">
+                    <span>external form id</span>
+                    <strong>checkbox-external-form</strong>
+                </div>
+                <button type="submit" class="demo-button demo-button--primary">Submit external form</button>
+            </form>
+
+            <div class="demo-grid demo-grid--2">
+                <div class="demo-scenario-card">
+                    <h3>Native button root</h3>
+                    <div class="demo-option-row">
+                        <CheckboxRoot NativeButton="true"
+                                      Name="external-consent"
+                                      Form="checkbox-external-form"
+                                      Value="accepted"
+                                      UncheckedValue="declined"
+                                      Checked="@nativeButtonChecked"
+                                      CheckedChanged="@(value => nativeButtonChecked = value)"
+                                      OnCheckedChange="@HandleNativeButtonChange"
+                                      ClassValue="@(state => CheckboxRootClass(state))">
+                            <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                                <CheckIcon />
+                            </CheckboxIndicator>
+                        </CheckboxRoot>
+                        <span>Consent stored outside the form element</span>
+                    </div>
+                    <div class="demo-state-panel">
+                        <div class="demo-state-row"><span>checked</span><strong>@nativeButtonChecked</strong></div>
+                        <div class="demo-state-row"><span>change count</span><strong>@nativeButtonChangeCount</strong></div>
+                        <div class="demo-state-row"><span>submitted value</span><strong>@nativeButtonSubmittedValue</strong></div>
+                    </div>
+                </div>
+
+                <div class="demo-scenario-card">
+                    <h3>Readonly + required attributes</h3>
+                    <div class="demo-option-row">
+                        <CheckboxRoot NativeButton="true"
+                                      ReadOnly="true"
+                                      Required="true"
+                                      DefaultChecked="true"
+                                      ClassValue="@(state => CheckboxRootClass(state))">
+                            <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                                <CheckIcon />
+                            </CheckboxIndicator>
+                        </CheckboxRoot>
+                        <span>Focusable, required, and readonly without value drift</span>
+                    </div>
+                    <p class="demo-muted">
+                        This catches regressions where native button mode loses ARIA or form attributes.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Keyboard Navigation"
+                 Description="Focus with Tab, toggle with Space or Enter keys.">
+        <div class="flex items-center gap-4">
+            <CheckboxRoot ClassValue="@(state => CheckboxRootClass(state))">
+                <CheckboxIndicator ClassValue="@(CheckboxIndicatorClass)">
+                    <CheckIcon />
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            <span class="text-gray-700">Tab here, then press Space or Enter</span>
+        </div>
+        @if (!IsWasmMode)
+        {
+            <p class="mt-2 text-xs text-amber-600">(Server mode may have slight latency)</p>
+        }
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private Lazy<Task<IJSObjectReference>> moduleTask = null!;
+    private bool controlledChecked;
+    private int changeCount;
+    private bool preventChange;
+    private bool nativeButtonChecked;
+    private int nativeButtonChangeCount;
+    private object formModel = new();
+    private string? lastSubmission;
+    private string nativeButtonSubmittedValue = "(not submitted)";
+    private Dictionary<string, string[]> externalErrors = new();
+
+    protected override void OnInitialized()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", "./demo-utilities.js").AsTask());
+    }
+
+    private void HandleCheckedChange(CheckboxCheckedChangeEventArgs e)
+    {
+        changeCount++;
+    }
+
+    private void HandleCancelableChange(CheckboxCheckedChangeEventArgs e)
+    {
+        if (preventChange)
+        {
+            e.Cancel();
+            preventChange = false;
+        }
+        StateHasChanged();
+    }
+
+    private void HandleNativeButtonChange(CheckboxCheckedChangeEventArgs e)
+    {
+        nativeButtonChangeCount++;
+    }
+
+    private async Task HandleExternalFormSubmit()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            nativeButtonSubmittedValue =
+                await module.InvokeAsync<string?>("getFormValue", "checkbox-external-form", "external-consent")
+                ?? "(not submitted)";
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private void HandleFormSubmit(FormSubmitEventArgs e)
+    {
+        lastSubmission = string.Join("\n", e.Values.Select(kv => $"{kv.Key}: {kv.Value}"));
+    }
+
+    private Task<string[]?> ValidateMustBeChecked(object? value)
+    {
+        var isChecked = value is true;
+        return Task.FromResult<string[]?>(isChecked ? null : ["This must be checked"]);
+    }
+
+    private void SetExternalError()
+    {
+        externalErrors = new Dictionary<string, string[]>
+        {
+            ["external"] = ["This is an external server error"]
+        };
+    }
+
+    private static string CheckboxRootClass(CheckboxRootState state)
+    {
+        return "demo-checkbox-control";
+    }
+
+    private static string CheckboxRootClassWithStates(CheckboxRootState state)
+    {
+        return CheckboxRootClass(state);
+    }
+
+    private static string CheckboxIndicatorClass(CheckboxIndicatorState state)
+    {
+        return "demo-checkbox-indicator";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+}

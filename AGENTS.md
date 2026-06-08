@@ -1,13 +1,13 @@
-# BlazorBaseUI
+# Blazix.BaseUI
 
 ## Project Overview
 
-BlazorBaseUI is a Blazor component library that ports [Base UI](https://base-ui.com/) (React) components to Blazor. The library provides unstyled, accessible UI primitives for building design systems.
+Blazix.BaseUI is a Blazor component library that ports [Base UI](https://base-ui.com/) (React) components to Blazor. The library provides unstyled, accessible UI primitives for building design systems.
 
 ### Repository Links
 
-- **GitHub**: <https://github.com/JakeMurrayDev/BlazorBaseUI/>
-- **GitHub API**: <https://api.github.com/repos/JakeMurrayDev/BlazorBaseUI>
+- **GitHub**: <https://github.com/JakeMurrayDev/Blazix.BaseUI/>
+- **GitHub API**: <https://api.github.com/repos/JakeMurrayDev/Blazix.BaseUI>
 
 ### Technology Stack
 
@@ -18,18 +18,18 @@ BlazorBaseUI is a Blazor component library that ports [Base UI](https://base-ui.
 ### Project Structure
 
 ```
-BlazorBaseUI/
+Blazix.BaseUI/
 ├── src/
-│   ├── BlazorBaseUI/              # Main component library
+│   ├── Blazix.BaseUI/              # Main component library
 │   │   ├── [Component]/           # Component folders
 │   │   └── wwwroot/               # JavaScript modules
-│   └── BlazorBaseUI.Utilities/    # Shared utilities
+│   └── Blazix.BaseUI.Utilities/    # Shared utilities
 ├── demo/
-│   └── BlazorBaseUI.Demo/         # Demo application (Server + Client)
+│   └── Blazix.BaseUI.Demo/         # Demo application (Server + Client)
 └── tests/
-    ├── BlazorBaseUI.Tests/        # Unit tests (bUnit)
-    ├── BlazorBaseUI.Tests.Contracts/  # Test interface contracts
-    └── BlazorBaseUI.Playwright.Tests/ # E2E tests (Playwright)
+    ├── Blazix.BaseUI.Tests/        # Unit tests (bUnit)
+    ├── Blazix.BaseUI.Tests.Contracts/  # Test interface contracts
+    └── Blazix.BaseUI.Playwright.Tests/ # E2E tests (Playwright)
 ```
 
 ### Tool Preferences
@@ -57,21 +57,21 @@ BlazorBaseUI/
 ### Build
 
 ```bash
-dotnet build BlazorBaseUI.slnx                    # Build entire solution
-dotnet build src/BlazorBaseUI/BlazorBaseUI.csproj # Build specific project
-dotnet build BlazorBaseUI.slnx -c Release         # Build in release mode
+dotnet build Blazix.BaseUI.slnx                    # Build entire solution
+dotnet build src/Blazix.BaseUI/Blazix.BaseUI.csproj # Build specific project
+dotnet build Blazix.BaseUI.slnx -c Release         # Build in release mode
 ```
 
 ### Run Demo
 
 ```bash
-dotnet run --project demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo.csproj
+dotnet run --project demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.csproj
 ```
 
 ### Unit Tests (bUnit)
 
 ```bash
-dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj
+dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj
 dotnet test --filter "FullyQualifiedName~CheckboxRootTests"  # Specific class
 dotnet test --filter "TestName"                               # Specific test
 dotnet test -v detailed                                       # Verbose output
@@ -80,7 +80,7 @@ dotnet test -v detailed                                       # Verbose output
 ### E2E Tests (Playwright)
 
 ```bash
-dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj
+dotnet test tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj
 dotnet test --filter "FullyQualifiedName~CollapsibleServerTests"  # Specific class
 ```
 
@@ -145,8 +145,8 @@ See [JS Interop Rules](.claude/rules/js-interop-rules.md) for imports, script st
 
 ### 4a. JS Interop File Architecture
 
-- Every component requiring JS interop **must** have its own component-specific JS file (e.g., `blazor-baseui-dialog.js`)
-- Component JS files import shared behavior from functional JS modules (e.g., `blazor-baseui-floating.js`, `blazor-baseui-composite.js`)
+- Every component requiring JS interop **must** have its own component-specific JS file (e.g., `blazix-baseui-dialog.js`)
+- Component JS files import shared behavior from functional JS modules (e.g., `blazix-baseui-floating.js`, `blazix-baseui-composite.js`)
 - Shared/functional JS modules must **never** contain component-specific logic
 - **Exception:** When the interaction is trivial (a single function call with no component-specific wiring), the C# component may import the shared JS module directly
 - When adding new behavior to a component, modify the component's JS file — not the shared module

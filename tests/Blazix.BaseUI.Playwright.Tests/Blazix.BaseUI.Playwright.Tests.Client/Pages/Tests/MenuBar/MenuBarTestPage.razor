@@ -1,0 +1,230 @@
+@page "/tests/menubar/wasm"
+@using Blazix.BaseUI
+@using Blazix.BaseUI.DirectionProvider
+@using Blazix.BaseUI.Menu
+@using Blazix.BaseUI.MenuBar
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>MenuBar Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <DirectionProvider Direction="@EffectiveDirection">
+        <MenuBarRoot
+            Orientation="@(Orientation == "vertical" ? Blazix.BaseUI.Orientation.Vertical : Blazix.BaseUI.Orientation.Horizontal)"
+            LoopFocus="@(LoopFocus ?? true)"
+            Modal="@(Modal ?? true)"
+            Disabled="@Disabled"
+            data-testid="menubar-root">
+
+            @* First Menu *@
+            <MenuRoot Context="_"
+                @bind-Open="menu1Open"
+                OnOpenChange="args => HandleMenuOpenChange(1, args)"
+                >
+                <MenuTrigger data-testid="menu-1-trigger">
+                    File
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-1-positioner" style="@GetPositionerStyle(1)">
+                        <MenuPopup data-testid="menu-1-popup">
+                            <MenuItem data-testid="menu-1-item-1" @onclick="() => HandleItemClick(1, 1)">
+                                New
+                            </MenuItem>
+                            <MenuItem data-testid="menu-1-item-2" @onclick="() => HandleItemClick(1, 2)">
+                                Open
+                            </MenuItem>
+                            <MenuItem data-testid="menu-1-item-3" @onclick="() => HandleItemClick(1, 3)">
+                                Save
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+
+            @* Second Menu *@
+            <MenuRoot Context="_"
+                @bind-Open="menu2Open"
+                OnOpenChange="args => HandleMenuOpenChange(2, args)"
+                >
+                <MenuTrigger data-testid="menu-2-trigger">
+                    Edit
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-2-positioner" style="@GetPositionerStyle(2)">
+                        <MenuPopup data-testid="menu-2-popup">
+                            <MenuItem data-testid="menu-2-item-1" @onclick="() => HandleItemClick(2, 1)">
+                                Undo
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-2" @onclick="() => HandleItemClick(2, 2)">
+                                Redo
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-3" Disabled="true">
+                                Cut (Disabled)
+                            </MenuItem>
+                            <MenuItem data-testid="menu-2-item-4" @onclick="() => HandleItemClick(2, 4)">
+                                Copy
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+
+        @* Third Menu *@
+        <MenuRoot Context="_"
+            @bind-Open="menu3Open"
+            OnOpenChange="args => HandleMenuOpenChange(3, args)"
+            >
+            <MenuTrigger data-testid="menu-3-trigger">
+                View
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner data-testid="menu-3-positioner">
+                    <MenuPopup data-testid="menu-3-popup">
+                        <MenuItem data-testid="menu-3-item-1" @onclick="() => HandleItemClick(3, 1)">
+                            Zoom In
+                        </MenuItem>
+                        <MenuItem data-testid="menu-3-item-2" @onclick="() => HandleItemClick(3, 2)">
+                            Zoom Out
+                        </MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+
+        @if (ShowSubmenu)
+        {
+            @* Fourth Menu with Submenu *@
+            <MenuRoot Context="_"
+                @bind-Open="menu4Open"
+                OnOpenChange="args => HandleMenuOpenChange(4, args)"
+                >
+                <MenuTrigger data-testid="menu-4-trigger">
+                    Help
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-4-positioner">
+                        <MenuPopup data-testid="menu-4-popup">
+                            <MenuItem data-testid="menu-4-item-1" @onclick="() => HandleItemClick(4, 1)">
+                                Documentation
+                            </MenuItem>
+                            <MenuSubmenuRoot
+                                @bind-Open="submenuOpen"
+                                OnOpenChange="HandleSubmenuOpenChange"
+                                >
+                                <MenuSubmenuTrigger data-testid="menu-4-submenu-trigger">
+                                    More Help
+                                </MenuSubmenuTrigger>
+                                <MenuPortal>
+                                    <MenuPositioner data-testid="menu-4-submenu-positioner">
+                                        <MenuPopup data-testid="menu-4-submenu-popup">
+                                            <MenuItem data-testid="menu-4-submenu-item-1" @onclick="() => HandleSubmenuItemClick(1)">
+                                                Tutorials
+                                            </MenuItem>
+                                            <MenuItem data-testid="menu-4-submenu-item-2" @onclick="() => HandleSubmenuItemClick(2)">
+                                                FAQ
+                                            </MenuItem>
+                                        </MenuPopup>
+                                    </MenuPositioner>
+                                </MenuPortal>
+                            </MenuSubmenuRoot>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        }
+        </MenuBarRoot>
+    </DirectionProvider>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Menu 1 Open: <span data-testid="menu-1-state">@menu1Open.ToString().ToLowerInvariant()</span></div>
+        <div>Menu 2 Open: <span data-testid="menu-2-state">@menu2Open.ToString().ToLowerInvariant()</span></div>
+        <div>Menu 3 Open: <span data-testid="menu-3-state">@menu3Open.ToString().ToLowerInvariant()</span></div>
+        @if (ShowSubmenu)
+        {
+            <div>Menu 4 Open: <span data-testid="menu-4-state">@menu4Open.ToString().ToLowerInvariant()</span></div>
+            <div>Submenu Open: <span data-testid="submenu-state">@submenuOpen.ToString().ToLowerInvariant()</span></div>
+        }
+        <div>Active Menu: <span data-testid="active-menu">@activeMenu</span></div>
+        <div>Last Item Clicked: <span data-testid="last-item-clicked">@lastItemClicked</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string Orientation { get; set; } = "horizontal";
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool? LoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modal")]
+    public bool? Modal { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showSubmenu")]
+    public bool ShowSubmenu { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string Direction { get; set; } = "ltr";
+
+    [SupplyParameterFromQuery(Name = "scenario")]
+    public string TestScenario { get; set; } = "";
+
+    private bool menu1Open;
+    private bool menu2Open;
+    private bool menu3Open;
+    private bool menu4Open;
+    private bool submenuOpen;
+    private int activeMenu;
+    private string lastItemClicked = "";
+    private int changeCount;
+
+    private Blazix.BaseUI.Direction EffectiveDirection =>
+        string.Equals(Direction, "rtl", StringComparison.OrdinalIgnoreCase)
+            ? Blazix.BaseUI.Direction.Rtl
+            : Blazix.BaseUI.Direction.Ltr;
+
+    private void HandleMenuOpenChange(int menuNumber, MenuOpenChangeEventArgs args)
+    {
+        changeCount++;
+        if (args.Open)
+        {
+            activeMenu = menuNumber;
+        }
+        else if (activeMenu == menuNumber)
+        {
+            activeMenu = 0;
+        }
+    }
+
+    private void HandleItemClick(int menuNumber, int itemNumber)
+    {
+        lastItemClicked = $"Menu{menuNumber}-Item{itemNumber}";
+    }
+
+    private void HandleSubmenuOpenChange(MenuOpenChangeEventArgs args)
+    {
+        changeCount++;
+    }
+
+    private void HandleSubmenuItemClick(int itemNumber)
+    {
+        lastItemClicked = $"Submenu-Item{itemNumber}";
+    }
+
+    private string? GetPositionerStyle(int menuNumber)
+    {
+        return TestScenario switch
+        {
+            "touch-scroll-lock-full-width" when menuNumber == 1 => "width: calc(100vw - 10px);",
+            "touch-scroll-lock-narrow" when menuNumber == 1 => "width: 240px;",
+            "touch-scroll-lock-handoff" when menuNumber == 1 => "width: calc(100vw - 10px);",
+            "touch-scroll-lock-handoff" when menuNumber == 2 => "width: 240px;",
+            _ => null
+        };
+    }
+}

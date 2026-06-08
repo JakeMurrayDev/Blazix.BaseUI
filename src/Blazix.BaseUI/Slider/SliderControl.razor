@@ -1,0 +1,434 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.DirectionProvider
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="SliderRootState"
+               Tag="div"
+               Enabled="Context is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="computedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-slider.min.js";
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private bool isProcessingPointerDown;
+    private double[]? previousInsetValues;
+    private DotNetObjectReference<SliderControl>? dotNetRef;
+    private ElementReference element;
+    private SliderRootState state = null!;
+    private RenderElement<SliderRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<SliderRootState, string?>? computedStyleValue;
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+
+    [CascadingParameter]
+    private SliderRootContext? Context { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SliderRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SliderRootState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<SliderRootState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    private bool IsVertical => Context?.Orientation == Orientation.Vertical;
+
+    private bool IsRtl => DirectionContext?.Direction == Direction.Rtl;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Context is not null)
+        {
+            state = Context.State;
+        }
+
+        computedStyleValue = s =>
+        {
+            const string baseStyle = "touch-action: none;";
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? baseStyle : $"{baseStyle} {userStyle}";
+        };
+
+        BuildComponentAttributes();
+
+        if (Context is { Inset: true } && hasRendered && !Context.Dragging)
+        {
+            if (previousInsetValues is null || !ValuesEqual(previousInsetValues, Context.Values))
+            {
+                previousInsetValues = [.. Context.Values];
+                _ = SyncInsetPositionsAsync();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var currentElement = renderElementReference?.Element;
+        if (currentElement.HasValue && !currentElement.Equals(previousElement))
+        {
+            previousElement = currentElement;
+            element = currentElement.Value;
+            Context?.SetControlElement(element);
+            _ = RegisterPointerGuardAsync();
+        }
+
+        if (firstRender && Context?.Inset == true)
+        {
+            _ = SetupInsetIndicatorAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+
+        if (moduleTask?.IsValueCreated == true && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("unregisterPointerGuard", element);
+                await module.InvokeVoidAsync("unobserveInsetResize", element);
+                await module.InvokeVoidAsync("stopDrag", element);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called from JavaScript during a drag operation to update the slider values.
+    /// </summary>
+    [JSInvokable]
+    public void OnDragMove(double[] values, int thumbIndex)
+    {
+        if (Context is null)
+            return;
+
+        Context.SetValue(values, SliderChangeReason.Drag, thumbIndex);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when a drag operation ends to commit the final values.
+    /// </summary>
+    [JSInvokable]
+    public void OnDragEnd(double[] values, int thumbIndex)
+    {
+        if (Context is null)
+            return;
+
+        Context.SetValue(values, SliderChangeReason.Drag, thumbIndex);
+        Context.CommitValue(values, SliderChangeReason.Drag);
+        Context.SetDragging(false);
+        Context.SetActiveThumbIndex(-1);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var orientationStr = state.Orientation.ToDataAttributeString() ?? "horizontal";
+
+        attrs["tabindex"] = -1;
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
+        if (Context?.ThumbAlignment == ThumbAlignment.Edge)
+        {
+            // lint-ignore:RULE-05 - Required for parity with Base UI's prehydration selector.
+            attrs["data-base-ui-slider-control"] = true;
+        }
+
+        attrs["data-dragging"] = state.Dragging;
+        attrs["data-orientation"] = orientationStr;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-valid"] = state.Valid == true;
+        attrs["data-invalid"] = state.Valid == false;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-focused"] = state.Focused;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandlePointerDown(PointerEventArgs e)
+    {
+        if (Context is null || Context.Disabled || Context.ReadOnly || e.Button != 0)
+            return;
+
+        if (isProcessingPointerDown)
+            return;
+
+        isProcessingPointerDown = true;
+
+        try
+        {
+            if (!hasRendered)
+                return;
+
+            var thumbs = Context.GetAllThumbMetadata();
+            var thumbElements = thumbs
+                .OrderBy(kvp => kvp.Key)
+                .Select(kvp => kvp.Value.ThumbElement)
+                .ToArray();
+
+            var config = new SliderDragConfig(
+                Context.Min,
+                Context.Max,
+                Context.Step,
+                Context.MinStepsBetweenValues,
+                Context.Orientation.ToDataAttributeString() ?? "horizontal",
+                IsRtl ? "rtl" : "ltr",
+                Context.ThumbCollisionBehavior.ToDataAttributeString(),
+                Context.ThumbAlignment.ToDataAttributeString(),
+                Context.Values,
+                Context.Disabled,
+                Context.ReadOnly,
+                Context.Inset ? await GetInsetOffsetAsync() : 0,
+                Context.HasRealtimeSubscribers);
+
+            try
+            {
+                var module = await ModuleTask.Value;
+
+                var result = await module.InvokeAsync<StartDragResult?>(
+                    "startDrag",
+                    element,
+                    dotNetRef,
+                    config,
+                    thumbElements,
+                    Context.GetIndicatorElement(),
+                    e.ClientX,
+                    e.ClientY);
+
+                if (result is not null)
+                {
+                    if (result.WasTrackPress)
+                    {
+                        Context.SetValue(result.Values, SliderChangeReason.TrackPress, result.ThumbIndex);
+                    }
+                    else
+                    {
+                        Context.SetValueSilent(result.Values);
+                    }
+
+                    Context.SetDragging(true);
+                    Context.SetActiveThumbIndex(result.ThumbIndex);
+
+                    if (!result.PressedOnFocusedThumb)
+                    {
+                        await FocusThumbAsync(result.ThumbIndex);
+                    }
+                }
+
+                await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+        finally
+        {
+            isProcessingPointerDown = false;
+        }
+    }
+
+    private async Task<double> GetInsetOffsetAsync()
+    {
+        if (!hasRendered || Context is null)
+            return 0;
+
+        var firstThumb = Context.GetAllThumbMetadata().OrderBy(kvp => kvp.Key).FirstOrDefault().Value;
+        if (firstThumb is null)
+            return 0;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            var thumbRect = await module.InvokeAsync<ThumbRect?>("getThumbRect", firstThumb.ThumbElement);
+            if (thumbRect is null)
+                return 0;
+
+            return IsVertical ? thumbRect.Height / 2 : thumbRect.Width / 2;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            return 0;
+        }
+    }
+
+    private async Task RegisterPointerGuardAsync()
+    {
+        if (!hasRendered || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("registerPointerGuard", element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task FocusThumbAsync(int index)
+    {
+        if (!hasRendered || Context is null)
+            return;
+
+        var thumbMeta = Context.GetThumbMetadata(index);
+        if (thumbMeta is null)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusThumbInput", thumbMeta.ThumbElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetupInsetIndicatorAsync()
+    {
+        if (!hasRendered || Context is null || !Context.Inset)
+            return;
+
+        await SyncInsetPositionsAsync();
+        await ObserveInsetResizeAsync();
+    }
+
+    private async Task SyncInsetPositionsAsync()
+    {
+        if (!hasRendered || Context is null)
+            return;
+
+        var indicatorEl = Context.GetIndicatorElement();
+        if (!indicatorEl.HasValue)
+            return;
+
+        var thumbElements = GetOrderedThumbElements();
+        if (thumbElements.Length == 0)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("syncInsetPositions",
+                element, thumbElements, indicatorEl.Value, BuildInsetConfig());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task ObserveInsetResizeAsync()
+    {
+        if (!hasRendered || Context is null)
+            return;
+
+        var indicatorEl = Context.GetIndicatorElement();
+        if (!indicatorEl.HasValue)
+            return;
+
+        var thumbElements = GetOrderedThumbElements();
+        if (thumbElements.Length == 0)
+            return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("observeInsetResize",
+                element, thumbElements, indicatorEl.Value, BuildInsetConfig());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private ElementReference[] GetOrderedThumbElements() =>
+        Context!.GetAllThumbMetadata()
+            .OrderBy(kvp => kvp.Key)
+            .Select(kvp => kvp.Value.ThumbElement)
+            .ToArray();
+
+    private object BuildInsetConfig() => new
+    {
+        min = Context!.Min,
+        max = Context.Max,
+        orientation = Context.Orientation.ToDataAttributeString() ?? "horizontal",
+        direction = IsRtl ? "rtl" : "ltr",
+        thumbAlignment = Context.ThumbAlignment.ToDataAttributeString(),
+        values = Context.Values
+    };
+
+    private static bool ValuesEqual(double[] a, double[] b)
+    {
+        if (a.Length != b.Length) return false;
+        for (var i = 0; i < a.Length; i++)
+        {
+            if (Math.Abs(a[i] - b[i]) > 1e-10) return false;
+        }
+        return true;
+    }
+}

@@ -1,0 +1,209 @@
+@using Blazix.BaseUI.Progress
+
+<ComponentShowcase ComponentName="Progress"
+                   Description="A progress bar that displays the completion status of a task."
+                   BaseRoute="/progress"
+                   IsWasmMode="IsWasmMode">
+    <DemoSection Title="Basic Usage"
+                 Description="A progress bar showing completion percentage.">
+        <div class="flex flex-col gap-8 w-80">
+            <ProgressRoot Value="value"
+                          ClassValue="@(state => "flex flex-col gap-2")">
+                <div class="flex justify-between text-sm text-gray-700">
+                    <ProgressLabel>Uploading...</ProgressLabel>
+                    <ProgressValue />
+                </div>
+                <ProgressTrack class="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <ProgressIndicator ClassValue="@(state => GetIndicatorClass(state.Status))" />
+                </ProgressTrack>
+            </ProgressRoot>
+
+            <div class="flex gap-2">
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="DecreaseValue">
+                    -10%
+                </button>
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="IncreaseValue">
+                    +10%
+                </button>
+                <button type="button"
+                        class="rounded bg-gray-600 px-3 py-1.5 text-sm text-white hover:bg-gray-700"
+                        @onclick="ResetValue">
+                    Reset
+                </button>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Indeterminate State"
+                 Description="A progress bar with null value shows indeterminate state.">
+        <div class="w-80">
+            <ProgressRoot Value="null"
+                          ClassValue="@(state => "flex flex-col gap-2")">
+                <div class="flex justify-between text-sm text-gray-700">
+                    <ProgressLabel>Loading...</ProgressLabel>
+                    <ProgressValue />
+                </div>
+                <ProgressTrack class="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <ProgressIndicator class="h-full bg-blue-600 animate-pulse rounded-full w-full" />
+                </ProgressTrack>
+            </ProgressRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Custom Value Display"
+                 Description="Progress bar with custom value rendering using ChildContent callback.">
+        <div class="w-80">
+            <ProgressRoot Value="customValue"
+                          ClassValue="@(state => "flex flex-col gap-2")">
+                <div class="flex justify-between text-sm text-gray-700">
+                    <ProgressLabel>Download Progress</ProgressLabel>
+                    <ProgressValue ChildContent="@CustomValueRenderer" />
+                </div>
+                <ProgressTrack class="relative h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                    <ProgressIndicator ClassValue="@(state => GetIndicatorClass(state.Status))" />
+                </ProgressTrack>
+            </ProgressRoot>
+
+            <div class="flex gap-2 mt-4">
+                <button type="button"
+                        class="rounded bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
+                        @onclick="SimulateDownload">
+                    Simulate Download
+                </button>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Custom Formatting"
+                 Description="Progress bar with custom number formatting.">
+        <div class="w-80">
+            <ProgressRoot Value="75"
+                          FormatString="F1"
+                          ClassValue="@(state => "flex flex-col gap-2")">
+                <div class="flex justify-between text-sm text-gray-700">
+                    <ProgressLabel>Task Completion</ProgressLabel>
+                    <ProgressValue />
+                </div>
+                <ProgressTrack class="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                    <ProgressIndicator class="h-full bg-purple-600 rounded-full transition-all duration-300" />
+                </ProgressTrack>
+            </ProgressRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Status-Based Styling"
+                 Description="Progress bar that changes color based on completion status.">
+        <div class="w-80">
+            <ProgressRoot Value="statusValue"
+                          ClassValue="@(state => "flex flex-col gap-2")">
+                <div class="flex justify-between text-sm text-gray-700">
+                    <ProgressLabel>Installation</ProgressLabel>
+                    <ProgressValue />
+                </div>
+                <ProgressTrack ClassValue="@(state => GetTrackClass(state.Status))">
+                    <ProgressIndicator ClassValue="@(state => GetStatusIndicatorClass(state.Status))" />
+                </ProgressTrack>
+            </ProgressRoot>
+
+            <div class="flex gap-2 mt-4">
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="() => statusValue = Math.Max(0, (statusValue ?? 0) - 25)">
+                    -25%
+                </button>
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="() => statusValue = Math.Min(100, (statusValue ?? 0) + 25)">
+                    +25%
+                </button>
+            </div>
+        </div>
+    </DemoSection>
+</ComponentShowcase>
+
+@code {
+    private double? value = 45;
+    private double? customValue = 0;
+    private double? statusValue = 50;
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private void IncreaseValue()
+    {
+        value = Math.Min(100, (value ?? 0) + 10);
+    }
+
+    private void DecreaseValue()
+    {
+        value = Math.Max(0, (value ?? 0) - 10);
+    }
+
+    private void ResetValue()
+    {
+        value = 0;
+    }
+
+    private async Task SimulateDownload()
+    {
+        customValue = 0;
+        for (int i = 0; i <= 100; i += 5)
+        {
+            customValue = i;
+            StateHasChanged();
+            await Task.Delay(100);
+        }
+    }
+
+    private RenderFragment CustomValueRenderer(string formattedValue, double? val)
+    {
+        return builder =>
+        {
+            if (val.HasValue)
+            {
+                builder.OpenElement(0, "span");
+                builder.AddAttribute(1, "class", "font-mono font-semibold");
+                builder.AddContent(2, $"{val:F0} / 100 MB");
+                builder.CloseElement();
+            }
+            else
+            {
+                builder.AddContent(0, "Waiting...");
+            }
+        };
+    }
+
+    private static string GetIndicatorClass(ProgressStatus status)
+    {
+        return status switch
+        {
+            ProgressStatus.Complete => "h-full bg-green-600 rounded-full transition-all duration-300",
+            ProgressStatus.Progressing => "h-full bg-blue-600 rounded-full transition-all duration-300",
+            _ => "h-full bg-gray-400 rounded-full"
+        };
+    }
+
+    private static string GetTrackClass(ProgressStatus status)
+    {
+        return status switch
+        {
+            ProgressStatus.Complete => "relative h-2 w-full overflow-hidden rounded-full bg-green-100",
+            ProgressStatus.Progressing => "relative h-2 w-full overflow-hidden rounded-full bg-blue-100",
+            _ => "relative h-2 w-full overflow-hidden rounded-full bg-gray-200"
+        };
+    }
+
+    private static string GetStatusIndicatorClass(ProgressStatus status)
+    {
+        return status switch
+        {
+            ProgressStatus.Complete => "h-full bg-green-600 rounded-full transition-all duration-500",
+            ProgressStatus.Progressing => "h-full bg-blue-600 rounded-full transition-all duration-500",
+            _ => "h-full bg-gray-400 rounded-full"
+        };
+    }
+}

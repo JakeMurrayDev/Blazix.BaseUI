@@ -1,0 +1,259 @@
+@using System.Globalization
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.DirectionProvider
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="context">
+    <RenderElement TState="ScrollAreaRootState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string JsModulePath = ScrollAreaConstants.JsModulePath;
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private string rootId = string.Empty;
+    private ScrollAreaRootContext context = new();
+    private ScrollAreaRootState state = ScrollAreaRootState.Default;
+    private ScrollAreaHiddenState hiddenState = ScrollAreaHiddenState.Default;
+    private ScrollAreaSize cornerSize = ScrollAreaSize.Zero;
+    private ScrollAreaSize thumbSize = ScrollAreaSize.Zero;
+    private bool hasMeasuredScrollbar;
+    private bool hovering;
+    private bool scrollingX;
+    private bool scrollingY;
+    private DotNetObjectReference<ScrollAreaRoot>? dotNetRef;
+    private RenderElement<ScrollAreaRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private Direction EffectiveDirection => DirectionContext?.Direction
+        ?? (CultureInfo.CurrentCulture.TextInfo.IsRightToLeft ? Direction.Rtl : Direction.Ltr);
+
+    private ScrollAreaOverflowEdgeThreshold NormalizedOverflowEdgeThreshold => OverflowEdgeThreshold.Normalize();
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the threshold in pixels that must be passed before overflow edge attributes are applied.
+    /// </summary>
+    [Parameter]
+    public ScrollAreaOverflowEdgeThreshold OverflowEdgeThreshold { get; set; } = ScrollAreaOverflowEdgeThreshold.Zero;
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ScrollAreaRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<ScrollAreaRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<ScrollAreaRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public ScrollAreaRoot()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        rootId = $"scroll-area-{Guid.NewGuid().ToIdString()}";
+        UpdateContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        UpdateContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            dotNetRef ??= DotNetObjectReference.Create(this);
+
+            if (firstRender)
+            {
+                await module.InvokeVoidAsync(
+                    "initializeRoot",
+                    Element.Value,
+                    rootId,
+                    dotNetRef,
+                    EffectiveDirection.ToAttributeString() ?? "ltr",
+                    NormalizedOverflowEdgeThreshold);
+            }
+            else
+            {
+                await module.InvokeVoidAsync(
+                    "updateRoot",
+                    rootId,
+                    EffectiveDirection.ToAttributeString() ?? "ltr",
+                    NormalizedOverflowEdgeThreshold);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeRoot", rootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Receives low-frequency state changes from JavaScript after DOM measurement or scroll state transitions.
+    /// </summary>
+    [JSInvokable]
+    public Task OnScrollAreaStateChanged(
+        bool nextScrollingX,
+        bool nextScrollingY,
+        bool nextHovering,
+        bool nextHasMeasuredScrollbar,
+        bool hiddenX,
+        bool hiddenY,
+        bool hiddenCorner,
+        bool overflowXStart,
+        bool overflowXEnd,
+        bool overflowYStart,
+        bool overflowYEnd,
+        double cornerWidth,
+        double cornerHeight,
+        double thumbWidth,
+        double thumbHeight)
+    {
+        var nextHiddenState = new ScrollAreaHiddenState(hiddenX, hiddenY, hiddenCorner);
+        var nextCornerSize = new ScrollAreaSize(cornerWidth, cornerHeight);
+        var nextThumbSize = new ScrollAreaSize(thumbWidth, thumbHeight);
+        var nextState = new ScrollAreaRootState(
+            Scrolling: nextScrollingX || nextScrollingY,
+            HasOverflowX: !hiddenX,
+            HasOverflowY: !hiddenY,
+            OverflowXStart: overflowXStart,
+            OverflowXEnd: overflowXEnd,
+            OverflowYStart: overflowYStart,
+            OverflowYEnd: overflowYEnd,
+            CornerHidden: hiddenCorner);
+
+        if (
+            state == nextState
+            && hiddenState == nextHiddenState
+            && cornerSize == nextCornerSize
+            && thumbSize == nextThumbSize
+            && hasMeasuredScrollbar == nextHasMeasuredScrollbar
+            && hovering == nextHovering
+            && scrollingX == nextScrollingX
+            && scrollingY == nextScrollingY)
+        {
+            return Task.CompletedTask;
+        }
+
+        state = nextState;
+        hiddenState = nextHiddenState;
+        cornerSize = nextCornerSize;
+        thumbSize = nextThumbSize;
+        hasMeasuredScrollbar = nextHasMeasuredScrollbar;
+        hovering = nextHovering;
+        scrollingX = nextScrollingX;
+        scrollingY = nextScrollingY;
+
+        UpdateContext();
+        BuildComponentAttributes();
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateContext()
+    {
+        context.RootId = rootId;
+        context.Direction = EffectiveDirection;
+        context.State = state;
+        context.HiddenState = hiddenState;
+        context.CornerSize = cornerSize;
+        context.ThumbSize = thumbSize;
+        context.HasMeasuredScrollbar = hasMeasuredScrollbar;
+        context.Hovering = hovering;
+        context.ScrollingX = scrollingX;
+        context.ScrollingY = scrollingY;
+        context.OverflowEdgeThreshold = NormalizedOverflowEdgeThreshold;
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "presentation",
+            ["style"] = string.Create(
+                CultureInfo.InvariantCulture,
+                $"position: relative; --scroll-area-corner-height: {cornerSize.Height}px; --scroll-area-corner-width: {cornerSize.Width}px")
+        };
+
+        ScrollAreaAttributeHelper.AddRootStateAttributes(attrs, state);
+        componentAttributes = attrs;
+    }
+}

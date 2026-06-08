@@ -1,0 +1,60 @@
+@using Blazix.BaseUI.Button
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<Button class="demo-icon-button demo-mobile-menu-button"
+        aria-label="Open component navigation"
+        aria-controls="demo-nav-panel"
+        @onclick="OpenMobileNavigationAsync">
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+</Button>
+
+@code {
+    private const string JsModulePath = "./demo-theme.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    public MobileNavToggle()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        var module = await moduleTask.Value;
+        await module.InvokeVoidAsync("initializeDemoShell");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task OpenMobileNavigationAsync()
+    {
+        var module = await moduleTask.Value;
+        await module.InvokeVoidAsync("setMobileNavOpen", true);
+    }
+}

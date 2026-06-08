@@ -1,0 +1,140 @@
+@page "/tests/popover/server"
+@using Blazix.BaseUI.Popover
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Popover Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <PopoverRoot
+        @bind-Open="isOpen"
+        DefaultOpen="@DefaultOpen"
+        Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)"
+        OnOpenChange="HandleOpenChange"
+        OnOpenChangeComplete="HandleOpenChangeComplete">
+        <PopoverTrigger
+            OpenOnHover="@OpenOnHover"
+            Delay="@OpenDelay"
+            CloseDelay="@CloseDelay"
+            data-testid="popover-trigger">
+            Open Popover
+        </PopoverTrigger>
+        <PopoverPortal KeepMounted="@KeepMounted">
+            @if (ShowBackdrop)
+            {
+                <PopoverBackdrop data-testid="popover-backdrop" />
+            }
+            <PopoverPositioner
+                Side="@(Side == "top" ? Blazix.BaseUI.Side.Top : Side == "left" ? Blazix.BaseUI.Side.Left : Side == "right" ? Blazix.BaseUI.Side.Right : Blazix.BaseUI.Side.Bottom)"
+                Align="@(Align == "start" ? Blazix.BaseUI.Align.Start : Align == "end" ? Blazix.BaseUI.Align.End : Blazix.BaseUI.Align.Center)"
+                SideOffset="@SideOffset"
+                AlignOffset="@AlignOffset"
+                data-testid="popover-positioner">
+                <PopoverPopup data-testid="popover-popup">
+                    @if (ShowTitle)
+                    {
+                        <PopoverTitle data-testid="popover-title">Popover Title</PopoverTitle>
+                    }
+                    @if (ShowDescription)
+                    {
+                        <PopoverDescription data-testid="popover-description">This is a description.</PopoverDescription>
+                    }
+                    <div data-testid="popover-content">Popover Content</div>
+                    @if (ShowFocusableContent)
+                    {
+                        <button data-testid="popup-button">Popup Button</button>
+                        <input data-testid="popup-input" type="text" placeholder="Popup input" />
+                    }
+                    @if (ShowClose)
+                    {
+                        <PopoverClose data-testid="popover-close">Close</PopoverClose>
+                    }
+                    @if (ShowArrow)
+                    {
+                        <PopoverArrow data-testid="popover-arrow" />
+                    }
+                </PopoverPopup>
+            </PopoverPositioner>
+        </PopoverPortal>
+    </PopoverRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Complete Count: <span data-testid="complete-count">@completeCount</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+    <input data-testid="focusable-input" type="text" placeholder="Focusable input" style="margin-top: 10px;" />
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modal")]
+    public bool Modal { get; set; }
+
+    [SupplyParameterFromQuery(Name = "openOnHover")]
+    public bool OpenOnHover { get; set; }
+
+    [SupplyParameterFromQuery(Name = "openDelay")]
+    public int OpenDelay { get; set; } = 300;
+
+    [SupplyParameterFromQuery(Name = "closeDelay")]
+    public int CloseDelay { get; set; }
+
+    [SupplyParameterFromQuery(Name = "keepMounted")]
+    public bool KeepMounted { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showClose")]
+    public bool ShowClose { get; set; } = true;
+
+    [SupplyParameterFromQuery(Name = "showArrow")]
+    public bool ShowArrow { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showTitle")]
+    public bool ShowTitle { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showDescription")]
+    public bool ShowDescription { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showBackdrop")]
+    public bool ShowBackdrop { get; set; }
+
+    [SupplyParameterFromQuery(Name = "side")]
+    public string Side { get; set; } = "bottom";
+
+    [SupplyParameterFromQuery(Name = "align")]
+    public string Align { get; set; } = "center";
+
+    [SupplyParameterFromQuery(Name = "sideOffset")]
+    public int SideOffset { get; set; }
+
+    [SupplyParameterFromQuery(Name = "alignOffset")]
+    public int AlignOffset { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showFocusableContent")]
+    public bool ShowFocusableContent { get; set; }
+
+    private bool isOpen;
+    private int changeCount;
+    private string lastReason = "";
+    private int completeCount;
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+    }
+
+    private void HandleOpenChange(PopoverOpenChangeEventArgs args)
+    {
+        changeCount++;
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleOpenChangeComplete(bool open)
+    {
+        completeCount++;
+    }
+}

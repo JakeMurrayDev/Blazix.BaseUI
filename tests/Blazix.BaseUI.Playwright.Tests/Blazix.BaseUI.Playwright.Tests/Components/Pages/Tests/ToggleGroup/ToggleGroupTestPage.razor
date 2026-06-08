@@ -1,0 +1,144 @@
+@page "/tests/togglegroup/server"
+@using Blazix.BaseUI.DirectionProvider
+@using Blazix.BaseUI.Toggle
+@using Blazix.BaseUI.ToggleGroup
+@using Blazix.BaseUI.Toolbar
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>ToggleGroup Test Page (Server)</PageTitle>
+
+<DirectionProvider Direction="@ResolvedDirection">
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()" dir="@TextDirection">
+    <button data-testid="outside-button" type="button" style="margin-bottom: 10px;">Outside Button</button>
+
+    @if (IsToolbar)
+    {
+        <ToolbarRoot
+            Disabled="@IsDisabled"
+            Orientation="@ResolvedOrientation"
+            LoopFocus="@IsLoopFocus"
+            data-testid="toolbar-root">
+            <ToggleGroup
+                Value="@controlledValue"
+                DefaultValue="@resolvedDefaultValue"
+                ValueChanged="HandleValueChanged"
+                Multiple="@IsMultiple"
+                Orientation="@ResolvedOrientation"
+                LoopFocus="@IsLoopFocus"
+                OnValueChange="HandleValueChange"
+                data-testid="toggle-group"
+                aria-label="Toggle group">
+
+                <Toggle Value="one" data-testid="toggle-one">One</Toggle>
+                <Toggle Value="two" Disabled="@IsItem2Disabled" data-testid="toggle-two">Two</Toggle>
+                <Toggle Value="three" data-testid="toggle-three">Three</Toggle>
+            </ToggleGroup>
+        </ToolbarRoot>
+    }
+    else
+    {
+        <ToggleGroup
+            Value="@controlledValue"
+            DefaultValue="@resolvedDefaultValue"
+            ValueChanged="HandleValueChanged"
+            Disabled="@IsDisabled"
+            Multiple="@IsMultiple"
+            Orientation="@ResolvedOrientation"
+            LoopFocus="@IsLoopFocus"
+            OnValueChange="HandleValueChange"
+            data-testid="toggle-group"
+            aria-label="Toggle group">
+
+            <Toggle Value="one" data-testid="toggle-one">One</Toggle>
+            <Toggle Value="two" Disabled="@IsItem2Disabled" data-testid="toggle-two">Two</Toggle>
+            <Toggle Value="three" data-testid="toggle-three">Three</Toggle>
+        </ToggleGroup>
+    }
+
+    <button data-testid="after-button" type="button" style="margin-top: 10px;">After Button</button>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Value: <span data-testid="value-state">@currentValueDisplay</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <button data-testid="select-one" type="button" @onclick='() => SetControlledValue(["one"])'>Select One</button>
+        <button data-testid="select-two" type="button" @onclick='() => SetControlledValue(["two"])'>Select Two</button>
+        <button data-testid="clear" type="button" @onclick="() => SetControlledValue([])">Clear</button>
+    </div>
+</div>
+</DirectionProvider>
+
+@code {
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool? QueryDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "multiple")]
+    public bool? QueryMultiple { get; set; }
+
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string? QueryOrientation { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool? QueryLoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? QueryDefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "item2Disabled")]
+    public bool? QueryItem2Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string? QueryDirection { get; set; }
+
+    [SupplyParameterFromQuery(Name = "toolbar")]
+    public bool? QueryToolbar { get; set; }
+
+    private bool IsDisabled => QueryDisabled ?? false;
+    private bool IsMultiple => QueryMultiple ?? false;
+    private bool IsLoopFocus => QueryLoopFocus ?? true;
+    private bool IsItem2Disabled => QueryItem2Disabled ?? false;
+    private bool IsToolbar => QueryToolbar ?? false;
+    private string TextDirection => string.Equals(QueryDirection, "rtl", StringComparison.OrdinalIgnoreCase) ? "rtl" : "ltr";
+
+    private Blazix.BaseUI.Direction ResolvedDirection =>
+        TextDirection == "rtl" ? Blazix.BaseUI.Direction.Rtl : Blazix.BaseUI.Direction.Ltr;
+
+    private Orientation ResolvedOrientation =>
+        QueryOrientation?.ToLowerInvariant() == "vertical" ? Orientation.Vertical : Orientation.Horizontal;
+
+    private IReadOnlyList<string>? resolvedDefaultValue;
+    private IReadOnlyList<string>? controlledValue;
+    private int changeCount;
+    private string currentValueDisplay = "";
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(QueryDefaultValue))
+        {
+            resolvedDefaultValue = QueryDefaultValue.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+    }
+
+    private void HandleValueChange(ToggleGroupValueChangeEventArgs args)
+    {
+        changeCount++;
+        currentValueDisplay = string.Join(",", args.Value);
+    }
+
+    private void HandleValueChanged(IReadOnlyList<string> value)
+    {
+        currentValueDisplay = string.Join(",", value);
+        if (controlledValue is not null)
+        {
+            controlledValue = value;
+        }
+    }
+
+    private void SetControlledValue(IReadOnlyList<string> value)
+    {
+        controlledValue = value;
+        currentValueDisplay = string.Join(",", value);
+    }
+}

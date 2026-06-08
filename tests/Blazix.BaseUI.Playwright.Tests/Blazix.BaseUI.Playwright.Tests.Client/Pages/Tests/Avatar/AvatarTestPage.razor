@@ -1,0 +1,75 @@
+@page "/tests/avatar/wasm"
+@using Blazix.BaseUI.Avatar
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Avatar Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <AvatarRoot
+        As="@CustomAs"
+        data-testid="avatar-root"
+        class="@CustomClass"
+        style="@ResolvedStyle"
+        data-custom="custom-value">
+        <AvatarImage
+            src="@ResolvedImageSrc"
+            data-testid="avatar-image"
+            OnLoadingStatusChange="HandleStatusChange" />
+        @if (ShowFallback)
+        {
+            <AvatarFallback
+                Delay="@FallbackDelay"
+                data-testid="avatar-fallback">
+                <span data-testid="fallback-content">FB</span>
+            </AvatarFallback>
+        }
+    </AvatarRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Loading Status: <span data-testid="loading-status">@loadingStatus</span></div>
+        <div>Status Change Count: <span data-testid="status-change-count">@statusChangeCount</span></div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "imageSrc")]
+    public string? ImageSrc { get; set; }
+
+    [SupplyParameterFromQuery(Name = "fallbackDelay")]
+    public int? FallbackDelay { get; set; }
+
+    [SupplyParameterFromQuery(Name = "forceError")]
+    public bool ForceError { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showFallback")]
+    public bool? ShowFallbackQuery { get; set; }
+
+    private bool ShowFallback => ShowFallbackQuery ?? true;
+
+    [SupplyParameterFromQuery(Name = "customClass")]
+    public string? CustomClass { get; set; }
+
+    [SupplyParameterFromQuery(Name = "customStyle")]
+    public string? CustomStyle { get; set; }
+
+    [SupplyParameterFromQuery(Name = "as")]
+    public string? CustomAs { get; set; }
+
+    private string ResolvedStyle => string.IsNullOrEmpty(CustomStyle)
+        ? "display: inline-block; min-width: 48px; min-height: 48px;"
+        : $"display: inline-block; min-width: 48px; min-height: 48px; {CustomStyle}";
+
+    private string loadingStatus = "idle";
+    private int statusChangeCount;
+
+    private string ResolvedImageSrc => ForceError
+        ? "data:image/png;base64,invalid_base64_data"
+        : ImageSrc ?? "/images/blazor-logo.png";
+
+    private void HandleStatusChange(ImageLoadingStatus status)
+    {
+        loadingStatus = status.ToString().ToLowerInvariant();
+        statusChangeCount++;
+        StateHasChanged();
+    }
+}

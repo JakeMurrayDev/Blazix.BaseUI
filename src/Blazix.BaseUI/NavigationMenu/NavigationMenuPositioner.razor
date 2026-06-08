@@ -1,0 +1,376 @@
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue TValue="NavigationMenuPositionerContext" Value="positionerContext" IsFixed="true">
+    <RenderElement TState="NavigationMenuPositionerState"
+                   Tag="div"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private PositionerInterop positionerInterop = null!;
+    private ElementReference? arrowElement;
+    private bool positioned;
+    private NavigationMenuPositionerState state;
+    private NavigationMenuPositionerContext positionerContext = null!;
+    private RenderElement<NavigationMenuPositionerState>? renderElementReference;
+    private DotNetObjectReference<NavigationMenuPositioner>? dotNetRef;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private CollisionAvoidance ResolvedCollisionAvoidance =>
+        CollisionAvoidance ?? new CollisionAvoidance
+        {
+            Side = CollisionAvoidanceSideMode.Flip,
+            Align = CollisionAvoidanceAlignMode.Flip,
+            FallbackAxisSide = RootContext?.IsNested == true
+                ? CollisionAvoidanceFallbackAxisSide.End
+                : CollisionAvoidanceFallbackAxisSide.None
+        };
+
+    private DotNetObjectReference<NavigationMenuPositioner> DotNetRef =>
+        dotNetRef ??= DotNetObjectReference.Create(this);
+
+    [CascadingParameter]
+    private NavigationMenuRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets which side of the anchor element to align the popup against.
+    /// </summary>
+    [Parameter]
+    public Side Side { get; set; } = Side.Bottom;
+
+    /// <summary>
+    /// Gets or sets how to align the popup relative to the specified side.
+    /// </summary>
+    [Parameter]
+    public Align Align { get; set; } = Align.Center;
+
+    /// <summary>
+    /// Gets or sets the distance between the anchor and the popup in pixels.
+    /// </summary>
+    [Parameter]
+    public int SideOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional offset along the alignment axis in pixels.
+    /// </summary>
+    [Parameter]
+    public int AlignOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional space to maintain from the edge of the collision boundary.
+    /// </summary>
+    [Parameter]
+    public int CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets an element or rectangle that delimits the area the popup is confined to.
+    /// </summary>
+    [Parameter]
+    public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets how to handle collisions when positioning the popup.
+    /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
+    /// </summary>
+    [Parameter]
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minimum distance to maintain between the arrow and the edges of the popup.
+    /// </summary>
+    [Parameter]
+    public int ArrowPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Determines whether the popup is maintained in the viewport after the anchor element is scrolled out of view.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Sticky { get; set; }
+
+    /// <summary>
+    /// Determines whether the popup is prevented from tracking any layout shift of its positioning anchor.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DisableAnchorTracking { get; set; }
+
+    /// <summary>
+    /// Gets or sets which CSS <c>position</c> property to use.
+    /// </summary>
+    [Parameter]
+    public PositionMethod PositionMethod { get; set; } = PositionMethod.Absolute;
+
+    /// <summary>
+    /// Gets or sets an element to position the popup against.
+    /// By default, the popup will be positioned against the active trigger.
+    /// </summary>
+    [Parameter]
+    public ElementReference? Anchor { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NavigationMenuPositionerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuPositionerState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuPositionerState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        positionerInterop = new PositionerInterop(
+            JSRuntime,
+            "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.min.js");
+
+        positionerContext = new NavigationMenuPositionerContext
+        {
+            Side = Side,
+            Align = Align,
+            GetArrowElement = () => arrowElement,
+            SetArrowElement = SetArrowElement
+        };
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetValue() is not null;
+        state = new NavigationMenuPositionerState(open, Side, Align, false, false);
+
+        positionerContext.Side = Side;
+        positionerContext.Align = Align;
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            positionerInterop.MarkRendered();
+            RootContext?.SetPositionerElement(Element);
+        }
+
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        {
+            if (!positionerInterop.IsInitialized)
+            {
+                await InitializePositionerAsync();
+            }
+            else if (!DisableAnchorTracking)
+            {
+                await UpdatePositionAsync();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await positionerInterop.DisposeAsync();
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Updates the positioner state after JavaScript computes placement metadata.
+    /// </summary>
+    [JSInvokable]
+    public Task OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        positioned = true;
+
+        if (Enum.TryParse<Side>(side, ignoreCase: true, out var parsedSide))
+        {
+            positionerContext.Side = parsedSide;
+        }
+
+        if (Enum.TryParse<Align>(align, ignoreCase: true, out var parsedAlign))
+        {
+            positionerContext.Align = parsedAlign;
+        }
+
+        positionerContext.AnchorHidden = anchorHidden;
+        positionerContext.ArrowUncentered = arrowUncentered;
+
+        state = state with
+        {
+            Side = positionerContext.Side,
+            Align = positionerContext.Align,
+            AnchorHidden = anchorHidden
+        };
+        BuildComponentAttributes();
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var open = RootContext?.GetValue() is not null;
+        var mounted = RootContext?.GetMounted() ?? false;
+
+        attrs["role"] = "presentation";
+        attrs["data-blazix-base-ui-positioner"] = true;
+
+        if (!mounted)
+        {
+            attrs["hidden"] = true;
+        }
+
+        if (!open)
+        {
+            attrs["inert"] = true;
+        }
+
+        // NOTE: Do NOT set inline "style" here. JS manages position styles on this
+        // element; if C# sets the style attribute, Blazor's diff will clobber JS-set
+        // values on re-render. Pointer-events handled by global CSS in blazix-baseui-floating.min.js.
+
+        attrs["data-side"] = state.Side.ToDataAttributeString()!;
+        attrs["data-align"] = state.Align.ToDataAttributeString()!;
+
+        if (positioned)
+        {
+            attrs["data-positioned"] = true;
+        }
+
+        if (open)
+        {
+            attrs["data-open"] = true;
+        }
+        else
+        {
+            attrs["data-closed"] = true;
+        }
+
+        if (state.AnchorHidden)
+        {
+            attrs["data-anchor-hidden"] = true;
+        }
+
+        if (state.Instant)
+        {
+            attrs["data-instant"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void SetArrowElement(ElementReference? element)
+    {
+        if (Nullable.Equals(arrowElement, element))
+        {
+            return;
+        }
+
+        arrowElement = element;
+
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
+        {
+            _ = UpdatePositionAsync();
+        }
+    }
+
+    private PositionerConfig BuildConfig() => new()
+    {
+        Side = Side,
+        Align = Align,
+        SideOffset = SideOffset,
+        AlignOffset = AlignOffset,
+        CollisionPadding = CollisionPadding,
+        CollisionBoundary = CollisionBoundary,
+        ArrowPadding = ArrowPadding,
+        Sticky = Sticky,
+        PositionMethod = PositionMethod,
+        DisableAnchorTracking = DisableAnchorTracking,
+        CollisionAvoidance = ResolvedCollisionAvoidance,
+        UseCollisionAvoidanceObject = true
+    };
+
+    private async Task InitializePositionerAsync()
+    {
+        if (!Element.HasValue || RootContext is null)
+        {
+            return;
+        }
+
+        // For navigation menu, the anchor is the active trigger element
+        var activeValue = RootContext.GetValue();
+        var anchorElement = Anchor;
+        if (!anchorElement.HasValue && activeValue is not null)
+        {
+            anchorElement = RootContext.GetTriggerElement(activeValue);
+        }
+
+        if (!anchorElement.HasValue)
+        {
+            return;
+        }
+
+        await positionerInterop.InitializeAsync(
+            Element.Value, anchorElement.Value, BuildConfig(), arrowElement, DotNetRef);
+    }
+
+    private async Task UpdatePositionAsync()
+    {
+        if (!positionerInterop.IsInitialized || RootContext is null)
+        {
+            return;
+        }
+
+        var activeValue = RootContext.GetValue();
+        var anchorElement = Anchor;
+        if (!anchorElement.HasValue && activeValue is not null)
+        {
+            anchorElement = RootContext.GetTriggerElement(activeValue);
+        }
+
+        if (!anchorElement.HasValue)
+        {
+            return;
+        }
+
+        await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement);
+    }
+}

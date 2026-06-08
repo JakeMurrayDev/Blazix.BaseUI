@@ -1,0 +1,479 @@
+﻿@using Blazix.BaseUI.Menu
+@using Blazix.BaseUI.MenuBar
+
+<ComponentShowcase ComponentName="MenuBar"
+                   Description="A horizontal menu bar for organizing multiple menus (File, Edit, View, etc.). Supports keyboard navigation between triggers, hover-to-switch when a menu is open, and all standard menu features."
+                   BaseRoute="/menubar"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic MenuBar"
+                 Description="A menubar containing multiple menus. Click a trigger to open its menu. When one menu is open, hovering over another trigger switches to that menu.">
+        <MenuBarRoot ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    File
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem @onclick="HandleClick" ClassValue="@(_ => ItemClass())">New File</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Open...</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Save</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Save As...</MenuItem>
+                            <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                            <MenuItem ClassValue="@(_ => ItemClass())">Exit</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Edit
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Undo</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Redo</MenuItem>
+                            <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                            <MenuItem ClassValue="@(_ => ItemClass())">Cut</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Copy</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Paste</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    View
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Zoom In</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Zoom Out</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Reset Zoom</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+    </DemoSection>
+
+    <DemoSection Title="Keyboard Navigation"
+                 Description="Use ArrowLeft/Right to navigate between menubar items, Space or Enter to open menus. Within menus, ArrowUp/Down navigates items.">
+        <MenuBarRoot ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    First
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 1A</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 1B</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 1C</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Second
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 2A</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 2B</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Third
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 3A</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 3B</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 3C</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Item 3D</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+        <div class="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+            <p class="font-medium text-gray-900">Keyboard shortcuts:</p>
+            <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-gray-600">
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowLeft</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowRight</kbd> - Navigate menubar triggers</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Home</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">End</kbd> - Jump to first/last trigger</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Enter</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Space</kbd> - Open/toggle menu</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowDown</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowUp</kbd> - Navigate menu items</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Escape</kbd> - Close menu</li>
+            </ul>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Hover Behavior"
+                 Description="When no menu is open, hovering does not open menus. When one menu is open, hover over another trigger to switch menus instantly.">
+        <MenuBarRoot ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Hover A
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu A - Item 1</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu A - Item 2</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Hover B
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu B - Item 1</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu B - Item 2</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Hover C
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu C - Item 1</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Menu C - Item 2</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+        <p class="mt-2 text-sm text-gray-500">Click one trigger first, then hover over others to switch.</p>
+    </DemoSection>
+
+    <DemoSection Title="With Submenus"
+                 Description="Menubar menus can contain nested submenus that open on hover or arrow key navigation.">
+        <MenuBarRoot ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    File
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">New</MenuItem>
+                            <MenuSubmenuRoot>
+                                <MenuSubmenuTrigger ClassValue="@(_ => SubmenuTriggerClass())">
+                                    <span>Open Recent</span>
+                                    @ChevronRightIcon
+                                </MenuSubmenuTrigger>
+                                <MenuPortal>
+                                    <MenuPositioner SideOffset="0" AlignOffset="-4">
+                                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                                            <MenuItem ClassValue="@(_ => ItemClass())">Document 1</MenuItem>
+                                            <MenuItem ClassValue="@(_ => ItemClass())">Document 2</MenuItem>
+                                            <MenuItem ClassValue="@(_ => ItemClass())">Document 3</MenuItem>
+                                        </MenuPopup>
+                                    </MenuPositioner>
+                                </MenuPortal>
+                            </MenuSubmenuRoot>
+                            <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                            <MenuItem ClassValue="@(_ => ItemClass())">Save</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Edit
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Undo</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Redo</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+    </DemoSection>
+
+    <DemoSection Title="Disabled MenuBar"
+                 Description="When disabled, no menus can be opened and keyboard navigation is blocked.">
+        <MenuBarRoot Disabled="true" ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    File
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">New</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Open</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Edit
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Undo</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Redo</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+    </DemoSection>
+
+    <DemoSection Title="Loop Focus"
+                 Description="By default, arrow navigation wraps around. Set LoopFocus=false to stop at the ends.">
+        <div class="flex flex-col gap-4">
+            <div>
+                <p class="mb-2 text-sm font-medium text-gray-700">Loop enabled (default):</p>
+                <MenuBarRoot LoopFocus="true" ClassValue="@(_ => MenuBarClass())">
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">First</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">Second</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">Last</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                </MenuBarRoot>
+            </div>
+            <div>
+                <p class="mb-2 text-sm font-medium text-gray-700">Loop disabled:</p>
+                <MenuBarRoot LoopFocus="false" ClassValue="@(_ => MenuBarClass())">
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">First</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">Second</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                    <MenuRoot Context="_">
+                        <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">Last</MenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="4">
+                                <MenuPopup ClassValue="@(_ => PopupClass())">
+                                    <MenuItem ClassValue="@(_ => ItemClass())">Item</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuRoot>
+                </MenuBarRoot>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Checkbox and Radio Items"
+                 Description="Menubar menus support checkbox and radio items for toggleable options.">
+        <MenuBarRoot ClassValue="@(_ => MenuBarClass())">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    View
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuCheckboxItem ClassValue="@(_ => CheckboxItemClass())" Checked="@showToolbar" OnCheckedChange="@(e => showToolbar = e.Checked)">
+                                <MenuCheckboxItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                    @CheckIcon
+                                </MenuCheckboxItemIndicator>
+                                <span>Show Toolbar</span>
+                            </MenuCheckboxItem>
+                            <MenuCheckboxItem ClassValue="@(_ => CheckboxItemClass())" Checked="@showStatusBar" OnCheckedChange="@(e => showStatusBar = e.Checked)">
+                                <MenuCheckboxItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                    @CheckIcon
+                                </MenuCheckboxItemIndicator>
+                                <span>Show Status Bar</span>
+                            </MenuCheckboxItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => MenuBarTriggerClass())">
+                    Theme
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="4">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuRadioGroup Value="@selectedTheme" OnValueChange="HandleThemeChange">
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("light")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>Light</span>
+                                </MenuRadioItem>
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>Dark</span>
+                                </MenuRadioItem>
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("system")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>System</span>
+                                </MenuRadioItem>
+                            </MenuRadioGroup>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+        <div class="mt-4 text-sm text-gray-600">
+            <p>Current state:</p>
+            <ul class="mt-1 list-inside list-disc">
+                <li>Toolbar: <strong>@(showToolbar ? "visible" : "hidden")</strong></li>
+                <li>Status Bar: <strong>@(showStatusBar ? "visible" : "hidden")</strong></li>
+                <li>Theme: <strong>@selectedTheme</strong></li>
+            </ul>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Data Attributes"
+                 Description="MenuBar and its nested menus expose data attributes for styling.">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <p class="font-medium text-gray-900">Available data attributes:</p>
+            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="text-sm font-medium text-gray-700">MenuBarRoot:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="rounded bg-gray-100 px-1 text-xs">role="menubar"</code></li>
+                        <li><code class="rounded bg-gray-100 px-1 text-xs">data-orientation</code></li>
+                        <li><code class="rounded bg-gray-100 px-1 text-xs">data-disabled</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">MenuTrigger (in menubar):</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="rounded bg-gray-100 px-1 text-xs">data-popup-open</code></li>
+                        <li><code class="rounded bg-gray-100 px-1 text-xs">data-disabled</code></li>
+                        <li>Uses roving tabindex</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private bool showToolbar = true;
+    private bool showStatusBar = false;
+    private object? selectedTheme = "light";
+
+    private void HandleClick()
+    {
+        Console.WriteLine("Clicked!");
+    }
+
+    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs e)
+    {
+        selectedTheme = e.Value;
+        return Task.CompletedTask;
+    }
+
+    private static string MenuBarClass() =>
+        "inline-flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1";
+
+    private static string MenuBarTriggerClass() =>
+        "inline-flex items-center justify-center h-8 px-3 rounded-md font-medium text-sm text-gray-700 select-none cursor-default outline-none hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 data-[popup-open]:bg-gray-200 data-[disabled]:text-gray-400 data-[disabled]:cursor-not-allowed";
+
+    private static string PopupClass() =>
+        "min-w-[180px] py-1 rounded-md bg-white text-gray-900 outline outline-1 outline-gray-200 shadow-lg origin-[var(--transform-origin)] transition-[scale,opacity] duration-150 data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90";
+
+    private static string ItemClass() =>
+        "outline-none cursor-default select-none py-2 px-4 text-sm text-gray-900 data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400 data-[disabled]:cursor-not-allowed";
+
+    private static string CheckboxItemClass() =>
+        "outline-none cursor-default select-none py-2 px-2.5 text-sm text-gray-900 grid grid-cols-[1rem_1fr] gap-2 items-center data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400";
+
+    private static string RadioItemClass() =>
+        "outline-none cursor-default select-none py-2 px-2.5 text-sm text-gray-900 grid grid-cols-[1rem_1fr] gap-2 items-center data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400";
+
+    private static string IndicatorClass() =>
+        "flex items-center justify-center w-4 h-4";
+
+    private static string SeparatorClass() =>
+        "mx-4 my-1.5 h-px bg-gray-200";
+
+    private static string SubmenuTriggerClass() =>
+        "outline-none cursor-default select-none py-2 px-4 text-sm text-gray-900 flex items-center justify-between gap-4 data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[popup-open]:bg-gray-100";
+}
+
+@* Icon Components *@
+
+@code {
+    private RenderFragment ChevronRightIcon => @<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 6l6 6-6 6" />
+    </svg>;
+
+    private RenderFragment CheckIcon => @<svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <path d="M5 12l5 5L20 7" />
+    </svg>;
+
+    private RenderFragment DotIcon => @<svg class="h-2 w-2" viewBox="0 0 8 8">
+        <circle cx="4" cy="4" r="4" fill="currentColor" />
+    </svg>;
+}

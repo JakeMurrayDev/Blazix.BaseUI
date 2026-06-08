@@ -1,0 +1,72 @@
+@using Blazix.BaseUI.Portal
+
+@if (RootContext is not null && (RootContext.GetMounted() || RootContext.ForceMount || KeepMounted))
+{
+    <CascadingValue TValue="SelectPortalContext" Value="portalContext" IsFixed="true">
+        <Portal Target="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalRef">
+            @ChildContent
+        </Portal>
+    </CascadingValue>
+}
+
+@code {
+    private SelectPortalContext portalContext = null!;
+    private Portal? portalRef;
+
+    [CascadingParameter]
+    private ISelectRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the portal contents should remain mounted in the DOM when the select is closed.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Gets or sets a CSS selector for the container to render the portal into.
+    /// Defaults to <c>"body"</c>.
+    /// </summary>
+    [Parameter]
+    public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<object>>? Render { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated <see cref="ElementReference"/> of the portal root element.
+    /// </summary>
+    public ElementReference? Element => portalRef?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("SelectPortal must be used within a SelectRoot.");
+        }
+
+        portalContext = new SelectPortalContext { KeepMounted = KeepMounted };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        portalContext.KeepMounted = KeepMounted;
+    }
+}

@@ -1,0 +1,123 @@
+@using Blazix.BaseUI.Utilities.LabelableProvider
+
+@implements IFieldStateSubscriber
+@implements IDisposable
+
+<RenderElement TState="FieldRootState"
+               Tag="p"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private string? defaultId;
+    private string? registeredId;
+    private FieldRootState state;
+    private RenderElement<FieldRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<FieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        registeredId = ResolvedId;
+        LabelableContext?.UpdateMessageIds.Invoke(registeredId, true);
+        FieldContext?.Subscribe(this);
+
+        state = State;
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var nextId = ResolvedId;
+        if (registeredId != nextId)
+        {
+            if (registeredId is not null)
+                LabelableContext?.UpdateMessageIds.Invoke(registeredId, false);
+
+            registeredId = nextId;
+            LabelableContext?.UpdateMessageIds.Invoke(registeredId, true);
+        }
+
+        state = State;
+        BuildComponentAttributes();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["id"] = registeredId ?? ResolvedId;
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
+
+        componentAttributes = attrs;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        FieldContext?.Unsubscribe(this);
+        if (registeredId is not null)
+            LabelableContext?.UpdateMessageIds.Invoke(registeredId, false);
+    }
+
+    /// <inheritdoc />
+    void IFieldStateSubscriber.NotifyStateChanged()
+    {
+        state = State;
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

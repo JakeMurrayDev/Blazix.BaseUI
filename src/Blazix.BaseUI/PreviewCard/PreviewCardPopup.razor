@@ -1,0 +1,180 @@
+@using Blazix.BaseUI.Popover
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="PreviewCardPopupState"
+               Tag="div"
+               Enabled="RootContext is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private PreviewCardPopupState state;
+    private RenderElement<PreviewCardPopupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-preview-card.min.js").AsTask());
+
+    [CascadingParameter]
+    private PreviewCardRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private PreviewCardPositionerContext? PositionerContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the popup element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<PreviewCardPopupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<PreviewCardPopupState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<PreviewCardPopupState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var side = PositionerContext?.Side ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? Align.Center;
+        var instant = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        state = new PreviewCardPopupState(open, side, align, instant, transitionStatus);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetPopupElement(currentElement);
+        }
+
+        if (firstRender)
+        {
+            await InitializePopupAsync();
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["id"] = RootContext?.PopupId ?? string.Empty;
+
+        var side = PositionerContext?.Side ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? Align.Center;
+        attrs["data-side"] = side.ToDataAttributeString()!;
+        attrs["data-align"] = align.ToDataAttributeString()!;
+        attrs["tabindex"] = -1;
+        // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
+        attrs["data-floating-ui-focusable"] = "";
+
+        var isOpen = RootContext?.GetOpen() ?? false;
+        attrs["data-open"] = isOpen;
+        attrs["data-closed"] = !isOpen;
+
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task InitializePopupAsync()
+    {
+        if (!Element.HasValue || RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("initializePopup", Element.Value);
+        }        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        if (e.Key == "Escape")
+        {
+            await RootContext.SetOpenAsync(false, PreviewCardOpenChangeReason.EscapeKey, null);
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask?.IsValueCreated == true && hasRendered && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposePopup", Element.Value);
+                await module.DisposeAsync();
+            }            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
+        }
+
+    }
+}

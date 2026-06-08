@@ -1,0 +1,209 @@
+@using Blazix.BaseUI.Dialog
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="DrawerBackdropState"
+               Tag="div"
+               Enabled="shouldRender"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="computedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string BaseStyle = "user-select: none; -webkit-user-select: none; --drawer-swipe-progress: 0; --drawer-swipe-strength: 1;";
+    private const string ClosedStyle = "pointer-events: none;";
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool shouldRender;
+    private DrawerBackdropState state;
+    private RenderElement<DrawerBackdropState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<DrawerBackdropState, string>? computedStyleValue;
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", "./_content/Blazix.BaseUI/blazix-baseui-drawer.min.js").AsTask());
+
+    [CascadingParameter]
+    private DialogRootContext? Context { get; set; }
+
+    [CascadingParameter]
+    private DialogPortalContext? PortalContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerBackdropState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerBackdropState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerBackdropState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Determines whether the backdrop is forced to render even when nested.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool ForceRender { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Context is null)
+        {
+            throw new InvalidOperationException("DrawerBackdrop must be used within a DrawerRoot.");
+        }
+
+        state = new DrawerBackdropState(Context.Open, Context.TransitionStatus);
+        UpdateShouldRender();
+        UpdateComputedStyleValue();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Context is not null)
+        {
+            state = new DrawerBackdropState(Context.Open, Context.TransitionStatus);
+        }
+
+        UpdateShouldRender();
+        UpdateComputedStyleValue();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (Element.HasValue && Element.Value.Id != previousElement?.Id)
+        {
+            previousElement = Element.Value;
+            Context?.SetBackdropElement(Element);
+            _ = SetBackdropElementJsAsync(Element.Value);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask?.IsValueCreated == true && Context is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("setBackdropElement", Context.RootId, null);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private void UpdateShouldRender()
+    {
+        if (Context is null)
+        {
+            shouldRender = false;
+            return;
+        }
+
+        if (Context.Nested && !ForceRender)
+        {
+            shouldRender = false;
+            return;
+        }
+
+        var keepMounted = PortalContext?.KeepMounted ?? false;
+        shouldRender = keepMounted || Context.Mounted;
+    }
+
+    private void UpdateComputedStyleValue()
+    {
+        computedStyleValue = s =>
+        {
+            var baseStyle = Context is not null && !Context.Open
+                ? $"{BaseStyle} {ClosedStyle}"
+                : BaseStyle;
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? baseStyle : $"{baseStyle} {userStyle}";
+        };
+    }
+
+    private void BuildComponentAttributes()
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "presentation",
+            ["data-open"] = Context.Open,
+            ["data-closed"] = !Context.Open
+        };
+
+        if (!Context.Mounted)
+        {
+            attrs["hidden"] = true;
+        }
+
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, Context.TransitionStatus);
+        componentAttributes = attrs;
+    }
+
+    private async Task SetBackdropElementJsAsync(ElementReference element)
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setBackdropElement", Context.RootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+}

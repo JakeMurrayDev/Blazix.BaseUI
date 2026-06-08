@@ -1,0 +1,187 @@
+@page "/tests/radiogroup/wasm"
+@using Blazix.BaseUI.Radio
+@using Blazix.BaseUI.RadioGroup
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>RadioGroup Test Page (WASM)</PageTitle>
+
+<style>
+    .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .radio-root {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #666;
+        border-radius: 50%;
+        background-color: white;
+        cursor: pointer;
+        position: relative;
+    }
+    .radio-root[data-checked] {
+        border-color: #4caf50;
+    }
+    .radio-root[data-disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .radio-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #4caf50;
+    }
+    .radio-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="outside-button" style="margin-bottom: 10px;">Outside Button</button>
+
+    @if (ShowForm)
+    {
+        <form data-testid="test-form" @onsubmit="HandleSubmit" @onsubmit:preventDefault>
+            @RenderRadioGroup()
+            <button type="submit" data-testid="submit-button">Submit</button>
+            <div data-testid="form-data">@formData</div>
+        </form>
+    }
+    else
+    {
+        @RenderRadioGroup()
+    }
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Value: <span data-testid="value-state">@(currentValue ?? "")</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+    </div>
+
+    <button data-testid="select-a" @onclick='() => SetValue("a")' style="margin-top: 10px;">Select A</button>
+    <button data-testid="select-b" @onclick='() => SetValue("b")' style="margin-top: 10px;">Select B</button>
+    <button data-testid="clear" @onclick="ClearValue" style="margin-top: 10px;">Clear</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValueQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnly")]
+    public bool ReadOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnlyB")]
+    public bool ReadOnlyB { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showForm")]
+    public bool ShowForm { get; set; }
+
+    [SupplyParameterFromQuery(Name = "name")]
+    public string? Name { get; set; }
+
+    [SupplyParameterFromQuery(Name = "nativeButton")]
+    public bool NativeButton { get; set; }
+
+    private string? currentValue;
+    private int changeCount;
+    private string formData = "";
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(DefaultValueQuery))
+        {
+            currentValue = DefaultValueQuery;
+        }
+    }
+
+    private RenderFragment RenderRadioGroup() => __builder =>
+    {
+        <RadioGroup TValue="string"
+            @bind-Value="currentValue"
+            DefaultValue="@(string.IsNullOrEmpty(DefaultValueQuery) ? null : DefaultValueQuery)"
+            Disabled="@Disabled"
+            ReadOnly="@ReadOnly"
+            Name="@Name"
+            OnValueChange="HandleValueChange"
+            class="radio-group"
+            data-testid="radio-group">
+
+            <div class="radio-item">
+                <RadioRoot TValue="string"
+                    id="radio-a-control"
+                    Value=@("a")
+                    NativeButton="@NativeButton"
+                    class="radio-root"
+                    data-testid="radio-a">
+                    <RadioIndicator class="radio-indicator" data-testid="indicator-a" />
+                </RadioRoot>
+                <span>Option A</span>
+            </div>
+
+            <div class="radio-item">
+                <RadioRoot TValue="string"
+                    id="radio-b-control"
+                    Value=@("b")
+                    ReadOnly="@ReadOnlyB"
+                    NativeButton="@NativeButton"
+                    class="radio-root"
+                    data-testid="radio-b">
+                    <RadioIndicator class="radio-indicator" data-testid="indicator-b" />
+                </RadioRoot>
+                <span>Option B</span>
+            </div>
+
+            <div class="radio-item">
+                <RadioRoot TValue="string"
+                    id="radio-c-control"
+                    Value=@("c")
+                    NativeButton="@NativeButton"
+                    class="radio-root"
+                    data-testid="radio-c">
+                    <RadioIndicator class="radio-indicator" data-testid="indicator-c" />
+                </RadioRoot>
+                <span>Option C</span>
+            </div>
+        </RadioGroup>
+    };
+
+    private void HandleValueChange(RadioGroupValueChangeEventArgs<string> args)
+    {
+        changeCount++;
+    }
+
+    private void SetValue(string value)
+    {
+        currentValue = value;
+    }
+
+    private void ClearValue()
+    {
+        currentValue = null;
+    }
+
+    private void HandleSubmit()
+    {
+        var data = new System.Text.StringBuilder();
+        if (!string.IsNullOrEmpty(Name) && !string.IsNullOrEmpty(currentValue))
+        {
+            data.Append($"{Name}={currentValue}");
+        }
+        formData = data.ToString();
+    }
+}

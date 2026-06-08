@@ -1,0 +1,143 @@
+@using Blazix.BaseUI.Popover
+@using Microsoft.AspNetCore.Components.Web
+
+<RenderElement TState="TooltipPopupState"
+               Tag="div"
+               Enabled="RootContext is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private TooltipPopupState state;
+    private RenderElement<TooltipPopupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+
+    [CascadingParameter]
+    private TooltipRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private TooltipPositionerContext? PositionerContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the popup element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<TooltipPopupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<TooltipPopupState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<TooltipPopupState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var side = PositionerContext?.Side ?? Side.Top;
+        var align = PositionerContext?.Align ?? Align.Center;
+        var instant = RootContext?.InstantType ?? TooltipInstantType.None;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        state = new TooltipPopupState(open, side, align, instant, transitionStatus);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetPopupElement(currentElement);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["role"] = "tooltip";
+        attrs["id"] = RootContext?.PopupId ?? string.Empty;
+        attrs["tabindex"] = -1;
+        // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity requires this exact empty marker attribute.
+        attrs["data-base-ui-focusable"] = "";
+
+        var side = PositionerContext?.Side ?? Side.Top;
+        var align = PositionerContext?.Align ?? Align.Center;
+        attrs["data-side"] = side.ToDataAttributeString()!;
+        attrs["data-align"] = align.ToDataAttributeString()!;
+
+        var isOpen = RootContext?.GetOpen() ?? false;
+        attrs["data-open"] = isOpen;
+        attrs["data-closed"] = !isOpen;
+
+        var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
+        var instantAttr = instantType.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
+
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
+
+        if (transitionStatus == TransitionStatus.Starting)
+        {
+            attrs["style"] = "transition: none";
+        }
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        // Escape key is handled globally in JS (blazix-baseui-tooltip.min.js handleGlobalKeyDown).
+        // Do not handle Escape here to avoid double-close.
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleMouseEnterAsync(MouseEventArgs e)
+    {
+        return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleMouseLeaveAsync(MouseEventArgs e)
+    {
+        return EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
+    }
+}

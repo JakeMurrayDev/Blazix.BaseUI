@@ -1,0 +1,347 @@
+@using Blazix.BaseUI.Dialog
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<CascadingValue TValue="DrawerViewportContext" Value="viewportContext" IsFixed="true">
+    <RenderElement TState="DrawerViewportState"
+                   Tag="div"
+                   Enabled="shouldRender"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="computedStyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-drawer.min.js";
+    private const string ClosedStyle = "pointer-events: none;";
+
+    private readonly DrawerViewportContext viewportContext = new();
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<DrawerViewport>? dotNetRef;
+    private bool hasRendered;
+    private bool shouldRender;
+    private DrawerViewportState state;
+    private RenderElement<DrawerViewportState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<DrawerViewportState, string>? computedStyleValue;
+    private ElementReference? previousElement;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
+
+    [CascadingParameter]
+    private DialogRootContext? Context { get; set; }
+
+    [CascadingParameter]
+    private DialogPortalContext? PortalContext { get; set; }
+
+    [CascadingParameter]
+    private DrawerRootContext? DrawerContext { get; set; }
+
+    [CascadingParameter]
+    private DrawerProviderContext? ProviderContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerViewportState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerViewportState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerViewportState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Context is null)
+        {
+            throw new InvalidOperationException("DrawerViewport must be used within a DrawerRoot.");
+        }
+
+        if (DrawerContext is null)
+        {
+            throw new InvalidOperationException("DrawerViewport must be used within a DrawerRoot.");
+        }
+
+        state = new DrawerViewportState(Context.Open, Context.TransitionStatus, Context.Nested);
+        UpdateShouldRender();
+        BuildComponentAttributes();
+        UpdateComputedStyleValue();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Context is not null)
+        {
+            state = new DrawerViewportState(Context.Open, Context.TransitionStatus, Context.Nested);
+        }
+
+        UpdateShouldRender();
+        BuildComponentAttributes();
+        UpdateComputedStyleValue();
+
+        if (hasRendered)
+        {
+            _ = UpdateViewportJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            Context?.SetViewportElement(currentElement);
+
+            if (currentElement.HasValue && Context is not null)
+            {
+                await InitializeViewportJsAsync(currentElement.Value);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        DrawerContext?.NotifyParentSwipingChange?.Invoke(false);
+        DrawerContext?.NotifyParentSwipeProgressChange?.Invoke(0);
+        ProviderContext?.SetVisualState(swipeProgress: 0, frontmostHeight: 0);
+
+        if (moduleTask?.IsValueCreated == true && hasRendered && Context is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeViewport", Context.RootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Handles swipe progress from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnSwipeProgress(double progress)
+    {
+        var resolvedProgress = double.IsFinite(progress) ? Math.Clamp(progress, 0, 1) : 0;
+        ProviderContext?.SetVisualState(
+            swipeProgress: Context is not null && Context.Open && !Context.Nested ? resolvedProgress : 0,
+            frontmostHeight: resolvedProgress > 0 ? DrawerContext?.FrontmostHeight ?? 0 : 0);
+        DrawerContext?.NotifyParentSwipeProgressChange?.Invoke(Context is not null && Context.Open ? resolvedProgress : 0);
+    }
+
+    /// <summary>
+    /// Handles swipe active state from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnSwipingChanged(bool swiping)
+    {
+        viewportContext.Swiping = swiping;
+        viewportContext.NotifyStateChanged();
+        DrawerContext?.NotifyParentSwipingChange?.Invoke(swiping);
+    }
+
+    /// <summary>
+    /// Handles a swipe dismiss request from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSwipeDismiss()
+    {
+        if (Context is not null)
+        {
+            await Context.SetOpenAsync(false, DialogOpenChangeReason.Swipe);
+        }
+    }
+
+    /// <summary>
+    /// Handles a snap point change request from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSnapPointChange(string? snapPoint)
+    {
+        var parsed = ParseSnapPoint(snapPoint);
+        if (DrawerContext is not null)
+        {
+            await DrawerContext.SetActiveSnapPointAsync(parsed, DrawerOpenChangeReason.Swipe);
+        }
+    }
+
+    private void UpdateShouldRender()
+    {
+        if (Context is null)
+        {
+            shouldRender = false;
+            return;
+        }
+
+        var keepMounted = PortalContext?.KeepMounted ?? false;
+        shouldRender = keepMounted || Context.Mounted;
+    }
+
+    private void BuildComponentAttributes()
+    {
+        if (Context is null)
+        {
+            return;
+        }
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "presentation",
+            ["data-open"] = Context.Open,
+            ["data-closed"] = !Context.Open
+        };
+
+        if (!Context.Mounted)
+        {
+            attrs["hidden"] = true;
+        }
+
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, Context.TransitionStatus);
+
+        if (Context.Nested)
+        {
+            attrs["data-nested"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void UpdateComputedStyleValue()
+    {
+        if (Context is null || Context.Open)
+        {
+            computedStyleValue = StyleValue;
+            return;
+        }
+
+        computedStyleValue = StyleValue is not null
+            ? s => $"{ClosedStyle} {StyleValue(s)}"
+            : _ => ClosedStyle;
+    }
+
+    private async Task InitializeViewportJsAsync(ElementReference element)
+    {
+        if (Context is null || DrawerContext is null || dotNetRef is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync(
+                "initializeViewport",
+                Context.RootId,
+                element,
+                dotNetRef,
+                DrawerContext.SwipeDirection.ToDataAttributeString(),
+                DrawerContext.SnapToSequentialPoints);
+            await UpdateViewportJsAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task UpdateViewportJsAsync()
+    {
+        if (Context is null || DrawerContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync(
+                "updateViewport",
+                Context.RootId,
+                Context.Open,
+                Context.Mounted,
+                DrawerContext.SwipeDirection.ToDataAttributeString(),
+                DrawerContext.SnapToSequentialPoints,
+                DrawerContext.SnapPoints?.Select(static point => point.ToString()).ToArray(),
+                DrawerContext.ActiveSnapPoint?.ToString());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private DrawerSnapPoint? ParseSnapPoint(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (DrawerContext?.SnapPoints is not null)
+        {
+            foreach (var snapPoint in DrawerContext.SnapPoints)
+            {
+                if (string.Equals(snapPoint.ToString(), value, StringComparison.Ordinal))
+                {
+                    return snapPoint;
+                }
+            }
+        }
+
+        return double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            ? number
+            : value;
+    }
+}

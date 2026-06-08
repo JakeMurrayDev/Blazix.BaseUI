@@ -7,7 +7,7 @@
     {
       "hash": "5661ac9e64e20279",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Accordion/AccordionPanel.cs",
+      "filePath": "src/Blazix.BaseUI/Accordion/AccordionPanel.cs",
       "lineNumber": 147,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -16,7 +16,7 @@
     {
       "hash": "f6fd33334c7e05df",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Accordion/AccordionTrigger.cs",
+      "filePath": "src/Blazix.BaseUI/Accordion/AccordionTrigger.cs",
       "lineNumber": 120,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -25,7 +25,7 @@
     {
       "hash": "0b0f1c1802a3a87f",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Avatar/AvatarFallback.cs",
+      "filePath": "src/Blazix.BaseUI/Avatar/AvatarFallback.cs",
       "lineNumber": 157,
       "codeSnippet": "catch (TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -34,7 +34,7 @@
     {
       "hash": "47eb18d6b4a7b806",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Avatar/AvatarImage.cs",
+      "filePath": "src/Blazix.BaseUI/Avatar/AvatarImage.cs",
       "lineNumber": 165,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -43,7 +43,7 @@
     {
       "hash": "f294bd07d4054fc7",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Button/Button.cs",
+      "filePath": "src/Blazix.BaseUI/Button/Button.cs",
       "lineNumber": 228,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -52,7 +52,7 @@
     {
       "hash": "e50a9dd031306681",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Checkbox/CheckboxRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Checkbox/CheckboxRoot.cs",
       "lineNumber": 536,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -61,7 +61,7 @@
     {
       "hash": "1deeec7ad43bd9ef",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Collapsible/CollapsiblePanel.cs",
+      "filePath": "src/Blazix.BaseUI/Collapsible/CollapsiblePanel.cs",
       "lineNumber": 132,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -70,7 +70,7 @@
     {
       "hash": "ff944178a2cbfce2",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Field/FieldControl.cs",
+      "filePath": "src/Blazix.BaseUI/Field/FieldControl.cs",
       "lineNumber": 294,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -79,7 +79,7 @@
     {
       "hash": "38668fb481c11bf3",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Field/FieldLabel.cs",
+      "filePath": "src/Blazix.BaseUI/Field/FieldLabel.cs",
       "lineNumber": 168,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -88,7 +88,7 @@
     {
       "hash": "7200c7bf2be858f4",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/NumberField/NumberFieldRoot.cs",
+      "filePath": "src/Blazix.BaseUI/NumberField/NumberFieldRoot.cs",
       "lineNumber": 355,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -97,7 +97,7 @@
     {
       "hash": "e726fb6a889ed698",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/NumberField/NumberFieldScrubArea.cs",
+      "filePath": "src/Blazix.BaseUI/NumberField/NumberFieldScrubArea.cs",
       "lineNumber": 111,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -106,7 +106,7 @@
     {
       "hash": "4ea79c1cd99e669c",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Popover/PopoverPopup.cs",
+      "filePath": "src/Blazix.BaseUI/Popover/PopoverPopup.cs",
       "lineNumber": 206,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -115,7 +115,7 @@
     {
       "hash": "9f32ed15aadc8373",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Popover/PopoverPositioner.cs",
+      "filePath": "src/Blazix.BaseUI/Popover/PopoverPositioner.cs",
       "lineNumber": 279,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -124,7 +124,7 @@
     {
       "hash": "104aef0f1b99267a",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Popover/PopoverRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Popover/PopoverRoot.cs",
       "lineNumber": 166,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -133,7 +133,7 @@
     {
       "hash": "2bc9d784864e27ea",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Popover/PopoverTrigger.cs",
+      "filePath": "src/Blazix.BaseUI/Popover/PopoverTrigger.cs",
       "lineNumber": 215,
       "codeSnippet": "catch (TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -142,7 +142,7 @@
     {
       "hash": "2b10043dc06a8d7e",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Portal/Portal.cs",
+      "filePath": "src/Blazix.BaseUI/Portal/Portal.cs",
       "lineNumber": 66,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -151,7 +151,7 @@
     {
       "hash": "21490b766a76dfb8",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Radio/RadioRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Radio/RadioRoot.cs",
       "lineNumber": 385,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -160,7 +160,7 @@
     {
       "hash": "69a419fd145a7463",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/RadioGroup/RadioGroup.cs",
+      "filePath": "src/Blazix.BaseUI/RadioGroup/RadioGroup.cs",
       "lineNumber": 383,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -169,7 +169,7 @@
     {
       "hash": "e576492f521eb42c",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Slider/SliderControl.cs",
+      "filePath": "src/Blazix.BaseUI/Slider/SliderControl.cs",
       "lineNumber": 209,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -178,7 +178,7 @@
     {
       "hash": "a7149aa472dcdc7b",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Slider/SliderRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Slider/SliderRoot.cs",
       "lineNumber": 349,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -187,7 +187,7 @@
     {
       "hash": "68904e52098aa81d",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Switch/SwitchRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Switch/SwitchRoot.cs",
       "lineNumber": 353,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -196,7 +196,7 @@
     {
       "hash": "eba4e1206f7f38e8",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Tabs/TabsIndicator.cs",
+      "filePath": "src/Blazix.BaseUI/Tabs/TabsIndicator.cs",
       "lineNumber": 180,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -205,7 +205,7 @@
     {
       "hash": "635e23b922a177f0",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Tabs/TabsList.cs",
+      "filePath": "src/Blazix.BaseUI/Tabs/TabsList.cs",
       "lineNumber": 182,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -214,7 +214,7 @@
     {
       "hash": "fe33431fadded7dd",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Tabs/TabsTab.cs",
+      "filePath": "src/Blazix.BaseUI/Tabs/TabsTab.cs",
       "lineNumber": 287,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -223,7 +223,7 @@
     {
       "hash": "13dacd2c34006b3d",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Toggle/Toggle.cs",
+      "filePath": "src/Blazix.BaseUI/Toggle/Toggle.cs",
       "lineNumber": 302,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -232,7 +232,7 @@
     {
       "hash": "797cafeeff7ea3bf",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/ToggleGroup/ToggleGroup.cs",
+      "filePath": "src/Blazix.BaseUI/ToggleGroup/ToggleGroup.cs",
       "lineNumber": 189,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -241,7 +241,7 @@
     {
       "hash": "1bba9967c016f1db",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Toolbar/ToolbarRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Toolbar/ToolbarRoot.cs",
       "lineNumber": 269,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -250,7 +250,7 @@
     {
       "hash": "300e777fd7548599",
       "ruleId": "SW003",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
       "lineNumber": 138,
       "codeSnippet": "catch\r\n            {\r\n                // Server not ready yet\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -259,7 +259,7 @@
     {
       "hash": "7394ab993a369f03",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
       "lineNumber": 143,
       "codeSnippet": "Task.Delay(500)",
       "message": "Test uses Task.Delay(500) which may indicate a timing-dependent test",
@@ -268,7 +268,7 @@
     {
       "hash": "1ac5255f9601a895",
       "ruleId": "SW003",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Infrastructure/AnimationHelpers.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Infrastructure/AnimationHelpers.cs",
       "lineNumber": 32,
       "codeSnippet": "catch (TimeoutException)\r\n        {\r\n            // No animations or element not found - continue\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -277,7 +277,7 @@
     {
       "hash": "4537f0d342233a49",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Infrastructure/AnimationHelpers.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Infrastructure/AnimationHelpers.cs",
       "lineNumber": 128,
       "codeSnippet": "Task.Delay(50)",
       "message": "Test uses Task.Delay(50) which may indicate a timing-dependent test",
@@ -286,7 +286,7 @@
     {
       "hash": "51ddded5c05f8c51",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Infrastructure/TestBase.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Infrastructure/TestBase.cs",
       "lineNumber": 207,
       "codeSnippet": "Task.Delay(300)",
       "message": "Test uses Task.Delay(300) which may indicate a timing-dependent test",
@@ -295,7 +295,7 @@
     {
       "hash": "96ab32240e70c63a",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Infrastructure/TestBase.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Infrastructure/TestBase.cs",
       "lineNumber": 268,
       "codeSnippet": "Task.Delay(50)",
       "message": "Test uses Task.Delay(50) which may indicate a timing-dependent test",
@@ -304,7 +304,7 @@
     {
       "hash": "2e9836c869f76996",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Server.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Server.cs",
       "lineNumber": 320,
       "codeSnippet": "Task.Delay(100)",
       "message": "Test uses Task.Delay(100) which may indicate a timing-dependent test",
@@ -313,7 +313,7 @@
     {
       "hash": "c2843d288fdcf650",
       "ruleId": "SW001",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
       "lineNumber": 225,
       "codeSnippet": "Fact(Skip = \u0022WASM mode has SSR timing issues with query parameters during initial render - fallback appears before delay elapses due to hydration timing\u0022)",
       "message": "Test method \u0027Fallback_ShouldNotShow_BeforeDelayElapsed\u0027 is disabled: WASM mode has SSR timing issues with query parameters during initial render - fallback appears before delay elapses due to hydration timing",
@@ -322,7 +322,7 @@
     {
       "hash": "c76ab75dfb3327ff",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
       "lineNumber": 349,
       "codeSnippet": "Task.Delay(100)",
       "message": "Test uses Task.Delay(100) which may indicate a timing-dependent test",
@@ -331,7 +331,7 @@
     {
       "hash": "f3af0bc12ac887b3",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Server.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Server.cs",
       "lineNumber": 585,
       "codeSnippet": "Task.Delay(50)",
       "message": "Test uses Task.Delay(50) which may indicate a timing-dependent test",
@@ -340,7 +340,7 @@
     {
       "hash": "06b7223a23d57abf",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Server.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Server.cs",
       "lineNumber": 596,
       "codeSnippet": "Task.Delay(500)",
       "message": "Test uses Task.Delay(500) which may indicate a timing-dependent test",
@@ -349,7 +349,7 @@
     {
       "hash": "609ea62baace718a",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Wasm.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Wasm.cs",
       "lineNumber": 584,
       "codeSnippet": "Task.Delay(50)",
       "message": "Test uses Task.Delay(50) which may indicate a timing-dependent test",
@@ -358,7 +358,7 @@
     {
       "hash": "5444464198668bc4",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Wasm.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTests.Wasm.cs",
       "lineNumber": 595,
       "codeSnippet": "Task.Delay(500)",
       "message": "Test uses Task.Delay(500) which may indicate a timing-dependent test",
@@ -367,7 +367,7 @@
     {
       "hash": "461b9c590d4956f9",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Tests/Avatar/AvatarFallbackTest.cs",
+      "filePath": "tests/Blazix.BaseUI.Tests/Avatar/AvatarFallbackTest.cs",
       "lineNumber": 116,
       "codeSnippet": "Task.Delay(200)",
       "message": "Test uses Task.Delay(200) which may indicate a timing-dependent test",
@@ -376,7 +376,7 @@
     {
       "hash": "39c18fa79d89d59f",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Tests/Avatar/AvatarImageTest.cs",
+      "filePath": "tests/Blazix.BaseUI.Tests/Avatar/AvatarImageTest.cs",
       "lineNumber": 108,
       "codeSnippet": "Task.Delay(100)",
       "message": "Test uses Task.Delay(100) which may indicate a timing-dependent test",
@@ -385,7 +385,7 @@
     {
       "hash": "c02910bb61ff2eb3",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Dialog/DialogPopup.cs",
+      "filePath": "src/Blazix.BaseUI/Dialog/DialogPopup.cs",
       "lineNumber": 103,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                    // Circuit-safe: intentionally empty to prevent crashes during Hot Reload or disconnection\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -394,7 +394,7 @@
     {
       "hash": "70fc02b7cac9636e",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Dialog/DialogPopup.cs",
+      "filePath": "src/Blazix.BaseUI/Dialog/DialogPopup.cs",
       "lineNumber": 235,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -403,7 +403,7 @@
     {
       "hash": "de0c7c000feda908",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Dialog/DialogRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Dialog/DialogRoot.cs",
       "lineNumber": 171,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n                {\r\n                    // Circuit-safe: intentionally empty to prevent crashes during Hot Reload or disconnection\r\n                }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -412,7 +412,7 @@
     {
       "hash": "d250edb10f8b0eb4",
       "ruleId": "SW003",
-      "filePath": "src/BlazorBaseUI/Dialog/DialogRoot.cs",
+      "filePath": "src/Blazix.BaseUI/Dialog/DialogRoot.cs",
       "lineNumber": 238,
       "codeSnippet": "catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)\r\n        {\r\n        }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -421,7 +421,7 @@
     {
       "hash": "ef975770a9491f0c",
       "ruleId": "SW001",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Avatar/AvatarTests.Wasm.cs",
       "lineNumber": 18,
       "codeSnippet": "Fact(Skip = \u0022Cannot control .NET WASM runtime time from Playwright Clock API. Delay behavior is covered by bUnit tests with FakeTimeProvider.\u0022)",
       "message": "Test method \u0027DoesNotShowBeforeDelayElapsed\u0027 is disabled: Cannot control .NET WASM runtime time from Playwright Clock API. Delay behavior is covered by bUnit tests with FakeTimeProvider.",
@@ -430,7 +430,7 @@
     {
       "hash": "bf11cd507ad1d9a5",
       "ruleId": "SW003",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Fixtures/BlazorTestFixture.cs",
       "lineNumber": 135,
       "codeSnippet": "catch\r\n            {\r\n            }",
       "message": "Empty catch block swallows exceptions without handling",
@@ -439,7 +439,7 @@
     {
       "hash": "4b9bc2fd0b6fe248",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Tests/Avatar/AvatarImageTests.cs",
+      "filePath": "tests/Blazix.BaseUI.Tests/Avatar/AvatarImageTests.cs",
       "lineNumber": 120,
       "codeSnippet": "Task.Delay(100)",
       "message": "Test uses Task.Delay(100) which may indicate a timing-dependent test",
@@ -448,7 +448,7 @@
     {
       "hash": "fce7e1158356361b",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Avatar/AvatarTestsBase.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Avatar/AvatarTestsBase.cs",
       "lineNumber": 307,
       "codeSnippet": "Task.Delay(100)",
       "message": "Test uses Task.Delay(100) which may indicate a timing-dependent test",
@@ -457,7 +457,7 @@
     {
       "hash": "9a6699c954f3e4da",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTestsBase.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTestsBase.cs",
       "lineNumber": 826,
       "codeSnippet": "Task.Delay(50)",
       "message": "Test uses Task.Delay(50) which may indicate a timing-dependent test",
@@ -466,7 +466,7 @@
     {
       "hash": "19557b308f2fb6f0",
       "ruleId": "SW004",
-      "filePath": "tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTestsBase.cs",
+      "filePath": "tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Tests/Collapsible/CollapsibleTestsBase.cs",
       "lineNumber": 836,
       "codeSnippet": "Task.Delay(500)",
       "message": "Test uses Task.Delay(500) which may indicate a timing-dependent test",

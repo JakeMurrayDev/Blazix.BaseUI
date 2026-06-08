@@ -1,0 +1,12 @@
+﻿@import 'tailwindcss';
+@source '../Blazix.BaseUI.Demo';
+@source '../Blazix.BaseUI.Demo.Client';
+
+@theme {
+    --breakpoint-2xl: 96rem;
+    --animate-accordion-slide-down: accordion-slide-down .3s cubic-bezier(.87,0,.13,1);
+    --animate-accordion-slide-up: accordion-slide-up .3s cubic-bezier(.87,0,.13,1);
+    --animate-collapsible-slide-down: collapsible-slide-down .3s cubic-bezier(.87,0,.13,1);
+    --animate-collapsible-slide-up: collapsible-slide-up .3s cubic-bezier(.87,0,.13,1);
+    --animate-caret-blink: caret-blink 1.2s ease-out infinite;
+}

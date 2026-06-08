@@ -1,0 +1,245 @@
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Csp
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+<RenderElement TState="SelectListState"
+               Tag="div"
+               State="CachedState"
+               Render="Render"
+               ClassValue="ResolveClass"
+               StyleValue="ResolveStyle"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
+    private static readonly SelectListState CachedState = new();
+
+    private string? listId;
+    private RenderElement<SelectListState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private bool subscribedToStateChanged;
+    private ElementReference? lastRegisteredElement;
+    private bool injectedScrollbarStyle;
+
+    public SelectList()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JS.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
+    }
+
+    [CascadingParameter]
+    private ISelectRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private CspProviderContext? CspContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SelectListState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectListState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectListState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null && !subscribedToStateChanged)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribedToStateChanged = true;
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (RootContext is null) return;
+
+        if (firstRender)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                if (!injectedScrollbarStyle && CspContext?.DisableStyleElements != true)
+                {
+                    await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
+                    injectedScrollbarStyle = true;
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        // Re-register on every element-ref change. Mirrors React's stable
+        // `setListElement` ref callback, which fires both on attach and on
+        // ref swap when consumers replace the rendered element via `Render`.
+        var current = Element;
+        if (current.HasValue && !SameElement(current, lastRegisteredElement))
+        {
+            RootContext.SetListElement(current);
+            lastRegisteredElement = current;
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        // Match the React `${id}-list` convention so `aria-controls` on the trigger
+        // and `aria-activedescendant` wiring stay stable across renders.
+        var rootId = RootContext?.RootId;
+        listId = string.IsNullOrEmpty(rootId) ? null : $"{rootId}-list";
+
+        if (!string.IsNullOrEmpty(listId))
+        {
+            attrs["id"] = listId;
+
+            if (RootContext is not null && RootContext.ListId != listId)
+            {
+                RootContext.ListId = listId;
+                RootContext.NotifyStateChanged();
+            }
+        }
+
+        attrs["role"] = "listbox";
+
+        if (RootContext?.Multiple == true)
+        {
+            attrs["aria-multiselectable"] = "true";
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void OnRootStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string? ResolveClass(SelectListState s)
+    {
+        var userClass = ClassValue?.Invoke(s);
+        var hideScrollbar =
+            RootContext?.HasScrollArrows == true &&
+            RootContext.OpenInteractionType != InteractionType.Touch;
+
+        var intrinsic = hideScrollbar ? "blazix-base-ui-disable-scrollbar" : null;
+
+        if (string.IsNullOrEmpty(intrinsic)) return userClass;
+        if (string.IsNullOrEmpty(userClass)) return intrinsic;
+        return $"{intrinsic} {userClass}";
+    }
+
+    private string? ResolveStyle(SelectListState s)
+    {
+        var userStyle = StyleValue?.Invoke(s);
+
+        // LIST_FUNCTIONAL_STYLES from .base-ui/packages/react/src/select/popup/utils.ts:7-12.
+        // Only applied under alignItemWithTrigger placement, which requires a
+        // fixed-height scroll region so the selected item can align over the trigger.
+        string? intrinsic = null;
+        if (RootContext?.AlignItemWithTriggerActive == true)
+        {
+            intrinsic = "position:relative;max-height:100%;overflow-x:hidden;overflow-y:auto;";
+        }
+
+        if (string.IsNullOrEmpty(intrinsic)) return userStyle;
+        if (string.IsNullOrEmpty(userStyle)) return intrinsic;
+        return $"{intrinsic} {userStyle}";
+    }
+
+    private static bool SameElement(ElementReference? a, ElementReference? b)
+    {
+        if (a is { } left && b is { } right)
+        {
+            return left.Id == right.Id;
+        }
+        return !a.HasValue && !b.HasValue;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (subscribedToStateChanged && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+            subscribedToStateChanged = false;
+        }
+
+        if (lastRegisteredElement.HasValue && RootContext is not null)
+        {
+            RootContext.SetListElement(null);
+            lastRegisteredElement = null;
+        }
+
+        var ownedListId = RootContext is null ? null : $"{RootContext.RootId}-list";
+        if (RootContext is not null &&
+            (RootContext.ListId == listId || RootContext.ListId == ownedListId))
+        {
+            // Clear the root context's list id so downstream consumers (e.g.
+            // SelectTrigger's aria-controls + SelectPopup's HasList branch)
+            // stop treating a missing list as present.
+            RootContext.ListId = null;
+            RootContext.NotifyStateChanged();
+        }
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+}

@@ -1,0 +1,14 @@
+﻿@using Blazix.BaseUI.Field
+
+@if (FieldContext is not null)
+{
+    @ChildContent?.Invoke(FieldContext.State)
+}
+
+@code {
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [Parameter]
+    public RenderFragment<FieldRootState>? ChildContent { get; set; }
+}

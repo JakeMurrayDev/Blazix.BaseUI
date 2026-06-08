@@ -1,0 +1,87 @@
+@page "/tests/tabs/server"
+@using Blazix.BaseUI.Tabs
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Tabs Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="before-button" type="button" style="margin-bottom: 10px;">Before Button</button>
+
+    <TabsRoot TValue="string"
+              DefaultValue="@ResolvedDefaultValue"
+              Orientation="@ResolvedOrientation"
+              OnValueChange="@HandleValueChange"
+              data-testid="tabs-root">
+        <TabsList TValue="string" ActivateOnFocus="@IsActivateOnFocus"
+                  LoopFocus="@IsLoopFocus"
+                  data-testid="tabs-list">
+            <TabsTab Value="@("tab1")" Disabled="@IsTab1Disabled" data-testid="tab-1">Tab 1</TabsTab>
+            <TabsTab Value="@("tab2")" Disabled="@IsTab2Disabled" data-testid="tab-2">Tab 2</TabsTab>
+            <TabsTab Value="@("tab3")" Disabled="@IsTab3Disabled" data-testid="tab-3">Tab 3</TabsTab>
+            @if (IsShowIndicator)
+            {
+                <TabsIndicator TValue="string" data-testid="tabs-indicator" />
+            }
+        </TabsList>
+        <TabsPanel Value="@("tab1")" KeepMounted="@IsKeepMounted" data-testid="panel-1">Panel 1 content</TabsPanel>
+        <TabsPanel Value="@("tab2")" KeepMounted="@IsKeepMounted" data-testid="panel-2">Panel 2 content</TabsPanel>
+        <TabsPanel Value="@("tab3")" KeepMounted="@IsKeepMounted" data-testid="panel-3">Panel 3 content</TabsPanel>
+    </TabsRoot>
+
+    <button data-testid="after-button" type="button" style="margin-top: 10px;">After Button</button>
+    <div data-testid="value-display">@CurrentValue</div>
+    <div data-testid="change-count">@ChangeCount</div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string? QueryOrientation { get; set; }
+
+    [SupplyParameterFromQuery(Name = "activateOnFocus")]
+    public bool? QueryActivateOnFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool? QueryLoopFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool? QueryDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tab1Disabled")]
+    public bool? QueryTab1Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tab2Disabled")]
+    public bool? QueryTab2Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tab3Disabled")]
+    public bool? QueryTab3Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? QueryDefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "keepMounted")]
+    public bool? QueryKeepMounted { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showIndicator")]
+    public bool? QueryShowIndicator { get; set; }
+
+    private string? ResolvedDefaultValue => QueryDefaultValue == "null" ? null : QueryDefaultValue ?? "tab1";
+    private Orientation ResolvedOrientation => QueryOrientation?.ToLowerInvariant() == "vertical"
+        ? Orientation.Vertical
+        : Orientation.Horizontal;
+    private bool IsActivateOnFocus => QueryActivateOnFocus ?? false;
+    private bool IsLoopFocus => QueryLoopFocus ?? true;
+    private bool IsTab1Disabled => QueryTab1Disabled ?? (QueryDisabled ?? false);
+    private bool IsTab2Disabled => QueryTab2Disabled ?? (QueryDisabled ?? false);
+    private bool IsTab3Disabled => QueryTab3Disabled ?? (QueryDisabled ?? false);
+    private bool IsKeepMounted => QueryKeepMounted ?? false;
+    private bool IsShowIndicator => QueryShowIndicator ?? false;
+
+    private string? CurrentValue { get; set; }
+    private int ChangeCount { get; set; }
+
+    private void HandleValueChange(TabsValueChangeEventArgs<string> args)
+    {
+        CurrentValue = args.Value;
+        ChangeCount++;
+    }
+}

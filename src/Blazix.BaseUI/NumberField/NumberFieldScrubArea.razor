@@ -1,0 +1,322 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="scrubContext">
+    <RenderElement TState="NumberFieldRootState"
+                   Tag="@DefaultTag"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="computedStyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string DefaultTag = "span";
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-number-field.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool isScrubbing;
+    private bool isTouchInput;
+    private bool isPointerLockDenied;
+    private ElementReference? scrubAreaElement;
+    private ElementReference? cursorElement;
+    private DotNetObjectReference<NumberFieldScrubArea>? dotNetRef;
+    private RenderElement<NumberFieldRootState>? renderElementReference;
+    private NumberFieldRootState state = NumberFieldRootState.Default;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<NumberFieldRootState, string?>? computedStyleValue;
+    private NumberFieldScrubAreaContext scrubContext = null!;
+
+    [CascadingParameter]
+    private NumberFieldRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the cursor movement direction in the scrub area.
+    /// Defaults to <see cref="ScrubDirection.Horizontal"/>.
+    /// </summary>
+    [Parameter]
+    public ScrubDirection Direction { get; set; } = ScrubDirection.Horizontal;
+
+    /// <summary>
+    /// Gets or sets how many pixels the cursor must move before the value changes.
+    /// A higher value will make scrubbing less sensitive.
+    /// Defaults to <c>2</c>.
+    /// </summary>
+    [Parameter]
+    public int PixelSensitivity { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the distance that the cursor may move from the center
+    /// of the scrub area before it will loop back around.
+    /// </summary>
+    [Parameter]
+    public int? TeleportDistance { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NumberFieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberFieldScrubArea"/> class.
+    /// </summary>
+    public NumberFieldScrubArea()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        scrubContext = new NumberFieldScrubAreaContext
+        {
+            SetCursorElement = SetCursorElement,
+            GetCursorElement = () => cursorElement,
+            SetScrubAreaElement = SetScrubAreaElement,
+            GetScrubAreaElement = () => scrubAreaElement
+        };
+
+        computedStyleValue = s =>
+        {
+            var userStyle = StyleValue?.Invoke(s);
+            var baseStyle = "touch-action:none;user-select:none;-webkit-user-select:none";
+            return string.IsNullOrEmpty(userStyle) ? baseStyle : $"{baseStyle};{userStyle}";
+        };
+
+        UpdateScrubContext();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = RootContext?.State ?? NumberFieldRootState.Default;
+        UpdateScrubContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            scrubAreaElement = Element;
+
+            if (scrubAreaElement.HasValue)
+            {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    var config = new
+                    {
+                        direction = Direction.ToDataAttributeString(),
+                        pixelSensitivity = PixelSensitivity,
+                        teleportDistance = TeleportDistance
+                    };
+                    await module.InvokeVoidAsync("initializeScrubArea", scrubAreaElement.Value, dotNetRef, config);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (moduleTask.IsValueCreated && scrubAreaElement.HasValue)
+            {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    await module.InvokeVoidAsync("disposeScrubArea", scrubAreaElement.Value);
+                    await module.DisposeAsync();
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
+            }
+        }
+        finally
+        {
+            dotNetRef?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Handles scrub movement from JavaScript interop to adjust the field value.
+    /// </summary>
+    [JSInvokable]
+    public void OnScrubMove(double movement, int direction, bool altKey, bool shiftKey)
+    {
+        if (RootContext?.Disabled == true || RootContext?.ReadOnly == true)
+            return;
+
+        var stepAmount = RootContext?.GetStepAmount(altKey, shiftKey) ?? 1;
+        var amount = Math.Abs(movement) * stepAmount;
+        RootContext?.IncrementValue(amount, direction, NumberFieldChangeReason.Scrub);
+    }
+
+    /// <summary>
+    /// Handles the end of a scrub interaction from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnScrubEnd()
+    {
+        isScrubbing = false;
+        RootContext?.SetIsScrubbing(false);
+        RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Scrub);
+        UpdateScrubContext();
+        StateHasChanged();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        attrs["role"] = "presentation";
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
+        attrs["data-scrubbing"] = state.Scrubbing;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-readonly"] = state.ReadOnly;
+        attrs["data-required"] = state.Required;
+        if (state.Valid == true)
+            attrs["data-valid"] = true;
+        else if (state.Valid == false)
+            attrs["data-invalid"] = true;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-filled"] = state.Filled;
+        attrs["data-focused"] = state.Focused;
+        componentAttributes = attrs;
+    }
+
+    private async Task HandlePointerDown(PointerEventArgs e)
+    {
+        if (RootContext?.Disabled == true || RootContext?.ReadOnly == true)
+            return;
+
+        if (e.Button != 0)
+            return;
+
+        var isTouch = e.PointerType == "touch";
+        isTouchInput = isTouch;
+
+        if (e.PointerType == "mouse")
+        {
+            RootContext?.FocusInput();
+        }
+
+        isScrubbing = true;
+        RootContext?.SetIsScrubbing(true);
+        UpdateScrubContext();
+        StateHasChanged();
+
+        if (!hasRendered || !scrubAreaElement.HasValue || dotNetRef is null)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var config = new
+            {
+                direction = Direction.ToDataAttributeString(),
+                pixelSensitivity = PixelSensitivity,
+                teleportDistance = TeleportDistance
+            };
+
+            var result = await module.InvokeAsync<ScrubStartResult>("startScrub",
+                scrubAreaElement.Value,
+                dotNetRef,
+                cursorElement,
+                config,
+                e.ClientX,
+                e.ClientY,
+                isTouch);
+
+            if (result.PointerLockDenied)
+            {
+                isPointerLockDenied = true;
+                UpdateScrubContext();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void SetCursorElement(ElementReference? element)
+    {
+        cursorElement = element;
+    }
+
+    private void SetScrubAreaElement(ElementReference? element)
+    {
+        scrubAreaElement = element;
+    }
+
+    private void UpdateScrubContext()
+    {
+        scrubContext.IsScrubbing = isScrubbing;
+        scrubContext.IsTouchInput = isTouchInput;
+        scrubContext.IsPointerLockDenied = isPointerLockDenied;
+        scrubContext.Direction = Direction;
+        scrubContext.PixelSensitivity = PixelSensitivity;
+        scrubContext.TeleportDistance = TeleportDistance;
+    }
+
+    private sealed class ScrubStartResult
+    {
+        public bool Success { get; set; }
+        public bool PointerLockDenied { get; set; }
+    }
+}
