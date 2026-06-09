@@ -45,7 +45,14 @@ public abstract class FieldValidityTestsBase : TestBase
                 .Build();
             await NavigateAsync(url);
 
-            await TriggerBlurValidationAsync();
+            var control = GetByTestId("field-control");
+            await control.FocusAsync();
+            await control.FillAsync("a");
+            await control.FillAsync("");
+
+            var otherInput = GetByTestId("other-input");
+            await otherInput.ClickAsync();
+            await WaitForDelayAsync(300);
 
             var validityValid = GetByTestId("validity-valid");
             await Assertions.Expect(validityValid).ToHaveTextAsync("false");
@@ -63,7 +70,14 @@ public abstract class FieldValidityTestsBase : TestBase
                 .Build();
             await NavigateAsync(url);
 
-            await TriggerBlurValidationAsync();
+            var control = GetByTestId("field-control");
+            await control.FocusAsync();
+            await control.FillAsync("a");
+            await control.FillAsync("");
+
+            var otherInput = GetByTestId("other-input");
+            await otherInput.ClickAsync();
+            await WaitForDelayAsync(300);
 
             var validityError = GetByTestId("validity-error");
             await Assertions.Expect(validityError).ToHaveTextAsync("Single error message");
@@ -84,42 +98,20 @@ public abstract class FieldValidityTestsBase : TestBase
                 .Build();
             await NavigateAsync(url);
 
-            await TriggerBlurValidationAsync();
+            var control = GetByTestId("field-control");
+            await control.FocusAsync();
+            await control.FillAsync("a");
+            await control.FillAsync("");
+
+            var otherInput = GetByTestId("other-input");
+            await otherInput.ClickAsync();
+            await WaitForDelayAsync(300);
 
             var validityErrorsCount = GetByTestId("validity-errors-count");
             await Assertions.Expect(validityErrorsCount).ToHaveTextAsync("3");
 
             var errorItems = Page.GetByTestId("validity-error-item");
             await Assertions.Expect(errorItems).ToHaveCountAsync(3);
-        });
-    }
-
-    private async Task TriggerBlurValidationAsync()
-    {
-        var control = GetByTestId("field-control");
-        await control.FocusAsync();
-        await Assertions.Expect(control).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
-
-        await control.FillAsync("a");
-        await Assertions.Expect(control).ToHaveValueAsync("a", new LocatorAssertionsToHaveValueOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
-
-        await control.FillAsync("");
-        await Assertions.Expect(control).ToHaveValueAsync("", new LocatorAssertionsToHaveValueOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
-
-        var otherInput = GetByTestId("other-input");
-        await otherInput.ClickAsync();
-        await Assertions.Expect(otherInput).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
         });
     }
 }

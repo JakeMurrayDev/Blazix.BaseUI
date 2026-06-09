@@ -9,7 +9,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectRootTests : BunitContext, ISelectRootContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
 
     public SelectRootTests()
     {
@@ -20,12 +20,6 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         JsInteropSetup.SetupLabelModule(JSInterop);
         Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         Services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-    }
-
-    private static async Task HighlightAndClickAsync(AngleSharp.Dom.IElement item)
-    {
-        await item.TriggerEventAsync("onmousemove", new MouseEventArgs());
-        item.Click();
     }
 
     private RenderFragment CreateSelect(
@@ -169,7 +163,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task Value_ShouldBeControlledWhenValueParameterIsProvidedWithoutValueChanged()
+    public Task Value_ShouldBeControlledWhenValueParameterIsProvidedWithoutValueChanged()
     {
         var cut = Render(CreateSelect(
             value: "cherry",
@@ -178,13 +172,14 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var items = cut.FindAll("[role='option']");
         items.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
 
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Banana")));
+        items.First(i => i.TextContent.Contains("Banana")).Click();
         cut.FindComponent<SelectRoot<string>>().Render();
 
         var updatedItems = cut.FindAll("[role='option']");
         updatedItems.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
         updatedItems.First(i => i.TextContent.Contains("Banana")).HasAttribute("data-selected").ShouldBeFalse();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -213,7 +208,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task Value_ShouldNotUpdateInternalIfControlledValueDoesNotChange()
+    public Task Value_ShouldNotUpdateInternalIfControlledValueDoesNotChange()
     {
         var cut = Render(CreateSelect(
             value: "apple",
@@ -223,7 +218,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         // Click on banana item
         var items = cut.FindAll("[role='option']");
         var bananaItem = items.First(i => i.TextContent.Contains("Banana"));
-        await HighlightAndClickAsync(bananaItem);
+        bananaItem.Click();
 
         // Since it's controlled and valueChanged doesn't update the value prop,
         // re-render to pick up state - apple should still be selected
@@ -233,6 +228,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var appleItem = updatedItems.First(i => i.TextContent.Contains("Apple"));
         appleItem.HasAttribute("data-selected").ShouldBeTrue();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -293,7 +289,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task OnValueChange_ShouldCallWhenItemSelected()
+    public Task OnValueChange_ShouldCallWhenItemSelected()
     {
         var invoked = false;
         string? receivedValue = null;
@@ -308,11 +304,12 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         var items = cut.FindAll("[role='option']");
         var bananaItem = items.First(i => i.TextContent.Contains("Banana"));
-        await HighlightAndClickAsync(bananaItem);
+        bananaItem.Click();
 
         invoked.ShouldBeTrue();
         receivedValue.ShouldBe("banana");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -380,17 +377,18 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task DefaultOpen_ShouldSelectItemAndCloseWhenClicked()
+    public Task DefaultOpen_ShouldSelectItemAndCloseWhenClicked()
     {
         var cut = Render(CreateSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
         var appleItem = items.First(i => i.TextContent.Contains("Apple"));
-        await HighlightAndClickAsync(appleItem);
+        appleItem.Click();
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -672,7 +670,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task Values_ShouldBeControlledWhenValuesParameterIsProvidedWithoutValuesChanged()
+    public Task Values_ShouldBeControlledWhenValuesParameterIsProvidedWithoutValuesChanged()
     {
         var cut = Render(CreateMultipleSelect(
             name: "fruits",
@@ -682,17 +680,18 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         cut.FindAll("input[type='hidden']").Single().GetAttribute("value").ShouldBe("apple");
 
         var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
-        await HighlightAndClickAsync(banana);
+        banana.Click();
         cut.FindComponent<SelectRoot<string>>().Render();
 
         var hiddenInputs = cut.FindAll("input[type='hidden']");
         hiddenInputs.Count.ShouldBe(1);
         hiddenInputs[0].GetAttribute("value").ShouldBe("apple");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task OnValueChange_MultipleReceivesNextValues()
+    public Task OnValueChange_MultipleReceivesNextValues()
     {
         IReadOnlyList<string>? receivedValues = null;
 
@@ -705,34 +704,36 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
-        await HighlightAndClickAsync(banana);
+        banana.Click();
 
         receivedValues.ShouldNotBeNull();
         receivedValues.ShouldBe(["apple", "banana"]);
 
+        return Task.CompletedTask;
     }
 
     // --- ItemToStringLabel ---
 
     [Fact]
-    public async Task ItemToStringLabel_UpdatesTriggerTextAfterSelectingItem()
+    public Task ItemToStringLabel_UpdatesTriggerTextAfterSelectingItem()
     {
         var cut = Render(CreateSelect(
             defaultOpen: true,
             itemToStringLabel: v => $"Fruit: {v}"));
 
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         var valueSpan = cut.FindComponent<SelectValue<string>>();
         valueSpan.Markup.ShouldContain("Fruit: apple");
 
+        return Task.CompletedTask;
     }
 
     // --- Event guard ---
 
     [Fact]
-    public async Task OnValueChange_IsNotCalledTwiceOnSelect()
+    public Task OnValueChange_IsNotCalledTwiceOnSelect()
     {
         var callCount = 0;
 
@@ -744,10 +745,11 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         callCount.ShouldBe(1);
 
+        return Task.CompletedTask;
     }
 
     // --- Disabled ---
@@ -881,25 +883,26 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     // --- Multiple ---
 
     [Fact]
-    public async Task Multiple_ShouldAllowMultipleSelections()
+    public Task Multiple_ShouldAllowMultipleSelections()
     {
         var cut = Render(CreateMultipleSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Banana")));
+        items.First(i => i.TextContent.Contains("Banana")).Click();
 
         // Both items should be selected in uncontrolled multi-select
         items = cut.FindAll("[role='option']");
         items.First(i => i.TextContent.Contains("Apple")).HasAttribute("data-selected").ShouldBeTrue();
         items.First(i => i.TextContent.Contains("Banana")).HasAttribute("data-selected").ShouldBeTrue();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task Multiple_ShouldDeselectItemsWhenClickedAgain()
+    public Task Multiple_ShouldDeselectItemsWhenClickedAgain()
     {
         var cut = Render(CreateMultipleSelect(
             defaultOpen: true,
@@ -907,11 +910,12 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Click apple again to deselect it
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         items = cut.FindAll("[role='option']");
         items.First(i => i.TextContent.Contains("Apple")).HasAttribute("data-selected").ShouldBeFalse();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -990,31 +994,33 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task Multiple_ShouldNotClosePopupWhenSelectingItems()
+    public Task Multiple_ShouldNotClosePopupWhenSelectingItems()
     {
         var cut = Render(CreateMultipleSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         // Popup should remain open in multi-select mode
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task Multiple_ShouldClosePopupInSingleSelectMode()
+    public Task Multiple_ShouldClosePopupInSingleSelectMode()
     {
         // Single-select mode should close popup on item press
         var cut = Render(CreateSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -1390,7 +1396,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     // --- FieldRoot integration tests ---
 
     [Fact]
-    public async Task FieldRoot_ResolvedNameFromFieldContext()
+    public Task FieldRoot_ResolvedNameFromFieldContext()
     {
         // When Name is not set on SelectRoot but FieldRoot provides one,
         // ResolvedName should use the field name for hidden inputs
@@ -1398,11 +1404,12 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item to make the hidden input appear with the field name
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         var hiddenInput = cut.Find("input[type='hidden']");
         hiddenInput.GetAttribute("name").ShouldBe("fruit");
 
+        return Task.CompletedTask;
     }
 
     [Fact]
@@ -1418,7 +1425,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public async Task FieldRoot_SetsFilledOnValueChange()
+    public Task FieldRoot_SetsFilledOnValueChange()
     {
         var cut = Render(CreateSelectInFieldRoot(defaultOpen: true));
 
@@ -1428,15 +1435,16 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         trigger = cut.Find("button");
         trigger.HasAttribute("data-filled").ShouldBeTrue();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task FieldRoot_SetsDirtyOnValueChange()
+    public Task FieldRoot_SetsDirtyOnValueChange()
     {
         var cut = Render(CreateSelectInFieldRoot(defaultOpen: true));
 
@@ -1446,15 +1454,16 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         trigger = cut.Find("button");
         trigger.HasAttribute("data-dirty").ShouldBeTrue();
 
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task FieldRoot_ClearsFormErrorsOnValueChange()
+    public Task FieldRoot_ClearsFormErrorsOnValueChange()
     {
         var errors = new Dictionary<string, string[]>
         {
@@ -1465,12 +1474,13 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item — this should clear form errors
         var items = cut.FindAll("[role='option']");
-        await HighlightAndClickAsync(items.First(i => i.TextContent.Contains("Apple")));
+        items.First(i => i.TextContent.Contains("Apple")).Click();
 
         // After selecting, the error should be cleared
         // We verify the trigger no longer has aria-invalid
         var trigger = cut.Find("button");
         trigger.HasAttribute("aria-invalid").ShouldBeFalse();
 
+        return Task.CompletedTask;
     }
 }

@@ -349,10 +349,10 @@ function suppressNextFocusOut(rootState) {
     const popupElement = rootState.popupElement;
     if (!popupElement) return;
 
-    popupElement.__blazorBaseUISuppressFocusOutOnce = true;
+    popupElement.__blazixBaseUISuppressFocusOutOnce = true;
     setTimeout(() => {
-        if (popupElement.__blazorBaseUISuppressFocusOutOnce) {
-            popupElement.__blazorBaseUISuppressFocusOutOnce = false;
+        if (popupElement.__blazixBaseUISuppressFocusOutOnce) {
+            popupElement.__blazixBaseUISuppressFocusOutOnce = false;
         }
     }, 0);
 }
@@ -404,9 +404,9 @@ function cleanupBackdropClick(rootState) {
 
 function consumeDrawerOutsidePressSuppression(rootState, target) {
     const now = performance.now();
-    const popupUntil = rootState.popupElement?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
-    const backdropUntil = rootState.backdropElement?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
-    const targetUntil = target?.__blazorBaseUIDrawerSuppressOutsidePressUntil;
+    const popupUntil = rootState.popupElement?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
+    const backdropUntil = rootState.backdropElement?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
+    const targetUntil = target?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
     const until = Math.max(popupUntil || 0, backdropUntil || 0, targetUntil || 0);
 
     if (until <= now) {
@@ -414,13 +414,13 @@ function consumeDrawerOutsidePressSuppression(rootState, target) {
     }
 
     if (rootState.popupElement) {
-        rootState.popupElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+        rootState.popupElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
     }
     if (rootState.backdropElement) {
-        rootState.backdropElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+        rootState.backdropElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
     }
     if (target) {
-        target.__blazorBaseUIDrawerSuppressOutsidePressUntil = 0;
+        target.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
     }
 
     return true;
@@ -462,20 +462,6 @@ function setupCompositeKeySuppression(rootState) {
     rootState.compositeKeyCleanup = () => popup.removeEventListener('keydown', handler);
 }
 
-function focusElementWhenReady(element, attempt = 0) {
-    if (!(element instanceof HTMLElement)) return;
-
-    if (document.contains(element)) {
-        element.focus();
-    }
-
-    if (document.activeElement === element || attempt >= 5) {
-        return;
-    }
-
-    requestAnimationFrame(() => focusElementWhenReady(element, attempt + 1));
-}
-
 export function initializePopup(rootId, popupElement, modal, initialFocusMode, initialFocusElement, finalFocusMode, finalFocusElement) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
@@ -497,7 +483,7 @@ export function setInitialFocusElement(rootId, mode, element) {
 
         // If popup is open or currently opening and mode is 'element', focus now.
         if ((rootState.isOpen || rootState.pendingOpen) && mode === 'element' && element) {
-            requestAnimationFrame(() => focusElementWhenReady(element));
+            requestAnimationFrame(() => element.focus());
         }
     }
 }

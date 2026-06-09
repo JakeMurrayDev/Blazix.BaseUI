@@ -41,7 +41,6 @@
     private bool computedArrowUncentered;
     private bool controlledAlignItemWithTrigger;
     private bool alignItemWithTriggerActive;
-    private bool alignPlacementRequested;
     private bool lastMounted;
     private int prevItemMapSize;
     private List<object?> prevItemMapValues = new();
@@ -237,11 +236,6 @@
         alignItemWithTriggerActive =
             mounted && controlledAlignItemWithTrigger && openMethod != InteractionType.Touch;
 
-        if (lastMounted && !mounted)
-        {
-            alignPlacementRequested = false;
-        }
-
         // When transitioning from mounted to unmounted, reset scroll arrow visibility
         // so the next open doesn't carry stale state (React useIsoLayoutEffect).
         if (!mounted && lastMounted)
@@ -334,12 +328,6 @@
                 // observers in Base UI; it does not suppress mount/open/rerender
                 // position recomputation.
                 await UpdatePositionAsync();
-            }
-
-            if (alignItemWithTriggerActive && !alignPlacementRequested)
-            {
-                alignPlacementRequested = true;
-                await BeginAlignItemWithTriggerPlacementAsync();
             }
         }
     }
@@ -494,20 +482,6 @@
         }
 
         controlledAlignItemWithTrigger = value;
-        if (!value)
-        {
-            alignItemWithTriggerActive = false;
-            alignPlacementRequested = false;
-            if (RootContext is not null)
-            {
-                RootContext.AlignItemWithTriggerActive = false;
-            }
-            positionerContext.AlignItemWithTriggerActive = false;
-            positionerContext.Side = computedSide;
-            state = new SelectPositionerState(RootContext?.Open ?? false, computedSide, computedAlign, computedAnchorHidden);
-            BuildComponentAttributes();
-        }
-
         _ = InvokeAsync(StateHasChanged);
     }
 
@@ -606,24 +580,6 @@
         }
 
         await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement, alignItemWithTriggerActive);
-    }
-
-    private async Task BeginAlignItemWithTriggerPlacementAsync()
-    {
-        if (RootContext is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var module = await SelectModule.Value;
-            await module.InvokeVoidAsync("beginAlignItemWithTriggerPlacement", RootContext.RootId, true); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
-        }
-        catch (Exception ex) when (IsJSInteropUnavailable(ex))
-        {
-            _ = ex;
-        }
     }
 
     /// <summary>
@@ -767,7 +723,6 @@
 
         if (RootContext.Open && alignItemWithTriggerActive)
         {
-            alignPlacementRequested = false;
             RootContext.ScrollUpArrowVisible = false;
             RootContext.ScrollDownArrowVisible = false;
             await ClearHeightStylesAsync();

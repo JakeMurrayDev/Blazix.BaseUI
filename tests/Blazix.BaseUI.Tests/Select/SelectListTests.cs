@@ -4,7 +4,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectListTests : BunitContext, ISelectListContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
 
     public SelectListTests()
     {
@@ -17,8 +17,7 @@ public class SelectListTests : BunitContext, ISelectListContract
         bool defaultOpen = true,
         bool multiple = false,
         string? userClass = null,
-        string? userStyle = null,
-        Func<bool>? renderList = null)
+        string? userStyle = null)
     {
         return builder =>
         {
@@ -37,26 +36,23 @@ public class SelectListTests : BunitContext, ISelectListContract
                     posBuilder.OpenComponent<SelectPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        if (renderList?.Invoke() != false)
+                        popupBuilder.OpenComponent<SelectList>(0);
+                        if (userClass is not null)
                         {
-                            popupBuilder.OpenComponent<SelectList>(0);
-                            if (userClass is not null)
-                            {
-                                popupBuilder.AddAttribute(1, "class", userClass);
-                            }
-                            if (userStyle is not null)
-                            {
-                                popupBuilder.AddAttribute(2, "style", userStyle);
-                            }
-                            popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(listBuilder =>
-                            {
-                                listBuilder.OpenComponent<SelectItem<string>>(0);
-                                listBuilder.AddAttribute(1, "Value", "apple");
-                                listBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
-                                listBuilder.CloseComponent();
-                            }));
-                            popupBuilder.CloseComponent();
+                            popupBuilder.AddAttribute(1, "class", userClass);
                         }
+                        if (userStyle is not null)
+                        {
+                            popupBuilder.AddAttribute(2, "style", userStyle);
+                        }
+                        popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(listBuilder =>
+                        {
+                            listBuilder.OpenComponent<SelectItem<string>>(0);
+                            listBuilder.AddAttribute(1, "Value", "apple");
+                            listBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
+                            listBuilder.CloseComponent();
+                        }));
+                        popupBuilder.CloseComponent();
                     }));
                     posBuilder.CloseComponent();
                 }));
@@ -68,7 +64,8 @@ public class SelectListTests : BunitContext, ISelectListContract
 
     private static AngleSharp.Dom.IElement FindList(IRenderedComponent<ContainerFragment> cut)
     {
-        return cut.FindComponent<SelectList>().Find("[role='listbox']");
+        return cut.FindAll("[role='listbox']")
+            .First(el => el.HasAttribute("id") && el.HasAttribute("role"));
     }
 
     private static RenderFragment WrapInCspProvider(RenderFragment child, string? nonce = null, bool disableStyleElements = false)
@@ -111,8 +108,7 @@ public class SelectListTests : BunitContext, ISelectListContract
     [Fact]
     public Task WritesListIdToRootContext()
     {
-        var showList = true;
-        var cut = Render(CreateSelectWithList(renderList: () => showList));
+        var cut = Render(CreateSelectWithList());
         var root = cut.FindComponent<SelectRoot<string>>().Instance;
 
         root.typedContext.ListId.ShouldNotBeNullOrEmpty();
@@ -300,24 +296,19 @@ public class SelectListTests : BunitContext, ISelectListContract
     [Fact]
     public Task ClearsListElementOnDispose()
     {
-        var showList = true;
-        var cut = Render(CreateSelectWithList(renderList: () => showList));
+        var cut = Render(CreateSelectWithList());
         var root = cut.FindComponent<SelectRoot<string>>().Instance;
 
         // Before dispose: SelectList registered ListId on the root context.
         root.typedContext.HasList.ShouldBeTrue();
         root.typedContext.ListId.ShouldNotBeNullOrEmpty();
 
-        showList = false;
-        cut.Render();
+        cut.Dispose();
 
         // After dispose: ListId cleared so HasList reports false, matching
         // React's ref-detach semantics (`setListElement(null)`).
-        cut.WaitForAssertion(() =>
-        {
-            root.typedContext.HasList.ShouldBeFalse();
-            root.typedContext.ListId.ShouldBeNull();
-        });
+        root.typedContext.HasList.ShouldBeFalse();
+        root.typedContext.ListId.ShouldBeNull();
         return Task.CompletedTask;
     }
 

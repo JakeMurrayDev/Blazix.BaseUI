@@ -143,7 +143,6 @@
             if (RootContext is not null && RootContext.ListId != listId)
             {
                 RootContext.ListId = listId;
-                RootContext.NotifyStateChanged();
             }
         }
 
@@ -218,15 +217,12 @@
             lastRegisteredElement = null;
         }
 
-        var ownedListId = RootContext is null ? null : $"{RootContext.RootId}-list";
-        if (RootContext is not null &&
-            (RootContext.ListId == listId || RootContext.ListId == ownedListId))
+        if (RootContext is not null && RootContext.ListId == listId)
         {
             // Clear the root context's list id so downstream consumers (e.g.
             // SelectTrigger's aria-controls + SelectPopup's HasList branch)
             // stop treating a missing list as present.
             RootContext.ListId = null;
-            RootContext.NotifyStateChanged();
         }
 
         if (moduleTask.IsValueCreated)

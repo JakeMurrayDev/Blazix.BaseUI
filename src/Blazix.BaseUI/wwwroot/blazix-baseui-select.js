@@ -574,8 +574,6 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         popupElement: null,
         listElement: null,
         positionerElement: null,
-        positionerId: null,
-        alignItemWithTriggerActive: false,
         triggerCleanup: null,
         triggerDotNetRef: null,
         scrollLockCleanup: null,
@@ -736,9 +734,6 @@ export function setPopupElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.popupElement = element;
-        if (rootState.popup) {
-            rootState.popup.popupElement = element;
-        }
     }
 }
 
@@ -765,9 +760,6 @@ export function registerPositioner(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.positionerElement = element;
-        if (rootState.isOpen && rootState.alignItemWithTriggerActive && rootState.popupElement) {
-            beginAlignItemWithTriggerPlacement(rootId, true);
-        }
     }
 }
 
@@ -814,15 +806,13 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
         setTimeout(() => {
             const doc = triggerElement.ownerDocument;
             const handler = (mu) => {
-                const currentTrigger =
-                    rootState.triggerElement?.isConnected ? rootState.triggerElement : triggerElement;
-                if (!currentTrigger?.isConnected) return;
+                if (!triggerElement.isConnected) return;
                 const tgt = mu.target;
 
-                if (contains(currentTrigger, tgt) || tgt === currentTrigger) return;
+                if (contains(triggerElement, tgt) || tgt === triggerElement) return;
                 if (rootState.positionerElement && contains(rootState.positionerElement, tgt)) return;
 
-                const b = getPseudoElementBounds(currentTrigger);
+                const b = getPseudoElementBounds(triggerElement);
                 if (mu.clientX >= b.left - BOUNDARY_OFFSET &&
                     mu.clientX <= b.right + BOUNDARY_OFFSET &&
                     mu.clientY >= b.top - BOUNDARY_OFFSET &&
@@ -830,10 +820,9 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
                     return;
                 }
 
-                const currentDotNetRef = rootState.triggerDotNetRef || triggerDotNetRef;
-                currentDotNetRef.invokeMethodAsync('NotifyCancelOpen').catch(() => { });
+                triggerDotNetRef.invokeMethodAsync('NotifyCancelOpen').catch(() => { });
             };
-            doc.addEventListener('mouseup', handler, { once: true, capture: true });
+            doc.addEventListener('mouseup', handler, { once: true });
         }, 0);
     };
 
@@ -848,14 +837,12 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
     triggerElement.addEventListener('pointerdown', onPointerDown);
     triggerElement.addEventListener('mousedown', onMouseDown);
     triggerElement.addEventListener('focusout', onFocusOut);
-    triggerElement.__blazixBaseUISelectTriggerInitialized = true;
 
     rootState.triggerCleanup = () => {
         triggerElement.removeEventListener('pointermove', onPointerMove);
         triggerElement.removeEventListener('pointerdown', onPointerDown);
         triggerElement.removeEventListener('mousedown', onMouseDown);
         triggerElement.removeEventListener('focusout', onFocusOut);
-        delete triggerElement.__blazixBaseUISelectTriggerInitialized;
     };
 }
 
@@ -1143,12 +1130,6 @@ export function disposeScrollArrow(rootId, direction) {
 // ─── Positioner API ───────────────────────────────────────────────────
 
 export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidance, alignItemWithTrigger, dotNetRef, rootId) {
-    const rootState = rootId ? state.roots.get(rootId) : null;
-    if (rootState) {
-        rootState.positionerElement = positionerElement;
-        rootState.alignItemWithTriggerActive = !!alignItemWithTrigger;
-    }
-
     let onPositionUpdated = null;
     if (dotNetRef) {
         onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
@@ -1171,8 +1152,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
             // re-renders (e.g., once items mount and the placement should
             // refine), so this JS-side invocation is purely the "first paint"
             // accelerator, not a replacement for the gate.
-            const currentRootState = rootId ? state.roots.get(rootId) : null;
-            if (rootId && currentRootState?.alignItemWithTriggerActive) {
+            if (alignItemWithTrigger && rootId) {
                 try { beginAlignItemWithTriggerPlacement(rootId, true); } catch { /* idempotent */ }
             }
         };
@@ -1200,20 +1180,6 @@ export async function initializePositioner(positionerElement, triggerElement, si
         dotNetRef: dotNetRef || null
     });
 
-    if (positionerId) {
-        if (rootState) {
-            rootState.positionerId = positionerId;
-        }
-        state.positioners.set(positionerId, {
-            rootId,
-            element: positionerElement
-        });
-    }
-
-    if (alignItemWithTrigger && rootId) {
-        try { beginAlignItemWithTriggerPlacement(rootId, true); } catch { /* idempotent */ }
-    }
-
     // alignItemWithTrigger placement is invoked from SelectPopup via
     // `beginAlignItemWithTriggerPlacement` so the popup-level layout pass
     // can read selectedItemText / valueElement refs.
@@ -1221,14 +1187,6 @@ export async function initializePositioner(positionerElement, triggerElement, si
 }
 
 export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidance, alignItemWithTrigger) {
-    const positionerState = state.positioners.get(positionerId);
-    if (positionerState?.rootId) {
-        const rootState = state.roots.get(positionerState.rootId);
-        if (rootState) {
-            rootState.alignItemWithTriggerActive = !!alignItemWithTrigger;
-        }
-    }
-
     await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
@@ -1251,7 +1209,6 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
 
 export function disposePositioner(positionerId) {
     floatingDisposePositioner(positionerId);
-    state.positioners.delete(positionerId);
 }
 
 // ─── Popup Placement Public API ───────────────────────────────────────
@@ -1395,12 +1352,8 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
     const popupState = ensurePopupState(rootState);
 
     popupState.alignItemWithTriggerActive = !!alignItemWithTriggerActive;
-    rootState.alignItemWithTriggerActive = !!alignItemWithTriggerActive;
 
-    const popupElement = popupState.popupElement || rootState.popupElement;
-    if (!popupState.popupElement && popupElement) {
-        popupState.popupElement = popupElement;
-    }
+    const popupElement = popupState.popupElement;
     const positionerElement = rootState.positionerElement;
     const triggerElement = rootState.triggerElement;
 
@@ -1531,16 +1484,6 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
                 popupState.initialPlaced = true;
                 clearPopupStylesInternal(rootState);
                 popupState.alignItemWithTriggerActive = false;
-                rootState.alignItemWithTriggerActive = false;
-                if (rootState.positionerId) {
-                    floatingUpdatePositioner(rootState.positionerId, {
-                        alignItemWithTriggerActive: false
-                    }).catch(() => {
-                        positionerElement.setAttribute('data-positioned', '');
-                    });
-                } else {
-                    positionerElement.setAttribute('data-positioned', '');
-                }
                 if (popupState.dotNetRef) {
                     popupState.dotNetRef.invokeMethodAsync('OnFallbackToAlignPopupToTrigger').catch(() => { });
                 }

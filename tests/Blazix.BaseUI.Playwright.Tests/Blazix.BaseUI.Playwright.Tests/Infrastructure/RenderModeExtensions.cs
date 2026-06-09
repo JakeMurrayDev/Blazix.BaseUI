@@ -66,12 +66,6 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
-    public TestPageUrlBuilder WithTopSpacer(int pixels)
-    {
-        queryParams["topSpacer"] = pixels.ToString();
-        return this;
-    }
-
     public TestPageUrlBuilder WithDefaultOpen(bool value)
     {
         queryParams["defaultOpen"] = value.ToString().ToLowerInvariant();

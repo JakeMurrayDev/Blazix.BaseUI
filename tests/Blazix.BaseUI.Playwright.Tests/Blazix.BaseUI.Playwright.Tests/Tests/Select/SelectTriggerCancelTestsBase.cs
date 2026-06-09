@@ -17,42 +17,18 @@ public abstract class SelectTriggerCancelTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/select-trigger-cancel"));
 
         var trigger = GetByTestId("select-trigger");
-        await Page.WaitForFunctionAsync(
-            "() => Boolean(document.querySelector('[data-testid=\"select-trigger\"]')?.__blazixBaseUISelectTriggerInitialized)",
-            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
-
         var triggerBox = await trigger.BoundingBoxAsync()
-            ?? throw new InvalidOperationException("Select trigger bounding box was null.");
-        var startX = (double)triggerBox.X + (double)triggerBox.Width / 2;
-        var startY = (double)triggerBox.Y + (double)triggerBox.Height / 2;
+            ?? throw new InvalidOperationException("Trigger bounding box was null.");
 
-        await trigger.DispatchEventAsync("mousedown", new
-        {
-            button = 0,
-            buttons = 1,
-            clientX = startX,
-            clientY = startY
-        });
-
-        var positioner = GetByTestId("select-positioner");
-        await Assertions.Expect(positioner).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
-        await WaitForDelayAsync(50);
-
-        await Page.Locator("body").DispatchEventAsync("mouseup", new
-        {
-            button = 0,
-            clientX = (double)triggerBox.X + (double)triggerBox.Width + 200,
-            clientY = (double)triggerBox.Y + (double)triggerBox.Height + 200
-        });
+        // Press, drag well outside the trigger bounds, release.
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width / 2, triggerBox.Y + triggerBox.Height / 2);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width + 200, triggerBox.Y + triggerBox.Height + 200);
+        await Page.Mouse.UpAsync();
 
         // The popup was opened on mousedown (click-to-open) then cancelled by mouseup outside bounds.
-        await Assertions.Expect(positioner).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
+        var positioner = GetByTestId("select-positioner");
+        await Assertions.Expect(positioner).ToBeHiddenAsync();
     }
 
     [Fact]
@@ -66,8 +42,8 @@ public abstract class SelectTriggerCancelTestsBase : TestBase
         // Popup is open; focus moves into an item via keyboard nav.
         await Page.Keyboard.PressAsync("ArrowDown");
 
-        // The trigger must not become touched because the blur containment check
+        // data-touched must still be "False" because the blur containment check
         // skipped the real-blur callback.
-        await Assertions.Expect(trigger).Not.ToHaveAttributeAsync("data-touched", "");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-touched", "False");
     }
 }

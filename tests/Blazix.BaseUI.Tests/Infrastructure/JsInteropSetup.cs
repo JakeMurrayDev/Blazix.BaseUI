@@ -4,7 +4,7 @@ namespace Blazix.BaseUI.Tests.Infrastructure;
 
 public static class JsInteropSetup
 {
-    private const string AvatarImageModule = "./_content/Blazix.BaseUI/blazix-baseui-avatar-image.min.js";
+    private const string AvatarImageModule = "./_content/Blazix.BaseUI/blazix-baseui-avatar-image.js";
 
     public static void SetupLoadedImage(BunitJSInterop jsInterop)
     {
@@ -27,7 +27,7 @@ public static class JsInteropSetup
             .SetResult("idle");
     }
 
-    private const string CollapsiblePanelModule = "./_content/Blazix.BaseUI/blazix-baseui-collapsible.min.js";
+    private const string CollapsiblePanelModule = "./_content/Blazix.BaseUI/blazix-baseui-collapsible.js";
 
     public static void SetupCollapsiblePanel(BunitJSInterop jsInterop)
     {
@@ -39,7 +39,7 @@ public static class JsInteropSetup
         module.SetupVoid("dispose", _ => true);
     }
 
-    private const string MenuModule = "./_content/Blazix.BaseUI/blazix-baseui-menu.min.js";
+    private const string MenuModule = "./_content/Blazix.BaseUI/blazix-baseui-menu.js";
 
     public static BunitJSModuleInterop SetupMenuModule(BunitJSInterop jsInterop)
     {
@@ -70,7 +70,7 @@ public static class JsInteropSetup
         return module;
     }
 
-    private const string MenuBarModule = "./_content/Blazix.BaseUI/blazix-baseui-menubar.min.js";
+    private const string MenuBarModule = "./_content/Blazix.BaseUI/blazix-baseui-menubar.js";
 
     public static void SetupMenuBarModule(BunitJSInterop jsInterop)
     {
@@ -83,7 +83,7 @@ public static class JsInteropSetup
         module.SetupVoid("disposeMenuBar", _ => true);
     }
 
-    private const string AccordionTriggerModule = "./_content/Blazix.BaseUI/blazix-baseui-accordion-trigger.min.js";
+    private const string AccordionTriggerModule = "./_content/Blazix.BaseUI/blazix-baseui-accordion-trigger.js";
 
     public static void SetupAccordionTrigger(BunitJSInterop jsInterop)
     {
@@ -275,7 +275,7 @@ public static class JsInteropSetup
         }
     }
 
-    private const string FieldModule = "./_content/Blazix.BaseUI/blazix-baseui-field.min.js";
+    private const string FieldModule = "./_content/Blazix.BaseUI/blazix-baseui-field.js";
 
     public static void SetupFieldModule(BunitJSInterop jsInterop)
     {
@@ -294,7 +294,7 @@ public static class JsInteropSetup
         module.SetupVoid("dispose", _ => true);
     }
 
-    private const string LabelModule = "./_content/Blazix.BaseUI/blazix-baseui-label.min.js";
+    private const string LabelModule = "./_content/Blazix.BaseUI/blazix-baseui-label.js";
 
     public static void SetupLabelModule(BunitJSInterop jsInterop)
     {
@@ -305,7 +305,7 @@ public static class JsInteropSetup
         module.SetupVoid("focusSliderControl", _ => true);
     }
 
-    private const string DialogModule = "./_content/Blazix.BaseUI/blazix-baseui-dialog.min.js";
+    private const string DialogModule = "./_content/Blazix.BaseUI/blazix-baseui-dialog.js";
 
     public static void SetupDialogModule(BunitJSInterop jsInterop)
     {
@@ -351,7 +351,7 @@ public static class JsInteropSetup
         }
     }
 
-    private const string ButtonModule = "./_content/Blazix.BaseUI/blazix-baseui-button.min.js";
+    private const string ButtonModule = "./_content/Blazix.BaseUI/blazix-baseui-button.js";
 
     public static void SetupButtonModule(BunitJSInterop jsInterop)
     {
@@ -359,7 +359,7 @@ public static class JsInteropSetup
         module.SetupVoid("sync", _ => true);
     }
 
-    private const string ToolbarModule = "./_content/Blazix.BaseUI/blazix-baseui-toolbar.min.js";
+    private const string ToolbarModule = "./_content/Blazix.BaseUI/blazix-baseui-toolbar.js";
 
     public static void SetupToolbarModule(BunitJSInterop jsInterop)
     {
@@ -371,23 +371,22 @@ public static class JsInteropSetup
         module.SetupVoid("disposeToolbar", _ => true);
     }
 
-    private const string RadioModule = "./_content/Blazix.BaseUI/blazix-baseui-radio.min.js";
+    private const string RadioModule = "./_content/Blazix.BaseUI/blazix-baseui-radio.js";
 
-    public static BunitJSModuleInterop SetupRadioModule(BunitJSInterop jsInterop)
+    public static void SetupRadioModule(BunitJSInterop jsInterop)
     {
         var module = jsInterop.SetupModule(RadioModule);
-        module.SetupVoid("initialize", _ => true).SetVoidResult();
-        module.SetupVoid("dispose", _ => true).SetVoidResult();
-        module.SetupVoid("updateState", _ => true).SetVoidResult();
-        module.SetupVoid("focus", _ => true).SetVoidResult();
-        module.SetupVoid("registerRadio", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterRadio", _ => true).SetVoidResult();
-        module.SetupVoid("navigateToPrevious", _ => true).SetVoidResult();
-        module.SetupVoid("navigateToNext", _ => true).SetVoidResult();
-        module.SetupVoid("initializeGroup", _ => true).SetVoidResult();
-        module.SetupVoid("disposeGroup", _ => true).SetVoidResult();
+        module.SetupVoid("initialize", _ => true);
+        module.SetupVoid("dispose", _ => true);
+        module.SetupVoid("updateState", _ => true);
+        module.SetupVoid("focus", _ => true);
+        module.SetupVoid("registerRadio", _ => true);
+        module.SetupVoid("unregisterRadio", _ => true);
+        module.SetupVoid("navigateToPrevious", _ => true);
+        module.SetupVoid("navigateToNext", _ => true);
+        module.SetupVoid("initializeGroup", _ => true);
+        module.SetupVoid("disposeGroup", _ => true);
         module.Setup<bool>("isBlurWithinGroup", _ => true).SetResult(false);
-        return module;
     }
 
     private const string TabsModule = "./_content/Blazix.BaseUI/blazix-baseui-tabs.js";
@@ -425,7 +424,7 @@ public static class JsInteropSetup
         }
     }
 
-    private const string NumberFieldModule = "./_content/Blazix.BaseUI/blazix-baseui-number-field.min.js";
+    private const string NumberFieldModule = "./_content/Blazix.BaseUI/blazix-baseui-number-field.js";
 
     public static void SetupNumberFieldModule(BunitJSInterop jsInterop)
     {
@@ -440,7 +439,7 @@ public static class JsInteropSetup
         module.SetupVoid("disposeScrubArea", _ => true).SetVoidResult();
     }
 
-    private const string NavigationMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.min.js";
+    private const string NavigationMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.js";
 
     public static BunitJSModuleInterop SetupNavigationMenuModule(BunitJSInterop jsInterop)
     {
@@ -458,7 +457,7 @@ public static class JsInteropSetup
         return module;
     }
 
-    private const string ToggleModule = "./_content/Blazix.BaseUI/blazix-baseui-toggle.min.js";
+    private const string ToggleModule = "./_content/Blazix.BaseUI/blazix-baseui-toggle.js";
 
     public static void SetupToggleModule(BunitJSInterop jsInterop)
     {
@@ -518,7 +517,7 @@ public static class JsInteropSetup
         }
     }
 
-    private const string ContextMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-context-menu.min.js";
+    private const string ContextMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-context-menu.js";
 
     public static void SetupContextMenuModule(BunitJSInterop jsInterop)
     {
@@ -606,9 +605,9 @@ public static class JsInteropSetup
         }
     }
 
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
 
-    public static BunitJSModuleInterop SetupSelectModule(BunitJSInterop jsInterop)
+    public static void SetupSelectModule(BunitJSInterop jsInterop)
     {
         var module = jsInterop.SetupModule(SelectModule);
         module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
@@ -646,10 +645,8 @@ public static class JsInteropSetup
         module.SetupVoid("setDirection", _ => true).SetVoidResult();
         module.Setup<string?>("getElementText", _ => true).SetResult(null);
 
-        var floating = jsInterop.SetupModule(FloatingMinModule);
+        var floating = jsInterop.SetupModule(FloatingModule);
         floating.SetupVoid("clearStyles", _ => true).SetVoidResult();
-
-        return module;
     }
 
     private const string ScrollAreaModule = "./_content/Blazix.BaseUI/blazix-baseui-scroll-area.js";

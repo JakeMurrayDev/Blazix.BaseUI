@@ -16,7 +16,7 @@ public class FloatingTreeTests : BunitContext, IFloatingTreeContract
         public Task SetOpenAsync(bool open) => Task.CompletedTask;
     }
 
-    private const string FloatingModule = "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js";
+    private const string FloatingModule = "./_content/Blazix.BaseUI/blazix-baseui-floating.js";
 
     public FloatingTreeTests()
     {

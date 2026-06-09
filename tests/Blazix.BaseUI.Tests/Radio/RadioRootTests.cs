@@ -9,14 +9,12 @@ namespace Blazix.BaseUI.Tests.Radio;
 
 public class RadioRootTests : BunitContext, IRadioRootContract
 {
-    private readonly BunitJSModuleInterop radioModule;
-
     public RadioRootTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         JsInteropSetup.SetupFieldModule(JSInterop);
         JsInteropSetup.SetupLabelModule(JSInterop);
-        radioModule = JsInteropSetup.SetupRadioModule(JSInterop);
+        JsInteropSetup.SetupRadioModule(JSInterop);
         Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
         Services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
     }
@@ -752,9 +750,7 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         });
 
         var group = cut.FindComponent<RadioGroup<CyclicRadioValue>>();
-        cut.WaitForAssertion(() =>
-            radioModule.Invocations.Any(invocation => invocation.Identifier == "registerRadio").ShouldBeTrue());
-        var registerInvocation = radioModule.Invocations.Last(invocation => invocation.Identifier == "registerRadio");
+        var registerInvocation = JSInterop.Invocations.Last(invocation => invocation.Identifier == "registerRadio");
         var navigationKey = registerInvocation.Arguments[2]?.ToString();
 
         navigationKey.ShouldNotBeNullOrEmpty();

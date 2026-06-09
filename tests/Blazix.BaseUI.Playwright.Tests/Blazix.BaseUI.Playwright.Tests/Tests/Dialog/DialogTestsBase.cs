@@ -202,12 +202,8 @@ public abstract class DialogTestsBase : TestBase
         await Assertions.Expect(popup).ToHaveAttributeAsync("tabindex", "-1");
 
         // Verify the popup can be focused programmatically
-        await WaitForDelayAsync(100);
         await popup.FocusAsync();
-        await Assertions.Expect(popup).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
-        {
-            Timeout = 5000 * TimeoutMultiplier
-        });
+        await Assertions.Expect(popup).ToBeFocusedAsync();
     }
 
     /// <summary>

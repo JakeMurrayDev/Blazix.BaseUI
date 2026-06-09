@@ -21,37 +21,34 @@
 @{
     var hasName = !string.IsNullOrEmpty(ResolvedName);
     var hasField = FieldContext is not null;
-    IReadOnlyList<TValue> currentValues = Multiple ? GetCurrentValues() : Array.Empty<TValue>();
     var serializedValue = typedContext?.GetFormValue(CurrentValue) ?? CurrentValue?.ToString() ?? string.Empty;
-    var hasMultipleSelection = Multiple && currentValues.Count > 0;
-    var renderRootHiddenInput = !Multiple || !hasMultipleSelection;
-    var hiddenInputName = renderRootHiddenInput ? ResolvedName : null;
+    var hasMultipleSelection = Multiple && GetCurrentValues().Count > 0;
+    var hiddenInputName = Multiple ? null : ResolvedName;
     var hiddenInputId = hiddenInputName is null ? $"{rootId}-hidden-input" : null;
     var describedBy = LabelableContext?.GetAriaDescribedBy();
 }
 
-@if (renderRootHiddenInput)
-{
-    <input type="hidden"
-           aria-hidden="true"
-           id="@hiddenInputId"
-           name="@hiddenInputName"
-           form="@Form"
-           autocomplete="@AutoComplete"
-           value="@serializedValue"
-           disabled="@ResolvedDisabled"
-           required="@(!Multiple && Required)"
-           readonly="@ReadOnly"
-           aria-invalid="@(FieldState.Valid == false ? "true" : null)"
-           aria-describedby="@(string.IsNullOrEmpty(describedBy) ? null : describedBy)"
-           @ref="hiddenInputElement"
-           @onfocus="HandleHiddenInputFocus"
-           @onchange="HandleHiddenInputChange" />
-}
+<input style="border:0;clip:rect(0 0 0 0);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;white-space:nowrap;width:1px"
+       tabindex="-1"
+       aria-hidden="true"
+       id="@hiddenInputId"
+       name="@hiddenInputName"
+       form="@Form"
+       autocomplete="@AutoComplete"
+       value="@serializedValue"
+       disabled="@ResolvedDisabled"
+       required="@(Required && !hasMultipleSelection)"
+       readonly="@ReadOnly"
+       aria-invalid="@(FieldState.Valid == false ? "true" : null)"
+       aria-describedby="@(string.IsNullOrEmpty(describedBy) ? null : describedBy)"
+       @ref="hiddenInputElement"
+       @onfocus="HandleHiddenInputFocus"
+       @onchange="HandleHiddenInputChange" />
 
-@if (Multiple && hasName && hasMultipleSelection)
+@if (Multiple && hasName)
 {
-    @foreach (var v in currentValues)
+    var values = GetCurrentValues();
+    @foreach (var v in values)
     {
         <input type="hidden" name="@ResolvedName" form="@Form" value="@(typedContext?.GetFormValue(v) ?? v?.ToString())" />
     }
@@ -324,29 +321,8 @@
     /// <inheritdoc />
     public override Task SetParametersAsync(ParameterView parameters)
     {
-        var sawAnyParameter = false;
-        var sawValueParameter = false;
-        var sawValuesParameter = false;
-
-        foreach (var parameter in parameters)
-        {
-            sawAnyParameter = true;
-
-            if (parameter.Name == nameof(Value))
-            {
-                sawValueParameter = true;
-            }
-            else if (parameter.Name == nameof(Values))
-            {
-                sawValuesParameter = true;
-            }
-        }
-
-        if (sawAnyParameter)
-        {
-            hasValueParameter = sawValueParameter;
-            hasValuesParameter = sawValuesParameter;
-        }
+        hasValueParameter = parameters.TryGetValue<TValue?>(nameof(Value), out _);
+        hasValuesParameter = parameters.TryGetValue<IReadOnlyList<TValue>?>(nameof(Values), out _);
 
         return base.SetParametersAsync(parameters);
     }
@@ -470,15 +446,6 @@
             {
                 _ = SyncRootOpenAsync(currentOpen, SelectOpenChangeReason.None);
             }
-        }
-        else if (currentOpen && !transition.IsMounted)
-        {
-            transition.BeginOpen();
-            activeIndex = 0;
-            context.TransitionStatus = transition.TransitionStatus;
-            context.Open = currentOpen;
-            context.Mounted = transition.IsMounted;
-            context.ActiveIndex = activeIndex;
         }
 
         context.Disabled = ResolvedDisabled;
@@ -666,9 +633,8 @@
         }
 
         context.TransitionStatus = transition.TransitionStatus;
-        context.Mounted = transition.IsMounted;
         typedContext.NotifyStateChanged();
-        _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -679,10 +645,10 @@
     {
         var unmounted = transition.HandleTransitionEnd(open);
         context.TransitionStatus = transition.TransitionStatus;
-        context.Mounted = transition.IsMounted;
 
         if (unmounted)
         {
+            context.Mounted = false;
             activeIndex = -1;
             context.ActiveIndex = activeIndex;
 
@@ -699,7 +665,7 @@
         }
 
         _ = InvokeOpenChangeCompleteAsync(open);
-        _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -713,7 +679,7 @@
             context.ScrollUpArrowVisible = up;
             context.ScrollDownArrowVisible = down;
             typedContext.NotifyStateChanged();
-            _ = InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
     }
 
@@ -729,7 +695,7 @@
             context.ActiveIndex = index;
             typedContext.NotifyHighlightCleared();
             typedContext.NotifyStateChanged();
-            _ = InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
     }
 
@@ -797,7 +763,7 @@
         await OpenChanged.InvokeAsync(nextOpen);
 
         typedContext.NotifyStateChanged();
-        await InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     private async Task SyncRootOpenAsync(bool open, SelectOpenChangeReason reason)
@@ -867,7 +833,7 @@
             HandleValueChanged();
 
             typedContext.NotifyStateChanged();
-            await InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
         else
         {
@@ -938,7 +904,7 @@
 
             HandleValueChanged();
             typedContext.NotifyStateChanged();
-            await InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
         else
         {
@@ -964,7 +930,7 @@
 
             HandleValueChanged();
             typedContext.NotifyStateChanged();
-            await InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
     }
 
@@ -1178,11 +1144,6 @@
                 await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value);
             }
 
-            if (positionerElement.HasValue)
-            {
-                await module.InvokeVoidAsync("registerPositioner", rootId, positionerElement.Value);
-            }
-
             if (listElement.HasValue)
             {
                 await module.InvokeVoidAsync("setListElement", rootId, listElement.Value);
@@ -1233,7 +1194,7 @@
         activeIndex = -1;
         context.ActiveIndex = activeIndex;
         typedContext.NotifyStateChanged();
-        _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     private void NotifyInputRefIfNeeded()
@@ -1417,7 +1378,7 @@
 
     private void SetActiveIndex(int index)
     {
-        if (activeIndex == index && context.ActiveIndex == index)
+        if (activeIndex == index)
         {
             return;
         }

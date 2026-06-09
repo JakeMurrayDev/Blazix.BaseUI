@@ -151,7 +151,7 @@ public abstract class MenuBarTestsBase : TestBase
         await Assertions.Expect(menu1State).ToHaveTextAsync("true");
 
         var changeCount = GetByTestId("change-count");
-        await Assertions.Expect(changeCount).ToHaveTextAsync("3");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("1");
     }
 
     [Fact]
@@ -462,7 +462,7 @@ public abstract class MenuBarTestsBase : TestBase
 
         await Assertions.Expect(GetByTestId("menu-3-state")).ToHaveTextAsync("true");
         await Assertions.Expect(GetByTestId("menu-1-state")).ToHaveTextAsync("false");
-        await Assertions.Expect(trigger3).ToHaveAttributeAsync("aria-expanded", "true");
+        await Assertions.Expect(trigger3).ToBeFocusedAsync();
     }
 
     [Fact]

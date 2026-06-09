@@ -4,12 +4,12 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectPopupTests : BunitContext, ISelectPopupContract
 {
-    private readonly BunitJSModuleInterop selectModule;
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
 
     public SelectPopupTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        selectModule = JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupSelectModule(JSInterop);
         JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
@@ -202,32 +202,34 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
     [Fact]
     public Task CallsInitializePopupOnFirstRender()
     {
+        var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true));
 
         // initializePopup is called from SelectPopup.OnAfterRenderAsync(firstRender=true).
-        selectModule.VerifyInvoke("initializePopup");
+        module.VerifyInvoke("initializePopup");
         return Task.CompletedTask;
     }
 
     [Fact]
     public Task CallsAlignItemPlacementOnFirstOpen()
     {
+        var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true, alignItemWithTrigger: true));
 
-        selectModule.Invocations
-            .Count(invocation => invocation.Identifier == "beginAlignItemWithTriggerPlacement")
-            .ShouldBeGreaterThan(0);
+        module.VerifyInvoke("beginAlignItemWithTriggerPlacement");
         return Task.CompletedTask;
     }
 
     [Fact]
-    public async Task CallsDisposePopupOnDispose()
+    public Task CallsDisposePopupOnDispose()
     {
+        var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true));
 
-        await cut.FindComponent<SelectPopup>().Instance.DisposeAsync();
+        cut.Dispose();
 
-        selectModule.VerifyInvoke("disposePopup");
+        module.VerifyInvoke("disposePopup");
+        return Task.CompletedTask;
     }
 
     [Fact]

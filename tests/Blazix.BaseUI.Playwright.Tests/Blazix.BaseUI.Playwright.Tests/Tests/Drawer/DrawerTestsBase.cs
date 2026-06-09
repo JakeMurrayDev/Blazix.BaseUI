@@ -152,34 +152,12 @@ public abstract class DrawerTestsBase : TestBase
         var box = await popup.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var startX = (double)box!.X + (double)box.Width / 2;
-        var startY = (double)box.Y + 40;
-        var body = Page.Locator("body");
-        await popup.DispatchEventAsync("pointerdown", new
-        {
-            button = 0,
-            buttons = 1,
-            clientX = startX,
-            clientY = startY,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
-        await body.DispatchEventAsync("pointermove", new
-        {
-            buttons = 1,
-            clientX = startX,
-            clientY = startY - 220,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
-        await body.DispatchEventAsync("pointerup", new
-        {
-            button = 0,
-            clientX = startX,
-            clientY = startY - 220,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
+        var startX = box!.X + box.Width / 2;
+        var startY = box.Y + 40;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY - 220, new MouseMoveOptions { Steps = 10 });
+        await Page.Mouse.UpAsync();
 
         await Assertions.Expect(GetByTestId("snap-point")).ToHaveTextAsync("0.75", new LocatorAssertionsToHaveTextOptions
         {

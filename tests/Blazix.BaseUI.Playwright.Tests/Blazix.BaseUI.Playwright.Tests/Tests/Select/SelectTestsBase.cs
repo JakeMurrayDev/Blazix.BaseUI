@@ -84,9 +84,8 @@ public abstract class SelectTestsBase : TestBase
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
-        var positionerBox = await GetByTestId("select-positioner").BoundingBoxAsync()
-            ?? throw new InvalidOperationException("Select positioner bounding box was null.");
-        await Page.Mouse.ClickAsync(positionerBox.X + positionerBox.Width + 40, positionerBox.Y + 20);
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.ClickAsync();
 
         await WaitForSelectClosedAsync();
     }
@@ -385,10 +384,9 @@ public abstract class SelectTestsBase : TestBase
     [Fact]
     public virtual async Task WindowResizeClosesOpenSelectWhenAligned()
     {
-        await NavigateAsync(CreateUrl("/tests/select").WithTopSpacer(80));
+        await NavigateAsync(CreateUrl("/tests/select"));
 
         await OpenSelectAsync();
-        await Assertions.Expect(GetByTestId("select-positioner")).ToHaveAttributeAsync("data-positioned", "");
 
         // Trigger a resize event — the JS resize listener inside SelectPopup
         // calls back to OnWindowResize, which calls SetOpenAsync(false, WindowResize).

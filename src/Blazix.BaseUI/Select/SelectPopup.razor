@@ -39,7 +39,6 @@
     private bool previousOpen;
     private bool previousAlignActive;
     private bool? previousHighlightItemOnHover;
-    private bool subscribedToStateChanged;
 
     public SelectPopup()
     {
@@ -114,8 +113,6 @@
             // Trigger's aria-controls targets `<RootId>-list`; assign deterministically
             // so the trigger and popup ids line up without an extra render cycle.
             RootContext.PopupId = $"{RootContext.RootId}-list";
-            RootContext.StateChanged += OnRootStateChanged;
-            subscribedToStateChanged = true;
         }
         dotNetRef = DotNetObjectReference.Create(this);
     }
@@ -148,7 +145,7 @@
             try
             {
                 var module = await moduleTask.Value;
-                if (!RootContext.HasList && CspContext?.DisableStyleElements != true)
+                if (CspContext?.DisableStyleElements != true)
                 {
                     await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
                 }
@@ -242,12 +239,6 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (subscribedToStateChanged && RootContext is not null)
-        {
-            RootContext.StateChanged -= OnRootStateChanged;
-            subscribedToStateChanged = false;
-        }
-
         if (jsInitialized && moduleTask.IsValueCreated && RootContext is not null)
         {
             try
@@ -287,7 +278,7 @@
         {
             _ = ex;
         }
-        await InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     /// <summary>
@@ -312,12 +303,7 @@
     public void OnFallbackToAlignPopupToTrigger()
     {
         PositionerContext?.SetControlledAlignItemWithTrigger(false);
-        _ = InvokeAsync(StateHasChanged);
-    }
-
-    private void OnRootStateChanged()
-    {
-        _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
     }
 
     private void BuildComponentAttributes()

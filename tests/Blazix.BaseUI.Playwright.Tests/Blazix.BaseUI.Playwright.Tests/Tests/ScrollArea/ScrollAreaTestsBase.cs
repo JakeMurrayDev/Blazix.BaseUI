@@ -158,33 +158,10 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await VerticalThumb.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var startX = (double)box!.X + (double)box.Width / 2;
-        var startY = (double)box.Y + (double)box.Height / 2;
-        await VerticalThumb.DispatchEventAsync("pointerdown", new
-        {
-            button = 0,
-            buttons = 1,
-            clientX = startX,
-            clientY = startY,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
-        await VerticalThumb.DispatchEventAsync("pointermove", new
-        {
-            buttons = 1,
-            clientX = startX,
-            clientY = startY + 55,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
-        await VerticalThumb.DispatchEventAsync("pointerup", new
-        {
-            button = 0,
-            clientX = startX,
-            clientY = startY + 55,
-            pointerId = 1,
-            pointerType = "mouse"
-        });
+        await Page.Mouse.MoveAsync(box!.X + box.Width / 2, box.Y + box.Height / 2);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2 + 55);
+        await Page.Mouse.UpAsync();
 
         await WaitForScrollTopGreaterThanAsync(afterTrackClick);
     }
@@ -365,7 +342,7 @@ public abstract class ScrollAreaTestsBase : TestBase
         await Page.WaitForFunctionAsync(
             "(value) => document.querySelector('[data-testid=\"scroll-viewport\"]').scrollTop > value",
             previousValue,
-            new PageWaitForFunctionOptions { Timeout = 10000 * TimeoutMultiplier });
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     private sealed class ThumbSizes

@@ -6,12 +6,12 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectPositionerTests : BunitContext, ISelectPositionerContract
 {
-    private readonly BunitJSModuleInterop selectModule;
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
 
     public SelectPositionerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        selectModule = JsInteropSetup.SetupSelectModule(JSInterop);
+        JsInteropSetup.SetupSelectModule(JSInterop);
         JsInteropSetup.SetupFloatingFocusManagerModule(JSInterop);
     }
 
@@ -201,19 +201,19 @@ public class SelectPositionerTests : BunitContext, ISelectPositionerContract
     [Fact]
     public Task RerenderUpdatesPositionWhenAnchorTrackingDisabled()
     {
+        var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(Wrap(
             defaultOpen: true,
             alignItemWithTrigger: false,
             disableAnchorTracking: true));
 
-        var initialUpdateCount = selectModule.Invocations.Count(i => i.Identifier == "updatePosition");
+        var initialUpdateCount = module.Invocations.Count(i => i.Identifier == "updatePosition");
 
         cut.FindComponent<SelectPositioner>().Render();
 
-        cut.WaitForAssertion(() =>
-            selectModule.Invocations
-                .Count(i => i.Identifier == "updatePosition")
-                .ShouldBe(initialUpdateCount + 1));
+        module.Invocations
+            .Count(i => i.Identifier == "updatePosition")
+            .ShouldBe(initialUpdateCount + 1);
 
         return Task.CompletedTask;
     }

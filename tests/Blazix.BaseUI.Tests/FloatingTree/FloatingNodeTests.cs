@@ -270,7 +270,7 @@ public class FloatingNodeTests : BunitContext, IFloatingNodeContract
     [Fact]
     public Task RegistersNodeWithJsOnFirstRender()
     {
-        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-floating.min.js");
+        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-floating.js");
         module.SetupVoid("getFloatingTree", _ => true).SetVoidResult();
         module.SetupVoid("addTreeNode", _ => true).SetVoidResult();
         module.SetupVoid("removeTreeNode", _ => true).SetVoidResult();
@@ -288,7 +288,7 @@ public class FloatingNodeTests : BunitContext, IFloatingNodeContract
     [Fact]
     public Task RemovesNodeFromJsOnDispose()
     {
-        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-floating.min.js");
+        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-floating.js");
         module.SetupVoid("getFloatingTree", _ => true).SetVoidResult();
         module.SetupVoid("addTreeNode", _ => true).SetVoidResult();
         module.SetupVoid("removeTreeNode", _ => true).SetVoidResult();
