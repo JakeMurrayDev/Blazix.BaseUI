@@ -1,6 +1,6 @@
 root = true
 
-# BlazorBaseUI analyzer rules (BBUI0001-BBUI0015)
+# Blazix.BaseUI analyzer rules (BBUI0001-BBUI0015)
 # Match both .cs and .razor files so analyzer diagnostics on Razor-generated
 # code (which Roslyn reports with mapped .razor paths) are also configured.
 [*.{cs,razor}]

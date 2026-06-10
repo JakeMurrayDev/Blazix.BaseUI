@@ -1,0 +1,123 @@
+@using Blazix.BaseUI.ContextMenu
+@using Microsoft.JSInterop
+
+<RenderElement TState="MenuBackdropState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="computedStyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private MenuBackdropState state;
+    private RenderElement<MenuBackdropState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Func<MenuBackdropState, string?>? computedStyleValue;
+
+    [CascadingParameter]
+    private MenuRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ContextMenuRootContext? ContextMenuContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<MenuBackdropState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuBackdropState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuBackdropState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        state = new MenuBackdropState(open, transitionStatus);
+        BuildComponentAttributes();
+        BuildComputedStyleValue();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ContextMenuContext?.RegisterBackdropElement is not null && Element.HasValue)
+        {
+            try
+            {
+                await ContextMenuContext.RegisterBackdropElement(Element.Value);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["role"] = "presentation";
+
+        var mounted = RootContext?.Mounted ?? false;
+        if (!mounted)
+        {
+            attrs["hidden"] = true;
+        }
+
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, state.Open, state.TransitionStatus);
+        componentAttributes = attrs;
+    }
+
+    private void BuildComputedStyleValue()
+    {
+        var openChangeReason = RootContext?.MenuOpenChangeReason ?? MenuOpenChangeReason.None;
+        var pointerEvents = openChangeReason == MenuOpenChangeReason.TriggerHover ? "none" : null;
+
+        computedStyleValue = s =>
+        {
+            var userStyle = StyleValue?.Invoke(s);
+            var cssVars = "user-select: none; -webkit-user-select: none;";
+            if (!string.IsNullOrEmpty(pointerEvents))
+            {
+                cssVars = $"pointer-events: {pointerEvents}; {cssVars}";
+            }
+            return string.IsNullOrEmpty(userStyle) ? cssVars : $"{cssVars} {userStyle}";
+        };
+    }
+
+}

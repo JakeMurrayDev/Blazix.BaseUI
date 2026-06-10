@@ -1,0 +1,70 @@
+@if (RootContext is not null && (RootContext.GetMounted() || KeepMounted))
+{
+    <CascadingValue Value="portalContext" IsFixed="true">
+        <Blazix.BaseUI.Portal.FloatingPortalLite Container="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalLiteRef">
+            @ChildContent
+        </Blazix.BaseUI.Portal.FloatingPortalLite>
+    </CascadingValue>
+}
+
+@code {
+    private TooltipPortalContext portalContext = null!;
+    private Blazix.BaseUI.Portal.FloatingPortalLite? portalLiteRef;
+
+    [CascadingParameter]
+    private TooltipRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the portal is kept mounted in the DOM while the popup is hidden.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS selector of the container element to portal the popup to.
+    /// Defaults to <c>"body"</c>.
+    /// </summary>
+    [Parameter]
+    public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<object>>? Render { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => portalLiteRef?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("Tooltip.Portal must be rendered inside a Tooltip.Root component.");
+        }
+
+        portalContext = new TooltipPortalContext { KeepMounted = KeepMounted };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        portalContext.KeepMounted = KeepMounted;
+    }
+}

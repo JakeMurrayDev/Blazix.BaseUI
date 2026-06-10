@@ -1,0 +1,405 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@typeparam TValue
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="listContext">
+    <RenderElement TState="TabsRootState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-tabs.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private DotNetObjectReference<TabsList<TValue>>? dotNetRef;
+    private TabsListContext<TValue>? listContext;
+    private TabsRootState state = TabsRootState.Default;
+    private RenderElement<TabsRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool hasRendered;
+
+    private Orientation Orientation => RootContext?.Orientation ?? Orientation.Horizontal;
+
+    private ActivationDirection ActivationDirection => RootContext?.ActivationDirection ?? ActivationDirection.None;
+
+    private Direction Direction => RootContext?.Direction ?? Direction.Ltr;
+
+    [CascadingParameter]
+    private ITabsRootContext<TValue>? RootContext { get; set; }
+
+    /// <summary>
+    /// Determines whether to automatically change the active tab on arrow key focus.
+    /// Otherwise, tabs will be activated using <kbd>Enter</kbd> or <kbd>Space</kbd> key press.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool ActivateOnFocus { get; set; }
+
+    /// <summary>
+    /// Determines whether to loop keyboard focus back to the first item
+    /// when the end of the list is reached while using the arrow keys.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool LoopFocus { get; set; } = true;
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// Accepts a function that returns the element to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<TabsRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public TabsList()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("TabsList must be used within a TabsRoot component.");
+        }
+
+        listContext = CreateContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var orientation = Orientation;
+        var activationDirection = ActivationDirection;
+
+        if (state.Orientation != orientation || state.ActivationDirection != activationDirection)
+        {
+            state = new TabsRootState(orientation, activationDirection);
+        }
+
+        if (listContext is not null)
+        {
+            listContext.ActivateOnFocus = ActivateOnFocus;
+            listContext.LoopFocus = LoopFocus;
+            listContext.Direction = Direction;
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            await InitializeJsAsync();
+        }
+        else if (hasRendered)
+        {
+            await UpdateJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeList", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Handles keyboard navigation to a tab. Called from JavaScript interop.
+    /// </summary>
+    /// <param name="serializedValue">The serialized value of the tab to navigate to.</param>
+    [JSInvokable]
+    public async Task OnNavigateToTab(string serializedValue)
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        TValue? value;
+        if (typeof(TValue) == typeof(string))
+        {
+            value = (TValue)(object)serializedValue;
+        }
+        else
+        {
+            try
+            {
+                value = System.Text.Json.JsonSerializer.Deserialize<TValue>(serializedValue);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return;
+            }
+        }
+
+        if (value is not null)
+        {
+            var direction = await DetectActivationDirectionAsync(value);
+            await RootContext.OnValueChangeAsync(value, direction, TabsValueChangeReason.None);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var orientation = Orientation;
+
+        attrs["role"] = "tablist";
+
+        if (orientation == Orientation.Vertical)
+        {
+            attrs["aria-orientation"] = "vertical";
+        }
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["data-activation-direction"] = ActivationDirection.ToDataAttributeString();
+        attrs["data-orientation"] = orientation.ToDataAttributeString() ?? "horizontal";
+
+        componentAttributes = attrs;
+    }
+
+    private TabsListContext<TValue> CreateContext() => new(
+        activateOnFocus: ActivateOnFocus,
+        loopFocus: LoopFocus,
+        direction: Direction,
+        getTabsListElement: () => Element,
+        rootContext: RootContext!);
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                dotNetRef = DotNetObjectReference.Create(this);
+                var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
+                var directionString = Direction.ToAttributeString() ?? "ltr";
+                await module.InvokeVoidAsync("initializeList", Element.Value, orientationString, LoopFocus, ActivateOnFocus, directionString, dotNetRef);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateJsAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
+                var directionString = Direction.ToAttributeString() ?? "ltr";
+                await module.InvokeVoidAsync("updateList", Element.Value, orientationString, LoopFocus, ActivateOnFocus, directionString);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (!hasRendered || !Element.HasValue)
+        {
+            return;
+        }
+
+        if (e.ShiftKey || e.CtrlKey || e.AltKey || e.MetaKey)
+        {
+            await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        var orientation = Orientation;
+        var isHorizontal = orientation == Orientation.Horizontal;
+        var isVertical = orientation == Orientation.Vertical;
+        var isRtl = Direction == Direction.Rtl;
+
+        var shouldNavigatePrevious =
+            (isHorizontal && ((isRtl && e.Key == "ArrowRight") || (!isRtl && e.Key == "ArrowLeft"))) ||
+            (isVertical && e.Key == "ArrowUp");
+
+        var shouldNavigateNext =
+            (isHorizontal && ((isRtl && e.Key == "ArrowLeft") || (!isRtl && e.Key == "ArrowRight"))) ||
+            (isVertical && e.Key == "ArrowDown");
+
+        if (shouldNavigatePrevious || shouldNavigateNext || e.Key == "Home" || e.Key == "End")
+        {
+            var activeElement = await GetActiveTabElementAsync();
+            if (activeElement is null)
+            {
+                await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+                return;
+            }
+
+            try
+            {
+                var module = await moduleTask.Value;
+                if (shouldNavigatePrevious)
+                {
+                    await module.InvokeVoidAsync("navigateToPrevious", Element.Value, activeElement);
+                }
+                else if (shouldNavigateNext)
+                {
+                    await module.InvokeVoidAsync("navigateToNext", Element.Value, activeElement);
+                }
+                else if (e.Key == "Home")
+                {
+                    await module.InvokeVoidAsync("navigateToFirst", Element.Value);
+                }
+                else if (e.Key == "End")
+                {
+                    await module.InvokeVoidAsync("navigateToLast", Element.Value);
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+            finally
+            {
+                await activeElement.DisposeAsync();
+            }
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private async Task<IJSObjectReference?> GetActiveTabElementAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            return await module.InvokeAsync<IJSObjectReference?>("getActiveElement");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<ActivationDirection> DetectActivationDirectionAsync(TValue newValue)
+    {
+        if (!hasRendered || RootContext is null || !Element.HasValue)
+        {
+            return ActivationDirection.None;
+        }
+
+        var currentValue = RootContext.Value;
+        if (currentValue is null || EqualityComparer<TValue>.Default.Equals(currentValue, newValue))
+        {
+            return ActivationDirection.None;
+        }
+
+        var currentTabElement = RootContext.GetTabElementByValue(currentValue);
+        var newTabElement = RootContext.GetTabElementByValue(newValue);
+
+        if (currentTabElement is null || !currentTabElement.HasValue ||
+            newTabElement is null || !newTabElement.HasValue)
+        {
+            return ActivationDirection.None;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var listElement = Element.Value;
+
+            var currentPosition = await module.InvokeAsync<TabPositionResult?>("getTabPosition", listElement, currentTabElement.Value);
+            var newPosition = await module.InvokeAsync<TabPositionResult?>("getTabPosition", listElement, newTabElement.Value);
+
+            if (currentPosition is null || newPosition is null)
+            {
+                return ActivationDirection.None;
+            }
+
+            var orientation = Orientation;
+            var isHorizontal = orientation == Orientation.Horizontal;
+            var currentEdge = isHorizontal ? currentPosition.Left : currentPosition.Top;
+            var newEdge = isHorizontal ? newPosition.Left : newPosition.Top;
+
+            if (isHorizontal)
+            {
+                return newEdge > currentEdge ? ActivationDirection.Right : ActivationDirection.Left;
+            }
+            else
+            {
+                return newEdge > currentEdge ? ActivationDirection.Down : ActivationDirection.Up;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            return ActivationDirection.None;
+        }
+    }
+
+    private sealed record TabPositionResult(double Left, double Top, double Width, double Height);
+}

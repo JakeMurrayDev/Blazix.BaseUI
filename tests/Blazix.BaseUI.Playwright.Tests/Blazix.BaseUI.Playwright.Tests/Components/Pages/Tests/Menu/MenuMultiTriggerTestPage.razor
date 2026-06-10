@@ -1,0 +1,128 @@
+@page "/tests/menu-multi-trigger/server"
+@using Blazix.BaseUI.Menu
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Menu Multi-Trigger Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    @if (UseHandle)
+    {
+        <MenuTypedTrigger TPayload="string"
+            id="trigger-a"
+            Handle="handle"
+            Payload='@("Payload A")'
+            data-testid="trigger-a"
+            style="position: absolute; left: 50px; top: 50px;">
+            Trigger A
+        </MenuTypedTrigger>
+
+        <MenuTypedTrigger TPayload="string"
+            id="trigger-b"
+            Handle="handle"
+            Payload='@("Payload B")'
+            data-testid="trigger-b"
+            style="position: absolute; left: 300px; top: 50px;">
+            Trigger B
+        </MenuTypedTrigger>
+
+        <MenuRoot
+            @bind-Open="isOpen"
+            Handle="handle"
+            DefaultOpen="@DefaultOpen"
+            DefaultTriggerId="@DefaultTriggerId">
+            <ChildContent Context="payloadContext">
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-positioner">
+                        <MenuPopup data-testid="menu-popup">
+                            <MenuItem data-testid="popup-content" CloseOnClick="false">
+                                @(payloadContext.Payload?.ToString() == "Payload A" ? "Content A" : "Content B")
+                            </MenuItem>
+                            <MenuItem data-testid="menu-close">Close</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </ChildContent>
+        </MenuRoot>
+
+        @if (ShowProgrammaticButtons)
+        {
+            <button data-testid="open-a-button" @onclick="OpenTriggerA">Open A</button>
+            <button data-testid="open-b-button" @onclick="OpenTriggerB">Open B</button>
+            <button data-testid="close-button" @onclick="CloseHandle">Close</button>
+        }
+    }
+    else
+    {
+        <MenuRoot
+            @bind-Open="isOpen"
+            DefaultOpen="@DefaultOpen"
+            DefaultTriggerId="@DefaultTriggerId">
+            <ChildContent Context="payloadContext">
+                <MenuTrigger id="trigger-a" Payload="@((object?)"Payload A")" data-testid="trigger-a">Trigger A</MenuTrigger>
+                <MenuTrigger id="trigger-b" Payload="@((object?)"Payload B")" data-testid="trigger-b">Trigger B</MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner data-testid="menu-positioner">
+                        <MenuPopup data-testid="menu-popup">
+                            <MenuItem data-testid="popup-content" CloseOnClick="false">
+                                @(payloadContext.Payload?.ToString() ?? "No Payload")
+                            </MenuItem>
+                            <MenuItem data-testid="menu-close">Close</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </ChildContent>
+        </MenuRoot>
+    }
+
+    @if (ShowPayload)
+    {
+        <span data-testid="payload-display">@GetPayloadDisplay()</span>
+    }
+
+    <div data-testid="state-display" style="margin-top: 120px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    private readonly MenuHandle<string> handle = new();
+    private bool isOpen;
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultTriggerId")]
+    public string? DefaultTriggerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useHandle")]
+    public bool UseHandle { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showPayload")]
+    public bool ShowPayload { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showProgrammaticButtons")]
+    public bool ShowProgrammaticButtons { get; set; }
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+    }
+
+    private void OpenTriggerA() => handle.Open("trigger-a");
+
+    private void OpenTriggerB() => handle.Open("trigger-b");
+
+    private void CloseHandle() => handle.Close();
+
+    private string GetPayloadDisplay()
+    {
+        if (UseHandle)
+        {
+            return handle.Payload ?? "No Payload";
+        }
+
+        return "No Payload";
+    }
+}

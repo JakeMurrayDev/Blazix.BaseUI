@@ -1,0 +1,234 @@
+@using Blazix.BaseUI.DirectionProvider
+@using Microsoft.AspNetCore.Components.Rendering
+
+@typeparam TValue where TValue : notnull
+
+<CascadingValue Value="@((IAccordionRootContext)context)"
+                IsFixed="true">
+    <RenderElement TState="AccordionRootState<TValue>"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private TValue[] currentValue = [];
+    private AccordionRootContext<TValue> context = null!;
+    private AccordionRootState<TValue> state = null!;
+    private RenderElement<AccordionRootState<TValue>>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsControlled => Value is not null;
+
+    private TValue[] CurrentValue => IsControlled ? Value! : currentValue;
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the controlled value of the item(s) that should be expanded.
+    /// To render an uncontrolled accordion, use <see cref="DefaultValue"/> instead.
+    /// </summary>
+    [Parameter]
+    public TValue[]? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the uncontrolled value of the item(s) that should be initially expanded.
+    /// To render a controlled accordion, use <see cref="Value"/> instead.
+    /// </summary>
+    [Parameter]
+    public TValue[] DefaultValue { get; set; } = [];
+
+    /// <summary>
+    /// Determines whether the component should ignore user interaction. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether multiple items can be open at the same time. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Multiple { get; set; }
+
+    /// <summary>
+    /// Gets or sets the visual orientation of the accordion.
+    /// Controls whether roving focus uses left/right or up/down arrow keys.
+    /// </summary>
+    [Parameter]
+    public Orientation Orientation { get; set; } = Orientation.Vertical;
+
+    /// <summary>
+    /// Determines whether to loop keyboard focus back to the first item
+    /// when the end of the list is reached while using the arrow keys. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool LoopFocus { get; set; } = true;
+
+    /// <summary>
+    /// Determines whether the browser's built-in page search can find and expand the panel contents.
+    /// Overrides <see cref="KeepMounted"/> and uses <c>hidden="until-found"</c> to hide the element
+    /// without removing it from the DOM. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool HiddenUntilFound { get; set; }
+
+    /// <summary>
+    /// Determines whether to keep the element in the DOM while the panel is closed.
+    /// This is ignored when <see cref="HiddenUntilFound"/> is used. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the value changes via two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TValue[]> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when an accordion item is expanded or collapsed.
+    /// Provides the new value as an argument.
+    /// </summary>
+    [Parameter]
+    public EventCallback<AccordionValueChangeEventArgs<TValue>> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// Accepts a function that returns the element to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AccordionRootState<TValue>>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<AccordionRootState<TValue>, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<AccordionRootState<TValue>, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        currentValue = DefaultValue;
+        var direction = DirectionContext?.Direction ?? Direction.Ltr;
+
+        context = new AccordionRootContext<TValue>
+        {
+            Value = CurrentValue,
+            Disabled = Disabled,
+            Orientation = Orientation,
+            Direction = direction,
+            LoopFocus = LoopFocus,
+            HiddenUntilFound = HiddenUntilFound,
+            KeepMounted = KeepMounted,
+            OnValueChange = HandleValueChangeAsync
+        };
+
+        state = new AccordionRootState<TValue>(CurrentValue, Disabled, Orientation);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var direction = DirectionContext?.Direction ?? Direction.Ltr;
+
+        context.Value = CurrentValue;
+        context.Disabled = Disabled;
+        context.Orientation = Orientation;
+        context.Direction = direction;
+        context.LoopFocus = LoopFocus;
+        context.HiddenUntilFound = HiddenUntilFound;
+        context.KeepMounted = KeepMounted;
+
+        if (!ReferenceEquals(state.Value, CurrentValue) || state.Disabled != Disabled || state.Orientation != Orientation)
+        {
+            state = state with { Value = CurrentValue, Disabled = Disabled, Orientation = Orientation };
+            BuildComponentAttributes();
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var direction = DirectionContext?.Direction ?? Direction.Ltr;
+        var attrs = new Dictionary<string, object>();
+
+        attrs["dir"] = direction.ToAttributeString()!;
+        attrs["role"] = "region";
+        attrs["data-blazix-base-ui-accordion-root"] = true;
+        attrs["data-orientation"] = state.Orientation.ToDataAttributeString()!;
+        attrs["data-disabled"] = state.Disabled;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleValueChangeAsync(TValue itemValue, bool nextOpen)
+    {
+        TValue[] nextValue;
+
+        if (!Multiple)
+        {
+            nextValue = CurrentValue.Length > 0 && EqualityComparer<TValue>.Default.Equals(CurrentValue[0], itemValue)
+                ? []
+                : [itemValue];
+        }
+        else if (nextOpen)
+        {
+            nextValue = [.. CurrentValue, itemValue];
+        }
+        else
+        {
+            nextValue = [.. CurrentValue.Where(v => !EqualityComparer<TValue>.Default.Equals(v, itemValue))];
+        }
+
+        var args = new AccordionValueChangeEventArgs<TValue>(nextValue);
+        await OnValueChange.InvokeAsync(args);
+
+        if (args.IsCanceled)
+        {
+            return;
+        }
+
+        if (!IsControlled)
+        {
+            currentValue = nextValue;
+        }
+
+        await ValueChanged.InvokeAsync(nextValue);
+
+        context.Value = nextValue;
+        state = state with { Value = nextValue };
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
+    }
+}

@@ -1,0 +1,455 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@typeparam TValue
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="TabsTabState"
+               Tag="button"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-tabs.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool previousActive;
+    private bool previousDisabled;
+    private Orientation previousOrientation;
+    private string? defaultId;
+    private string tabId = null!;
+    private TabsTabState state = TabsTabState.Default;
+    private RenderElement<TabsTabState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsActive
+    {
+        get
+        {
+            if (RootContext is null)
+            {
+                return false;
+            }
+
+            return EqualityComparer<TValue>.Default.Equals(RootContext.Value, Value);
+        }
+    }
+
+    private Orientation Orientation => RootContext?.Orientation ?? Orientation.Horizontal;
+
+    private int TabIndex
+    {
+        get
+        {
+            if (RootContext is null)
+            {
+                return 0;
+            }
+
+            if (Disabled)
+            {
+                return -1;
+            }
+
+            if (IsActive)
+            {
+                return 0;
+            }
+
+            if (RootContext.Value is null)
+            {
+                return 0;
+            }
+
+            return -1;
+        }
+    }
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    [CascadingParameter]
+    private ITabsRootContext<TValue>? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ITabsListContext? ListContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the unique value of the tab.
+    /// When this tab is active, the corresponding <see cref="TabsPanel{TValue}"/> with the same value is shown.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public TValue Value { get; set; } = default!;
+
+    /// <summary>
+    /// Determines whether the tab is disabled.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders a native <c>&lt;button&gt;</c> element
+    /// when replacing it via the <see cref="Render"/> prop.
+    /// Set to <see langword="false"/> if the rendered element is not a button (e.g. <c>&lt;div&gt;</c>).
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// Accepts a function that returns the element to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<TabsTabState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsTabState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsTabState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public TabsTab()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("TabsTab must be used within a TabsRoot component.");
+        }
+
+        tabId = ResolvedId;
+        previousActive = IsActive;
+        previousDisabled = Disabled;
+        previousOrientation = Orientation;
+        state = new TabsTabState(previousActive, previousDisabled, previousOrientation);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var newId = ResolvedId;
+        if (newId != tabId)
+        {
+            tabId = newId;
+        }
+
+        var currentActive = IsActive;
+        var currentDisabled = Disabled;
+        var currentOrientation = Orientation;
+
+        if (currentActive != previousActive ||
+            currentDisabled != previousDisabled ||
+            currentOrientation != previousOrientation)
+        {
+            state = new TabsTabState(currentActive, currentDisabled, currentOrientation);
+            previousActive = currentActive;
+            previousDisabled = currentDisabled;
+            previousOrientation = currentOrientation;
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Element.HasValue)
+        {
+            hasRendered = true;
+            RootContext?.RegisterTabInfo(Value, Element.Value, tabId, Disabled);
+
+            if (!NativeButton)
+            {
+                await InitializeJsAsync();
+            }
+
+            await RegisterWithListAsync();
+        }
+        else if (hasRendered && Element.HasValue)
+        {
+            RootContext?.RegisterTabInfo(Value, Element.Value, tabId, Disabled);
+            await RegisterWithListAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        RootContext?.UnregisterTabInfo(Value);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                await UnregisterFromListAsync();
+                var module = await moduleTask.Value;
+
+                if (!NativeButton)
+                {
+                    await module.InvokeVoidAsync("dispose", Element.Value);
+                }
+
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var isActive = IsActive;
+        var panelId = RootContext?.GetTabPanelIdByValue(Value);
+        var orientationValue = Orientation.ToDataAttributeString();
+
+        attrs["id"] = tabId;
+        attrs["role"] = "tab";
+        attrs["aria-selected"] = isActive ? "true" : "false";
+        attrs["tabindex"] = TabIndex;
+
+        if (panelId is not null)
+        {
+            attrs["aria-controls"] = panelId;
+        }
+
+        if (NativeButton)
+        {
+            attrs["type"] = "button";
+        }
+
+        if (Disabled)
+        {
+            attrs["aria-disabled"] = "true";
+        }
+
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+
+        if (orientationValue is not null)
+        {
+            attrs["data-orientation"] = orientationValue;
+        }
+
+        attrs["data-active"] = isActive;
+        attrs["data-disabled"] = Disabled;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task RegisterWithListAsync()
+    {
+        if (ListContext?.TabsListElement is null || !ListContext.TabsListElement.HasValue || !Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var serializedValue = SerializeValue(Value);
+            await module.InvokeVoidAsync("registerTab", ListContext.TabsListElement.Value, Element.Value, serializedValue);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UnregisterFromListAsync()
+    {
+        if (ListContext?.TabsListElement is null || !ListContext.TabsListElement.HasValue || !Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("unregisterTab", ListContext.TabsListElement.Value, Element.Value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private static string? SerializeValue(TValue? value)
+    {
+        if (value is null)
+            return null;
+
+        if (value is string str)
+            return str;
+
+        return System.Text.Json.JsonSerializer.Serialize(value);
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                await module.InvokeVoidAsync("initializeTab", Element.Value);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    /// <summary>
+    /// Programmatically sets focus to this tab element.
+    /// </summary>
+    internal async ValueTask FocusAsync()
+    {
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                await module.InvokeVoidAsync("focus", Element.Value);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (!Disabled && !IsActive && e.Button == 0)
+        {
+            await ActivateTabAsync(e);
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleFocusAsync(FocusEventArgs e)
+    {
+        if (!Disabled && ListContext?.ActivateOnFocus == true && !IsActive)
+        {
+            await ActivateTabAsync(e);
+        }
+
+        await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private async Task ActivateTabAsync(EventArgs? sourceEventArgs = null)
+    {
+        if (ListContext is null || RootContext is null)
+        {
+            return;
+        }
+
+        var direction = await DetectActivationDirectionAsync();
+        await ListContext.OnTabActivationAsync(
+            Value,
+            direction,
+            TabsValueChangeReason.None,
+            sourceEventArgs);
+    }
+
+    private async Task<ActivationDirection> DetectActivationDirectionAsync()
+    {
+        if (!hasRendered || RootContext is null || ListContext?.TabsListElement is null || !Element.HasValue)
+        {
+            return ActivationDirection.None;
+        }
+
+        var currentValue = RootContext.Value;
+        var currentTabElement = RootContext.GetTabElementByValue(currentValue);
+
+        if (currentTabElement is null || !currentTabElement.HasValue)
+        {
+            return ActivationDirection.None;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var listElement = ListContext.TabsListElement.Value;
+
+            var currentPosition = await module.InvokeAsync<TabPositionResult?>("getTabPosition", listElement, currentTabElement.Value);
+            var newPosition = await module.InvokeAsync<TabPositionResult?>("getTabPosition", listElement, Element.Value);
+
+            if (currentPosition is null || newPosition is null)
+            {
+                return ActivationDirection.None;
+            }
+
+            var orientation = Orientation;
+            var isHorizontal = orientation == Orientation.Horizontal;
+            var currentEdge = isHorizontal ? currentPosition.Left : currentPosition.Top;
+            var newEdge = isHorizontal ? newPosition.Left : newPosition.Top;
+
+            if (isHorizontal)
+            {
+                return newEdge > currentEdge ? ActivationDirection.Right : ActivationDirection.Left;
+            }
+            else
+            {
+                return newEdge > currentEdge ? ActivationDirection.Down : ActivationDirection.Up;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            return ActivationDirection.None;
+        }
+    }
+
+    private sealed record TabPositionResult(double Left, double Top, double Width, double Height);
+}

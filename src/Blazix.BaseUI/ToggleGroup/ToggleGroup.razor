@@ -1,0 +1,397 @@
+@using Blazix.BaseUI.DirectionProvider
+@using Blazix.BaseUI.Toolbar
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="@((IToggleGroupContext)groupContext)" IsFixed="true">
+    <RenderElement TState="ToggleGroupState"
+                   Tag="@DefaultTag"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string DefaultTag = "div";
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-toggle.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private List<string> internalValue = [];
+    private bool hasRendered;
+    private Orientation previousOrientation;
+    private bool previousLoopFocus;
+    private Direction previousDirection;
+    private bool hasValueParameter;
+    private bool hasDefaultValueParameter;
+    private RenderElement<ToggleGroupState>? renderElementReference;
+    private ToggleGroupState state = ToggleGroupState.Default;
+    private ToggleGroupContext groupContext = null!;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsControlled => Value is not null;
+
+    private bool ResolvedDisabled => Disabled || (ToolbarContext?.Disabled ?? false);
+
+    private Direction ResolvedDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
+    private IReadOnlyList<string> CurrentValue => IsControlled ? Value! : internalValue;
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    [CascadingParameter]
+    private ToolbarRootContext? ToolbarContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the open state of the toggle group represented by an array of
+    /// the values of all pressed toggle buttons.
+    /// This is the controlled counterpart of <see cref="DefaultValue"/>.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<string>? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the initial open state of the toggle group represented by an array of
+    /// the values of all pressed toggle buttons.
+    /// This is the uncontrolled counterpart of <see cref="Value"/>.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<string>? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Determines whether the toggle group should ignore user interaction.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the orientation of the toggle group.
+    /// Defaults to <see cref="Orientation.Horizontal"/>.
+    /// </summary>
+    [Parameter]
+    public Orientation Orientation { get; set; } = Orientation.Horizontal;
+
+    /// <summary>
+    /// Determines whether to loop keyboard focus back to the first item
+    /// when the end of the list is reached while using the arrow keys.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool LoopFocus { get; set; } = true;
+
+    /// <summary>
+    /// Determines whether multiple items can be pressed at the same time.
+    /// When <see langword="false"/>, only one item in the group can be pressed.
+    /// If any item in the group becomes pressed, the others will become unpressed.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Multiple { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback that is invoked when the group value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<IReadOnlyList<string>> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets a cancellable callback that is invoked when the group value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ToggleGroupValueChangeEventArgs> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ToggleGroupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<ToggleGroupState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<ToggleGroupState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public ToggleGroup()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        hasValueParameter = false;
+        hasDefaultValueParameter = false;
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Name == nameof(Value))
+            {
+                hasValueParameter = true;
+            }
+            else if (parameter.Name == nameof(DefaultValue))
+            {
+                hasDefaultValueParameter = true;
+            }
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (!IsControlled && DefaultValue is not null)
+        {
+            internalValue = [.. DefaultValue];
+        }
+
+        previousOrientation = Orientation;
+        previousLoopFocus = LoopFocus;
+        previousDirection = ResolvedDirection;
+
+        groupContext = new ToggleGroupContext
+        {
+            Disabled = ResolvedDisabled,
+            Orientation = Orientation,
+            LoopFocus = LoopFocus,
+            Direction = ResolvedDirection,
+            IsValueInitialized = hasValueParameter || hasDefaultValueParameter,
+            IsInToolbar = ToolbarContext is not null,
+            GetValueFunc = () => CurrentValue,
+            SetGroupValueFunc = SetGroupValueInternalAsync,
+            GetGroupElementFunc = () => Element
+        };
+
+        state = new ToggleGroupState(ResolvedDisabled, Multiple, Orientation);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var resolvedDisabled = ResolvedDisabled;
+        var resolvedDirection = ResolvedDirection;
+
+        if (state.Disabled != resolvedDisabled || state.Multiple != Multiple || state.Orientation != Orientation)
+        {
+            state = new ToggleGroupState(resolvedDisabled, Multiple, Orientation);
+        }
+
+        if (groupContext is not null)
+        {
+            groupContext.Disabled = resolvedDisabled;
+            groupContext.Orientation = Orientation;
+            groupContext.LoopFocus = LoopFocus;
+            groupContext.Direction = resolvedDirection;
+            groupContext.IsValueInitialized = hasValueParameter || hasDefaultValueParameter;
+            groupContext.IsInToolbar = ToolbarContext is not null;
+        }
+
+        if (hasRendered && (Orientation != previousOrientation || LoopFocus != previousLoopFocus || resolvedDirection != previousDirection))
+        {
+            previousOrientation = Orientation;
+            previousLoopFocus = LoopFocus;
+            previousDirection = resolvedDirection;
+            _ = UpdateJsStateAsync();
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            await InitializeJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeGroup", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var orientationString = Orientation.ToDataAttributeString();
+        var resolvedDisabled = ResolvedDisabled;
+
+        attrs["role"] = "group";
+
+        if (orientationString is not null)
+        {
+            if (ToolbarContext is null)
+            {
+                attrs["aria-orientation"] = orientationString;
+            }
+
+            attrs["data-orientation"] = orientationString;
+        }
+
+        if (resolvedDisabled)
+        {
+            attrs["data-disabled"] = true;
+        }
+
+        if (Multiple)
+        {
+            attrs["data-multiple"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        if (!Element.HasValue || ToolbarContext is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
+            await module.InvokeVoidAsync(
+                "initializeGroup",
+                Element.Value,
+                orientationString,
+                LoopFocus,
+                ResolvedDirection.ToAttributeString() ?? "ltr");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateJsStateAsync()
+    {
+        if (!hasRendered || !Element.HasValue || ToolbarContext is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
+            await module.InvokeVoidAsync(
+                "updateGroup",
+                Element.Value,
+                orientationString,
+                LoopFocus,
+                ResolvedDirection.ToAttributeString() ?? "ltr");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task<ToggleGroupValueChangeEventArgs> SetGroupValueInternalAsync(
+        string toggleValue,
+        bool nextPressed,
+        MouseEventArgs? mouseEventArgs)
+    {
+        List<string> newGroupValue;
+
+        if (Multiple)
+        {
+            newGroupValue = [.. CurrentValue];
+            if (nextPressed)
+            {
+                newGroupValue.Add(toggleValue);
+            }
+            else
+            {
+                var index = newGroupValue.IndexOf(toggleValue);
+                if (index >= 0)
+                {
+                    newGroupValue.RemoveAt(index);
+                }
+            }
+        }
+        else
+        {
+            newGroupValue = nextPressed ? [toggleValue] : [];
+        }
+
+        var eventArgs = new ToggleGroupValueChangeEventArgs(newGroupValue, mouseEventArgs);
+
+        if (OnValueChange.HasDelegate)
+        {
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                StateHasChanged();
+                return eventArgs;
+            }
+        }
+
+        if (!IsControlled)
+        {
+            internalValue = newGroupValue;
+        }
+
+        if (ValueChanged.HasDelegate)
+        {
+            await ValueChanged.InvokeAsync(newGroupValue);
+        }
+
+        StateHasChanged();
+        return eventArgs;
+    }
+}

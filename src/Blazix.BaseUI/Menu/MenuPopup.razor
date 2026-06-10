@@ -1,0 +1,252 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Blazix.BaseUI.FloatingFocusManager
+
+<RenderElement TState="MenuPopupState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="GetTransitionAwareStyle"
+               ComponentAttributes="componentAttributes"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference">
+        <FloatingFocusManager Modal="@isContextMenu"
+                          Disabled="@(RootContext is null || !RootContext.GetMounted())"
+                          InitialFocus="@(!nested)"
+                          ReturnFocus="@resolvedReturnFocus"
+                          ReturnFocusElement="@resolvedReturnFocusElement"
+                          RestoreFocus="true"
+                          CloseOnFocusOut="false"
+                          PreviousFocusableElement="@(RootContext?.GetTriggerElement())"
+                          InteractionType="@(RootContext?.InteractionType)">
+        @ChildContent
+    </FloatingFocusManager>
+</RenderElement>
+
+@code {
+    private MenuPopupState state;
+    private bool isContextMenu;
+    private bool nested;
+    private bool resolvedReturnFocus = true;
+    private ElementReference? resolvedReturnFocusElement;
+    private RenderElement<MenuPopupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private MenuRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private MenuPositionerContext? PositionerContext { get; set; }
+
+    [CascadingParameter]
+    private Toolbar.ToolbarRootContext? ToolbarContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<MenuPopupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuPopupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuPopupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets the element to return focus to when the menu closes.
+    /// When not set, focus returns to the trigger element.
+    /// An <see cref="Microsoft.AspNetCore.Components.ElementReference"/> is implicitly converted to <see cref="FocusTarget.Element"/>.
+    /// </summary>
+    [Parameter]
+    public FocusTarget? FinalFocus { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var side = PositionerContext?.Side ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? Align.Center;
+        var instant = RootContext?.MenuInstantType ?? MenuInstantType.None;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        var parentType = RootContext?.ParentType ?? MenuParentType.None;
+
+        isContextMenu = parentType == MenuParentType.ContextMenu;
+        nested = parentType == MenuParentType.Menu;
+
+        // React returnFocus logic:
+        // - Default true for top-level (None) or context menus
+        // - True when a trigger element exists
+        // - True for menubar unless close reason was outsidePress
+        resolvedReturnFocus = parentType == MenuParentType.None || isContextMenu;
+        if (RootContext?.GetTriggerElement() is not null)
+        {
+            resolvedReturnFocus = true;
+        }
+        else if (parentType == MenuParentType.Menubar &&
+                 RootContext?.MenuOpenChangeReason != MenuOpenChangeReason.OutsidePress)
+        {
+            resolvedReturnFocus = true;
+        }
+
+        // React: returnFocus={finalFocus === undefined ? returnFocus : finalFocus}
+        // When FinalFocus is set, it overrides the computed returnFocus.
+        resolvedReturnFocusElement = null;
+        if (FinalFocus is not null)
+        {
+            switch (FinalFocus)
+            {
+                case FocusTarget.None:
+                    resolvedReturnFocus = false;
+                    break;
+                case FocusTarget.Default:
+                    resolvedReturnFocus = true;
+                    break;
+                case FocusTarget.Element e:
+                    resolvedReturnFocus = true;
+                    resolvedReturnFocusElement = e.Ref;
+                    break;
+            }
+        }
+
+        state = new MenuPopupState(open, side, align, instant, transitionStatus, nested);
+
+        if (RootContext is not null)
+        {
+            RootContext.FinalFocus = FinalFocus;
+            RootContext.InsideToolbar = ToolbarContext is not null;
+            var (mode, element) = ResolveFocusTarget(FinalFocus);
+            RootContext.FinalFocusMode = mode;
+            RootContext.FinalFocusElement = element;
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            RootContext?.SetPopupElement(Element);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var rootId = RootContext?.RootId;
+
+        attrs["role"] = "menu";
+        attrs["tabindex"] = "-1";
+
+        if (!string.IsNullOrEmpty(RootContext?.PopupId))
+        {
+            attrs["id"] = RootContext.PopupId;
+        }
+
+        attrs["data-side"] = state.Side.ToDataAttributeString()!;
+        attrs["data-align"] = state.Align.ToDataAttributeString()!;
+
+        if (state.Open)
+        {
+            attrs["data-open"] = true;
+        }
+        else
+        {
+            attrs["data-closed"] = true;
+        }
+
+        if (state.TransitionStatus == TransitionStatus.Starting)
+        {
+            attrs["data-starting-style"] = true;
+        }
+        else if (state.TransitionStatus == TransitionStatus.Ending)
+        {
+            attrs["data-ending-style"] = true;
+        }
+
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+
+        var instantAttr = state.Instant.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
+
+        if (state.Nested)
+        {
+            attrs["data-nested"] = true;
+        }
+
+        if (!string.IsNullOrEmpty(rootId))
+        {
+            attrs["data-rootownerid"] = rootId;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        // Note: Escape key is handled globally in JS (blazix-baseui-menu.min.js handleGlobalKeyDown)
+        // to properly manage nested menu closing. Do not handle Escape here.
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private string? GetTransitionAwareStyle(MenuPopupState s)
+    {
+        var userStyle = StyleValue?.Invoke(s);
+        if (s.TransitionStatus == TransitionStatus.Starting)
+        {
+            return string.IsNullOrEmpty(userStyle)
+                ? "transition-property:none"
+                : $"transition-property:none;{userStyle}";
+        }
+
+        return userStyle;
+    }
+
+    private static (string? Mode, ElementReference? Element) ResolveFocusTarget(FocusTarget? target)
+    {
+        return target switch
+        {
+            null => (null, null),
+            FocusTarget.None => ("none", null),
+            FocusTarget.Default => ("default", null),
+            FocusTarget.Element e => ("element", e.Ref),
+            _ => (null, null)
+        };
+    }
+}

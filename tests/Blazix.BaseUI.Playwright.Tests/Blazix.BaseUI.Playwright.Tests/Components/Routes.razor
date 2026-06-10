@@ -1,0 +1,8 @@
+<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="[typeof(Blazix.BaseUI.Playwright.Tests.Client._Imports).Assembly]"
+        NotFoundPage="typeof(Blazix.BaseUI.Playwright.Tests.Client.Pages.NotFound)">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Blazix.BaseUI.Playwright.Tests.Client.Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

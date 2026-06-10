@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="Tailwind Source Files" pattern="(file:demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo//*||file:demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client//*)&amp;&amp;!file:demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo/wwwroot/global.css&amp;&amp;!file:demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo/wwwroot/global.min.css" />
+</component>

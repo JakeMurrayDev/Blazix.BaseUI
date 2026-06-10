@@ -1,0 +1,675 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.FocusGuard
+
+@typeparam TPayload
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+@if (ShouldRenderFocusGuards)
+{
+    <FocusGuard OnFocus="HandlePreGuardFocusAsync" @ref="preGuardRef" />
+}
+
+<RenderElement TState="PopoverTriggerState"
+               Tag="button"
+               Enabled="RootContext is not null || HasHandle"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@if (ShouldRenderFocusGuards)
+{
+    <FocusGuard OnFocus="HandlePostGuardFocusAsync" @ref="postGuardRef" />
+}
+
+@code {
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private bool hoverInitialized;
+    private string? hoverRootId;
+    private string triggerId = null!;
+    private string lastPointerType = string.Empty;
+    private PopoverOpenChangeReason lastOpenReason;
+    private PopoverTriggerState state;
+    private PopoverHandle<TPayload>? registeredHandle;
+    private RenderElement<PopoverTriggerState>? renderElementReference;
+    private FocusGuard? preGuardRef;
+    private FocusGuard? postGuardRef;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private ElementReference? previousFocusTarget;
+    private CancellationTokenSource? hoverOpenFallbackCts;
+    private DotNetObjectReference<PopoverTypedTrigger<TPayload>>? hoverDotNetRef;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-popover.min.js").AsTask());
+
+    private bool HasHandle => Handle is not null;
+
+    private bool HasRootContext => RootContext is not null;
+
+    private bool ShouldRenderFocusGuards =>
+        HasRootContext &&
+        IsOpenedByThisTrigger() &&
+        !RootContext!.FocusManagerModal;
+
+    [CascadingParameter]
+    private PopoverRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the trigger element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<PopoverTriggerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Determines whether the trigger is currently disabled.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders a native <c>&lt;button&gt;</c> element when replacing it via the <see cref="Render"/> prop.
+    /// Set to <see langword="false"/> if the rendered element is not a button (e.g. a <c>&lt;div&gt;</c>).
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Determines whether the popover should also open when the trigger is hovered.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool OpenOnHover { get; set; }
+
+    /// <summary>
+    /// Gets or sets how long to wait, in milliseconds, before the popover may be opened on hover.
+    /// Requires the <see cref="OpenOnHover"/> prop.
+    /// Defaults to <c>300</c>.
+    /// </summary>
+    [Parameter]
+    public int Delay { get; set; } = 300;
+
+    /// <summary>
+    /// Gets or sets how long to wait, in milliseconds, before closing the popover that was opened on hover.
+    /// Requires the <see cref="OpenOnHover"/> prop.
+    /// Defaults to <c>0</c>.
+    /// </summary>
+    [Parameter]
+    public int CloseDelay { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger. In addition to being forwarded to the rendered element,
+    /// it is also used to specify the active trigger for the popover in controlled mode.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the handle to associate the trigger with a popover.
+    /// </summary>
+    [Parameter]
+    public PopoverHandle<TPayload>? Handle { get; set; }
+
+    /// <summary>
+    /// Gets or sets the payload to pass to the popover when it is opened by this trigger.
+    /// </summary>
+    [Parameter]
+    public TPayload? Payload { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<PopoverTriggerState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<PopoverTriggerState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        triggerId = Id ?? Guid.NewGuid().ToIdString();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var previousTriggerId = triggerId;
+        var previousHandle = registeredHandle;
+        var registrationChanged = false;
+
+        if (Id is not null && Id != triggerId)
+        {
+            triggerId = Id;
+            registrationChanged = true;
+        }
+
+        if (Handle != registeredHandle)
+        {
+            registeredHandle = Handle;
+            registrationChanged = true;
+        }
+
+        if (registrationChanged)
+        {
+            if (hasRendered)
+            {
+                UnregisterFromStore(previousHandle, previousTriggerId);
+                RegisterWithCurrentStore();
+            }
+            else if (previousHandle is not null)
+            {
+                previousHandle.UnregisterTrigger(previousTriggerId);
+            }
+        }
+        else if (HasHandle)
+        {
+            Handle!.UpdateTriggerPayload(triggerId, Payload);
+        }
+
+        var open = IsOpenedByThisTrigger();
+        state = new PopoverTriggerState(open, Disabled);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+
+            if (HasHandle)
+            {
+                Handle!.RegisterTrigger(triggerId, Element, Payload);
+                registeredHandle = Handle;
+            }
+            else
+            {
+                RootContext?.RegisterTrigger(triggerId, Element, postGuardRef?.Element, Payload);
+            }
+
+            if (OpenOnHover && !hoverInitialized)
+            {
+                _ = InitializeHoverInteractionAsync();
+            }
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            OnElementChanged();
+        }
+
+        var currentFocusTarget = postGuardRef?.Element;
+        if (!Nullable.Equals(previousFocusTarget, currentFocusTarget))
+        {
+            previousFocusTarget = currentFocusTarget;
+            OnFocusTargetChanged();
+        }
+
+        if (!HasHandle)
+        {
+            RootContext?.SetTriggerPayload(triggerId, Payload);
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (!NativeButton)
+        {
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
+        }
+        else
+        {
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
+        }
+
+        attrs["aria-haspopup"] = "dialog";
+
+        var open = IsOpenedByThisTrigger();
+        attrs["aria-expanded"] = open ? "true" : "false";
+        if (open && !string.IsNullOrEmpty(RootContext?.PopupId))
+        {
+            attrs["aria-controls"] = RootContext.PopupId;
+        }
+        attrs["id"] = triggerId;
+
+        attrs["data-popup-open"] = open;
+
+        var openReason = HasHandle ? lastOpenReason : (RootContext?.PopoverOpenChangeReason ?? PopoverOpenChangeReason.TriggerPress);
+        attrs["data-pressed"] = open && openReason == PopoverOpenChangeReason.TriggerPress;
+        // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity marker.
+        attrs["data-base-ui-click-trigger"] = "";
+
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        if (OpenOnHover)
+        {
+            attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+            attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseMoveAsync);
+            attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        }
+
+        componentAttributes = attrs;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        CancelHoverOpenFallback();
+
+        UnregisterFromCurrentStore(triggerId);
+
+        if (moduleTask?.IsValueCreated == true && hasRendered && hoverInitialized && hoverRootId is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeHoverInteraction", hoverRootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        hoverDotNetRef?.Dispose();
+    }
+
+    private void OnElementChanged()
+    {
+        if (HasHandle)
+        {
+            Handle!.UpdateTriggerElement(triggerId, Element);
+        }
+        else
+        {
+            RootContext?.SetTriggerElementById(triggerId, Element);
+        }
+    }
+
+    private void OnFocusTargetChanged()
+    {
+        if (!HasHandle)
+        {
+            RootContext?.SetTriggerFocusTargetById(triggerId, previousFocusTarget);
+        }
+    }
+
+    private void UnregisterFromCurrentStore(string id)
+    {
+        UnregisterFromStore(registeredHandle, id);
+    }
+
+    private void UnregisterFromStore(PopoverHandle<TPayload>? handle, string id)
+    {
+        if (handle is not null)
+        {
+            handle.UnregisterTrigger(id);
+        }
+        else
+        {
+            RootContext?.UnregisterTrigger(id);
+        }
+    }
+
+    private void RegisterWithCurrentStore()
+    {
+        if (HasHandle)
+        {
+            Handle!.RegisterTrigger(triggerId, Element, Payload);
+        }
+        else
+        {
+            RootContext?.RegisterTrigger(triggerId, Element, postGuardRef?.Element, Payload);
+        }
+    }
+
+    private bool IsOpenedByThisTrigger()
+    {
+        // Check handle state first if using detached trigger pattern
+        if (HasHandle)
+        {
+            var isOpen = Handle!.IsOpen;
+            if (!isOpen)
+            {
+                return false;
+            }
+            var activeId = Handle.ActiveTriggerId;
+            return activeId == triggerId || (activeId is null && isOpen);
+        }
+
+        // Fall back to root context
+        if (RootContext is null)
+        {
+            return false;
+        }
+
+        var rootOpen = RootContext.GetOpen();
+        if (!rootOpen)
+        {
+            return false;
+        }
+
+        var activeTriggerId = RootContext.ActiveTriggerId;
+        return activeTriggerId == triggerId || (activeTriggerId is null && rootOpen);
+    }
+
+    private Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        lastPointerType = e.PointerType ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (Disabled || (!HasRootContext && !HasHandle))
+        {
+            return;
+        }
+
+        var nextOpen = !IsOpenedByThisTrigger();
+        string? detectedInteractionType = e.Detail == 0 ? "keyboard" : lastPointerType;
+        lastPointerType = string.Empty;
+
+        // Patient click protection: when the popover was recently hover-opened,
+        // suppress the first click that would close it (the click "sticks" the
+        // popover open instead). Only applies to root-context triggers.
+        if (!nextOpen && HasRootContext && OpenOnHover)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                var stuck = await module.InvokeAsync<bool>("consumeStickIfOpen", RootContext!.RootId);
+                if (stuck)
+                {
+                    await RequestOpenAsync(true, PopoverOpenChangeReason.TriggerPress, detectedInteractionType);
+                    await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        await RequestOpenAsync(nextOpen, PopoverOpenChangeReason.TriggerPress, detectedInteractionType);
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleMouseEnterAsync(MouseEventArgs e)
+    {
+        ScheduleHoverOpenFallback();
+        await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleMouseMoveAsync(MouseEventArgs e)
+    {
+        ScheduleHoverOpenFallback();
+        await EventUtilities.InvokeOnMouseMoveAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
+    {
+        CancelHoverOpenFallback();
+        await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
+    }
+
+    private void ScheduleHoverOpenFallback()
+    {
+        if (!OpenOnHover || hoverInitialized || Disabled || (!HasRootContext && !HasHandle) || IsOpenedByThisTrigger() || hoverOpenFallbackCts is not null)
+        {
+            return;
+        }
+
+        hoverOpenFallbackCts = new CancellationTokenSource();
+        _ = RunHoverOpenFallbackAsync(hoverOpenFallbackCts);
+    }
+
+    private async Task RunHoverOpenFallbackAsync(CancellationTokenSource cancellationSource)
+    {
+        try
+        {
+            if (Delay > 0)
+            {
+                await Task.Delay(Delay, cancellationSource.Token);
+            }
+
+            if (cancellationSource.IsCancellationRequested || !OpenOnHover || Disabled || IsOpenedByThisTrigger())
+            {
+                return;
+            }
+
+            await InvokeAsync(() => RequestOpenAsync(true, PopoverOpenChangeReason.TriggerHover));
+        }
+        catch (OperationCanceledException)
+        {
+            // Hover left before the open delay elapsed.
+        }
+        finally
+        {
+            if (ReferenceEquals(hoverOpenFallbackCts, cancellationSource))
+            {
+                hoverOpenFallbackCts = null;
+            }
+
+            cancellationSource.Dispose();
+        }
+    }
+
+    private void CancelHoverOpenFallback()
+    {
+        var cancellationSource = hoverOpenFallbackCts;
+        if (cancellationSource is null)
+        {
+            return;
+        }
+
+        hoverOpenFallbackCts = null;
+        cancellationSource.Cancel();
+    }
+
+    private async Task InitializeHoverInteractionAsync()
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        if (HasHandle)
+        {
+            // Handle-based trigger: use trigger-level hover ID and dotnet ref
+            try
+            {
+                var module = await ModuleTask.Value;
+                hoverDotNetRef = DotNetObjectReference.Create(this);
+                var hoverId = $"hover-{triggerId}";
+                await module.InvokeVoidAsync("initializeHoverInteraction", hoverId, Element.Value, Delay, CloseDelay, hoverDotNetRef);
+                hoverInitialized = true;
+                hoverRootId = hoverId;
+                CancelHoverOpenFallback();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+        else
+        {
+            if (RootContext is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, Element.Value, Delay, CloseDelay);
+                hoverInitialized = true;
+                hoverRootId = RootContext.RootId;
+                CancelHoverOpenFallback();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Handles a hover open event from JavaScript interop for handle-based triggers.
+    /// </summary>
+    [JSInvokable]
+    public Task OnHoverOpen()
+    {
+        if (HasHandle)
+        {
+            Handle!.RequestOpen(triggerId, PopoverOpenChangeReason.TriggerHover);
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Handles a hover close event from JavaScript interop for handle-based triggers.
+    /// </summary>
+    [JSInvokable]
+    public Task OnHoverClose()
+    {
+        if (HasHandle)
+        {
+            Handle!.RequestClose(PopoverOpenChangeReason.TriggerHover);
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task HandlePreGuardFocusAsync()
+    {
+        if (!HasRootContext || preGuardRef is null)
+        {
+            return;
+        }
+
+        var shouldClose = true;
+        try
+        {
+            var module = await ModuleTask.Value;
+            var result = await module.InvokeAsync<string>(
+                "handleTriggerPreGuardFocus",
+                RootContext!.RootId,
+                preGuardRef.Element);
+
+            shouldClose = result != "handled";
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+
+        if (!shouldClose)
+        {
+            return;
+        }
+
+        await RequestOpenAsync(false, PopoverOpenChangeReason.FocusOut);
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusPreviousTabbable", preGuardRef.Element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task HandlePostGuardFocusAsync()
+    {
+        if (!HasRootContext || postGuardRef is null) return;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            var result = await module.InvokeAsync<string>(
+                "handleTriggerPostGuardFocus",
+                RootContext!.RootId,
+                postGuardRef.Element);
+
+            if (result == "close")
+            {
+                await RequestOpenAsync(false, PopoverOpenChangeReason.FocusOut);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private Task RequestOpenAsync(bool open, PopoverOpenChangeReason reason, string? requestInteractionType = null)
+    {
+        if (HasHandle)
+        {
+            if (open)
+            {
+                lastOpenReason = reason;
+                Handle!.RequestOpen(triggerId, reason, requestInteractionType);
+            }
+            else
+            {
+                Handle!.RequestClose(reason, requestInteractionType);
+            }
+            return Task.CompletedTask;
+        }
+
+        if (RootContext is not null)
+        {
+            if (requestInteractionType is not null)
+            {
+                RootContext.SetInteractionType(requestInteractionType);
+            }
+
+            return RootContext.SetOpenAsync(open, reason, open ? Payload : null, triggerId);
+        }
+
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,275 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<RenderElement TState="MenuCheckboxItemIndicatorState"
+               Tag="span"
+               State="state"
+               Enabled="IsPresent"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private bool isMounted;
+    private bool hasRendered;
+    private TransitionStatus transitionStatus = TransitionStatus.Undefined;
+    private bool hasInitialized;
+    private MenuCheckboxItemIndicatorState state;
+    private bool previousChecked;
+    private bool previousDisabled;
+    private bool previousHighlighted;
+    private TransitionStatus previousTransitionStatus = TransitionStatus.Undefined;
+    private RenderElement<MenuCheckboxItemIndicatorState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>> moduleTask = default!;
+    private DotNetObjectReference<MenuCheckboxItemIndicator>? dotNetRef;
+    private bool pendingEntryTransition;
+    private bool pendingExitTransition;
+    private int transitionVersion;
+
+    private bool Rendered => ItemContext?.Checked == true;
+
+    private bool IsPresent => KeepMounted || isMounted || Rendered;
+
+    [CascadingParameter]
+    private MenuCheckboxItemContext? ItemContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the indicator should remain in the DOM when the checkbox is unchecked.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<MenuCheckboxItemIndicatorState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuCheckboxItemIndicatorState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<MenuCheckboxItemIndicatorState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-animations.min.js").AsTask());
+        dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        UpdateTransitionStatus();
+
+        var itemChecked = ItemContext?.Checked ?? false;
+        var itemDisabled = ItemContext?.Disabled ?? false;
+        var itemHighlighted = ItemContext?.Highlighted ?? false;
+
+        var stateChanged = previousChecked != itemChecked ||
+                           previousDisabled != itemDisabled ||
+                           previousHighlighted != itemHighlighted ||
+                           previousTransitionStatus != transitionStatus;
+
+        if (!hasInitialized || stateChanged)
+        {
+            hasInitialized = true;
+            state = new MenuCheckboxItemIndicatorState(
+                Checked: itemChecked,
+                Disabled: itemDisabled,
+                Highlighted: itemHighlighted,
+                TransitionStatus: transitionStatus);
+            BuildComponentAttributes();
+        }
+
+        previousChecked = itemChecked;
+        previousDisabled = itemDisabled;
+        previousHighlighted = itemHighlighted;
+        previousTransitionStatus = transitionStatus;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+        }
+
+        if (pendingEntryTransition)
+        {
+            pendingEntryTransition = false;
+            await StartEntryTransitionAsync();
+        }
+        else if (pendingExitTransition)
+        {
+            pendingExitTransition = false;
+            await StartExitTransitionAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Called from JavaScript when the entry transition frame has been applied.
+    /// </summary>
+    [JSInvokable]
+    public void OnTransitionStarted()
+    {
+        transitionStatus = TransitionStatus.Undefined;
+        state = state with { TransitionStatus = transitionStatus };
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Called from JavaScript when the exit transition has completed.
+    /// </summary>
+    [JSInvokable]
+    public void OnTransitionEnded()
+    {
+        // Ignore stale callbacks from a previous transition that was superseded
+        // by a newer checked state change (e.g. rapid checked -> unchecked -> checked).
+        if (Rendered)
+        {
+            return;
+        }
+
+        isMounted = false;
+        transitionStatus = TransitionStatus.Undefined;
+        state = state with { TransitionStatus = transitionStatus };
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["aria-hidden"] = "true";
+        attrs["data-checked"] = state.Checked;
+        attrs["data-unchecked"] = !state.Checked;
+        attrs["data-disabled"] = state.Disabled;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
+
+        componentAttributes = attrs;
+    }
+
+    private void UpdateTransitionStatus()
+    {
+        var wasRendered = isMounted;
+        var isRendered = Rendered;
+
+        if (isRendered && !wasRendered)
+        {
+            isMounted = true;
+            transitionVersion++;
+
+            if (hasRendered)
+            {
+                transitionStatus = TransitionStatus.Starting;
+                pendingEntryTransition = true;
+                pendingExitTransition = false;
+            }
+        }
+        else if (!isRendered && wasRendered)
+        {
+            transitionVersion++;
+
+            if (hasRendered)
+            {
+                transitionStatus = TransitionStatus.Ending;
+                pendingExitTransition = true;
+                pendingEntryTransition = false;
+            }
+            else
+            {
+                isMounted = false;
+            }
+        }
+    }
+
+    private async Task StartEntryTransitionAsync()
+    {
+        if (!hasRendered) return;
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                await module.InvokeVoidAsync("applyStartingStyle", Element.Value, dotNetRef);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task StartExitTransitionAsync()
+    {
+        if (!hasRendered) return;
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                await module.InvokeVoidAsync("waitForExitTransition", Element.Value, dotNetRef);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+}

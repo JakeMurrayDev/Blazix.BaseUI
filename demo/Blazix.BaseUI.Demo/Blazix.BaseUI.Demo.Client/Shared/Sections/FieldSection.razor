@@ -1,0 +1,386 @@
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+@using Blazix.BaseUI.Utilities
+
+<ComponentShowcase ComponentName="Field"
+                   Description="A component that provides labeling and validation for form controls."
+                   BaseRoute="/field"
+                   IsWasmMode="IsWasmMode">
+    <DemoSection Title="Disabled State"
+                 Description="Disabled state propagates to label, control, description, and data-disabled attributes.">
+        <FieldRoot Disabled="true" ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Disabled Label</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
+                          placeholder="Disabled input" />
+            <FieldDescription ClassValue="FieldDescriptionClass">
+                This field is disabled.
+            </FieldDescription>
+        </FieldRoot>
+    </DemoSection>
+
+    <DemoSection Title="State Data Attributes"
+                 Description="Focused, touched, dirty, and filled states are visible through the state object and data attributes.">
+        <div class="demo-grid demo-grid--2">
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Focus and blur</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Focus me" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    data-focused appears during focus. data-touched appears after blur.
+                </FieldDescription>
+                <FieldStateDisplay>
+                    <div class="demo-state-panel">
+                        <div class="demo-state-row"><span>focused</span><strong>@context.Focused</strong></div>
+                        <div class="demo-state-row"><span>touched</span><strong>@context.Touched</strong></div>
+                    </div>
+                </FieldStateDisplay>
+            </FieldRoot>
+
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Dirty and filled</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Type, then clear" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    Dirty resets when the value returns to its initial value.
+                </FieldDescription>
+                <FieldStateDisplay>
+                    <div class="demo-state-panel">
+                        <div class="demo-state-row"><span>dirty</span><strong>@context.Dirty</strong></div>
+                        <div class="demo-state-row"><span>filled</span><strong>@context.Filled</strong></div>
+                    </div>
+                </FieldStateDisplay>
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Controlled Dirty/Touched Props"
+                 Description="External DirtyState and TouchedState values override internal state.">
+        <div class="demo-panel">
+            <div class="demo-inline">
+                <label class="demo-option-row">
+                    <input type="checkbox" @bind="controlledDirty" class="demo-checkbox-native" />
+                    <span>Dirty</span>
+                </label>
+                <label class="demo-option-row">
+                    <input type="checkbox" @bind="controlledTouched" class="demo-checkbox-native" />
+                    <span>Touched</span>
+                </label>
+            </div>
+            <FieldRoot DirtyState="@controlledDirty"
+                       TouchedState="@controlledTouched"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Controlled Field</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    Dirty: @controlledDirty, Touched: @controlledTouched
+                </FieldDescription>
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Label Association"
+                 Description="Native and non-native labels should both focus the control.">
+        <div class="demo-grid demo-grid--2">
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="ClickableLabelClass">
+                    Native label focuses the input
+                </FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass" />
+            </FieldRoot>
+
+            <FieldRoot ClassValue="FieldRootClass">
+                <FieldLabel Render="RenderLabelAsSpan"
+                            NativeLabel="@false"
+                            ClassValue="ClickableLabelClass">
+                    Span label focuses the input
+                </FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Focus via span" />
+                <FieldDescription ClassValue="FieldDescriptionClass">
+                    NativeLabel=false keeps click-to-focus behavior without rendering a label element.
+                </FieldDescription>
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Aria Describedby"
+                 Description="The control should reference descriptions, errors, and caller-provided aria-describedby ids.">
+        <FieldRoot Invalid="true" ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Field with description and error</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
+                          aria-describedby="external-help-id" />
+            <FieldDescription ClassValue="FieldDescriptionClass">
+                This is a helpful description.
+            </FieldDescription>
+            <p id="external-help-id" class="demo-description">
+                This external paragraph id should remain in aria-describedby.
+            </p>
+            <FieldError Match="true" ClassValue="FieldErrorClass">
+                This is an error message.
+            </FieldError>
+        </FieldRoot>
+    </DemoSection>
+
+    <DemoSection Title="Validation Modes"
+                 Description="Compare OnBlur, OnChange, and debounced OnChange validation.">
+        <div class="demo-grid demo-grid--3">
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">OnBlur</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnChange"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">OnChange</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnChange"
+                       ValidationDebounceTime="500"
+                       Validate="ValidateMinLength"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Debounced 500ms</FieldLabel>
+                <FieldControl TValue="string"
+                              DefaultValue="@("Test")"
+                              ClassValue="FieldControlClass"
+                              placeholder="Min 3 chars" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="FieldValidity Render Prop"
+                 Description="Validity state, the first error, and all errors are exposed to consumers.">
+        <FieldRoot ValidationMode="ValidationMode.OnChange"
+                   Validate="ValidateEmail"
+                   ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Email Address</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          type="email"
+                          placeholder="test@example.com"
+                          ClassValue="FieldControlClass" />
+            <div class="demo-state-panel">
+                <FieldValidity>
+                    <div class="demo-state-row"><span>valid</span><strong>@(context.State.Valid?.ToString() ?? "null")</strong></div>
+                    <div class="demo-state-row"><span>error</span><strong>@(string.IsNullOrEmpty(context.Error) ? "(none)" : context.Error)</strong></div>
+                    <div>errors: [@string.Join(", ", context.Errors)]</div>
+                </FieldValidity>
+            </div>
+        </FieldRoot>
+    </DemoSection>
+
+    <DemoSection Title="Multiple Errors"
+                 Description="A custom validator can return more than one error message.">
+        <FieldRoot ValidationMode="ValidationMode.OnChange"
+                   Validate="ValidateMultiple"
+                   ClassValue="FieldRootClass">
+            <FieldLabel ClassValue="FieldLabelClass">Password</FieldLabel>
+            <FieldControl TValue="string"
+                          DefaultValue="@("Test")"
+                          ClassValue="FieldControlClass"
+                          placeholder="8 chars, uppercase, number" />
+            <FieldError ClassValue="FieldErrorClass" />
+        </FieldRoot>
+    </DemoSection>
+
+    <DemoSection Title="ActionsRef"
+                 Description="Imperative validation should update field state and error output.">
+        <div class="demo-panel">
+            <FieldRoot Name="username"
+                       Validate="ValidateRequired"
+                       ActionsRef="@(actions => fieldActions = actions)"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Username</FieldLabel>
+                <FieldControl TValue="string"
+                              ClassValue="FieldControlClass"
+                              placeholder="Leave empty and validate" />
+                <FieldError ClassValue="FieldErrorClass" />
+            </FieldRoot>
+            <button type="button"
+                    @onclick="ValidateFieldImperatively"
+                    class="demo-button demo-button--primary">
+                Validate Field
+            </button>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Native Constraint Validity"
+                 Description="Native validity matches should render independently for valueMissing, typeMismatch, and patternMismatch.">
+        <div class="demo-grid demo-grid--3">
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Required</FieldLabel>
+                <FieldControl TValue="string"
+                              required="true"
+                              ClassValue="FieldControlClass"
+                              placeholder="Required value" />
+                <FieldError MatchValidity="valueMissing" ClassValue="FieldErrorClass">
+                    Value is required.
+                </FieldError>
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Email type</FieldLabel>
+                <FieldControl TValue="string"
+                              type="email"
+                              ClassValue="FieldControlClass"
+                              placeholder="not-an-email" />
+                <FieldError MatchValidity="typeMismatch" ClassValue="FieldErrorClass">
+                    Enter a valid email address.
+                </FieldError>
+            </FieldRoot>
+
+            <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                       ClassValue="FieldRootClass">
+                <FieldLabel ClassValue="FieldLabelClass">Pattern</FieldLabel>
+                <FieldControl TValue="string"
+                              pattern="[A-Z]{3}"
+                              ClassValue="FieldControlClass"
+                              placeholder="ABC" />
+                <FieldError MatchValidity="patternMismatch" ClassValue="FieldErrorClass">
+                    Use exactly three uppercase letters.
+                </FieldError>
+            </FieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="ValueMissing Suppression"
+                 Description="Required valueMissing should stay suppressed for pristine fields and show after a dirty empty value.">
+        <div class="demo-grid demo-grid--2">
+            <div class="demo-scenario-card">
+                <h4>Pristine blur</h4>
+                <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                           ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Required field</FieldLabel>
+                    <FieldControl TValue="string"
+                                  required="true"
+                                  ClassValue="FieldControlClass"
+                                  placeholder="Focus then blur" />
+                    <FieldError ClassValue="FieldErrorClass" />
+                    <FieldDescription ClassValue="FieldDescriptionClass">
+                        No error should show before the value changes.
+                    </FieldDescription>
+                </FieldRoot>
+            </div>
+
+            <div class="demo-scenario-card">
+                <h4>Dirty empty blur</h4>
+                <FieldRoot ValidationMode="ValidationMode.OnBlur"
+                           ClassValue="FieldRootClass">
+                    <FieldLabel ClassValue="FieldLabelClass">Required field</FieldLabel>
+                    <FieldControl TValue="string"
+                                  required="true"
+                                  ClassValue="FieldControlClass"
+                                  placeholder="Type, clear, then blur" />
+                    <FieldError ClassValue="FieldErrorClass" />
+                    <FieldDescription ClassValue="FieldDescriptionClass">
+                        The error should appear after the field becomes dirty.
+                    </FieldDescription>
+                </FieldRoot>
+            </div>
+        </div>
+    </DemoSection>
+</ComponentShowcase>
+
+@code {
+    private bool controlledDirty;
+    private bool controlledTouched;
+    private FieldRootActions? fieldActions;
+
+    private RenderFragment<RenderProps<FieldRootState>> RenderLabelAsSpan =>
+        ctx => RenderUtilities.CreateElement("span", ctx);
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private static string FieldRootClass(FieldRootState state) => "demo-field";
+
+    private static string FieldControlClass(FieldRootState state) => "demo-control";
+
+    private static string FieldLabelClass(FieldRootState state) => "demo-label";
+
+    private static string ClickableLabelClass(FieldRootState state) => "demo-label demo-label--clickable";
+
+    private static string FieldDescriptionClass(FieldRootState state) => "demo-description";
+
+    private static string FieldErrorClass(FieldErrorState state) => "demo-error";
+
+    private async Task ValidateFieldImperatively()
+    {
+        if (fieldActions is not null)
+        {
+            await fieldActions.ValidateAsync();
+        }
+    }
+
+    private Task<string[]?> ValidateRequired(object? value)
+    {
+        var str = value?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(str))
+            return Task.FromResult<string[]?>(["This field is required"]);
+
+        return Task.FromResult<string[]?>(null);
+    }
+
+    private Task<string[]?> ValidateMinLength(object? value)
+    {
+        var str = value?.ToString() ?? string.Empty;
+        if (string.IsNullOrEmpty(str) || str.Length < 3)
+            return Task.FromResult<string[]?>(["Must be at least 3 characters"]);
+
+        return Task.FromResult<string[]?>(null);
+    }
+
+    private Task<string[]?> ValidateEmail(object? value)
+    {
+        var str = value?.ToString() ?? string.Empty;
+        if (string.IsNullOrEmpty(str))
+            return Task.FromResult<string[]?>(null);
+
+        if (!str.Contains('@'))
+            return Task.FromResult<string[]?>(["Invalid email format"]);
+
+        return Task.FromResult<string[]?>(null);
+    }
+
+    private Task<string[]?> ValidateMultiple(object? value)
+    {
+        var str = value?.ToString() ?? string.Empty;
+        if (string.IsNullOrEmpty(str))
+            return Task.FromResult<string[]?>(null);
+
+        var errors = new List<string>();
+        if (str.Length < 8)
+            errors.Add("Must be at least 8 characters");
+        if (!str.Any(char.IsUpper))
+            errors.Add("Must contain an uppercase letter");
+        if (!str.Any(char.IsDigit))
+            errors.Add("Must contain a number");
+
+        return Task.FromResult<string[]?>(errors.Count > 0 ? errors.ToArray() : null);
+    }
+}

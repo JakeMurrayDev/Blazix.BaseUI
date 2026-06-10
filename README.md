@@ -1,1 +1,1 @@
-# BlazorBaseUI
+# Blazix.BaseUI

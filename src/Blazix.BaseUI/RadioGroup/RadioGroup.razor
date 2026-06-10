@@ -1,0 +1,576 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using Blazix.BaseUI.Fieldset
+@using Microsoft.Extensions.Logging
+
+@typeparam TValue
+@implements IFieldStateSubscriber
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject ILogger<RadioGroup<TValue>> Logger
+
+<CascadingValue Value="@((IRadioGroupContext<TValue>)groupContext!)" IsFixed="true">
+    <RenderElement TState="RadioGroupState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-radio.min.js";
+
+    private readonly Dictionary<string, TValue?> radioValues = new();
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private DotNetObjectReference<RadioGroup<TValue>>? dotNetRef;
+    private bool hasRendered;
+    private bool hasValueParameter;
+    private string? defaultId;
+    private TValue? internalValue;
+    private TValue? previousValue;
+    private RadioGroupContext<TValue>? groupContext;
+
+    private RadioGroupState state = RadioGroupState.Default;
+    private bool stateDirty = true;
+
+    private bool contextDisabled;
+    private bool contextReadOnly;
+    private bool contextRequired;
+    private string? contextName;
+    private string? contextForm;
+    private FieldValidation? contextValidation;
+
+    private Func<Task> cachedValueChangedCallback = default!;
+    private RenderElement<RadioGroupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private FormContext? FormContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private FieldsetRootContext? FieldsetContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the controlled value of the radio group.
+    /// Use together with <see cref="ValueChanged"/> for two-way binding.
+    /// </summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the uncontrolled default value of the radio group when it is initially rendered.
+    /// To render a controlled radio group, use <see cref="Value"/> instead.
+    /// </summary>
+    [Parameter]
+    public TValue? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Determines whether the radio group should ignore user interaction.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the radio group is read-only.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// Determines whether the radio group is required for form submission.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Required { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name that identifies the field when a form is submitted.
+    /// </summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the form that owns the radio inputs when the group is rendered outside the form.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the value changes, for two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TValue?> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the radio group value changes.
+    /// The event can be canceled by calling <see cref="RadioGroupValueChangeEventArgs{TValue}.Cancel"/>.
+    /// </summary>
+    [Parameter]
+    public EventCallback<RadioGroupValueChangeEventArgs<TValue>> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<RadioGroupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<RadioGroupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<RadioGroupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    private bool IsControlled => hasValueParameter;
+
+    private TValue? CurrentValue => IsControlled ? Value : internalValue;
+
+    private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
+
+    private string? ResolvedName => Name ?? FieldContext?.Name;
+
+    private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
+
+    private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    public RadioGroup()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        hasValueParameter = parameters.TryGetValue<TValue?>(nameof(Value), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (!IsControlled)
+        {
+            internalValue = DefaultValue;
+        }
+
+        var initialValue = CurrentValue;
+        FieldContext?.Validation.SetInitialValue(initialValue);
+
+        if (FieldContext is not null && initialValue is not null)
+        {
+            var currentValidityData = FieldContext.ValidityData;
+            FieldContext.SetValidityData(currentValidityData with { Value = initialValue });
+        }
+
+        FieldContext?.SetFilled(initialValue is not null);
+        FieldContext?.RegisterFocusHandlerFunc(FocusFirstRadioAsync);
+        FieldContext?.SubscribeFunc(this);
+
+        previousValue = CurrentValue;
+
+        contextDisabled = ResolvedDisabled;
+        contextReadOnly = ReadOnly;
+        contextRequired = Required;
+        contextName = ResolvedName;
+        contextForm = Form;
+        contextValidation = FieldContext?.Validation;
+
+        groupContext = CreateContext();
+
+        state = RadioGroupState.FromFieldState(FieldState, ResolvedDisabled, ReadOnly, Required);
+        stateDirty = false;
+
+        BuildComponentAttributes();
+
+        cachedValueChangedCallback = async () =>
+        {
+            try
+            {
+                await HandleValueChangedAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error handling value change in {component}", nameof(RadioGroup<>));
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var currentDisabled = ResolvedDisabled;
+        var currentReadOnly = ReadOnly;
+        var currentRequired = Required;
+
+        if (currentDisabled != contextDisabled ||
+            currentReadOnly != contextReadOnly ||
+            currentRequired != contextRequired)
+        {
+            stateDirty = true;
+        }
+
+        if (!EqualityComparer<TValue>.Default.Equals(CurrentValue, previousValue))
+        {
+            previousValue = CurrentValue;
+            _ = InvokeAsync(cachedValueChangedCallback);
+        }
+
+        if (stateDirty)
+        {
+            state = RadioGroupState.FromFieldState(FieldState, ResolvedDisabled, ReadOnly, Required);
+            stateDirty = false;
+        }
+
+        var needsContextUpdate = groupContext is null ||
+            contextDisabled != ResolvedDisabled ||
+            contextReadOnly != ReadOnly ||
+            contextRequired != Required ||
+            contextName != ResolvedName ||
+            contextForm != Form ||
+            !ReferenceEquals(contextValidation, FieldContext?.Validation);
+
+        if (needsContextUpdate)
+        {
+            contextDisabled = ResolvedDisabled;
+            contextReadOnly = ReadOnly;
+            contextRequired = Required;
+            contextName = ResolvedName;
+            contextForm = Form;
+            contextValidation = FieldContext?.Validation;
+
+            if (groupContext is null)
+            {
+                groupContext = CreateContext();
+            }
+            else
+            {
+                groupContext.Disabled = contextDisabled;
+                groupContext.ReadOnly = contextReadOnly;
+                groupContext.Required = contextRequired;
+                groupContext.Name = contextName;
+                groupContext.Form = contextForm;
+                groupContext.Validation = contextValidation;
+            }
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            await InitializeJsAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        FieldContext?.UnsubscribeFunc(this);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeGroup", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Notifies the component that its field state has changed and triggers a re-render.
+    /// </summary>
+    public void NotifyStateChanged()
+    {
+        stateDirty = true;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private RadioGroupContext<TValue> CreateContext() => new()
+    {
+        Disabled = ResolvedDisabled,
+        ReadOnly = ReadOnly,
+        Required = Required,
+        Name = ResolvedName,
+        Form = Form,
+        Validation = FieldContext?.Validation,
+        GetCheckedValueFunc = () => CurrentValue,
+        SetCheckedValueFunc = SetValueInternalAsync,
+        GetGroupElementFunc = () => Element,
+        RegisterRadioValueFunc = RegisterRadioValue,
+        UnregisterRadioValueFunc = UnregisterRadioValue
+    };
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "role"))
+            attrs["role"] = "radiogroup";
+
+        if (Required && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-required"))
+            attrs["aria-required"] = "true";
+
+        if (ResolvedDisabled && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-disabled"))
+            attrs["aria-disabled"] = "true";
+
+        if (ReadOnly && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-readonly"))
+            attrs["aria-readonly"] = "true";
+
+        var labelledBy = LabelableContext?.LabelId ?? FieldsetContext?.LegendId;
+        if (!string.IsNullOrEmpty(labelledBy) &&
+            !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby"))
+        {
+            attrs["aria-labelledby"] = labelledBy;
+        }
+
+        var describedBy = AttributeUtilities.CombineIdRefs(
+            AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+            LabelableContext?.GetAriaDescribedBy());
+        if (!string.IsNullOrEmpty(describedBy))
+            attrs["aria-describedby"] = describedBy;
+
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
+
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-readonly"] = state.ReadOnly;
+        attrs["data-required"] = state.Required;
+        attrs["data-valid"] = state.Valid == true;
+        attrs["data-invalid"] = state.Valid == false;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-filled"] = state.Filled;
+        attrs["data-focused"] = state.Focused;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            if (Element.HasValue)
+            {
+                dotNetRef = DotNetObjectReference.Create(this);
+                await module.InvokeVoidAsync("initializeGroup", Element.Value, dotNetRef);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when arrow key navigation selects a radio button value.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnNavigateToRadio(string? valueKey, bool isNullValue, string? serializedValue = null)
+    {
+        if (ResolvedDisabled || ReadOnly)
+        {
+            return;
+        }
+
+        TValue? value;
+
+        if (valueKey is not null && radioValues.TryGetValue(valueKey, out value))
+        {
+            await SetValueInternalAsync(value);
+            return;
+        }
+
+        if (isNullValue)
+        {
+            await SetValueInternalAsync(default);
+            return;
+        }
+
+        if (typeof(TValue) != typeof(string))
+            return;
+
+        value = (TValue)(object)(serializedValue ?? string.Empty);
+        await SetValueInternalAsync(value);
+    }
+
+    private Task HandleFocus(FocusEventArgs e)
+    {
+        FieldContext?.SetFocused(true);
+        return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleBlur(FocusEventArgs e)
+    {
+        _ = HandleBlurInternalAsync();
+        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleBlurInternalAsync()
+    {
+        if (!hasRendered)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var isWithinGroup = Element.HasValue && await module.InvokeAsync<bool>("isBlurWithinGroup", Element.Value);
+
+            if (!isWithinGroup)
+            {
+                FieldContext?.SetTouched(true);
+                FieldContext?.SetFocused(false);
+
+                if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
+                {
+                    await FieldContext.Validation.CommitAsync(CurrentValue);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when an arrow key is pressed within the group.
+    /// </summary>
+    [JSInvokable]
+    public void OnArrowKeyPressed()
+    {
+        FieldContext?.SetTouched(true);
+        FieldContext?.SetFocused(true);
+    }
+
+    private async ValueTask FocusFirstRadioAsync()
+    {
+        if (!hasRendered || !Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var firstRadio = await module.InvokeAsync<IJSObjectReference?>("getFirstEnabledRadio", Element.Value);
+            if (firstRadio is not null)
+            {
+                await module.InvokeVoidAsync("focus", firstRadio);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetValueInternalAsync(TValue? value)
+    {
+        var eventArgs = new RadioGroupValueChangeEventArgs<TValue>(value);
+
+        if (OnValueChange.HasDelegate)
+        {
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                StateHasChanged();
+                return;
+            }
+        }
+
+        if (!IsControlled)
+        {
+            internalValue = value;
+        }
+
+        if (ValueChanged.HasDelegate)
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+
+        await HandleValueChangedAsync();
+        StateHasChanged();
+    }
+
+    private async Task HandleValueChangedAsync()
+    {
+        var currentValue = CurrentValue;
+
+        FormContext?.ClearErrors(ResolvedName);
+
+        var initialValue = FieldContext?.ValidityData.InitialValue;
+        var isDirty = initialValue is TValue initial
+            ? !EqualityComparer<TValue>.Default.Equals(currentValue, initial)
+            : currentValue is not null;
+
+        FieldContext?.SetDirty(isDirty);
+        FieldContext?.SetFilled(currentValue is not null);
+
+        if (FieldContext?.ShouldValidateOnChangeFunc() == true)
+        {
+            await FieldContext.Validation.CommitAsync(currentValue);
+        }
+        else
+        {
+            await (FieldContext?.Validation.CommitAsync(currentValue, revalidateOnly: true) ?? Task.CompletedTask);
+        }
+    }
+
+    private void RegisterRadioValue(string key, TValue? value) => radioValues[key] = value;
+
+    private void UnregisterRadioValue(string key) => radioValues.Remove(key);
+}

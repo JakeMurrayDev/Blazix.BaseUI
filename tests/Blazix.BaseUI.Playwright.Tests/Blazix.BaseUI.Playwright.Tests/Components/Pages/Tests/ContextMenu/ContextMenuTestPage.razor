@@ -1,0 +1,179 @@
+@page "/tests/context-menu/server"
+@using Blazix.BaseUI.ContextMenu
+@using Blazix.BaseUI.Menu
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>ContextMenu Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <ContextMenuRoot
+        @bind-Open="isOpen"
+        DefaultOpen="@DefaultOpen"
+        Disabled="@Disabled"
+        LoopFocus="@LoopFocus"
+        OnOpenChange="HandleOpenChange"
+        OnOpenChangeComplete="HandleOpenChangeComplete">
+        <ContextMenuTrigger data-testid="context-menu-trigger" StyleValue="@(_ => "display:block;width:300px;height:200px;border:2px dashed #ccc;padding:20px;")">
+            Right-click here
+        </ContextMenuTrigger>
+        <MenuPositioner data-testid="context-menu-positioner">
+            <MenuPopup data-testid="context-menu-popup">
+                <MenuItem data-testid="menu-item-1" @onclick="() => HandleItemClick(1)">
+                    Item 1
+                </MenuItem>
+                <MenuItem data-testid="menu-item-2" @onclick="() => HandleItemClick(2)">
+                    Item 2
+                </MenuItem>
+                <MenuItem data-testid="menu-item-3" Disabled="true">
+                    Item 3 (Disabled)
+                </MenuItem>
+                <MenuItem data-testid="menu-item-4" @onclick="() => HandleItemClick(4)">
+                    Item 4
+                </MenuItem>
+                <MenuItem data-testid="menu-item-last" @onclick="() => HandleItemClick(5)">
+                    Item 5
+                </MenuItem>
+
+                @if (ShowPopupGap)
+                {
+                    <div data-testid="popup-gap" role="presentation" style="height:32px;padding:8px;">
+                        Non-item area
+                    </div>
+                }
+
+                @if (ShowSubmenu)
+                {
+                    <MenuSubmenuRoot
+                        @bind-Open="submenuOpen"
+                        OnOpenChange="HandleSubmenuOpenChange">
+                        <MenuSubmenuTrigger data-testid="submenu-trigger">
+                            Submenu
+                        </MenuSubmenuTrigger>
+                        <MenuPositioner data-testid="submenu-positioner">
+                            <MenuPopup data-testid="submenu-popup">
+                                <MenuItem data-testid="submenu-item-1" @onclick="() => HandleSubmenuItemClick(1)">
+                                    Submenu Item 1
+                                </MenuItem>
+                                <MenuItem data-testid="submenu-item-2" @onclick="() => HandleSubmenuItemClick(2)">
+                                    Submenu Item 2
+                                </MenuItem>
+                            </MenuPopup>
+                        </MenuPositioner>
+                    </MenuSubmenuRoot>
+                }
+            </MenuPopup>
+        </MenuPositioner>
+    </ContextMenuRoot>
+
+    @if (ShowNestedContextMenu)
+    {
+        <div style="margin-top: 20px;">
+            <ContextMenuRoot
+                @bind-Open="nestedIsOpen"
+                OnOpenChange="HandleNestedOpenChange">
+                <ContextMenuTrigger data-testid="nested-context-menu-trigger" StyleValue="@(_ => "display:block;width:300px;height:100px;border:2px dashed #69c;padding:20px;")">
+                    Nested context menu - right-click here
+                </ContextMenuTrigger>
+                <MenuPositioner data-testid="nested-context-menu-positioner">
+                    <MenuPopup data-testid="nested-context-menu-popup">
+                        <MenuItem data-testid="nested-menu-item-1" @onclick="() => HandleNestedItemClick(1)">
+                            Nested Item 1
+                        </MenuItem>
+                        <MenuItem data-testid="nested-menu-item-2" @onclick="() => HandleNestedItemClick(2)">
+                            Nested Item 2
+                        </MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </ContextMenuRoot>
+        </div>
+    }
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Complete Count: <span data-testid="complete-count">@completeCount</span></div>
+        <div>Last Item Clicked: <span data-testid="last-item-clicked">@lastItemClicked</span></div>
+        @if (ShowSubmenu)
+        {
+            <div>Submenu Open: <span data-testid="submenu-state">@submenuOpen.ToString().ToLowerInvariant()</span></div>
+            <div>Submenu Item Clicked: <span data-testid="submenu-item-clicked">@lastSubmenuItemClicked</span></div>
+        }
+        @if (ShowNestedContextMenu)
+        {
+            <div>Nested Open: <span data-testid="nested-open-state">@nestedIsOpen.ToString().ToLowerInvariant()</span></div>
+            <div>Nested Item Clicked: <span data-testid="nested-item-clicked">@lastNestedItemClicked</span></div>
+        }
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "loopFocus")]
+    public bool LoopFocus { get; set; } = true;
+
+    [SupplyParameterFromQuery(Name = "showSubmenu")]
+    public bool ShowSubmenu { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showNestedContextMenu")]
+    public bool ShowNestedContextMenu { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showPopupGap")]
+    public bool ShowPopupGap { get; set; }
+
+    private bool isOpen;
+    private int changeCount;
+    private string lastReason = "";
+    private int completeCount;
+    private int lastItemClicked;
+    private bool submenuOpen;
+    private int lastSubmenuItemClicked;
+    private bool nestedIsOpen;
+    private int lastNestedItemClicked;
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+    }
+
+    private void HandleOpenChange(MenuOpenChangeEventArgs args)
+    {
+        changeCount++;
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleOpenChangeComplete(bool open)
+    {
+        completeCount++;
+    }
+
+    private void HandleItemClick(int itemNumber)
+    {
+        lastItemClicked = itemNumber;
+    }
+
+    private void HandleSubmenuOpenChange(MenuOpenChangeEventArgs args)
+    {
+    }
+
+    private void HandleSubmenuItemClick(int itemNumber)
+    {
+        lastSubmenuItemClicked = itemNumber;
+    }
+
+    private void HandleNestedOpenChange(MenuOpenChangeEventArgs args)
+    {
+    }
+
+    private void HandleNestedItemClick(int itemNumber)
+    {
+        lastNestedItemClicked = itemNumber;
+    }
+}

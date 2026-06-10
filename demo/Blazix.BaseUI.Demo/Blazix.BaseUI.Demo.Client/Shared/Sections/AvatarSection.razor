@@ -1,0 +1,212 @@
+﻿@using Blazix.BaseUI.Avatar
+
+<ComponentShowcase ComponentName="Avatar"
+                   Description="Displays a user's profile picture, initials, or fallback icon."
+                   BaseRoute="/avatar"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic Usage"
+                 Description="A simple avatar with default span element rendering.">
+        <div class="flex items-center justify-center gap-8">
+            <AvatarRoot class="inline-flex size-12 items-center justify-center overflow-hidden rounded-full bg-gray-100 align-middle text-base font-medium text-gray-700 select-none">
+                AC
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-16 items-center justify-center overflow-hidden rounded-full bg-blue-100 align-middle text-lg font-semibold text-blue-700 select-none">
+                JD
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-20 items-center justify-center overflow-hidden rounded-full bg-emerald-100 align-middle text-xl font-bold text-emerald-700 select-none">
+                MK
+            </AvatarRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Image Loading"
+                 Description="Avatar displays the image when it loads successfully. The fallback is hidden once the image is loaded.">
+        <div class="flex items-center justify-center gap-8">
+            <AvatarRoot class="inline-flex size-12 items-center justify-center overflow-hidden rounded-full bg-gray-100 align-middle select-none">
+                <AvatarImage src="https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?w=128&h=128&dpr=2&q=80"
+                             alt="User avatar"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center text-base font-medium text-gray-700">
+                    AC
+                </AvatarFallback>
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-16 items-center justify-center overflow-hidden rounded-full bg-gray-100 align-middle select-none">
+                <AvatarImage src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&dpr=2&q=80"
+                             alt="User avatar"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center text-lg font-medium text-gray-700">
+                    JD
+                </AvatarFallback>
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-20 items-center justify-center overflow-hidden rounded-full bg-gray-100 align-middle select-none">
+                <AvatarImage src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&dpr=2&q=80"
+                             alt="User avatar"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center text-xl font-medium text-gray-700">
+                    MK
+                </AvatarFallback>
+            </AvatarRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Fallback on Image Error"
+                 Description="When the image fails to load, the fallback content is displayed instead.">
+        <div class="flex items-center justify-center gap-8">
+            <AvatarRoot class="inline-flex size-12 items-center justify-center overflow-hidden rounded-full bg-rose-100 align-middle select-none">
+                <AvatarImage src="https://invalid-url.example/broken-image.jpg"
+                             alt="Broken image"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center text-base font-medium text-rose-700">
+                    ER
+                </AvatarFallback>
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-16 items-center justify-center overflow-hidden rounded-full bg-amber-100 align-middle select-none">
+                <AvatarImage src=""
+                             alt="Empty source"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center text-lg font-medium text-amber-700">
+                    NA
+                </AvatarFallback>
+            </AvatarRoot>
+            <AvatarRoot class="inline-flex size-20 items-center justify-center overflow-hidden rounded-full bg-violet-100 align-middle select-none">
+                <AvatarImage src="https://this-domain-does-not-exist-12345.com/image.png"
+                             alt="Invalid domain"
+                             class="size-full object-cover" />
+                <AvatarFallback class="flex size-full items-center justify-center">
+                    <svg class="size-10 text-violet-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                </AvatarFallback>
+            </AvatarRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Fallback with Delay"
+                 Description="The fallback can be delayed before appearing. This prevents flickering when images load quickly. Try refreshing to see the delay in action.">
+        <div class="flex items-center justify-center gap-8">
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-sky-100 align-middle select-none">
+                    <AvatarImage src="https://invalid-url.example/image1.jpg"
+                                 alt="Broken image"
+                                 class="size-full object-cover" />
+                    <AvatarFallback Delay="0"
+                                    class="flex size-full items-center justify-center text-base font-medium text-sky-700">
+                        0ms
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">No delay</span>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-teal-100 align-middle select-none">
+                    <AvatarImage src="https://invalid-url.example/image2.jpg"
+                                 alt="Broken image"
+                                 class="size-full object-cover" />
+                    <AvatarFallback Delay="500"
+                                    class="flex size-full items-center justify-center text-base font-medium text-teal-700">
+                        500
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">500ms delay</span>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-orange-100 align-middle select-none">
+                    <AvatarImage src="https://invalid-url.example/image3.jpg"
+                                 alt="Broken image"
+                                 class="size-full object-cover" />
+                    <AvatarFallback Delay="1000"
+                                    class="flex size-full items-center justify-center text-base font-medium text-orange-700">
+                        1s
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">1000ms delay</span>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-pink-100 align-middle select-none">
+                    <AvatarImage src="https://invalid-url.example/image4.jpg"
+                                 alt="Broken image"
+                                 class="size-full object-cover" />
+                    <AvatarFallback Delay="2000"
+                                    class="flex size-full items-center justify-center text-base font-medium text-pink-700">
+                        2s
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">2000ms delay</span>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Avatar Sizes"
+                 Description="Avatars can be rendered at various sizes through styling.">
+        <div class="flex items-end justify-center gap-6">
+            @foreach (var size in AvatarSizes)
+            {
+                <AvatarRoot @key="size.Name"
+                            class="@($"inline-flex {size.SizeClass} items-center justify-center overflow-hidden rounded-full bg-indigo-100 align-middle select-none")">
+                    <AvatarImage src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=128&h=128&dpr=2&q=80"
+                                 alt="@size.Name"
+                                 class="size-full object-cover" />
+                    <AvatarFallback class="@($"flex size-full items-center justify-center {size.TextClass} font-medium text-indigo-700")">
+                        TW
+                    </AvatarFallback>
+                </AvatarRoot>
+            }
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Avatar Shapes"
+                 Description="Avatars can have different shapes such as circles, rounded squares, or squares.">
+        <div class="flex items-center justify-center gap-8">
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-full bg-cyan-100 align-middle select-none">
+                    <AvatarImage src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=128&h=128&dpr=2&q=80"
+                                 alt="Circle avatar"
+                                 class="size-full object-cover" />
+                    <AvatarFallback class="flex size-full items-center justify-center text-base font-medium text-cyan-700">
+                        CL
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">Circle</span>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-lg bg-lime-100 align-middle select-none">
+                    <AvatarImage src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=128&h=128&dpr=2&q=80"
+                                 alt="Rounded avatar"
+                                 class="size-full object-cover" />
+                    <AvatarFallback class="flex size-full items-center justify-center text-base font-medium text-lime-700">
+                        RD
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">Rounded</span>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <AvatarRoot class="inline-flex size-14 items-center justify-center overflow-hidden rounded-none bg-fuchsia-100 align-middle select-none">
+                    <AvatarImage src="https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=128&h=128&dpr=2&q=80"
+                                 alt="Square avatar"
+                                 class="size-full object-cover" />
+                    <AvatarFallback class="flex size-full items-center justify-center text-base font-medium text-fuchsia-700">
+                        SQ
+                    </AvatarFallback>
+                </AvatarRoot>
+                <span class="text-xs text-gray-500">Square</span>
+            </div>
+        </div>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    private record AvatarSize(string Name, string SizeClass, string TextClass);
+
+    private static readonly AvatarSize[] AvatarSizes =
+    [
+        new("Extra Small", "size-8", "text-xs"),
+        new("Small", "size-10", "text-sm"),
+        new("Medium", "size-12", "text-base"),
+        new("Large", "size-16", "text-lg"),
+        new("Extra Large", "size-20", "text-xl")
+    ];
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+}

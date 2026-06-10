@@ -1,0 +1,176 @@
+@page "/tests/slider/server"
+@using Blazix.BaseUI.Slider
+@using Blazix.BaseUI.DirectionProvider
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Slider Test Page (Server)</PageTitle>
+
+<DirectionProvider Direction="@ParsedDirection">
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()" dir="@Direction">
+    <SliderRoot
+        Value="@currentValue"
+        Values="@currentValues"
+        DefaultValue="@DefaultValue"
+        DefaultValues="@ParsedDefaultValues"
+        Min="@(Min ?? 0)"
+        Max="@(Max ?? 100)"
+        Step="@(Step ?? 1)"
+        LargeStep="@(LargeStep ?? 10)"
+        MinStepsBetweenValues="@MinStepsBetweenValues"
+        Orientation="@ParsedOrientation"
+        Disabled="@Disabled"
+        ReadOnly="@ReadOnly"
+        Required="@Required"
+        ThumbCollisionBehavior="@ParsedThumbCollisionBehavior"
+        OnValueChange="HandleValueChange"
+        OnValuesChange="HandleValuesChange"
+        OnValueCommitted="HandleValueCommitted"
+        OnValuesCommitted="HandleValuesCommitted"
+        data-testid="slider-root">
+        <SliderValue data-testid="slider-value" />
+        <SliderControl data-testid="slider-control">
+            <SliderTrack data-testid="slider-track">
+                <SliderIndicator data-testid="slider-indicator" />
+                @if (ShowRangeSlider && ParsedDefaultValues is not null && ParsedDefaultValues.Length > 1)
+                {
+                    for (var i = 0; i < ParsedDefaultValues.Length; i++)
+                    {
+                        var index = i;
+                        <SliderThumb Index="@index" data-testid="@($"slider-thumb-{index}")" />
+                    }
+                }
+                else
+                {
+                    <SliderThumb data-testid="slider-thumb-0" />
+                }
+            </SliderTrack>
+        </SliderControl>
+    </SliderRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Current Value: <span data-testid="current-value">@(ShowRangeSlider ? string.Join(", ", currentValues ?? []) : currentValue?.ToString() ?? "")</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Change Reason: <span data-testid="last-change-reason">@lastChangeReason</span></div>
+        <div>Commit Count: <span data-testid="commit-count">@commitCount</span></div>
+        <div>Last Commit Reason: <span data-testid="last-commit-reason">@lastCommitReason</span></div>
+        <div>Last Thumb Index: <span data-testid="last-thumb-index">@lastThumbIndex</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+</DirectionProvider>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public double? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValues")]
+    public string? DefaultValuesString { get; set; }
+
+    [SupplyParameterFromQuery(Name = "min")]
+    public double? Min { get; set; }
+
+    [SupplyParameterFromQuery(Name = "max")]
+    public double? Max { get; set; }
+
+    [SupplyParameterFromQuery(Name = "step")]
+    public double? Step { get; set; }
+
+    [SupplyParameterFromQuery(Name = "largeStep")]
+    public double? LargeStep { get; set; }
+
+    [SupplyParameterFromQuery(Name = "minStepsBetweenValues")]
+    public double MinStepsBetweenValues { get; set; }
+
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string Orientation { get; set; } = "horizontal";
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnly")]
+    public bool ReadOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "required")]
+    public bool Required { get; set; }
+
+    [SupplyParameterFromQuery(Name = "thumbCollisionBehavior")]
+    public string ThumbCollisionBehavior { get; set; } = "push";
+
+    [SupplyParameterFromQuery(Name = "showRangeSlider")]
+    public bool ShowRangeSlider { get; set; }
+
+    [SupplyParameterFromQuery(Name = "direction")]
+    public string Direction { get; set; } = "ltr";
+
+    private double? currentValue;
+    private double[]? currentValues;
+    private int changeCount;
+    private string lastChangeReason = "";
+    private int commitCount;
+    private string lastCommitReason = "";
+    private int lastThumbIndex = -1;
+
+    private double[]? ParsedDefaultValues =>
+        string.IsNullOrEmpty(DefaultValuesString)
+            ? null
+            : DefaultValuesString.Split(',').Select(s => double.Parse(s.Trim(), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+
+    private Orientation ParsedOrientation =>
+        Orientation?.ToLowerInvariant() == "vertical"
+            ? Blazix.BaseUI.Orientation.Vertical
+            : Blazix.BaseUI.Orientation.Horizontal;
+
+    private ThumbCollisionBehavior ParsedThumbCollisionBehavior =>
+        ThumbCollisionBehavior?.ToLowerInvariant() switch
+        {
+            "swap" => Blazix.BaseUI.Slider.ThumbCollisionBehavior.Swap,
+            "block" => Blazix.BaseUI.Slider.ThumbCollisionBehavior.None,
+            _ => Blazix.BaseUI.Slider.ThumbCollisionBehavior.Push
+        };
+
+    private Blazix.BaseUI.Direction ParsedDirection =>
+        Direction?.ToLowerInvariant() == "rtl"
+            ? Blazix.BaseUI.Direction.Rtl
+            : Blazix.BaseUI.Direction.Ltr;
+
+    protected override void OnInitialized()
+    {
+        if (ShowRangeSlider && ParsedDefaultValues is not null)
+        {
+            currentValues = ParsedDefaultValues;
+        }
+        else if (DefaultValue.HasValue)
+        {
+            currentValue = DefaultValue;
+        }
+    }
+
+    private void HandleValueChange(SliderValueChangeEventArgs<double> args)
+    {
+        currentValue = args.Value;
+        changeCount++;
+        lastChangeReason = args.Reason.ToString();
+        lastThumbIndex = args.ActiveThumbIndex;
+    }
+
+    private void HandleValuesChange(SliderValueChangeEventArgs<double[]> args)
+    {
+        currentValues = args.Value;
+        changeCount++;
+        lastChangeReason = args.Reason.ToString();
+        lastThumbIndex = args.ActiveThumbIndex;
+    }
+
+    private void HandleValueCommitted(SliderValueCommittedEventArgs<double> args)
+    {
+        commitCount++;
+        lastCommitReason = args.Reason.ToString();
+    }
+
+    private void HandleValuesCommitted(SliderValueCommittedEventArgs<double[]> args)
+    {
+        commitCount++;
+        lastCommitReason = args.Reason.ToString();
+    }
+}

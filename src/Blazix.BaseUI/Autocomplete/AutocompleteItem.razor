@@ -1,0 +1,256 @@
+@typeparam TValue
+@using Microsoft.AspNetCore.Components.Web
+
+@implements IAutocompleteItemRegistration
+@implements IDisposable
+
+<RenderElement TState="AutocompleteItemState"
+               Tag="@(NativeButton ? "button" : "div")"
+               State="state"
+               Enabled="RootContext is not null && visible"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private bool highlighted;
+    private bool visible = true;
+    private int itemIndex = -1;
+    private AutocompleteItemState state;
+    private RenderElement<AutocompleteItemState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IAutocompleteRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private AutocompleteRootContext<TValue>? TypedRootContext { get; set; }
+
+    [CascadingParameter]
+    private AutocompleteRowContext? RowContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the item value.
+    /// </summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this item is disabled.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets a text label used for filtering and typeahead.
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// Gets or sets the explicit index of this item.
+    /// </summary>
+    [Parameter]
+    public int? Index { get; set; }
+
+    /// <summary>
+    /// Determines whether the rendered element is a native button.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AutocompleteItemState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteItemState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<AutocompleteItemState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    object? IAutocompleteItemRegistration.ValueBoxed => Value;
+
+    string? IAutocompleteItemRegistration.Label => Label;
+
+    bool IAutocompleteItemRegistration.Disabled => Disabled;
+
+    int? IAutocompleteItemRegistration.Index => Index;
+
+    ElementReference? IAutocompleteItemRegistration.Element => Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            RootContext.ItemMapChanged += OnItemMapChanged;
+            subscribed = true;
+            itemIndex = RootContext.RegisterItem(this);
+        }
+
+        RefreshFromRoot();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        RefreshFromRoot();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+            RootContext.ItemMapChanged -= OnItemMapChanged;
+            RootContext.UnregisterItem(this);
+        }
+    }
+
+    void IAutocompleteItemRegistration.RefreshFromRoot()
+    {
+        RefreshFromRoot();
+    }
+
+    private void OnRootStateChanged()
+    {
+        RefreshFromRoot();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnItemMapChanged()
+    {
+        RefreshFromRoot();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshFromRoot()
+    {
+        visible = RootContext?.IsItemVisible(this) ?? true;
+        itemIndex = RootContext?.GetItemIndex(this) ?? -1;
+        highlighted = RootContext?.IsItemHighlighted(this) ?? false;
+        state = new AutocompleteItemState(Disabled, highlighted);
+        BuildComponentAttributes();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (RootContext is not null && itemIndex >= 0)
+        {
+            attrs["id"] = $"{RootContext.RootId}-{itemIndex}";
+        }
+
+        attrs["role"] = RowContext is not null ? "gridcell" : "option";
+        attrs["tabindex"] = -1;
+        attrs["data-autocomplete-item"] = true;
+
+        if (NativeButton)
+        {
+            attrs["type"] = "button";
+        }
+
+        if (highlighted)
+        {
+            attrs["data-highlighted"] = true;
+        }
+
+        if (Disabled)
+        {
+            attrs["aria-disabled"] = "true";
+            attrs["data-disabled"] = true;
+            if (NativeButton)
+            {
+                attrs["disabled"] = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(Label))
+        {
+            attrs["data-blazix-base-ui-label"] = Label;
+        }
+
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["onpointerenter"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEnterAsync);
+        attrs["onpointermove"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerMoveAsync);
+        attrs["onpointerleave"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerLeaveAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || Disabled)
+        {
+            return;
+        }
+
+        await RootContext.CommitItemAsync(Value, AutocompleteChangeReason.ItemPress);
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerEnterAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null && !Disabled && RootContext.HighlightItemOnHover)
+        {
+            RootContext.KeyboardActive = false;
+            await RootContext.HighlightIndexAsync(itemIndex, AutocompleteHighlightReason.Pointer);
+        }
+
+        await EventUtilities.InvokeOnPointerEnterAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerMoveAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null)
+        {
+            RootContext.KeyboardActive = false;
+        }
+
+        await EventUtilities.InvokeOnPointerMoveAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerLeaveAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null && !RootContext.KeepHighlight && RootContext.HighlightItemOnHover)
+        {
+            await RootContext.HighlightIndexAsync(-1, AutocompleteHighlightReason.Pointer);
+        }
+
+        await EventUtilities.InvokeOnPointerLeaveAsync(AdditionalAttributes, e);
+    }
+}

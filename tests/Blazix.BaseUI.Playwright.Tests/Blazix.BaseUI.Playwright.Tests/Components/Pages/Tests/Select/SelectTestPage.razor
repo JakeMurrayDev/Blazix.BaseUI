@@ -1,0 +1,135 @@
+@page "/tests/select/server"
+@using Blazix.BaseUI.Select
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Select Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <SelectRoot TValue="string"
+        @bind-Open="isOpen"
+        DefaultOpen="@DefaultOpen"
+        DefaultValue="@DefaultValue"
+        Disabled="@Disabled"
+        Multiple="@Multiple"
+        Modal="@(Modal ? SelectModalMode.True : SelectModalMode.False)"
+        Name="@SelectName"
+        OnOpenChange="HandleOpenChange"
+        OnValueChange="HandleValueChange">
+        <SelectTrigger data-testid="select-trigger">
+            <SelectValue TValue="string" Placeholder="Select a fruit..." />
+            <SelectIcon>
+                <span>&#9662;</span>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner data-testid="select-positioner">
+                <SelectPopup data-testid="select-popup">
+                    @if (ShowGroups)
+                    {
+                        <SelectGroup>
+                            <SelectGroupLabel>Fruits</SelectGroupLabel>
+                            <SelectItem TValue="string" Value="@("apple")" Label="Apple" data-testid="select-item-apple">
+                                <SelectItemText>Apple</SelectItemText>
+                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                            </SelectItem>
+                            <SelectItem TValue="string" Value="@("banana")" Label="Banana" data-testid="select-item-banana">
+                                <SelectItemText>Banana</SelectItemText>
+                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                            </SelectItem>
+                            <SelectItem TValue="string" Value="@("cherry")" Label="Cherry" data-testid="select-item-cherry">
+                                <SelectItemText>Cherry</SelectItemText>
+                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                            </SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                            <SelectGroupLabel>Vegetables</SelectGroupLabel>
+                            <SelectItem TValue="string" Value="@("carrot")" Label="Carrot" data-testid="select-item-carrot">
+                                <SelectItemText>Carrot</SelectItemText>
+                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                            </SelectItem>
+                        </SelectGroup>
+                    }
+                    else
+                    {
+                        <SelectItem TValue="string" Value="@("apple")" Label="Apple" data-testid="select-item-apple">
+                            <SelectItemText>Apple</SelectItemText>
+                            <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                        </SelectItem>
+                        <SelectItem TValue="string" Value="@("banana")" Label="Banana" data-testid="select-item-banana">
+                            <SelectItemText>Banana</SelectItemText>
+                            <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                        </SelectItem>
+                        <SelectItem TValue="string" Value="@("cherry")" Label="Cherry" data-testid="select-item-cherry">
+                            <SelectItemText>Cherry</SelectItemText>
+                            <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                        </SelectItem>
+                        <SelectItem TValue="string" Value="@("disabled-item")" Label="Disabled" Disabled="true" data-testid="select-item-disabled">
+                            <SelectItemText>Disabled Item</SelectItemText>
+                        </SelectItem>
+                        <SelectItem TValue="string" Value="@("date")" Label="Date" data-testid="select-item-date">
+                            <SelectItemText>Date</SelectItemText>
+                            <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                        </SelectItem>
+                    }
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Selected Value: <span data-testid="selected-value">@selectedValue</span></div>
+        <div>Value Change Count: <span data-testid="value-change-count">@valueChangeCount</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "multiple")]
+    public bool Multiple { get; set; }
+
+    [SupplyParameterFromQuery(Name = "modal")]
+    public bool Modal { get; set; }
+
+    [SupplyParameterFromQuery(Name = "selectName")]
+    public string? SelectName { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showGroups")]
+    public bool ShowGroups { get; set; }
+
+    private bool isOpen;
+    private int changeCount;
+    private string lastReason = "";
+    private string selectedValue = "";
+    private int valueChangeCount;
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+        selectedValue = DefaultValue ?? "";
+    }
+
+    private void HandleOpenChange(SelectOpenChangeEventArgs args)
+    {
+        changeCount++;
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleValueChange(SelectValueChangeEventArgs<string> args)
+    {
+        valueChangeCount++;
+        selectedValue = args.Value ?? "";
+    }
+}

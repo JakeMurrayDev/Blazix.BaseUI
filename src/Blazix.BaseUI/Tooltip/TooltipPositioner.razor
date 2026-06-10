@@ -1,0 +1,515 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+@if (RootContext is not null)
+{
+    <CascadingValue Value="positionerContext" IsFixed="true">
+        <RenderElement TState="TooltipPositionerState"
+                       Tag="div"
+                       State="state"
+                       Render="Render"
+                       ClassValue="ClassValue"
+                       StyleValue="ResolvedStyleValue"
+                       ComponentAttributes="componentAttributes"
+                       ChildContent="ChildContent"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+    </CascadingValue>
+}
+
+@code {
+    private PositionerInterop positionerInterop = null!;
+    private ElementReference? arrowElement;
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
+    private DotNetObjectReference<TooltipPositioner>? positionerDotNetRef;
+    private TooltipPositionerState state;
+    private TooltipPositionerContext positionerContext = null!;
+    private RenderElement<TooltipPositionerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private bool previousMounted;
+
+    [CascadingParameter]
+    private TooltipRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private TooltipPortalContext? PortalContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render template for the positioner element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<TooltipPositionerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the side of the anchor element to position against.
+    /// Defaults to <see cref="Popover.Side.Top"/>.
+    /// </summary>
+    [Parameter]
+    public Side Side { get; set; } = Side.Top;
+
+    /// <summary>
+    /// Gets or sets the alignment of the tooltip relative to the specified side.
+    /// Defaults to <see cref="Popover.Align.Center"/>.
+    /// </summary>
+    [Parameter]
+    public Align Align { get; set; } = Align.Center;
+
+    /// <summary>
+    /// Gets or sets the offset in pixels from the side of the anchor element.
+    /// Defaults to <c>0</c>.
+    /// </summary>
+    [Parameter]
+    public int SideOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that computes the side offset dynamically based on anchor/popup dimensions.
+    /// When set, takes precedence over <see cref="SideOffset"/>.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? SideOffsetFunction { get; set; }
+
+    /// <summary>
+    /// Gets or sets the offset in pixels from the alignment edge of the anchor element.
+    /// Defaults to <c>0</c>.
+    /// </summary>
+    [Parameter]
+    public int AlignOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that computes the align offset dynamically based on anchor/popup dimensions.
+    /// When set, takes precedence over <see cref="AlignOffset"/>.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? AlignOffsetFunction { get; set; }
+
+    /// <summary>
+    /// Gets or sets the padding in pixels between the tooltip and the collision boundary edge.
+    /// Defaults to <c>5</c>.
+    /// </summary>
+    [Parameter]
+    public int CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets per-side collision padding between the tooltip and the collision boundary edge.
+    /// When set, takes precedence over <see cref="CollisionPadding"/>.
+    /// </summary>
+    [Parameter]
+    public SidePadding? CollisionPaddingPerSide { get; set; }
+
+    /// <summary>
+    /// Gets or sets the boundary used to detect collisions for repositioning.
+    /// Defaults to <see cref="Popover.CollisionBoundary.ClippingAncestors"/>.
+    /// </summary>
+    [Parameter]
+    public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets the minimum padding in pixels between the arrow and the edges of the popup.
+    /// Defaults to <c>5</c>.
+    /// </summary>
+    [Parameter]
+    public int ArrowPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Determines whether the tooltip stays attached to its anchor element when it overflows.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Sticky { get; set; }
+
+    /// <summary>
+    /// Determines whether anchor tracking updates are disabled as the popup repositions on scroll/resize.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DisableAnchorTracking { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS positioning method for the tooltip.
+    /// Defaults to <see cref="Popover.PositionMethod.Absolute"/>.
+    /// </summary>
+    [Parameter]
+    public PositionMethod PositionMethod { get; set; } = PositionMethod.Absolute;
+
+    /// <summary>
+    /// Gets or sets how collisions are handled when positioning the tooltip.
+    /// When <see langword="null"/>, defaults to flipping on both the side and alignment axes.
+    /// </summary>
+    [Parameter]
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom anchor element to position the tooltip against instead of the trigger.
+    /// </summary>
+    [Parameter]
+    public ElementReference? Anchor { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns CSS class names based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<TooltipPositionerState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns inline styles based on the current state.
+    /// </summary>
+    [Parameter]
+    public Func<TooltipPositionerState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        positionerInterop = new PositionerInterop(
+            JSRuntime, "./_content/Blazix.BaseUI/blazix-baseui-tooltip.min.js");
+
+        computedSide = Side;
+        computedAlign = Align;
+        computedAnchorHidden = false;
+
+        positionerContext = new TooltipPositionerContext
+        {
+            Side = computedSide,
+            Align = computedAlign,
+            AnchorHidden = computedAnchorHidden,
+            ArrowUncentered = false,
+            GetArrowElement = () => arrowElement,
+            SetArrowElement = SetArrowElement
+        };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        // Reset computed values when parameters change
+        computedSide = Side;
+        computedAlign = Align;
+
+        var open = RootContext?.GetOpen() ?? false;
+        var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
+        var instant = trackCursorAxis != TrackCursorAxis.None
+            ? TooltipInstantType.TrackingCursor
+            : RootContext?.InstantType ?? TooltipInstantType.None;
+        state = new TooltipPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            positionerInterop.MarkRendered();
+            positionerDotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            RootContext?.SetPositionerElement(currentElement);
+        }
+
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.GetMounted() == true)
+        {
+            previousMounted = true;
+            if (!positionerInterop.IsInitialized)
+            {
+                await InitializePositionerAsync();
+            }
+            else
+            {
+                await UpdatePositionAsync();
+            }
+        }
+        else if (previousMounted && positionerInterop.IsInitialized && RootContext?.GetMounted() == false)
+        {
+            previousMounted = false;
+            try
+            {
+                var module = await positionerInterop.GetModuleAsync();
+                await module.InvokeVoidAsync("disposePositioner", positionerInterop.PositionerId);
+                positionerInterop.SetPositionerId(null);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private Func<TooltipPositionerState, string>? ResolvedStyleValue
+    {
+        get
+        {
+            var disableHoverablePopup = RootContext?.DisableHoverablePopup ?? false;
+            var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
+            var open = RootContext?.GetOpen() ?? false;
+            var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+            var needsPointerEventsNone = !open || disableHoverablePopup || trackCursorAxis == TrackCursorAxis.Both;
+            var needsTransitionNone = transitionStatus == TransitionStatus.Starting;
+
+            if (!needsPointerEventsNone && !needsTransitionNone && StyleValue is null)
+            {
+                return null;
+            }
+
+            if (!needsPointerEventsNone && !needsTransitionNone)
+            {
+                return StyleValue;
+            }
+
+            return s =>
+            {
+                var parts = new List<string>(3);
+
+                var userStyle = StyleValue?.Invoke(s);
+                if (!string.IsNullOrEmpty(userStyle))
+                {
+                    parts.Add(userStyle);
+                }
+
+                if (needsPointerEventsNone)
+                {
+                    parts.Add("pointer-events: none");
+                }
+
+                if (needsTransitionNone)
+                {
+                    parts.Add("transition: none");
+                }
+
+                return string.Join("; ", parts);
+            };
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["role"] = "presentation";
+        attrs["data-blazix-base-ui-positioner"] = true;
+
+        if (!(RootContext?.GetMounted() ?? false))
+        {
+            attrs["hidden"] = true;
+        }
+
+        attrs["data-side"] = computedSide.ToDataAttributeString()!;
+        attrs["data-align"] = computedAlign.ToDataAttributeString()!;
+
+        var isOpen = RootContext?.GetOpen() ?? false;
+        attrs["data-open"] = isOpen;
+        attrs["data-closed"] = !isOpen;
+        attrs["data-anchor-hidden"] = computedAnchorHidden;
+
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
+
+        var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
+        var instantType = trackCursorAxis != TrackCursorAxis.None
+            ? TooltipInstantType.TrackingCursor
+            : RootContext?.InstantType ?? TooltipInstantType.None;
+        var instantAttr = instantType.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
+
+        componentAttributes = attrs;
+    }
+
+    private void SetArrowElement(ElementReference? element)
+    {
+        if (Nullable.Equals(arrowElement, element))
+        {
+            return;
+        }
+
+        arrowElement = element;
+
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
+        {
+            _ = UpdatePositionAsync();
+        }
+    }
+
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var physicalSide = Blazix.BaseUI.Extensions.ParseSide(side);
+        var newAlign = Blazix.BaseUI.Extensions.ParseAlign(align);
+
+        if (physicalSide == computedSide && newAlign == computedAlign && anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            return;
+        }
+
+        computedSide = physicalSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+
+        var open = RootContext?.GetOpen() ?? false;
+        var trackCursorAxis = RootContext?.TrackCursorAxis ?? TrackCursorAxis.None;
+        var instant = trackCursorAxis != TrackCursorAxis.None
+            ? TooltipInstantType.TrackingCursor
+            : RootContext?.InstantType ?? TooltipInstantType.None;
+        state = new TooltipPositionerState(open, computedSide, computedAlign, computedAnchorHidden, instant);
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public double ComputeSideOffset(OffsetData data) => SideOffsetFunction?.Invoke(data) ?? SideOffset;
+
+    [JSInvokable]
+    public double ComputeAlignOffset(OffsetData data) => AlignOffsetFunction?.Invoke(data) ?? AlignOffset;
+
+    private object GetCollisionPaddingArg() =>
+        CollisionPaddingPerSide is not null
+            ? new { top = CollisionPaddingPerSide.Top, right = CollisionPaddingPerSide.Right, bottom = CollisionPaddingPerSide.Bottom, left = CollisionPaddingPerSide.Left }
+            : (object)CollisionPadding;
+
+    private async Task InitializePositionerAsync()
+    {
+        if (!Element.HasValue || RootContext is null)
+        {
+            return;
+        }
+
+        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
+        if (!anchorElement.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
+
+            var virtualId = RootContext.VirtualAnchorId;
+            positionerInterop.SetPositionerId(await module.InvokeAsync<string>(
+                "initializePositioner",
+                Element.Value,
+                anchorElement.Value,
+                Side.ToDataAttributeString(),
+                Align.ToDataAttributeString(),
+                SideOffset,
+                AlignOffset,
+                GetCollisionPaddingArg(),
+                CollisionBoundary.ToDataAttributeString(),
+                ArrowPadding,
+                arrowElement,
+                Sticky,
+                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
+                DisableAnchorTracking,
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                positionerDotNetRef,
+                virtualId,
+                SideOffsetFunction is not null,
+                AlignOffsetFunction is not null,
+                RootContext.HasViewport));
+
+            // Register positioner with root so cursor tracking can trigger updates
+            await module.InvokeVoidAsync("setPositionerId", RootContext.RootId, positionerInterop.PositionerId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdatePositionAsync()
+    {
+        if (!positionerInterop.IsInitialized || RootContext is null)
+        {
+            return;
+        }
+
+        // When cursor tracking is active, skip C# anchor override — JS uses virtual anchor
+        var isCursorTracking = RootContext.VirtualAnchorId is not null;
+        ElementReference? anchorElement = null;
+        if (!isCursorTracking)
+        {
+            anchorElement = Anchor ?? RootContext.GetTriggerElement();
+            if (!anchorElement.HasValue)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var module = await positionerInterop.GetModuleAsync();
+            var ca = CollisionAvoidance ?? new CollisionAvoidance();
+
+            await module.InvokeVoidAsync(
+                "updatePosition",
+                positionerInterop.PositionerId,
+                isCursorTracking ? null : (object?)anchorElement!.Value,
+                Side.ToDataAttributeString(),
+                Align.ToDataAttributeString(),
+                SideOffset,
+                AlignOffset,
+                GetCollisionPaddingArg(),
+                CollisionBoundary.ToDataAttributeString(),
+                ArrowPadding,
+                arrowElement,
+                Sticky,
+                PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
+                (ca.Side).ToJsString(),
+                (ca.Align).ToJsString(),
+                (ca.FallbackAxisSide).ToJsString(),
+                SideOffsetFunction is not null,
+                AlignOffsetFunction is not null,
+                RootContext?.HasViewport ?? false);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
+    }
+}

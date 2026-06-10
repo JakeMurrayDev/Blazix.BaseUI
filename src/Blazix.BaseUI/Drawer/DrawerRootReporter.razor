@@ -1,0 +1,138 @@
+@using Blazix.BaseUI.Dialog
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-drawer.min.js";
+
+    private readonly string reporterId = Guid.NewGuid().ToIdString();
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<DrawerRootReporter>? dotNetRef;
+    private bool hasRendered;
+    private bool previousOpen;
+    private bool previousPresence;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
+
+    [CascadingParameter]
+    private DialogRootContext? DialogContext { get; set; }
+
+    [CascadingParameter]
+    private DrawerRootContext? DrawerContext { get; set; }
+
+    [CascadingParameter]
+    private DrawerProviderContext? ProviderContext { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (DialogContext is null || DrawerContext is null)
+        {
+            return;
+        }
+
+        ProviderContext?.SetDrawerOpen(reporterId, DialogContext.Open);
+
+        var present = DialogContext.Open || DialogContext.TransitionStatus == TransitionStatus.Ending;
+        if (present != previousPresence)
+        {
+            previousPresence = present;
+            DrawerContext.NotifyParentHasNestedDrawer?.Invoke(present);
+        }
+
+        if (hasRendered && previousOpen != DialogContext.Open)
+        {
+            previousOpen = DialogContext.Open;
+            _ = SetRootOpenAsync(DialogContext.Open);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || DialogContext is null)
+        {
+            return;
+        }
+
+        hasRendered = true;
+        previousOpen = DialogContext.Open;
+        dotNetRef = DotNetObjectReference.Create(this);
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("initializeRootReporter", DialogContext.RootId, dotNetRef);
+            await module.InvokeVoidAsync("setRootOpen", DialogContext.RootId, DialogContext.Open);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        ProviderContext?.RemoveDrawer(reporterId);
+        if (previousPresence)
+        {
+            DrawerContext?.NotifyParentHasNestedDrawer?.Invoke(false);
+        }
+
+        DrawerContext?.NotifyParentFrontmostHeight?.Invoke(0);
+        DrawerContext?.NotifyParentSwipingChange?.Invoke(false);
+        DrawerContext?.NotifyParentSwipeProgressChange?.Invoke(0);
+
+        if (moduleTask?.IsValueCreated == true && hasRendered && DialogContext is not null)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeRootReporter", DialogContext.RootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Handles CloseWatcher close requests from JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnCloseWatcher()
+    {
+        if (DialogContext is not null)
+        {
+            await DialogContext.SetOpenAsync(false, DialogOpenChangeReason.CloseWatcher);
+        }
+    }
+
+    private async Task SetRootOpenAsync(bool open)
+    {
+        if (DialogContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setRootOpen", DialogContext.RootId, open);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+}

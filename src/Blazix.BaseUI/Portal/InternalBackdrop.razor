@@ -1,0 +1,144 @@
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+@* BLAZOR WORKAROUND: The React source computes clip-path synchronously during render
+   via getBoundingClientRect(). Blazor cannot read DOM layout during render, so clip-path
+   management is delegated entirely to JS (initializeBackdrop/disposeBackdrop) which uses
+   ResizeObserver and scroll listeners to keep the cutout in sync reactively. *@
+
+<div role="presentation"
+     data-blazix-base-ui-inert
+     inert="@Inert"
+     style="@ResolvedStyle"
+     @ref="element"
+     @attributes="AdditionalAttributes" />
+
+@code {
+    private const string BaseStyle =
+        "position:fixed;inset:0;user-select:none;-webkit-user-select:none;";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private ElementReference element;
+    private string? backdropId;
+    private ElementReference? previousCutout;
+
+    private string ResolvedStyle => string.IsNullOrEmpty(PointerEvents)
+        ? BaseStyle
+        : $"{BaseStyle}pointer-events:{PointerEvents};";
+
+    public InternalBackdrop()
+    {
+        moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js").AsTask());
+    }
+
+    /// <summary>
+    /// Gets or sets the element to cut out of the backdrop.
+    /// The element's bounding rectangle will be excluded via <c>clip-path: polygon()</c>,
+    /// allowing it to remain interactive while the backdrop is present.
+    /// </summary>
+    [Parameter]
+    public ElementReference? Cutout { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the backdrop is inert.
+    /// When <see langword="true"/>, the element and its descendants are non-interactive.
+    /// </summary>
+    [Parameter]
+    public bool Inert { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS pointer-events value for the backdrop.
+    /// Defaults to browser behavior when omitted.
+    /// </summary>
+    [Parameter]
+    public string? PointerEvents { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the element reference of the rendered backdrop element.
+    /// </summary>
+    public ElementReference Element => element;
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Cutout.HasValue && !Nullable.Equals(Cutout, previousCutout))
+        {
+            previousCutout = Cutout;
+            try
+            {
+                var module = await moduleTask.Value;
+
+                if (backdropId is not null)
+                {
+                    // Cutout element changed — update the existing instance
+                    await module.InvokeVoidAsync("updateBackdropCutout", backdropId, Cutout.Value);
+                }
+                else
+                {
+                    // First cutout — initialize reactive clip-path management
+                    backdropId = await module.InvokeAsync<string>("initializeBackdrop", element, Cutout.Value);
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+        else if (!Cutout.HasValue && backdropId is not null)
+        {
+            previousCutout = null;
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeBackdrop", backdropId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+
+            backdropId = null;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (backdropId is not null && moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeBackdrop", backdropId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+}

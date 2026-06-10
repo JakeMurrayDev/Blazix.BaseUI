@@ -1,0 +1,218 @@
+@using Blazix.BaseUI.NavigationMenu
+
+<ComponentShowcase ComponentName="Navigation Menu"
+                   Description="A horizontal (or vertical) navigation bar with trigger-revealed content panels."
+                   BaseRoute="/navigation-menu"
+                   IsWasmMode="IsWasmMode">
+    <DemoSection Title="Basic Usage"
+                 Description="A horizontal navigation menu with three items, each with trigger and content panel containing links.">
+        <div class="flex flex-col gap-4">
+            <NavigationMenuRoot
+                @bind-Value="basicValue"
+                ClassValue="@(_ => "relative")">
+                <NavigationMenuList class="flex gap-1 rounded-lg bg-gray-100 p-1">
+                    <NavigationMenuItem Value="getting-started">
+                        <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                            <NavigationMenuIcon /> Getting Started
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-96 p-4">
+                            <div class="flex flex-col gap-2">
+                                <NavigationMenuLink Href="#introduction" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Introduction</NavigationMenuLink>
+                                <NavigationMenuLink Href="#installation" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Installation</NavigationMenuLink>
+                                <NavigationMenuLink Href="#quick-start" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Quick Start</NavigationMenuLink>
+                            </div>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem Value="components">
+                        <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                            <NavigationMenuIcon /> Components
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-96 p-4">
+                            <div class="flex flex-col gap-2">
+                                <NavigationMenuLink Href="#buttons" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Buttons</NavigationMenuLink>
+                                <NavigationMenuLink Href="#inputs" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Inputs</NavigationMenuLink>
+                                <NavigationMenuLink Href="#dialogs" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Dialogs</NavigationMenuLink>
+                            </div>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem Value="resources">
+                        <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                            <NavigationMenuIcon /> Resources
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-96 p-4">
+                            <div class="flex flex-col gap-2">
+                                <NavigationMenuLink Href="#docs" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Documentation</NavigationMenuLink>
+                                <NavigationMenuLink Href="#examples" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Examples</NavigationMenuLink>
+                            </div>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
+            </NavigationMenuRoot>
+            <p class="text-sm text-gray-500">Active: @(basicValue ?? "none")</p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Controlled Value"
+                 Description="Navigation menu with externally controlled value and reset button.">
+        <div class="flex flex-col gap-4">
+            <NavigationMenuRoot
+                Value="@controlledValue"
+                OnValueChange="HandleControlledValueChange"
+                ClassValue="@(_ => "relative")">
+                <NavigationMenuList class="flex gap-1 rounded-lg bg-gray-100 p-1">
+                    <NavigationMenuItem Value="tab1">
+                        <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                            Tab 1
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-80 p-4">
+                            <p class="text-sm text-gray-600">Content for Tab 1</p>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem Value="tab2">
+                        <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                            Tab 2
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-80 p-4">
+                            <p class="text-sm text-gray-600">Content for Tab 2</p>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
+            </NavigationMenuRoot>
+            <div class="flex gap-2">
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="@(() => controlledValue = "tab1")">
+                    Open Tab 1
+                </button>
+                <button type="button"
+                        class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        @onclick="@(() => controlledValue = "tab2")">
+                    Open Tab 2
+                </button>
+                <button type="button"
+                        class="rounded bg-gray-600 px-3 py-1.5 text-sm text-white hover:bg-gray-700"
+                        @onclick="() => controlledValue = null">
+                    Close All
+                </button>
+            </div>
+            <p class="text-sm text-gray-500">Controlled value: @(controlledValue ?? "none")</p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Active Link"
+                 Description="Navigation menu with an active link highlighted using aria-current page.">
+        <NavigationMenuRoot DefaultValue="pages"
+                            ClassValue="@(_ => "relative")">
+            <NavigationMenuList class="flex gap-1 rounded-lg bg-gray-100 p-1">
+                <NavigationMenuItem Value="pages">
+                    <NavigationMenuTrigger class="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-white hover:shadow-sm transition-all">
+                        <NavigationMenuIcon /> Pages
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent class="w-80 p-4">
+                        <div class="flex flex-col gap-2">
+                            <NavigationMenuLink Href="/navigation-menu" Active="true"
+                                                class="block rounded-md p-2 text-sm font-semibold text-blue-700 bg-blue-50">
+                                Navigation Menu (Current)
+                            </NavigationMenuLink>
+                            <NavigationMenuLink Href="/meter"
+                                                class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">
+                                Meter
+                            </NavigationMenuLink>
+                            <NavigationMenuLink Href="/progress"
+                                                class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">
+                                Progress
+                            </NavigationMenuLink>
+                        </div>
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+            </NavigationMenuList>
+            <NavigationMenuPortal KeepMounted="true">
+                <NavigationMenuPositioner SideOffset="8"
+                                          Align="Align.Start"
+                                          class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                    <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                    </NavigationMenuPopup>
+                </NavigationMenuPositioner>
+            </NavigationMenuPortal>
+        </NavigationMenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Vertical Orientation"
+                 Description="Navigation menu with vertical orientation for sidebar-style layouts.">
+        <div class="flex gap-4">
+            <NavigationMenuRoot
+                @bind-Value="verticalValue"
+                Orientation="@NavigationMenuOrientation.Vertical"
+                ClassValue="@(_ => "relative")">
+                <NavigationMenuList class="flex flex-col gap-1 w-48 rounded-lg bg-gray-100 p-1">
+                    <NavigationMenuItem Value="dashboard">
+                        <NavigationMenuTrigger class="w-full rounded-md px-3 py-2 text-sm font-medium text-gray-700 text-left hover:bg-white hover:shadow-sm transition-all">
+                            <NavigationMenuIcon /> Dashboard
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-64 p-4">
+                            <div class="flex flex-col gap-2">
+                                <NavigationMenuLink Href="#overview" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Overview</NavigationMenuLink>
+                                <NavigationMenuLink Href="#analytics" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Analytics</NavigationMenuLink>
+                            </div>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                    <NavigationMenuItem Value="settings">
+                        <NavigationMenuTrigger class="w-full rounded-md px-3 py-2 text-sm font-medium text-gray-700 text-left hover:bg-white hover:shadow-sm transition-all">
+                            <NavigationMenuIcon /> Settings
+                        </NavigationMenuTrigger>
+                        <NavigationMenuContent class="w-64 p-4">
+                            <div class="flex flex-col gap-2">
+                                <NavigationMenuLink Href="#profile" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Profile</NavigationMenuLink>
+                                <NavigationMenuLink Href="#security" class="block rounded-md p-2 text-sm text-gray-700 hover:bg-gray-50">Security</NavigationMenuLink>
+                            </div>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+                <NavigationMenuPortal KeepMounted="true">
+                    <NavigationMenuPositioner Side="Side.Right"
+                                              SideOffset="8"
+                                              Align="Align.Start"
+                                              class="z-50 box-border h-[var(--positioner-height)] w-[var(--positioner-width)]">
+                        <NavigationMenuPopup class="relative h-[var(--popup-height)] w-[var(--popup-width)] rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
+            </NavigationMenuRoot>
+            <p class="text-sm text-gray-500">Active: @(verticalValue ?? "none")</p>
+        </div>
+    </DemoSection>
+</ComponentShowcase>
+
+@code {
+    private string? basicValue;
+    private string? controlledValue;
+    private string? verticalValue;
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private void HandleControlledValueChange(NavigationMenuValueChangeEventArgs args)
+    {
+        controlledValue = args.Value;
+    }
+}

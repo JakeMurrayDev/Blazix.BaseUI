@@ -1,0 +1,954 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@implements IPreviewCardHandleSubscriber
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="context">
+    @if (ChildContentWithPayload is not null)
+    {
+        @ChildContentWithPayload(new PreviewCardRootPayloadContext(payload))
+    }
+    else
+    {
+        @ChildContent
+    }
+</CascadingValue>
+
+@code {
+    private readonly string rootId = Guid.NewGuid().ToIdString();
+    private readonly string popupId = Guid.NewGuid().ToIdString();
+    private readonly Dictionary<string, ElementReference?> triggerElements = new();
+    private readonly Dictionary<string, object?> triggerPayloads = new();
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private bool hasRendered;
+    private bool isOpen;
+    private readonly TransitionLifecycleManager transition = new();
+    private string? activeTriggerId;
+    private object? payload;
+    private ElementReference? positionerElement;
+    private ElementReference? popupElement;
+    private PreviewCardOpenChangeReason openChangeReason = PreviewCardOpenChangeReason.None;
+    private PreviewCardInstantType instantType = PreviewCardInstantType.None;
+    private bool preventUnmountOnClose;
+    private PreviewCardRootState state;
+    private PreviewCardRootContext context = null!;
+    private DotNetObjectReference<PreviewCardRoot>? dotNetRef;
+    private IPreviewCardHandle? subscribedHandle;
+    private bool hasViewport;
+    private bool syncTriggerAttributesAfterRender;
+    private bool syncRootOpenAfterRender;
+    private bool rootOpenToSyncAfterRender;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-preview-card.min.js").AsTask());
+
+    /// <summary>
+    /// Determines whether the preview card is currently open.
+    /// To render a controlled preview card, use this prop. Otherwise, the component manages its own state.
+    /// </summary>
+    [Parameter]
+    public bool? Open { get; set; }
+
+    /// <summary>
+    /// Determines whether the preview card is initially open.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DefaultOpen { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger that the preview card is associated with.
+    /// This is useful in conjunction with the <see cref="Open"/> prop to create a controlled preview card.
+    /// </summary>
+    [Parameter]
+    public string? TriggerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ID of the trigger that the preview card is initially associated with.
+    /// This is useful in conjunction with the <see cref="DefaultOpen"/> prop.
+    /// </summary>
+    [Parameter]
+    public string? DefaultTriggerId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the imperative actions reference for the preview card.
+    /// Provides <see cref="PreviewCardRootActions.Unmount"/>, <see cref="PreviewCardRootActions.Close"/>,
+    /// and <see cref="PreviewCardRootActions.Open"/> actions.
+    /// </summary>
+    [Parameter]
+    public PreviewCardRootActions? ActionsRef { get; set; }
+
+    /// <summary>
+    /// Gets or sets the handle to associate the preview card with detached triggers.
+    /// If specified, allows external triggers to control the preview card's open state.
+    /// </summary>
+    [Parameter]
+    public IPreviewCardHandle? Handle { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the open state changes for two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OpenChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the preview card is opened or closed.
+    /// The event args include the reason for the state change and can be canceled.
+    /// </summary>
+    [Parameter]
+    public EventCallback<PreviewCardOpenChangeEventArgs> OnOpenChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked after any animations complete when the preview card is opened or closed.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnOpenChangeComplete { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance with access to the active trigger's payload.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<PreviewCardRootPayloadContext>? ChildContentWithPayload { get; set; }
+
+    private bool IsControlled => Open.HasValue;
+
+    private bool CurrentOpen => IsControlled ? Open!.Value : isOpen;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+
+        if (CurrentOpen)
+        {
+            transition.BeginOpen();
+        }
+
+        activeTriggerId = DefaultTriggerId;
+        state = new PreviewCardRootState(CurrentOpen);
+        context = new PreviewCardRootContext
+        {
+            RootId = rootId,
+            PopupId = popupId,
+            Open = CurrentOpen,
+            Mounted = transition.IsMounted,
+            OpenChangeReason = openChangeReason,
+            TransitionStatus = transition.TransitionStatus,
+            InstantType = instantType,
+            ActiveTriggerId = activeTriggerId,
+            Payload = payload,
+            HasViewport = hasViewport,
+            GetOpen = () => state.Open,
+            GetMounted = () => transition.IsMounted,
+            GetPayload = () => payload,
+            GetTriggerElement = GetTriggerElement,
+            GetTriggerElementById = GetTriggerElementById,
+            RegisterTriggerElement = RegisterTriggerElement,
+            UnregisterTriggerElement = UnregisterTriggerElement,
+            SetPositionerElement = SetPositionerElement,
+            SetPopupElement = SetPopupElement,
+            GetPopupElement = () => popupElement,
+            GetPositionerElement = () => positionerElement,
+            SetOpenAsync = SetOpenAsync,
+            SetTriggerPayload = SetTriggerPayload,
+            ForceUnmount = ForceUnmount,
+            SetHasViewport = SetHasViewport
+        };
+
+        if (ActionsRef is not null)
+        {
+            ActionsRef.Unmount = ForceUnmount;
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PreviewCardOpenChangeReason.ImperativeAction, null);
+            ActionsRef.Open = () => _ = SetOpenWithExceptionHandlingAsync(true, PreviewCardOpenChangeReason.ImperativeAction, null);
+            ActionsRef.OpenWithTriggerId = triggerId => _ = SetOpenWithExceptionHandlingAsync(true, PreviewCardOpenChangeReason.ImperativeAction, triggerId);
+        }
+
+        SubscribeToHandle();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var currentOpen = CurrentOpen;
+        var parameterOpenChanged = state.Open != currentOpen;
+        if (parameterOpenChanged)
+        {
+            ApplyOpenParameterChange(currentOpen);
+        }
+
+        if (TriggerId is not null)
+        {
+            SetActiveTrigger(TriggerId);
+        }
+
+        TrySetImplicitActiveTrigger();
+
+        if (parameterOpenChanged)
+        {
+            CompleteOpenParameterChange(currentOpen);
+        }
+
+        if (ActionsRef is not null)
+        {
+            ActionsRef.Unmount = ForceUnmount;
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PreviewCardOpenChangeReason.ImperativeAction, null);
+            ActionsRef.Open = () => _ = SetOpenWithExceptionHandlingAsync(true, PreviewCardOpenChangeReason.ImperativeAction, null);
+            ActionsRef.OpenWithTriggerId = triggerId => _ = SetOpenWithExceptionHandlingAsync(true, PreviewCardOpenChangeReason.ImperativeAction, triggerId);
+        }
+
+        // Handle change of handle parameter
+        if (Handle != subscribedHandle)
+        {
+            UnsubscribeFromHandle();
+            SubscribeToHandle();
+        }
+
+        RefreshCascadingContext();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            await InitializeJsAsync();
+        }
+
+        if (hasRendered && syncRootOpenAfterRender)
+        {
+            syncRootOpenAfterRender = false;
+            await SyncOpenStateToJsAsync(rootOpenToSyncAfterRender, true);
+        }
+
+        if (hasRendered && syncTriggerAttributesAfterRender)
+        {
+            syncTriggerAttributesAfterRender = false;
+            await SyncTriggerAttributesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Handles an escape key press event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnEscapeKey()
+    {
+        await SetOpenAsync(false, PreviewCardOpenChangeReason.EscapeKey, null);
+    }
+
+    /// <summary>
+    /// Handles a hover open event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnHoverOpen(string? triggerId)
+    {
+        await SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerHover, triggerId);
+    }
+
+    /// <summary>
+    /// Handles a hover close event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnHoverClose(string? triggerId)
+    {
+        await SetOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover, triggerId);
+    }
+
+    /// <summary>
+    /// Handles an outside press event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnOutsidePress()
+    {
+        await SetOpenAsync(false, PreviewCardOpenChangeReason.OutsidePress, null);
+    }
+
+    /// <summary>
+    /// Handles the starting style application event from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnStartingStyleApplied()
+    {
+        if (transition.HandleStartingStyleApplied())
+        {
+            context.TransitionStatus = transition.TransitionStatus;
+            RefreshCascadingContext();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Handles a transition end event from JavaScript interop.
+    /// </summary>
+    /// <param name="open">Whether the preview card is open after the transition.</param>
+    [JSInvokable]
+    public void OnTransitionEnd(bool open)
+    {
+        var unmounted = transition.HandleTransitionEnd(open, preventUnmountOnClose);
+        preventUnmountOnClose = false;
+        context.TransitionStatus = transition.TransitionStatus;
+
+        if (unmounted)
+        {
+            context.Mounted = false;
+            activeTriggerId = null;
+            context.ActiveTriggerId = null;
+            payload = null;
+            context.Payload = null;
+        }
+
+        instantType = PreviewCardInstantType.None;
+        context.InstantType = instantType;
+
+        _ = InvokeOpenChangeCompleteAsync(open);
+        RefreshCascadingContext();
+        StateHasChanged();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        UnsubscribeFromHandle();
+
+        if (moduleTask?.IsValueCreated == true && hasRendered)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposeRoot", rootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
+    {
+        triggerElements[triggerId] = element;
+
+        if (state.Open && activeTriggerId == triggerId)
+        {
+            payload = GetPayloadFromHandle(triggerId);
+            context.Payload = payload;
+        }
+
+        if (hasRendered && element.HasValue && activeTriggerId == triggerId)
+        {
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
+        }
+    }
+
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerUnregistered(string triggerId)
+    {
+        triggerElements.Remove(triggerId);
+        triggerPayloads.Remove(triggerId);
+
+        if (activeTriggerId == triggerId && state.Open)
+        {
+            activeTriggerId = null;
+            context.ActiveTriggerId = null;
+            payload = null;
+            context.Payload = null;
+        }
+    }
+
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    {
+        triggerElements[triggerId] = element;
+
+        if (hasRendered && element.HasValue && activeTriggerId == triggerId)
+        {
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
+        }
+    }
+
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnOpenChangeRequested(bool open, PreviewCardOpenChangeReason reason, string? triggerId, string? interactionType)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await SetOpenAsync(open, reason, triggerId);
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        });
+    }
+
+    void IComponentHandleSubscriberBase<PreviewCardOpenChangeReason>.OnStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Sets the preview card's open state with the specified reason and trigger association.
+    /// </summary>
+    /// <param name="nextOpen">The desired open state.</param>
+    /// <param name="reason">The reason for the state change.</param>
+    /// <param name="triggerId">The ID of the trigger initiating the change, or <see langword="null"/>.</param>
+    internal async Task SetOpenAsync(bool nextOpen, PreviewCardOpenChangeReason reason, string? triggerId)
+    {
+        var currentOpen = state.Open;
+        var activeTriggerChanged = nextOpen && triggerId is not null && triggerId != activeTriggerId;
+
+        if (currentOpen == nextOpen && !activeTriggerChanged)
+        {
+            return;
+        }
+
+        var triggerReference = triggerId is null ? null : GetTriggerElementById(triggerId);
+        var args = new PreviewCardOpenChangeEventArgs(nextOpen, reason, triggerId, triggerReference);
+        await OnOpenChange.InvokeAsync(args);
+
+        if (args.IsCanceled)
+        {
+            return;
+        }
+
+        if (!nextOpen)
+        {
+            preventUnmountOnClose = args.PreventUnmount;
+        }
+
+        openChangeReason = reason;
+        context.OpenChangeReason = reason;
+
+        if (nextOpen)
+        {
+            if (triggerId is not null)
+            {
+                var previousTriggerId = activeTriggerId;
+                SetActiveTrigger(triggerId);
+
+                if (currentOpen && hasViewport && previousTriggerId is not null && previousTriggerId != triggerId)
+                {
+                    _ = NotifyViewportTriggerChangeAsync(previousTriggerId, triggerId);
+                }
+            }
+
+            instantType = reason == PreviewCardOpenChangeReason.TriggerFocus
+                ? PreviewCardInstantType.Focus
+                : PreviewCardInstantType.None;
+            if (!currentOpen || !transition.IsMounted)
+            {
+                transition.BeginOpen();
+            }
+        }
+        else
+        {
+            instantType = reason switch
+            {
+                PreviewCardOpenChangeReason.EscapeKey or PreviewCardOpenChangeReason.TriggerPress => PreviewCardInstantType.Dismiss,
+                _ => PreviewCardInstantType.None
+            };
+            if (currentOpen)
+            {
+                transition.BeginClose();
+            }
+        }
+
+        context.InstantType = instantType;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
+
+        if (!IsControlled)
+        {
+            isOpen = nextOpen;
+        }
+
+        state = new PreviewCardRootState(nextOpen);
+        context.Open = nextOpen;
+
+        TrySetImplicitActiveTrigger();
+
+        if (nextOpen && activeTriggerId is null)
+        {
+            payload = null;
+            context.Payload = null;
+        }
+
+        SyncHandleState(nextOpen, activeTriggerId);
+
+        if (currentOpen != nextOpen)
+        {
+            await OpenChanged.InvokeAsync(nextOpen);
+        }
+
+        if (hasRendered)
+        {
+            await SyncOpenStateToJsAsync(nextOpen, currentOpen != nextOpen || activeTriggerChanged);
+        }
+
+        context.NotifyStateChanged();
+        RefreshCascadingContext();
+        syncTriggerAttributesAfterRender = true;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Registers a trigger element with the preview card root.
+    /// </summary>
+    /// <param name="triggerId">The ID of the trigger to register.</param>
+    /// <param name="element">The element reference for the trigger.</param>
+    internal void RegisterTriggerElement(string triggerId, ElementReference? element)
+    {
+        triggerElements[triggerId] = element;
+
+        TrySetImplicitActiveTrigger();
+
+        if (hasRendered && element.HasValue && activeTriggerId == triggerId)
+        {
+            _ = SetTriggerElementJsAsync(triggerId, element.Value);
+        }
+    }
+
+    /// <summary>
+    /// Unregisters a trigger element from the preview card root.
+    /// </summary>
+    /// <param name="triggerId">The ID of the trigger to unregister.</param>
+    internal void UnregisterTriggerElement(string triggerId)
+    {
+        triggerElements.Remove(triggerId);
+        triggerPayloads.Remove(triggerId);
+
+        if (activeTriggerId == triggerId && state.Open)
+        {
+            activeTriggerId = null;
+            context.ActiveTriggerId = null;
+            payload = null;
+            context.Payload = null;
+        }
+    }
+
+    /// <summary>
+    /// Sets the payload associated with a specific trigger.
+    /// </summary>
+    /// <param name="triggerId">The ID of the trigger.</param>
+    /// <param name="triggerPayload">The payload value to associate with the trigger.</param>
+    internal void SetTriggerPayload(string triggerId, object? triggerPayload)
+    {
+        triggerPayloads[triggerId] = triggerPayload;
+
+        if (activeTriggerId == triggerId && state.Open)
+        {
+            payload = triggerPayload;
+            context.Payload = payload;
+            context.NotifyStateChanged();
+        }
+    }
+
+    /// <summary>
+    /// Stores the positioner element reference for positioning calculations.
+    /// </summary>
+    /// <param name="element">The positioner element reference.</param>
+    internal void SetPositionerElement(ElementReference? element)
+    {
+        positionerElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetPositionerElementJsAsync(element.Value);
+        }
+    }
+
+    /// <summary>
+    /// Stores the popup element reference and registers it with JavaScript interop.
+    /// </summary>
+    /// <param name="element">The popup element reference.</param>
+    internal void SetPopupElement(ElementReference? element)
+    {
+        popupElement = element;
+
+        if (hasRendered && element.HasValue)
+        {
+            _ = SetPopupElementJsAsync(element.Value);
+        }
+    }
+
+    /// <summary>
+    /// Sets whether a viewport component is present.
+    /// </summary>
+    /// <param name="value">Whether a viewport is present.</param>
+    internal void SetHasViewport(bool value)
+    {
+        hasViewport = value;
+        context.HasViewport = value;
+    }
+
+    /// <summary>
+    /// Gets the current open state of the preview card.
+    /// </summary>
+    internal bool GetOpen() => context.Open;
+
+    /// <summary>
+    /// Gets whether the preview card is currently mounted in the DOM.
+    /// </summary>
+    internal bool GetMounted() => transition.IsMounted;
+
+    /// <summary>
+    /// Gets the current payload value from the active trigger.
+    /// </summary>
+    internal object? GetPayload() => payload;
+
+    /// <summary>
+    /// Gets the element reference of the currently active trigger.
+    /// </summary>
+    internal ElementReference? GetTriggerElement()
+    {
+        if (activeTriggerId is not null && triggerElements.TryGetValue(activeTriggerId, out var element))
+        {
+            return element;
+        }
+
+        // Try to get from handle if available
+        if (Handle is not null && activeTriggerId is not null)
+        {
+            var handleElement = GetTriggerElementFromHandle(activeTriggerId);
+            if (handleElement.HasValue)
+            {
+                return handleElement;
+            }
+        }
+
+        return triggerElements.Values.FirstOrDefault();
+    }
+
+    private ElementReference? GetTriggerElementById(string? triggerId)
+    {
+        if (triggerId is null)
+        {
+            return null;
+        }
+
+        if (triggerElements.TryGetValue(triggerId, out var element))
+        {
+            return element;
+        }
+
+        if (Handle is not null)
+        {
+            return GetTriggerElementFromHandle(triggerId);
+        }
+
+        return null;
+    }
+
+    private async Task InitializeJsAsync()
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef);
+
+            if (positionerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setPositionerElement", rootId, positionerElement.Value);
+            }
+
+            var triggerElement = GetTriggerElementById(activeTriggerId);
+            if (activeTriggerId is not null && triggerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);
+            }
+
+            if (popupElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setPopupElement", rootId, popupElement.Value);
+            }
+
+            if (state.Open)
+            {
+                await module.InvokeVoidAsync("setRootOpen", rootId, true, activeTriggerId);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetTriggerElementJsAsync(string triggerId, ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setTriggerElement", rootId, triggerId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetPositionerElementJsAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setPositionerElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetPopupElementJsAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setPopupElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void ApplyOpenParameterChange(bool nextOpen)
+    {
+        var previousOpen = state.Open;
+
+        openChangeReason = PreviewCardOpenChangeReason.None;
+        context.OpenChangeReason = openChangeReason;
+        instantType = PreviewCardInstantType.None;
+
+        if (nextOpen)
+        {
+            if (!previousOpen || !transition.IsMounted)
+            {
+                transition.BeginOpen();
+            }
+        }
+        else
+        {
+            preventUnmountOnClose = false;
+
+            if (previousOpen)
+            {
+                transition.BeginClose();
+            }
+        }
+
+        state = new PreviewCardRootState(nextOpen);
+        context.Open = nextOpen;
+        context.InstantType = instantType;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
+    }
+
+    private void CompleteOpenParameterChange(bool nextOpen)
+    {
+        if (nextOpen && activeTriggerId is null)
+        {
+            payload = null;
+            context.Payload = null;
+        }
+
+        SyncHandleState(nextOpen, activeTriggerId);
+
+        if (hasRendered)
+        {
+            rootOpenToSyncAfterRender = nextOpen;
+            syncRootOpenAfterRender = true;
+            syncTriggerAttributesAfterRender = true;
+        }
+
+        context.NotifyStateChanged();
+    }
+
+    private async Task SyncOpenStateToJsAsync(bool nextOpen, bool syncRootOpen)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+
+            if (nextOpen && activeTriggerId is not null)
+            {
+                var triggerElement = GetTriggerElementById(activeTriggerId);
+                if (triggerElement.HasValue)
+                {
+                    await module.InvokeVoidAsync("setTriggerElement", rootId, activeTriggerId, triggerElement.Value);
+                }
+            }
+
+            if (syncRootOpen)
+            {
+                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, activeTriggerId);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncTriggerAttributesAsync()
+    {
+        if (moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("syncTriggerOpenAttributes", rootId, state.Open, activeTriggerId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, PreviewCardOpenChangeReason reason, string? triggerId)
+    {
+        try
+        {
+            await SetOpenAsync(nextOpen, reason, triggerId);
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
+    }
+
+    private void ForceUnmount()
+    {
+        transition.ForceUnmount();
+        context.Mounted = false;
+        context.TransitionStatus = transition.TransitionStatus;
+        activeTriggerId = null;
+        context.ActiveTriggerId = null;
+        payload = null;
+        context.Payload = null;
+        RefreshCascadingContext();
+        _ = InvokeOpenChangeCompleteAsync(false);
+        StateHasChanged();
+    }
+
+    private void TrySetImplicitActiveTrigger()
+    {
+        if (state.Open && activeTriggerId is null && triggerElements.Count == 1)
+        {
+            var entry = triggerElements.First();
+            SetActiveTrigger(entry.Key);
+        }
+    }
+
+    private void SetActiveTrigger(string triggerId)
+    {
+        activeTriggerId = triggerId;
+        context.ActiveTriggerId = triggerId;
+
+        if (triggerPayloads.TryGetValue(triggerId, out var triggerPayload))
+        {
+            payload = triggerPayload;
+        }
+        else
+        {
+            payload = GetPayloadFromHandle(triggerId);
+        }
+
+        context.Payload = payload;
+    }
+
+    private void RefreshCascadingContext()
+    {
+        context.Open = state.Open;
+        context.Mounted = transition.IsMounted;
+        context.OpenChangeReason = openChangeReason;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.InstantType = instantType;
+        context.ActiveTriggerId = activeTriggerId;
+        context.Payload = payload;
+        context.HasViewport = hasViewport;
+    }
+
+    private async Task NotifyViewportTriggerChangeAsync(string previousTriggerId, string nextTriggerId)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            var previousTriggerElement = GetTriggerElementById(previousTriggerId);
+            var nextTriggerElement = GetTriggerElementById(nextTriggerId);
+            if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("onViewportTriggerChange", rootId, previousTriggerElement.Value, nextTriggerElement.Value);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task InvokeOpenChangeCompleteAsync(bool open)
+    {
+        try
+        {
+            await OnOpenChangeComplete.InvokeAsync(open);
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
+    }
+
+    private void SubscribeToHandle()
+    {
+        if (Handle is null)
+        {
+            return;
+        }
+
+        subscribedHandle = Handle;
+        Handle.Subscribe(this);
+        Handle.SyncRootId(rootId);
+    }
+
+    private void UnsubscribeFromHandle()
+    {
+        if (subscribedHandle is null)
+        {
+            return;
+        }
+
+        subscribedHandle.Unsubscribe(this);
+        subscribedHandle.SyncRootId(null);
+        subscribedHandle = null;
+    }
+
+    private void SyncHandleState(bool open, string? triggerId)
+    {
+        Handle?.SyncState(open, triggerId, payload);
+    }
+
+    private object? GetPayloadFromHandle(string triggerId)
+    {
+        return Handle?.GetTriggerPayloadAsObject(triggerId);
+    }
+
+    private ElementReference? GetTriggerElementFromHandle(string triggerId)
+    {
+        return Handle?.GetTriggerElement(triggerId);
+    }
+}

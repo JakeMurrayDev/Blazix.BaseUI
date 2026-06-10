@@ -1,0 +1,268 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+<RenderElement TState="AccordionTriggerState"
+               Tag="button"
+               State="state"
+               Enabled="ItemContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-accordion-trigger.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private string? defaultId;
+    private bool hasRendered;
+    private bool pendingConfigUpdate;
+    private bool previousIsHorizontal;
+    private bool previousIsRtl;
+    private bool previousLoopFocus;
+    private bool previousNativeButton;
+    private AccordionTriggerState state = null!;
+    private RenderElement<AccordionTriggerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool ResolvedDisabled => Disabled ?? ItemContext?.Disabled ?? false;
+
+    private string ResolvedId
+    {
+        get
+        {
+            var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () =>
+                string.IsNullOrEmpty(ItemContext?.TriggerId)
+                    ? defaultId ??= Guid.NewGuid().ToIdString()
+                    : ItemContext.TriggerId);
+            if (id != ItemContext?.TriggerId)
+            {
+                ItemContext?.SetTriggerId(id);
+            }
+            return id;
+        }
+    }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = null!;
+
+    [CascadingParameter]
+    private IAccordionRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private IAccordionItemContext? ItemContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the component should ignore user interaction.
+    /// When <see langword="null"/>, inherits from the parent <see cref="AccordionItem{TValue}"/>.
+    /// </summary>
+    [Parameter]
+    public bool? Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the component renders a native <c>&lt;button&gt;</c> element. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// Accepts a function that returns the element to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<AccordionTriggerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<AccordionTriggerState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<AccordionTriggerState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public AccordionTrigger()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var currentOpen = ItemContext?.Open ?? false;
+        var currentOrientation = ItemContext?.Orientation ?? Orientation.Vertical;
+        var currentIndex = ItemContext?.Index ?? 0;
+        var currentValue = ItemContext?.StringValue ?? string.Empty;
+        var currentDisabled = ResolvedDisabled;
+        var currentHidden = ItemContext?.Hidden ?? true;
+
+        if (state is null)
+        {
+            state = new AccordionTriggerState(currentOpen, currentOrientation, currentIndex, currentValue, currentDisabled, currentHidden);
+        }
+        else if (state.Open != currentOpen || state.Orientation != currentOrientation || state.Index != currentIndex || state.Value != currentValue || state.Disabled != currentDisabled || state.Hidden != currentHidden)
+        {
+            state = state with { Open = currentOpen, Orientation = currentOrientation, Index = currentIndex, Value = currentValue, Disabled = currentDisabled, Hidden = currentHidden };
+        }
+
+        if (hasRendered && RootContext is not null)
+        {
+            var isHorizontal = RootContext.Orientation == Orientation.Horizontal;
+            var isRtl = RootContext.Direction == Direction.Rtl;
+            var loopFocus = RootContext.LoopFocus;
+
+            if (isHorizontal != previousIsHorizontal || isRtl != previousIsRtl || loopFocus != previousLoopFocus || NativeButton != previousNativeButton)
+            {
+                pendingConfigUpdate = true;
+            }
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+
+            if (Element.HasValue)
+            {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
+                    var isRtl = RootContext?.Direction == Direction.Rtl;
+                    var loopFocus = RootContext?.LoopFocus ?? true;
+
+                    previousIsHorizontal = isHorizontal;
+                    previousIsRtl = isRtl;
+                    previousLoopFocus = loopFocus;
+                    previousNativeButton = NativeButton;
+
+                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
+            }
+        }
+        else if (pendingConfigUpdate && Element.HasValue)
+        {
+            pendingConfigUpdate = false;
+
+            try
+            {
+                var module = await moduleTask.Value;
+                var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
+                var isRtl = RootContext?.Direction == Direction.Rtl;
+                var loopFocus = RootContext?.LoopFocus ?? true;
+
+                previousIsHorizontal = isHorizontal;
+                previousIsRtl = isRtl;
+                previousLoopFocus = loopFocus;
+                previousNativeButton = NativeButton;
+
+                await module.InvokeVoidAsync("updateConfig", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        ItemContext?.SetTriggerId(null);
+
+        if (moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("dispose", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private void BuildComponentAttributes()
+    {
+        if (ItemContext is null) return;
+
+        var attrs = new Dictionary<string, object>();
+
+        attrs["id"] = ResolvedId;
+
+        if (NativeButton)
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, ResolvedDisabled, focusableWhenDisabled: true);
+        else
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, ResolvedDisabled, focusableWhenDisabled: true);
+
+        attrs["aria-expanded"] = ItemContext.Open ? "true" : "false";
+
+        if (ItemContext.Open)
+            attrs["aria-controls"] = ItemContext.PanelId;
+
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["data-panel-open"] = state.Open;
+        attrs["data-index"] = state.Index.ToString();
+        attrs["data-orientation"] = state.Orientation.ToDataAttributeString()!;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-hidden"] = state.Hidden;
+        attrs["data-value"] = state.Value;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs args)
+    {
+        if (ResolvedDisabled)
+        {
+            return;
+        }
+
+        if (ItemContext is not null)
+        {
+            await ItemContext.HandleTrigger();
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
+    }
+}

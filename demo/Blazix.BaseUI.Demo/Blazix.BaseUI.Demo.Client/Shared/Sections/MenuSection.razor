@@ -1,0 +1,541 @@
+@using Blazix.BaseUI.Menu
+
+<ComponentShowcase ComponentName="Menu"
+                   Description="A popup menu displaying a list of actions or options. Supports keyboard navigation, nested submenus, checkbox items, and radio groups."
+                   BaseRoute="/menu"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic Menu"
+                 Description="Click the trigger button to open the menu. Click an item or outside to close.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Open Menu
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">Add to Library</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Add to Playlist</MenuItem>
+                        <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                        <MenuItem ClassValue="@(_ => ItemClass())">Play Next</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Play Last</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Keyboard Navigation"
+                 Description="Use Arrow keys to navigate items, Home/End to jump to first/last, Enter or Space to select. Disabled items are included in navigation but cannot be activated.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Keyboard Demo
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">Item 1</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Item 2</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())" Disabled="true">Item 3 (disabled)</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Item 4</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Item 5</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+        <div class="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+            <p class="font-medium text-gray-900">Keyboard shortcuts:</p>
+            <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-gray-600">
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowDown</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">ArrowUp</kbd> - Navigate items</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Home</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">End</kbd> - Jump to first/last item</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Enter</kbd> / <kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Space</kbd> - Select item</li>
+                <li><kbd class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs">Escape</kbd> - Close menu</li>
+            </ul>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Text Navigation (Typeahead)"
+                 Description="Type characters to jump to matching items. The menu uses innerText matching for navigation.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Type to Navigate
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">Aa</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Ba</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Bb</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Ca</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Cb</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Cd</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Close On Click"
+                 Description="By default, clicking an item closes the menu. Set CloseOnClick='false' to keep it open.">
+        <div class="flex gap-4">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                    Closes on Click
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Click me to close</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Me too!</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                    Stays Open (@clickCount)
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())" CloseOnClick="false" @onclick="@(() => clickCount++)">
+                                Increment (stays open)
+                            </MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())" CloseOnClick="false">
+                                Click count: @clickCount
+                            </MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Items"
+                 Description="Disabled items can be focused but not activated. They are included in keyboard navigation.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Edit Menu
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">Undo</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Redo</MenuItem>
+                        <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                        <MenuItem ClassValue="@(_ => ItemClass())" Disabled="true">Cut (nothing selected)</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())" Disabled="true">Copy (nothing selected)</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Paste</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Checkbox Items"
+                 Description="Menu items that toggle a checked state. By default, checkbox items keep the menu open when clicked.">
+        <div class="flex flex-col gap-4">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                    View Options
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuCheckboxItem ClassValue="@(_ => CheckboxItemClass())" Checked="@showToolbar" OnCheckedChange="@(e => showToolbar = e.Checked)">
+                                <MenuCheckboxItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                    @CheckIcon
+                                </MenuCheckboxItemIndicator>
+                                <span>Show Toolbar</span>
+                            </MenuCheckboxItem>
+                            <MenuCheckboxItem ClassValue="@(_ => CheckboxItemClass())" Checked="@showSidebar" OnCheckedChange="@(e => showSidebar = e.Checked)">
+                                <MenuCheckboxItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                    @CheckIcon
+                                </MenuCheckboxItemIndicator>
+                                <span>Show Sidebar</span>
+                            </MenuCheckboxItem>
+                            <MenuCheckboxItem ClassValue="@(_ => CheckboxItemClass())" Checked="@showStatusBar" OnCheckedChange="@(e => showStatusBar = e.Checked)">
+                                <MenuCheckboxItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                    @CheckIcon
+                                </MenuCheckboxItemIndicator>
+                                <span>Show Status Bar</span>
+                            </MenuCheckboxItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <div class="text-sm text-gray-600">
+                <p>Current state:</p>
+                <ul class="mt-1 list-inside list-disc">
+                    <li>Toolbar: <strong>@(showToolbar ? "visible" : "hidden")</strong></li>
+                    <li>Sidebar: <strong>@(showSidebar ? "visible" : "hidden")</strong></li>
+                    <li>Status Bar: <strong>@(showStatusBar ? "visible" : "hidden")</strong></li>
+                </ul>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Radio Items"
+                 Description="Menu items within a radio group for single selection. By default, radio items keep the menu open.">
+        <div class="flex flex-col gap-4">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                    Theme: @selectedTheme
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuRadioGroup Value="@selectedTheme" OnValueChange="HandleThemeChange">
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("light")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>Light</span>
+                                </MenuRadioItem>
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>Dark</span>
+                                </MenuRadioItem>
+                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("system")">
+                                    <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
+                                        @DotIcon
+                                    </MenuRadioItemIndicator>
+                                    <span>System</span>
+                                </MenuRadioItem>
+                            </MenuRadioGroup>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <div class="text-sm text-gray-600">
+                <p>Selected theme: <strong>@selectedTheme</strong></p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Submenu"
+                 Description="Nested menus that open on hover or arrow key navigation. Use ArrowRight to open and ArrowLeft to close (reversed in RTL).">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                File Menu
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">New File</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Open...</MenuItem>
+                        <MenuSubmenuRoot>
+                            <MenuSubmenuTrigger ClassValue="@(_ => SubmenuTriggerClass())">
+                                <span>Open Recent</span>
+                                @ChevronRightIcon
+                            </MenuSubmenuTrigger>
+                            <MenuPortal>
+                                <MenuPositioner SideOffset="0" AlignOffset="-4">
+                                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                                        <MenuItem ClassValue="@(_ => ItemClass())">Document 1.txt</MenuItem>
+                                        <MenuItem ClassValue="@(_ => ItemClass())">Document 2.txt</MenuItem>
+                                        <MenuItem ClassValue="@(_ => ItemClass())">Document 3.txt</MenuItem>
+                                        <MenuSubmenuRoot>
+                                            <MenuSubmenuTrigger ClassValue="@(_ => SubmenuTriggerClass())">
+                                                <span>More...</span>
+                                                @ChevronRightIcon
+                                            </MenuSubmenuTrigger>
+                                            <MenuPortal>
+                                                <MenuPositioner SideOffset="0" AlignOffset="-4">
+                                                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                                                        <MenuItem ClassValue="@(_ => ItemClass())">Document 4.txt</MenuItem>
+                                                        <MenuItem ClassValue="@(_ => ItemClass())">Document 5.txt</MenuItem>
+                                                    </MenuPopup>
+                                                </MenuPositioner>
+                                            </MenuPortal>
+                                        </MenuSubmenuRoot>
+                                    </MenuPopup>
+                                </MenuPositioner>
+                            </MenuPortal>
+                        </MenuSubmenuRoot>
+                        <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                        <MenuItem ClassValue="@(_ => ItemClass())">Save</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Save As...</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Hover to Open"
+                 Description="Open the menu on hover with configurable delay. Useful for toolbar-style menus.">
+        <div class="flex gap-4">
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())" OpenOnHover="true" Delay="0">
+                    Instant Hover
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Opens immediately</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">On hover</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+
+            <MenuRoot Context="_">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())" OpenOnHover="true" Delay="300" CloseDelay="200">
+                    300ms Delay
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Opens after 300ms</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Closes after 200ms leave</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Modal Mode"
+                 Description="When modal is true, a backdrop is rendered behind the menu. This blocks interaction with the rest of the page.">
+        <MenuRoot Context="_" Modal="MenuModalMode.True">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Open Modal Menu
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuBackdrop ClassValue="@(_ => "fixed inset-0 bg-black/20")" />
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuItem ClassValue="@(_ => ItemClass())">This menu has a backdrop</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Click outside closes menu</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Press Escape to close</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Controlled Open State"
+                 Description="Control the menu open state externally with callbacks.">
+        <div class="flex flex-col gap-4">
+            <MenuRoot Context="_" Open="@controlledOpen" OnOpenChange="HandleOpenChangeEvent">
+                <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                    @(controlledOpen ? "Close" : "Open") Menu
+                    @ChevronDownIcon
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner SideOffset="8">
+                        <MenuPopup ClassValue="@(_ => PopupClass())">
+                            <MenuItem ClassValue="@(_ => ItemClass())">Controlled menu item 1</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Controlled menu item 2</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+            <div class="text-sm text-gray-600">
+                <p>Open state: <strong>@controlledOpen</strong></p>
+                <button class="mt-2 rounded bg-gray-900 px-3 py-1.5 text-sm text-white hover:bg-gray-800"
+                        @onclick="@(() => controlledOpen = !controlledOpen)">
+                    Toggle Programmatically
+                </button>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="With Arrow"
+                 Description="Display an arrow pointing to the trigger element.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Menu with Arrow
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuArrow ClassValue="@(_ => ArrowClass())">
+                            @ArrowSvg
+                        </MenuArrow>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Arrow points to trigger</MenuItem>
+                        <MenuItem ClassValue="@(_ => ItemClass())">Another item</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Groups and Separators"
+                 Description="Organize menu items into groups with labels and visual separators. MenuGroup creates a group with role='group' and MenuGroupLabel provides an accessible label via aria-labelledby.">
+        <MenuRoot Context="_">
+            <MenuTrigger ClassValue="@(_ => TriggerClass())">
+                Organized Menu
+                @ChevronDownIcon
+            </MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner SideOffset="8">
+                    <MenuPopup ClassValue="@(_ => PopupClass())">
+                        <MenuGroup ClassValue="@(_ => "")">
+                            <MenuGroupLabel ClassValue="@(_ => GroupLabelClass())">
+                                File
+                            </MenuGroupLabel>
+                            <MenuItem ClassValue="@(_ => ItemClass())">New</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Open</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Save</MenuItem>
+                        </MenuGroup>
+                        <Blazix.BaseUI.Separator.Separator ClassValue="@(_ => SeparatorClass())" />
+                        <MenuGroup ClassValue="@(_ => "")">
+                            <MenuGroupLabel ClassValue="@(_ => GroupLabelClass())">
+                                Edit
+                            </MenuGroupLabel>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Undo</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Redo</MenuItem>
+                            <MenuItem ClassValue="@(_ => ItemClass())">Cut</MenuItem>
+                        </MenuGroup>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+    </DemoSection>
+
+    <DemoSection Title="Data Attributes"
+                 Description="Menu components expose data attributes for styling based on state.">
+        <div class="rounded-lg border border-gray-200 bg-white p-4">
+            <p class="font-medium text-gray-900">Available data attributes:</p>
+            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                    <p class="text-sm font-medium text-gray-700">Menu Trigger:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-popup-open</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-pressed</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">Menu Popup:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-open</code> / <code class="text-xs bg-gray-100 px-1 rounded">data-closed</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-side</code> (top/right/bottom/left)</li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-align</code> (start/center/end)</li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-starting-style</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-ending-style</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">Menu Item:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-highlighted</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-disabled</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">Checkbox/Radio Item:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-checked</code> / <code class="text-xs bg-gray-100 px-1 rounded">data-unchecked</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-highlighted</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-disabled</code></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-700">Submenu Trigger:</p>
+                    <ul class="mt-1 list-inside list-disc text-sm text-gray-600">
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-popup-open</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-highlighted</code></li>
+                        <li><code class="text-xs bg-gray-100 px-1 rounded">data-disabled</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private bool showToolbar = true;
+    private bool showSidebar = true;
+    private bool showStatusBar = false;
+    private object? selectedTheme = "light";
+    private int clickCount = 0;
+    private bool controlledOpen = false;
+
+    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs e)
+    {
+        selectedTheme = e.Value;
+        return Task.CompletedTask;
+    }
+
+    private Task HandleOpenChangeEvent(MenuOpenChangeEventArgs e)
+    {
+        controlledOpen = e.Open;
+        return Task.CompletedTask;
+    }
+
+    private static string TriggerClass() =>
+        "inline-flex items-center justify-center gap-1.5 h-10 px-3.5 border border-gray-200 rounded-md bg-gray-50 font-medium text-sm text-gray-900 select-none cursor-default outline-none hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 data-[popup-open]:bg-gray-100";
+
+    private static string PopupClass() =>
+        "min-w-[180px] py-1 rounded-md bg-white text-gray-900 outline outline-1 outline-gray-200 shadow-lg origin-[var(--transform-origin)] transition-[scale,opacity] duration-150 data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90";
+
+    private static string ItemClass() =>
+        "outline-none cursor-default select-none py-2 px-4 text-sm text-gray-900 data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400 data-[disabled]:cursor-not-allowed";
+
+    private static string CheckboxItemClass() =>
+        "outline-none cursor-default select-none py-2 px-2.5 text-sm text-gray-900 grid grid-cols-[1rem_1fr] gap-2 items-center data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400";
+
+    private static string RadioItemClass() =>
+        "outline-none cursor-default select-none py-2 px-2.5 text-sm text-gray-900 grid grid-cols-[1rem_1fr] gap-2 items-center data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[disabled]:text-gray-400";
+
+    private static string IndicatorClass() =>
+        "flex items-center justify-center w-4 h-4";
+
+    private static string SeparatorClass() =>
+        "mx-4 my-1.5 h-px bg-gray-200";
+
+    private static string GroupLabelClass() =>
+        "py-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide";
+
+    private static string SubmenuTriggerClass() =>
+        "outline-none cursor-default select-none py-2 px-4 text-sm text-gray-900 flex items-center justify-between gap-4 data-[highlighted]:bg-gray-900 data-[highlighted]:text-white data-[popup-open]:bg-gray-100";
+
+    private static string ArrowClass() =>
+        "data-[side=top]:bottom-[-10px] data-[side=top]:rotate-180 data-[side=bottom]:top-[-10px] data-[side=left]:right-[-13px] data-[side=left]:rotate-90 data-[side=right]:left-[-13px] data-[side=right]:-rotate-90";
+}
+
+@* Icon Components *@
+
+@code {
+    private RenderFragment ChevronDownIcon => @<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6" />
+    </svg>;
+
+    private RenderFragment ChevronRightIcon => @<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 6l6 6-6 6" />
+    </svg>;
+
+    private RenderFragment CheckIcon => @<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <path d="M5 12l5 5L20 7" />
+    </svg>;
+
+    private RenderFragment DotIcon => @<svg class="w-2 h-2" viewBox="0 0 8 8">
+        <circle cx="4" cy="4" r="4" fill="currentColor" />
+    </svg>;
+
+    private RenderFragment ArrowSvg => @<svg width="20" height="10" viewBox="0 0 20 10" fill="none">
+        <path d="M9.66437 2.60207L4.80758 6.97318C4.07308 7.63423 3.11989 8 2.13172 8H0V10H20V8H18.5349C17.5468 8 16.5936 7.63423 15.8591 6.97318L11.0023 2.60207C10.622 2.2598 10.0447 2.25979 9.66437 2.60207Z" class="fill-white" />
+        <path d="M8.99542 1.85876C9.75604 1.17425 10.9106 1.17422 11.6713 1.85878L16.5281 6.22989C17.0789 6.72568 17.7938 7.00001 18.5349 7.00001L15.89 7L11.0023 2.60207C10.622 2.2598 10.0447 2.2598 9.66436 2.60207L4.77553 7L2.13171 7.00001C2.87284 7.00001 3.58774 6.72568 4.13861 6.22989L8.99542 1.85876Z" class="fill-gray-200" />
+    </svg>;
+}

@@ -1,0 +1,91 @@
+@using Blazix.BaseUI.Utilities
+
+@implements IDisposable
+
+<CascadingValue TValue="NavigationMenuItemContext" Value="itemContext" IsFixed="true">
+    <RenderElement TState="NavigationMenuItemState"
+                   Tag="li"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes" />
+</CascadingValue>
+
+@code {
+    private string itemValue = null!;
+    private NavigationMenuItemState state;
+    private NavigationMenuItemContext itemContext = null!;
+
+    [CascadingParameter]
+    private NavigationMenuRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the unique value identifying this item.
+    /// If not provided, an auto-generated value will be used.
+    /// </summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NavigationMenuItemState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuItemState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<NavigationMenuItemState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        itemValue = Value ?? Guid.NewGuid().ToIdString();
+        var triggerId = $"nav-trigger-{itemValue}";
+        var contentId = $"nav-content-{itemValue}";
+
+        itemContext = new NavigationMenuItemContext
+        {
+            Value = itemValue,
+            TriggerId = triggerId,
+            ContentId = contentId
+        };
+
+        RootContext?.RegisterItem(itemValue);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = new NavigationMenuItemState();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        RootContext?.UnregisterItem(itemValue);
+    }
+}

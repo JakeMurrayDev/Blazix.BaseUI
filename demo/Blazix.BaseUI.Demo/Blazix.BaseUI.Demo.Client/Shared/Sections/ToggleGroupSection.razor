@@ -1,0 +1,640 @@
+@using Blazix.BaseUI.Toggle
+@using Blazix.BaseUI.ToggleGroup
+
+<ComponentShowcase ComponentName="ToggleGroup"
+                   Description="A container that groups multiple toggles together, providing shared state management and keyboard navigation."
+                   BaseRoute="/toggle-group"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic ToggleGroup"
+                 Description="Select one option from a group. Single selection mode (default).">
+        <ToggleGroup DefaultValue="@(new[] { "center" })"
+                     ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="left"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Left</span>
+                </Toggle>
+                <Toggle Value="center"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Center</span>
+                </Toggle>
+                <Toggle Value="right"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Right</span>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Controlled ToggleGroup"
+                 Description="State controlled externally via Value parameter.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Value="@controlledGroupValue"
+                         ValueChanged="@(value => controlledGroupValue = value.ToList())"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="bold"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2 font-bold">B</span>
+                    </Toggle>
+                    <Toggle Value="italic"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2 italic">I</span>
+                    </Toggle>
+                    <Toggle Value="underline"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2 underline">U</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-700">Selected: <strong>@(string.Join(", ", controlledGroupValue))</strong></span>
+                <button type="button"
+                        class="rounded bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700"
+                        @onclick="@(() => controlledGroupValue = new List<string> { "italic" })">
+                    Set to Italic
+                </button>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Default Value"
+                 Description="Group starts with pre-selected value using DefaultValue.">
+        <ToggleGroup DefaultValue="@(new[] { "two" })"
+                     ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="one"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">One</span>
+                </Toggle>
+                <Toggle Value="two"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Two</span>
+                </Toggle>
+                <Toggle Value="three"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Three</span>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Multiple Selection Mode"
+                 Description="When Multiple is true, multiple items can be pressed simultaneously.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Multiple="true"
+                         DefaultValue="@(new[] { "one" })"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="one"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">One</span>
+                    </Toggle>
+                    <Toggle Value="two"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Two</span>
+                    </Toggle>
+                    <Toggle Value="three"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Three</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Click multiple toggles - they stay pressed independently.
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Single Selection Mode"
+                 Description="When Multiple is false (default), only one item can be pressed at a time.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Multiple="false"
+                         DefaultValue="@(new[] { "one" })"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="one"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">One</span>
+                    </Toggle>
+                    <Toggle Value="two"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Two</span>
+                    </Toggle>
+                    <Toggle Value="three"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Three</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Clicking a new toggle unpresses the previous one.
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Group"
+                 Description="Entire group can be disabled. All toggles become non-interactive.">
+        <ToggleGroup Disabled="true"
+                     DefaultValue="@(new[] { "a" })"
+                     ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="a"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Option A</span>
+                </Toggle>
+                <Toggle Value="b"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Option B</span>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Disabled Individual Items"
+                 Description="Individual toggles can be disabled within an enabled group.">
+        <ToggleGroup ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="x"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Option X</span>
+                </Toggle>
+                <Toggle Value="y"
+                        Disabled="true"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Option Y (disabled)</span>
+                </Toggle>
+                <Toggle Value="z"
+                        ClassValue="@(state => ToggleClass(state))">
+                    <span class="px-3 py-2">Option Z</span>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Orientation"
+                 Description="Sets data-orientation attribute. Affects keyboard navigation direction.">
+        <div class="flex gap-8">
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">Horizontal (default):</span>
+                <ToggleGroup Orientation="Orientation.Horizontal"
+                             ClassValue="@(state => ToggleGroupClass(state))">
+                    <div class="flex gap-1">
+                        <Toggle Value="h1"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">A</span>
+                        </Toggle>
+                        <Toggle Value="h2"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">B</span>
+                        </Toggle>
+                        <Toggle Value="h3"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">C</span>
+                        </Toggle>
+                    </div>
+                </ToggleGroup>
+                <p class="text-xs text-gray-500">Use Left/Right arrow keys</p>
+            </div>
+            <div class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-gray-600">Vertical:</span>
+                <ToggleGroup Orientation="Orientation.Vertical"
+                             ClassValue="@(state => ToggleGroupClass(state))">
+                    <div class="flex flex-col gap-1">
+                        <Toggle Value="v1"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">A</span>
+                        </Toggle>
+                        <Toggle Value="v2"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">B</span>
+                        </Toggle>
+                        <Toggle Value="v3"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">C</span>
+                        </Toggle>
+                    </div>
+                </ToggleGroup>
+                <p class="text-xs text-gray-500">Use Up/Down arrow keys</p>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Keyboard Navigation: Arrow Keys"
+                 Description="Use arrow keys to navigate between toggles.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Value="@keyboardNavValue"
+                         ValueChanged="@(v => keyboardNavValue = v.ToList())"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="nav-a"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">A</span>
+                    </Toggle>
+                    <Toggle Value="nav-b"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">B</span>
+                    </Toggle>
+                    <Toggle Value="nav-c"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">C</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                1. Tab to focus the group<br />
+                2. Use ArrowLeft/ArrowRight to move focus<br />
+                3. Press Enter or Space to toggle the focused item<br />
+                4. Home goes to first, End goes to last
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Focus Looping"
+                 Description="Navigation loops from last item back to first, and vice versa.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup LoopFocus="true"
+                         Value="@loopFocusValue"
+                         ValueChanged="@(v => loopFocusValue = v.ToList())"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="loop-1"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">First</span>
+                    </Toggle>
+                    <Toggle Value="loop-2"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Second</span>
+                    </Toggle>
+                    <Toggle Value="loop-3"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Third</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Press ArrowRight on "Third" to loop back to "First".<br />
+                Press ArrowLeft on "First" to loop to "Third".
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="No Focus Looping"
+                 Description="When LoopFocus is false, navigation stops at the boundaries.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup LoopFocus="false"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="noloop-1"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">First</span>
+                    </Toggle>
+                    <Toggle Value="noloop-2"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Second</span>
+                    </Toggle>
+                    <Toggle Value="noloop-3"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Third</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Press ArrowRight on "Third" - focus stays on "Third".<br />
+                Press ArrowLeft on "First" - focus stays on "First".
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Skip Disabled Items"
+                 Description="Arrow key navigation automatically skips disabled toggles.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Value="@skipDisabledValue"
+                         ValueChanged="@(v => skipDisabledValue = v.ToList())"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="skip-1"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">1 (enabled)</span>
+                    </Toggle>
+                    <Toggle Value="skip-2"
+                            Disabled="true"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">2 (disabled)</span>
+                    </Toggle>
+                    <Toggle Value="skip-3"
+                            Disabled="true"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">3 (disabled)</span>
+                    </Toggle>
+                    <Toggle Value="skip-4"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">4 (enabled)</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Focus item 1, then press ArrowRight - focus jumps directly to item 4.
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Roving TabIndex"
+                 Description="Only the selected (or first enabled) toggle has tabindex=0. Tab exits the group.">
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-4">
+                <button type="button"
+                        class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        @onfocus="@(() => rovingFocusLocation = "Before button")">
+                    Before
+                </button>
+
+                <ToggleGroup Value="@rovingTabIndexValue"
+                             ValueChanged="@(v => { rovingTabIndexValue = v.ToList(); rovingFocusLocation = $"Toggle: {string.Join(", ", v)}"; })"
+                             ClassValue="@(state => ToggleGroupClass(state))">
+                    <div class="flex gap-1">
+                        <Toggle Value="roving-a"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">A</span>
+                        </Toggle>
+                        <Toggle Value="roving-b"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">B</span>
+                        </Toggle>
+                        <Toggle Value="roving-c"
+                                ClassValue="@(state => ToggleClass(state))">
+                            <span class="px-3 py-2">C</span>
+                        </Toggle>
+                    </div>
+                </ToggleGroup>
+
+                <button type="button"
+                        class="rounded border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        @onfocus="@(() => rovingFocusLocation = "After button")">
+                    After
+                </button>
+            </div>
+            <div class="text-sm text-gray-600">
+                <strong>Last focus:</strong> @rovingFocusLocation
+            </div>
+            <p class="text-sm text-gray-500">
+                1. No selection: Tab focuses "A" (first enabled), Tab again goes to "After"<br />
+                2. Select "C", Tab away, then Shift+Tab back - focus returns to "C"
+            </p>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="OnValueChange Callback"
+                 Description="Event handler called when the group's value changes.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup OnValueChange="@HandleGroupValueChange"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="apple"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Apple</span>
+                    </Toggle>
+                    <Toggle Value="banana"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Banana</span>
+                    </Toggle>
+                    <Toggle Value="cherry"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Cherry</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <span class="text-sm text-gray-700">Change count: @groupChangeCount</span>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Cancelable Value Change"
+                 Description="OnValueChange can cancel the state change by calling Cancel().">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup OnValueChange="@HandleCancelableGroupChange"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle Value="opt-1"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Option 1</span>
+                    </Toggle>
+                    <Toggle Value="opt-2"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Option 2</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" @bind="preventGroupChange" class="rounded" />
+                <span class="text-sm text-gray-700">Cancel next change</span>
+            </label>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Data Attributes"
+                 Description="Shows data-* style hooks on the group element.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Multiple="@dataAttrMultiple"
+                         Disabled="@dataAttrGroupDisabled"
+                         Orientation="@(dataAttrVertical ? Orientation.Vertical : Orientation.Horizontal)"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="@(dataAttrVertical ? "flex flex-col gap-1" : "flex gap-1")">
+                    <Toggle Value="data-1"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">A</span>
+                    </Toggle>
+                    <Toggle Value="data-2"
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">B</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @bind="dataAttrGroupDisabled" class="rounded" />
+                    <span>Disabled</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @bind="dataAttrMultiple" class="rounded" />
+                    <span>Multiple</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" @bind="dataAttrVertical" class="rounded" />
+                    <span>Vertical</span>
+                </label>
+            </div>
+            <div class="rounded bg-gray-100 p-3 font-mono text-xs">
+                <p>Expected attributes on group:</p>
+                <ul class="mt-1 list-inside list-disc">
+                    <li>role="group"</li>
+                    @if (dataAttrGroupDisabled)
+                    {
+                        <li>data-disabled</li>
+                    }
+                    @if (dataAttrMultiple)
+                    {
+                        <li>data-multiple</li>
+                    }
+                    <li>data-orientation="@(dataAttrVertical ? "vertical" : "horizontal")"</li>
+                </ul>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Icon Toggle Group"
+                 Description="Example using icons for a text formatting toolbar.">
+        <ToggleGroup Multiple="true"
+                     DefaultValue="@(new[] { "bold" })"
+                     ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="bold"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="italic"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 4h4m-2 0v16m-4 0h8" transform="skewX(-10)" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="underline"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 20h12M8 4v8a4 4 0 008 0V4" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="strikethrough"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16M8 6h8a4 4 0 010 8H8" />
+                    </svg>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Alignment Toggle Group"
+                 Description="Example using a single-select group for text alignment.">
+        <ToggleGroup DefaultValue="@(new[] { "align-left" })"
+                     ClassValue="@(state => ToggleGroupClass(state))">
+            <div class="flex gap-1">
+                <Toggle Value="align-left"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h12M3 18h18" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="align-center"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M6 12h12M3 18h18" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="align-right"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M9 12h12M3 18h18" />
+                    </svg>
+                </Toggle>
+                <Toggle Value="align-justify"
+                        ClassValue="@(state => IconToggleClass(state))">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 12h18M3 18h18" />
+                    </svg>
+                </Toggle>
+            </div>
+        </ToggleGroup>
+    </DemoSection>
+
+    <DemoSection Title="Toggles Without Explicit Value"
+                 Description="Toggles without value prop get auto-generated unique IDs.">
+        <div class="flex flex-col gap-4">
+            <ToggleGroup Multiple="true"
+                         ClassValue="@(state => ToggleGroupClass(state))">
+                <div class="flex gap-1">
+                    <Toggle ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Auto ID 1</span>
+                    </Toggle>
+                    <Toggle Value=""
+                            ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Empty Value</span>
+                    </Toggle>
+                    <Toggle ClassValue="@(state => ToggleClass(state))">
+                        <span class="px-3 py-2">Auto ID 2</span>
+                    </Toggle>
+                </div>
+            </ToggleGroup>
+            <p class="text-sm text-gray-500">
+                Each toggle gets a unique identifier even without explicit value.
+            </p>
+        </div>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private int groupChangeCount;
+    private bool preventGroupChange;
+    private bool dataAttrGroupDisabled;
+    private bool dataAttrMultiple;
+    private bool dataAttrVertical;
+
+    private List<string> controlledGroupValue = new() { "bold" };
+    private List<string> keyboardNavValue = new();
+    private List<string> loopFocusValue = new();
+    private List<string> skipDisabledValue = new();
+    private List<string> rovingTabIndexValue = new();
+    private string rovingFocusLocation = "(none)";
+
+    private void HandleGroupValueChange(ToggleGroupValueChangeEventArgs e)
+    {
+        groupChangeCount++;
+    }
+
+    private void HandleCancelableGroupChange(ToggleGroupValueChangeEventArgs e)
+    {
+        if (preventGroupChange)
+        {
+            e.Cancel();
+            preventGroupChange = false;
+        }
+    }
+
+    private static string ToggleClass(ToggleState state)
+    {
+        var baseClass = "inline-flex items-center justify-center rounded-md border text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2";
+
+        if (state.Disabled)
+            return $"{baseClass} border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed";
+
+        if (state.Pressed)
+            return $"{baseClass} border-indigo-600 bg-indigo-600 text-white";
+
+        return $"{baseClass} border-gray-300 bg-white text-gray-700 hover:bg-gray-50";
+    }
+
+    private static string IconToggleClass(ToggleState state)
+    {
+        var baseClass = "inline-flex items-center justify-center rounded-md border p-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2";
+
+        if (state.Disabled)
+            return $"{baseClass} border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed";
+
+        if (state.Pressed)
+            return $"{baseClass} border-indigo-600 bg-indigo-100 text-indigo-600";
+
+        return $"{baseClass} border-gray-300 bg-white text-gray-700 hover:bg-gray-50";
+    }
+
+    private static string ToggleGroupClass(ToggleGroupState state)
+    {
+        return "inline-flex";
+    }
+}

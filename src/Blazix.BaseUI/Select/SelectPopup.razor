@@ -1,0 +1,370 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Csp
+@using Blazix.BaseUI.FloatingFocusManager
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+<RenderElement TState="SelectPopupState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ResolveClass"
+               StyleValue="ResolveStyle"
+               ComponentAttributes="componentAttributes"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference">
+    <FloatingFocusManager Modal="@false"
+                          Disabled="@(!(RootContext?.GetMounted() ?? false))"
+                          InitialFocus="@false"
+                          FinalFocus="FinalFocus"
+                          CloseOnFocusOut="@true">
+        @ChildContent
+    </FloatingFocusManager>
+</RenderElement>
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
+
+    private SelectPopupState state;
+    private RenderElement<SelectPopupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private DotNetObjectReference<SelectPopup>? dotNetRef;
+    private bool jsInitialized;
+    private bool resizeAttached;
+    private bool previousOpen;
+    private bool previousAlignActive;
+    private bool? previousHighlightItemOnHover;
+
+    public SelectPopup()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JS.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
+    }
+
+    [CascadingParameter]
+    private ISelectRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private SelectPositionerContext? PositionerContext { get; set; }
+
+    [CascadingParameter]
+    private CspProviderContext? CspContext { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SelectPopupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectPopupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectPopupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Determines the element to focus when the select popup is closed.
+    /// <list type="bullet">
+    /// <item><see cref="FinalFocusTarget.Default"/> — focus the trigger or previously-focused element (default).</item>
+    /// <item><see cref="FinalFocusTarget.None"/> — leave focus where it is.</item>
+    /// <item>An <see cref="ElementReference"/> — focus that element.</item>
+    /// <item>A <c>(closeType) =&gt; FinalFocusResult</c> callback — decide at close time.</item>
+    /// </list>
+    /// When <c>null</c>, falls back to the underlying focus manager's default
+    /// (<see cref="FloatingFocusManager.ReturnFocus"/>).
+    /// </summary>
+    [Parameter]
+    public FinalFocusTarget? FinalFocus { get; set; }
+
+    /// <summary>
+    /// Gets the associated <see cref="ElementReference"/> of the popup container.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            // Trigger's aria-controls targets `<RootId>-list`; assign deterministically
+            // so the trigger and popup ids line up without an extra render cycle.
+            RootContext.PopupId = $"{RootContext.RootId}-list";
+        }
+        dotNetRef = DotNetObjectReference.Create(this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var side = PositionerContext?.Side ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? Align.Center;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        var alignActive = PositionerContext?.AlignItemWithTriggerActive ?? false;
+
+        state = new SelectPopupState(open, side, align, transitionStatus, alignActive);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (RootContext is null) return;
+
+        var open = state.Open;
+        var alignActive = state.AlignItemWithTriggerActive;
+
+        if (firstRender && Element.HasValue && !jsInitialized)
+        {
+            RootContext.SetPopupElement(Element);
+
+            try
+            {
+                var module = await moduleTask.Value;
+                if (CspContext?.DisableStyleElements != true)
+                {
+                    await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
+                }
+                await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, RootContext.HighlightItemOnHover);
+                previousHighlightItemOnHover = RootContext.HighlightItemOnHover;
+                await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!);
+                jsInitialized = true;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        if (!jsInitialized || !Element.HasValue) return;
+
+        // Sync highlightItemOnHover when changed.
+        var hov = RootContext.HighlightItemOnHover;
+        if (previousHighlightItemOnHover != hov)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, hov);
+                previousHighlightItemOnHover = hov;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+
+        var isActiveAndOpen = open && alignActive;
+
+        // Clear positioner styles only when BOTH open and align-item mode are false,
+        // matching React's `if (open || alignItemWithTriggerActive) return;` guard in
+        // useIsoLayoutEffect. Clearing while still mounted during the close transition
+        // restores the saved `top: '0', left: '0'` fallbacks, which causes the popup
+        // to visibly jump to the top-left of the viewport during the exit animation.
+        var bothInactiveNow = !open && !alignActive;
+        var bothInactivePrev = !previousOpen && !previousAlignActive;
+        if (bothInactiveNow && !bothInactivePrev)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("clearPopupStyles", RootContext.RootId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+
+        // Run alignItemWithTrigger placement on every render while active & open.
+        // The JS routine is idempotent and owns releasing the FOUC hide by setting
+        // data-positioned after it writes the fixed placement. Waiting for the C#
+        // IsPositioned round-trip can leave Server-rendered popups invisible when
+        // Floating UI's first callback is delayed or skipped.
+        if (isActiveAndOpen)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("beginAlignItemWithTriggerPlacement", RootContext.RootId, true);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+
+        // Attach/detach the window-resize listener so the popup auto-closes
+        // when the viewport changes shape under align-item-with-trigger mode.
+        if (isActiveAndOpen && !resizeAttached)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("attachWindowResizeListener", RootContext.RootId);
+                resizeAttached = true;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+        else if (!isActiveAndOpen && resizeAttached)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("detachWindowResizeListener", RootContext.RootId);
+                resizeAttached = false;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+
+        previousOpen = open;
+        previousAlignActive = alignActive;
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (jsInitialized && moduleTask.IsValueCreated && RootContext is not null)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                if (resizeAttached)
+                {
+                    await module.InvokeVoidAsync("detachWindowResizeListener", RootContext.RootId);
+                }
+                await module.InvokeVoidAsync("disposePopup", RootContext.RootId);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Invoked from JS when the pointer leaves the popup container while
+    /// <see cref="ISelectRootContext.HighlightItemOnHover"/> is enabled.
+    /// Clears the keyboard-set highlight and refocuses the popup.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnPopupPointerLeave()
+    {
+        if (RootContext is null) return;
+        RootContext.SetActiveIndex(-1);
+        try
+        {
+            await RootContext.ClearHighlightsAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Invoked from JS when a window-resize event fires while the popup is in
+    /// align-item-with-trigger mode. Closes the select with
+    /// <see cref="SelectOpenChangeReason.WindowResize"/>.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnWindowResize()
+    {
+        if (RootContext is null) return;
+        await RootContext.SetOpenAsync(false, SelectOpenChangeReason.WindowResize);
+    }
+
+    /// <summary>
+    /// Invoked from JS when the popup placement pipeline determines the
+    /// align-item layout cannot fit (trigger near a viewport edge or pinch-zoom).
+    /// Disables align-item mode at the positioner level so the layout reverts to
+    /// the standard floating-positioner placement on the next render.
+    /// </summary>
+    [JSInvokable]
+    public void OnFallbackToAlignPopupToTrigger()
+    {
+        PositionerContext?.SetControlledAlignItemWithTrigger(false);
+        StateHasChanged();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var hasListChild = RootContext?.HasList ?? false;
+
+        if (hasListChild)
+        {
+            // SelectList carries the listbox semantics; the popup becomes presentational.
+            attrs["role"] = "presentation";
+        }
+        else
+        {
+            if (RootContext?.PopupId is { Length: > 0 } popupId)
+            {
+                attrs["id"] = popupId;
+            }
+            attrs["role"] = "listbox";
+            attrs["tabindex"] = "-1";
+            if (RootContext?.Multiple == true)
+            {
+                attrs["aria-multiselectable"] = "true";
+            }
+        }
+
+        attrs["data-side"] = state.Side.ToDataAttributeString()!;
+        attrs["data-align"] = state.Align.ToDataAttributeString()!;
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, state.Open, state.TransitionStatus);
+
+        componentAttributes = attrs;
+    }
+
+    private string? ResolveClass(SelectPopupState s)
+    {
+        var userClass = ClassValue?.Invoke(s);
+        var hasList = RootContext?.HasList ?? false;
+        var intrinsic = (s.AlignItemWithTriggerActive && !hasList)
+            ? "blazix-base-ui-disable-scrollbar"
+            : null;
+
+        if (string.IsNullOrEmpty(intrinsic)) return userClass;
+        if (string.IsNullOrEmpty(userClass)) return intrinsic;
+        return $"{intrinsic} {userClass}";
+    }
+
+    private string? ResolveStyle(SelectPopupState s)
+    {
+        var userStyle = StyleValue?.Invoke(s);
+        string? intrinsic = null;
+        if (s.AlignItemWithTriggerActive)
+        {
+            var hasList = RootContext?.HasList ?? false;
+            intrinsic = hasList
+                ? "height:100%;"
+                : "position:relative;max-height:100%;overflow-x:hidden;overflow-y:auto;";
+        }
+
+        if (string.IsNullOrEmpty(intrinsic)) return userStyle;
+        if (string.IsNullOrEmpty(userStyle)) return intrinsic;
+        var sep = intrinsic.TrimEnd().EndsWith(';') ? " " : "; ";
+        return $"{intrinsic}{sep}{userStyle}";
+    }
+}

@@ -1,0 +1,141 @@
+@page "/tests/popover-multi-trigger/server"
+@using Blazix.BaseUI.Popover
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Popover Multi-Trigger Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    @if (UseHandle)
+    {
+        <PopoverTypedTrigger TPayload="string"
+            Id="trigger-a"
+            Handle="handle"
+            Payload='@("Payload A")'
+            data-testid="trigger-a"
+            style="position: absolute; left: 50px; top: 50px;">
+            Trigger A
+        </PopoverTypedTrigger>
+
+        <PopoverTypedTrigger TPayload="string"
+            Id="trigger-b"
+            Handle="handle"
+            Payload='@("Payload B")'
+            data-testid="trigger-b"
+            style="position: absolute; left: 300px; top: 50px;">
+            Trigger B
+        </PopoverTypedTrigger>
+
+        <PopoverRoot
+            @bind-Open="isOpen"
+            Handle="handle"
+            DefaultOpen="@DefaultOpen"
+            DefaultTriggerId="@DefaultTriggerId">
+            <PopoverPortal>
+                <PopoverPositioner data-testid="popover-positioner">
+                    <PopoverPopup data-testid="popover-popup">
+                        @if (UseViewport)
+                        {
+                            <PopoverViewport data-testid="popover-viewport">
+                                <div data-testid="popup-content">@(handle.ActiveTriggerId == "trigger-a" ? "Content A" : "Content B")</div>
+                            </PopoverViewport>
+                        }
+                        else
+                        {
+                            <div data-testid="popup-content">@(handle.ActiveTriggerId == "trigger-a" ? "Content A" : "Content B")</div>
+                        }
+                        <PopoverClose data-testid="popover-close">Close</PopoverClose>
+                    </PopoverPopup>
+                </PopoverPositioner>
+            </PopoverPortal>
+        </PopoverRoot>
+
+        @if (ShowProgrammaticButtons)
+        {
+            <button data-testid="open-a-button" @onclick="OpenTriggerA">Open A</button>
+            <button data-testid="open-b-button" @onclick="OpenTriggerB">Open B</button>
+            <button data-testid="close-button" @onclick="CloseHandle">Close</button>
+        }
+    }
+    else
+    {
+        <PopoverRoot
+            @bind-Open="isOpen"
+            DefaultOpen="@DefaultOpen"
+            DefaultTriggerId="@DefaultTriggerId">
+            <ChildContent Context="payloadContext">
+                <PopoverTrigger Id="trigger-a" Payload="@((object?)"Payload A")" data-testid="trigger-a">Trigger A</PopoverTrigger>
+                <PopoverTrigger Id="trigger-b" Payload="@((object?)"Payload B")" data-testid="trigger-b">Trigger B</PopoverTrigger>
+                <PopoverPortal>
+                    <PopoverPositioner data-testid="popover-positioner">
+                        <PopoverPopup data-testid="popover-popup">
+                            @if (UseViewport)
+                            {
+                                <PopoverViewport data-testid="popover-viewport">
+                                    <div data-testid="popup-content">@(payloadContext.Payload?.ToString() ?? "No Payload")</div>
+                                </PopoverViewport>
+                            }
+                            else
+                            {
+                                <div data-testid="popup-content">@(payloadContext.Payload?.ToString() ?? "No Payload")</div>
+                            }
+                            <PopoverClose data-testid="popover-close">Close</PopoverClose>
+                        </PopoverPopup>
+                    </PopoverPositioner>
+                </PopoverPortal>
+            </ChildContent>
+        </PopoverRoot>
+    }
+
+    @if (ShowPayload)
+    {
+        <span data-testid="payload-display">@GetPayloadDisplay()</span>
+    }
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    private PopoverHandle<string> handle = new();
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultTriggerId")]
+    public string? DefaultTriggerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useHandle")]
+    public bool UseHandle { get; set; }
+
+    [SupplyParameterFromQuery(Name = "useViewport")]
+    public bool UseViewport { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showPayload")]
+    public bool ShowPayload { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showProgrammaticButtons")]
+    public bool ShowProgrammaticButtons { get; set; }
+
+    private bool isOpen;
+
+    protected override void OnInitialized()
+    {
+        isOpen = DefaultOpen;
+    }
+
+    private void OpenTriggerA() => handle.Open("trigger-a");
+    private void OpenTriggerB() => handle.Open("trigger-b");
+    private void CloseHandle() => handle.Close();
+
+    private string GetPayloadDisplay()
+    {
+        if (UseHandle)
+        {
+            return handle.Payload ?? "No Payload";
+        }
+        return "No Payload";
+    }
+}

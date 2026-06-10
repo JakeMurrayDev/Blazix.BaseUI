@@ -1,0 +1,111 @@
+@page "/tests/navigation-menu/wasm"
+@using Blazix.BaseUI.NavigationMenu
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Navigation Menu Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <NavigationMenuRoot
+        @bind-Value="currentValue"
+        DefaultValue="@DefaultValue"
+        Orientation="@(Orientation == "vertical" ? NavigationMenuOrientation.Vertical : NavigationMenuOrientation.Horizontal)"
+        Delay="@Delay"
+        CloseDelay="@CloseDelay"
+        OnValueChange="HandleValueChange">
+        <NavigationMenuList>
+            <NavigationMenuItem Value="item1">
+                <NavigationMenuTrigger Disabled="@DisableItem1" data-testid="nav-trigger-1">
+                    <NavigationMenuIcon />
+                    Item 1
+                </NavigationMenuTrigger>
+                <NavigationMenuContent data-testid="nav-content-1">
+                    <NavigationMenuLink Href="/link1a" data-testid="nav-link-1a">Link 1A</NavigationMenuLink>
+                    <NavigationMenuLink Href="/link1b" data-testid="nav-link-1b">Link 1B</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+            <NavigationMenuItem Value="item2">
+                <NavigationMenuTrigger data-testid="nav-trigger-2">
+                    <NavigationMenuIcon />
+                    Item 2
+                </NavigationMenuTrigger>
+                <NavigationMenuContent data-testid="nav-content-2">
+                    <NavigationMenuLink Href="/link2a" data-testid="nav-link-2a">Link 2A</NavigationMenuLink>
+                    <NavigationMenuLink Href="/link2b" data-testid="nav-link-2b">Link 2B</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+            <NavigationMenuItem Value="item3">
+                <NavigationMenuTrigger data-testid="nav-trigger-3">
+                    <NavigationMenuIcon />
+                    Item 3
+                </NavigationMenuTrigger>
+                <NavigationMenuContent data-testid="nav-content-3">
+                    <NavigationMenuLink Href="/link3a" Active="true" data-testid="nav-link-3a-active">Link 3A (Active)</NavigationMenuLink>
+                    <NavigationMenuLink Href="/link3b" data-testid="nav-link-3b">Link 3B</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+            @if (ShowNestedNav)
+            {
+                <NavigationMenuItem Value="nested">
+                    <NavigationMenuTrigger data-testid="nav-trigger-nested">
+                        Nested Nav
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent data-testid="nav-content-nested">
+                        <NavigationMenuRoot data-testid="nested-nav-root">
+                            <NavigationMenuList>
+                                <NavigationMenuItem Value="nested-item1">
+                                    <NavigationMenuTrigger data-testid="nested-nav-trigger-1">Nested Item 1</NavigationMenuTrigger>
+                                    <NavigationMenuContent data-testid="nested-nav-content-1">
+                                        <NavigationMenuLink Href="/nested1" data-testid="nested-nav-link-1">Nested Link 1</NavigationMenuLink>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+                            </NavigationMenuList>
+                        </NavigationMenuRoot>
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+            }
+        </NavigationMenuList>
+    </NavigationMenuRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Active Value: <span data-testid="active-value">@(currentValue ?? "none")</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Changed Value: <span data-testid="last-changed-value">@(lastChangedValue ?? "none")</span></div>
+    </div>
+
+    <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "orientation")]
+    public string Orientation { get; set; } = "horizontal";
+
+    [SupplyParameterFromQuery(Name = "delay")]
+    public int Delay { get; set; } = 50;
+
+    [SupplyParameterFromQuery(Name = "closeDelay")]
+    public int CloseDelay { get; set; } = 50;
+
+    [SupplyParameterFromQuery(Name = "showNestedNav")]
+    public bool ShowNestedNav { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disableItem1")]
+    public bool DisableItem1 { get; set; }
+
+    private string? currentValue;
+    private int changeCount;
+    private string? lastChangedValue;
+
+    protected override void OnInitialized()
+    {
+        currentValue = DefaultValue;
+    }
+
+    private void HandleValueChange(NavigationMenuValueChangeEventArgs args)
+    {
+        changeCount++;
+        lastChangedValue = args.Value;
+    }
+}

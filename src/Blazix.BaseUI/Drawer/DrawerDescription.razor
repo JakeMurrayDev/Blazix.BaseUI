@@ -1,0 +1,107 @@
+@using Blazix.BaseUI.Dialog
+
+@implements IDisposable
+
+<RenderElement TState="DrawerDescriptionState"
+               Tag="p"
+               Enabled="Context is not null"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private string? defaultId;
+    private DrawerDescriptionState state;
+    private RenderElement<DrawerDescriptionState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private string ResolvedId => Id ?? (defaultId ??= Guid.NewGuid().ToIdString());
+
+    [CascadingParameter]
+    private DialogRootContext? Context { get; set; }
+
+    /// <summary>
+    /// Gets or sets the element ID. When not specified, an ID is auto-generated.
+    /// The ID is registered with the drawer for <c>aria-describedby</c>.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<DrawerDescriptionState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerDescriptionState, string>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<DrawerDescriptionState, string>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Context is null)
+        {
+            throw new InvalidOperationException("DrawerDescription must be used within a DrawerRoot.");
+        }
+
+        state = new DrawerDescriptionState();
+        Context.SetDescriptionId(ResolvedId);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var currentId = ResolvedId;
+        if (Context is not null && Context.DescriptionId != currentId)
+        {
+            Context.SetDescriptionId(currentId);
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        Context?.SetDescriptionId(null);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        attrs["id"] = ResolvedId;
+        componentAttributes = attrs;
+    }
+}

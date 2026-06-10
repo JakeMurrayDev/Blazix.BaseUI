@@ -1,0 +1,456 @@
+@using Blazix.BaseUI.AlertDialog
+@using Blazix.BaseUI.Dialog
+
+<ComponentShowcase ComponentName="Alert Dialog"
+                   Description="A modal dialog that requires a user response to proceed. Unlike regular dialogs, alert dialogs cannot be dismissed by clicking outside."
+                   BaseRoute="/alert-dialog"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic Alert Dialog"
+                 Description="A simple alert dialog with trigger, content, title, description, and close button. Note the role='alertdialog' and aria-labelledby/describedby attributes."
+                 CodeSnippet="@BasicCodeSnippet">
+        <AlertDialogRoot>
+            <AlertDialogTrigger ClassValue="@(s => DangerTriggerClass(s))">
+                Delete Item
+            </AlertDialogTrigger>
+            <AlertDialogPortal>
+                <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                    <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                        Delete this item?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                        This action cannot be undone. The item will be permanently removed.
+                    </AlertDialogDescription>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <AlertDialogClose ClassValue="@(s => SecondaryButtonClass(s))">
+                            Cancel
+                        </AlertDialogClose>
+                        <AlertDialogClose ClassValue="@(s => DangerButtonClass(s))">
+                            Delete
+                        </AlertDialogClose>
+                    </div>
+                </AlertDialogPopup>
+            </AlertDialogPortal>
+        </AlertDialogRoot>
+    </DemoSection>
+
+    <DemoSection Title="Controlled State"
+                 Description="Control the alert dialog open state externally with callbacks."
+                 CodeSnippet="@ControlledCodeSnippet">
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <button class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none"
+                        @onclick="@(() => controlledOpen = true)">
+                    Open Alert Externally
+                </button>
+                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                    @(controlledOpen ? "Open" : "Closed")
+                </span>
+            </div>
+            <AlertDialogRoot Open="@controlledOpen"
+                             OpenChanged="@(e => controlledOpen = e)"
+                             OnOpenChange="HandleOpenChange">
+                <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                    Toggle Alert Dialog
+                </AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                    <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                        <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                            Controlled Alert Dialog
+                        </AlertDialogTitle>
+                        <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                            This alert dialog's state is controlled externally.
+                        </AlertDialogDescription>
+                        <div class="mt-4 rounded bg-gray-50 p-3 font-mono text-xs">
+                            <p>Last reason: <strong>@lastReason</strong></p>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                                Close
+                            </AlertDialogClose>
+                        </div>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Cannot Dismiss on Backdrop Click"
+                 Description="This is the key difference from regular Dialog: clicking the backdrop does NOT close an Alert Dialog. Users must explicitly click a close button or press ESC."
+                 CodeSnippet="@BackdropCodeSnippet">
+        <div class="flex flex-wrap gap-4">
+            <AlertDialogRoot>
+                <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                    Open Alert Dialog
+                </AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                    <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                        <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                            Try Clicking the Backdrop
+                        </AlertDialogTitle>
+                        <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                            Click outside this dialog on the dark backdrop. Notice that the dialog does NOT close.
+                            This ensures users must make an explicit choice.
+                        </AlertDialogDescription>
+                        <div class="mt-6 flex justify-end">
+                            <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                                Close (Required)
+                            </AlertDialogClose>
+                        </div>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Nested Alert Dialogs"
+                 Description="Alert dialogs can be nested with proper stacking and focus management."
+                 CodeSnippet="@NestedCodeSnippet">
+        <AlertDialogRoot>
+            <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                Open First Alert
+            </AlertDialogTrigger>
+            <AlertDialogPortal>
+                <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                    <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                        First Alert Dialog
+                    </AlertDialogTitle>
+                    <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                        This is the first alert dialog. You can open another one from here.
+                    </AlertDialogDescription>
+                    <div class="mt-4">
+                        <AlertDialogRoot Context="_">
+                            <AlertDialogTrigger ClassValue="@(s => SecondaryTriggerClass(s))">
+                                Open Second Alert
+                            </AlertDialogTrigger>
+                            <AlertDialogPortal>
+                                <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                                <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                                    <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                                        Second Alert Dialog
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                                        This is a nested alert dialog. Each ESC press closes one dialog at a time.
+                                    </AlertDialogDescription>
+                                    <div class="mt-6 flex justify-end">
+                                        <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                                            Close
+                                        </AlertDialogClose>
+                                    </div>
+                                </AlertDialogPopup>
+                            </AlertDialogPortal>
+                        </AlertDialogRoot>
+                    </div>
+                    <div class="mt-6 flex justify-end">
+                        <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                            Close
+                        </AlertDialogClose>
+                    </div>
+                </AlertDialogPopup>
+            </AlertDialogPortal>
+        </AlertDialogRoot>
+    </DemoSection>
+
+    <DemoSection Title="Animations"
+                 Description="Use CSS transitions with data attributes for smooth enter/exit animations."
+                 CodeSnippet="@AnimationsCodeSnippet">
+        <AlertDialogRoot>
+            <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                Open Animated Alert
+            </AlertDialogTrigger>
+            <AlertDialogPortal>
+                <AlertDialogBackdrop ClassValue="@(s => AnimatedBackdropClass(s))" />
+                <AlertDialogPopup ClassValue="@(s => AnimatedPopupClass(s))">
+                    <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                        Animated Alert Dialog
+                    </AlertDialogTitle>
+                    <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                        This alert dialog uses CSS transitions for smooth enter and exit animations.
+                        The backdrop fades and the popup scales in.
+                    </AlertDialogDescription>
+                    <div class="mt-6 flex justify-end">
+                        <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                            Close
+                        </AlertDialogClose>
+                    </div>
+                </AlertDialogPopup>
+            </AlertDialogPortal>
+        </AlertDialogRoot>
+    </DemoSection>
+
+    <DemoSection Title="Disabled States"
+                 Description="Disabled trigger and close buttons prevent interaction."
+                 CodeSnippet="@DisabledCodeSnippet">
+        <div class="flex flex-wrap gap-4">
+            <AlertDialogRoot>
+                <AlertDialogTrigger Disabled="true" ClassValue="@(s => DisabledTriggerClass(s))">
+                    Disabled Trigger
+                </AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                    <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                        <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                            You shouldn't see this
+                        </AlertDialogTitle>
+                        <div class="mt-6 flex justify-end">
+                            <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                                Close
+                            </AlertDialogClose>
+                        </div>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+
+            <AlertDialogRoot>
+                <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                    Alert with Disabled Close
+                </AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                    <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                        <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                            Disabled Close Button
+                        </AlertDialogTitle>
+                        <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                            The close button is disabled. Use ESC to close this dialog.
+                        </AlertDialogDescription>
+                        <div class="mt-6 flex justify-end">
+                            <AlertDialogClose Disabled="true" ClassValue="@(s => DisabledCloseButtonClass(s))">
+                                Close (Disabled)
+                            </AlertDialogClose>
+                        </div>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Actions Reference"
+                 Description="Use ActionsRef for imperative control of the alert dialog (open, close, unmount)."
+                 CodeSnippet="@ActionsRefCodeSnippet">
+        <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <button class="inline-flex items-center gap-2 rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none"
+                        @onclick="CloseImperatively">
+                    Close Imperatively
+                </button>
+            </div>
+            <AlertDialogRoot ActionsRef="actionsRef">
+                <AlertDialogTrigger ClassValue="@(s => TriggerClass(s))">
+                    Open with Trigger
+                </AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                    <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                        <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                            Imperative Control
+                        </AlertDialogTitle>
+                        <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                            This alert dialog can be controlled imperatively via the ActionsRef.
+                        </AlertDialogDescription>
+                        <div class="mt-6 flex justify-end">
+                            <AlertDialogClose ClassValue="@(s => CloseButtonClass(s))">
+                                Close
+                            </AlertDialogClose>
+                        </div>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Confirmation Alert Dialog"
+                 Description="A complete example of a confirmation dialog for destructive actions."
+                 CodeSnippet="@ConfirmationCodeSnippet">
+        <AlertDialogRoot>
+            <AlertDialogTrigger ClassValue="@(s => DangerTriggerClass(s))">
+                Delete Account
+            </AlertDialogTrigger>
+            <AlertDialogPortal>
+                <AlertDialogBackdrop ClassValue="@(s => BackdropClass(s))" />
+                <AlertDialogPopup ClassValue="@(s => PopupClass(s))">
+                    <AlertDialogTitle class="text-lg font-semibold text-gray-900">
+                        Delete Account?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription class="mt-2 text-sm text-gray-600">
+                        Are you sure you want to delete your account? All of your data will be permanently removed.
+                        This action cannot be undone.
+                    </AlertDialogDescription>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <AlertDialogClose ClassValue="@(s => SecondaryButtonClass(s))">
+                            Cancel
+                        </AlertDialogClose>
+                        <AlertDialogClose ClassValue="@(s => DangerButtonClass(s))">
+                            Yes, Delete Account
+                        </AlertDialogClose>
+                    </div>
+                </AlertDialogPopup>
+            </AlertDialogPortal>
+        </AlertDialogRoot>
+    </DemoSection>
+
+</ComponentShowcase>
+
+@code {
+    private bool controlledOpen;
+    private DialogOpenChangeReason lastReason = DialogOpenChangeReason.None;
+    private DialogRootActions actionsRef = new();
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private void HandleOpenChange(DialogOpenChangeEventArgs args)
+    {
+        lastReason = args.Reason;
+    }
+
+    private void CloseImperatively()
+    {
+        actionsRef.Close?.Invoke();
+    }
+
+    private Func<DialogTriggerState, string> TriggerClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed";
+
+    private Func<DialogTriggerState, string> SecondaryTriggerClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none";
+
+    private Func<DialogTriggerState, string> DangerTriggerClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none";
+
+    private Func<DialogTriggerState, string> DisabledTriggerClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500 cursor-not-allowed";
+
+    private Func<DialogBackdropState, string> BackdropClass => _ =>
+        "fixed inset-0 bg-black/50 z-50";
+
+    private Func<DialogBackdropState, string> AnimatedBackdropClass => state =>
+        $"fixed inset-0 bg-black/50 z-50 transition-opacity duration-200 {(state.TransitionStatus == TransitionStatus.Starting || state.TransitionStatus == TransitionStatus.Ending ? "opacity-0" : "opacity-100")}";
+
+    private Func<DialogPopupState, string> PopupClass => _ =>
+        "fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl";
+
+    private Func<DialogPopupState, string> AnimatedPopupClass => state =>
+        $"fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl transition-all duration-200 {(state.TransitionStatus == TransitionStatus.Starting || state.TransitionStatus == TransitionStatus.Ending ? "opacity-0 scale-95" : "opacity-100 scale-100")}";
+
+    private Func<DialogCloseState, string> CloseButtonClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none";
+
+    private Func<DialogCloseState, string> SecondaryButtonClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none";
+
+    private Func<DialogCloseState, string> DangerButtonClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none";
+
+    private Func<DialogCloseState, string> DisabledCloseButtonClass => _ =>
+        "inline-flex items-center justify-center rounded-md bg-gray-300 px-4 py-2 text-sm font-medium text-gray-500 cursor-not-allowed";
+
+    private const string BasicCodeSnippet = @"<AlertDialogRoot>
+    <AlertDialogTrigger>Delete Item</AlertDialogTrigger>
+    <AlertDialogPortal>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+            <AlertDialogTitle>Delete this item?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone.
+            </AlertDialogDescription>
+            <AlertDialogClose>Cancel</AlertDialogClose>
+            <AlertDialogClose>Delete</AlertDialogClose>
+        </AlertDialogPopup>
+    </AlertDialogPortal>
+</AlertDialogRoot>";
+
+    private const string ControlledCodeSnippet = @"<AlertDialogRoot Open=""@isOpen""
+                  OpenChanged=""@(e => isOpen = e)""
+                  OnOpenChange=""HandleOpenChange"">
+    <AlertDialogTrigger>Toggle Alert</AlertDialogTrigger>
+    <AlertDialogPortal>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+            <AlertDialogTitle>Controlled</AlertDialogTitle>
+            <AlertDialogClose>Close</AlertDialogClose>
+        </AlertDialogPopup>
+    </AlertDialogPortal>
+</AlertDialogRoot>";
+
+    private const string BackdropCodeSnippet = @"// Alert Dialog cannot be dismissed by clicking backdrop
+// This is set automatically (DisablePointerDismissal=true)
+<AlertDialogRoot>
+    <AlertDialogTrigger>Open Alert</AlertDialogTrigger>
+    <AlertDialogPortal>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+            <AlertDialogTitle>Click backdrop - nothing happens!</AlertDialogTitle>
+            <AlertDialogClose>Close (Required)</AlertDialogClose>
+        </AlertDialogPopup>
+    </AlertDialogPortal>
+</AlertDialogRoot>";
+
+    private const string NestedCodeSnippet = @"<AlertDialogRoot>
+    <AlertDialogTrigger>Open First</AlertDialogTrigger>
+    <AlertDialogPortal>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+            <AlertDialogTitle>First Alert</AlertDialogTitle>
+            <AlertDialogRoot>
+                <AlertDialogTrigger>Open Second</AlertDialogTrigger>
+                <AlertDialogPortal>
+                    <AlertDialogBackdrop />
+                    <AlertDialogPopup>
+                        <AlertDialogTitle>Second Alert</AlertDialogTitle>
+                        <AlertDialogClose>Close</AlertDialogClose>
+                    </AlertDialogPopup>
+                </AlertDialogPortal>
+            </AlertDialogRoot>
+            <AlertDialogClose>Close</AlertDialogClose>
+        </AlertDialogPopup>
+    </AlertDialogPortal>
+</AlertDialogRoot>";
+
+    private const string AnimationsCodeSnippet = @"<AlertDialogBackdrop ClassValue=""@(s =>
+    $""... transition-opacity duration-200
+    {(s.TransitionStatus == TransitionStatus.Starting ? ""opacity-0"" : ""opacity-100"")}"")"" />
+
+<AlertDialogPopup ClassValue=""@(s =>
+    $""... transition-all duration-200
+    {(s.TransitionStatus == TransitionStatus.Starting ? ""opacity-0 scale-95"" : ""opacity-100 scale-100"")}"")"" />";
+
+    private const string DisabledCodeSnippet = @"// Disabled trigger
+<AlertDialogTrigger Disabled=""true"">...</AlertDialogTrigger>
+
+// Disabled close button
+<AlertDialogClose Disabled=""true"">...</AlertDialogClose>";
+
+    private const string ActionsRefCodeSnippet = @"@code {
+    private DialogRootActions actionsRef = new();
+}
+
+<AlertDialogRoot ActionsRef=""actionsRef"">
+    ...
+</AlertDialogRoot>
+
+// Open imperatively
+actionsRef.Open?.Invoke();
+
+// Close imperatively
+actionsRef.Close?.Invoke();";
+
+    private const string ConfirmationCodeSnippet = @"<AlertDialogRoot>
+    <AlertDialogTrigger>Delete Account</AlertDialogTrigger>
+    <AlertDialogPortal>
+        <AlertDialogBackdrop />
+        <AlertDialogPopup>
+            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+            <AlertDialogDescription>
+                Are you sure? This cannot be undone.
+            </AlertDialogDescription>
+            <AlertDialogClose>Cancel</AlertDialogClose>
+            <AlertDialogClose>Yes, Delete</AlertDialogClose>
+        </AlertDialogPopup>
+    </AlertDialogPortal>
+</AlertDialogRoot>";
+}

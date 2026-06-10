@@ -1,0 +1,89 @@
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+<span @ref="Element"
+      tabindex="0"
+      data-blazix-base-ui-focus-guard
+      role="@(isSafari ? "button" : null)"
+      aria-hidden="@(isSafari ? null : "true")"
+      style="@VisuallyHiddenStyle"
+      @onfocus="OnFocusAsync"
+      @attributes="AdditionalAttributes" />
+
+@code {
+    private const string VisuallyHiddenStyle =
+        "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0;";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private bool isSafari;
+
+    public FocusGuard()
+    {
+        moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js").AsTask());
+    }
+
+    /// <summary>
+    /// Callback invoked when the focus guard receives focus.
+    /// The consumer should redirect focus to the appropriate element.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnFocus { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// A reference to the rendered <c>&lt;span&gt;</c> element.
+    /// </summary>
+    public ElementReference Element { get; private set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                var safari = await module.InvokeAsync<bool>("isSafari");
+                if (safari)
+                {
+                    isSafari = true;
+                    StateHasChanged();
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    private async Task OnFocusAsync()
+    {
+        await OnFocus.InvokeAsync();
+    }
+}

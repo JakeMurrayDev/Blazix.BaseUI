@@ -1,0 +1,883 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+@using Blazix.BaseUI.Slider
+@using Blazix.BaseUI.Utilities.LabelableProvider
+
+@implements IFieldStateSubscriber
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<CascadingValue Value="context">
+    <RenderElement TState="NumberFieldRootState"
+                   Tag="@DefaultTag"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="@RootContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private const string DefaultTag = "div";
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-number-field.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool hasRendered;
+    private bool inputInteropInitialized;
+    private bool hasWheelListener;
+    private bool isValueParameterSupplied;
+    private bool allowInputSync = true;
+    private bool hasPendingCommit;
+    private string? defaultId;
+    private double? currentValue;
+    private double? lastChangedValue;
+    private string inputValue = string.Empty;
+    private bool isScrubbing;
+    private ElementReference? inputElement;
+    private DotNetObjectReference<NumberFieldRoot>? dotNetRef;
+    private RenderElement<NumberFieldRootState>? renderElementReference;
+    private NumberFieldRootContext context = null!;
+    private NumberFieldRootState state = NumberFieldRootState.Default;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsControlled => isValueParameterSupplied;
+
+    private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
+
+    private string? ResolvedName => Name ?? FieldContext?.Name;
+
+    private string ResolvedId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    private double MinWithDefault => Min ?? double.MinValue;
+
+    private double MaxWithDefault => Max ?? double.MaxValue;
+
+    private double MinWithZeroDefault => Min ?? 0;
+
+    private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
+
+    private double StepValue => ResolveStepValue();
+
+    private object HiddenStepValue => IsStepAny() ? "any" : StepValue;
+
+    private RenderFragment RootContent => builder =>
+    {
+        builder.AddContent(0, ChildContent);
+        builder.OpenElement(1, "input");
+        builder.AddAttribute(2, "type", "number");
+        builder.AddAttribute(3, "name", ResolvedName);
+        builder.AddAttribute(4, "value", NumberFieldUtilities.ToHiddenInputValue(currentValue));
+        builder.AddAttribute(5, "min", Min);
+        builder.AddAttribute(6, "max", Max);
+        builder.AddAttribute(7, "step", HiddenStepValue);
+        builder.AddAttribute(8, "disabled", ResolvedDisabled);
+        builder.AddAttribute(9, "required", Required);
+        builder.AddAttribute(10, "aria-hidden", "true");
+        builder.AddAttribute(11, "tabindex", -1);
+        builder.AddAttribute(12, "style", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0");
+        builder.AddAttribute(13, "form", Form);
+        builder.CloseElement();
+    };
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private FormContext? FormContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the id of the input element.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minimum value of the input element.
+    /// </summary>
+    [Parameter]
+    public double? Min { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum value of the input element.
+    /// </summary>
+    [Parameter]
+    public double? Max { get; set; }
+
+    /// <summary>
+    /// Gets or sets the small step value of the input element when incrementing while the meta key is held.
+    /// Snaps to multiples of this value.
+    /// Defaults to <c>0.1</c>.
+    /// </summary>
+    [Parameter]
+    public double SmallStep { get; set; } = 0.1;
+
+    /// <summary>
+    /// Gets or sets the amount to increment and decrement with the buttons and arrow keys,
+    /// or to scrub with pointer movement in the scrub area.
+    /// Defaults to <c>1</c>.
+    /// </summary>
+    [Parameter]
+    public object? Step { get; set; } = 1d;
+
+    /// <summary>
+    /// Gets or sets the large step value of the input element when incrementing while the shift key is held.
+    /// Snaps to multiples of this value.
+    /// Defaults to <c>10</c>.
+    /// </summary>
+    [Parameter]
+    public double LargeStep { get; set; } = 10;
+
+    /// <summary>
+    /// Determines whether the user must enter a value before submitting a form.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Required { get; set; }
+
+    /// <summary>
+    /// Determines whether the component should ignore user interaction.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the user should be unable to change the field value.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// Gets or sets the name that identifies the field when a form is submitted.
+    /// </summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the id of the external form that owns the hidden input.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
+
+    /// <summary>
+    /// Gets or sets the raw numeric value of the field.
+    /// To render an uncontrolled number field, use <see cref="DefaultValue"/> instead.
+    /// </summary>
+    [Parameter]
+    public double? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the uncontrolled value of the field when it is initially rendered.
+    /// To render a controlled number field, use <see cref="Value"/> instead.
+    /// </summary>
+    [Parameter]
+    public double? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the value changes via two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<double?> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback fired when the number value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<NumberFieldValueChangeEventArgs> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback fired when the value is committed.
+    /// Runs later than <see cref="OnValueChange"/> when the input is blurred after typing
+    /// or the pointer is released after scrubbing or pressing the increment/decrement buttons.
+    /// </summary>
+    [Parameter]
+    public EventCallback<NumberFieldValueCommittedEventArgs> OnValueCommitted { get; set; }
+
+    /// <summary>
+    /// Determines whether to allow the user to scrub the input value with the mouse wheel
+    /// while focused and hovering over the input.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool AllowWheelScrub { get; set; }
+
+    /// <summary>
+    /// Determines whether direct text input may exceed the configured <see cref="Min"/> and <see cref="Max"/> values.
+    /// Step interactions still clamp to the configured range.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool AllowOutOfRange { get; set; }
+
+    /// <summary>
+    /// Determines whether the value should snap to the nearest step when incrementing or decrementing.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool SnapOnStep { get; set; }
+
+    /// <summary>
+    /// Gets or sets the options to format the input value.
+    /// </summary>
+    [Parameter]
+    public NumberFormatOptions? Format { get; set; }
+
+    /// <summary>
+    /// Gets or sets the locale of the input element.
+    /// Defaults to the user's runtime locale.
+    /// </summary>
+    [Parameter]
+    public string? Locale { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<NumberFieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS style based on the component's state.
+    /// </summary>
+    [Parameter]
+    public Func<NumberFieldRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberFieldRoot"/> class.
+    /// </summary>
+    public NumberFieldRoot()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        isValueParameterSupplied = parameters.TryGetValue<double?>(nameof(Value), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        InitializeValue();
+
+        FieldContext?.Validation.SetInitialValue(currentValue);
+        FieldContext?.SetFilled(currentValue.HasValue);
+        FieldContext?.RegisterFocusHandlerFunc(FocusInputAsync);
+        FieldContext?.SubscribeFunc(this);
+
+        context = new NumberFieldRootContext
+        {
+            SetValue = SetValueInternal,
+            GetValidatedValue = GetValidatedValue,
+            IncrementValue = IncrementValueInternal,
+            GetStepAmount = GetStepAmount,
+            StartAutoChange = StartAutoChangeInternal,
+            StopAutoChange = StopAutoChangeInternal,
+            SetInputValue = SetInputValueDirect,
+            SetAllowInputSync = SetAllowInputSyncInternal,
+            SetIsScrubbing = SetIsScrubbingInternal,
+            OnValueCommitted = HandleValueCommitted,
+            SetInputElement = SetInputElementInternal,
+            FocusInput = () => _ = FocusInputAsync()
+        };
+
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+
+        if (hasRendered)
+        {
+            _ = UpdateInputInteropConfigAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (IsControlled)
+        {
+            var newValue = Value;
+            if (newValue != currentValue)
+            {
+                currentValue = newValue;
+                allowInputSync = true;
+                inputValue = FormatNumber(currentValue, maximumPrecision: Format is null);
+            }
+        }
+
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+
+            if (inputElement.HasValue)
+            {
+                await InitializeInputInteropAsync();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        LabelableContext?.SetControlId(null);
+        FieldContext?.UnsubscribeFunc(this);
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                if (inputElement.HasValue)
+                {
+                    await module.InvokeVoidAsync("dispose", inputElement.Value);
+                }
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Notifies the component that the parent field state has changed and triggers a re-render.
+    /// </summary>
+    public void NotifyStateChanged()
+    {
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Handles mouse wheel changes from JavaScript interop to adjust the field value.
+    /// </summary>
+    [JSInvokable]
+    public void OnWheelChange(int direction, bool altKey, bool shiftKey)
+    {
+        if (ResolvedDisabled || ReadOnly) return;
+
+        var amount = GetStepAmount(altKey, shiftKey);
+        allowInputSync = true;
+        IncrementValueInternal(amount, direction, NumberFieldChangeReason.Wheel);
+        HandleValueCommitted(lastChangedValue ?? currentValue, NumberFieldChangeReason.Wheel);
+    }
+
+    /// <summary>
+    /// Handles an auto-change tick from JavaScript interop during press-and-hold interactions.
+    /// </summary>
+    [JSInvokable]
+    public void OnAutoChangeTick(bool isIncrement)
+    {
+        if (ResolvedDisabled || ReadOnly) return;
+
+        var amount = StepValue;
+        allowInputSync = true;
+        IncrementValueInternal(amount, isIncrement ? 1 : -1, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+    }
+
+    /// <summary>
+    /// Handles the end of an auto-change sequence from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public void OnAutoChangeEnd(bool isIncrement)
+    {
+        HandleValueCommitted(lastChangedValue ?? currentValue, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+    }
+
+    /// <summary>
+    /// Handles validated clipboard text from JavaScript paste handling.
+    /// </summary>
+    [JSInvokable]
+    public void OnPasteText(string pastedText)
+    {
+        if (ResolvedDisabled || ReadOnly) return;
+
+        var parsedValue = NumberFieldUtilities.ParseNumber(pastedText, Locale, Format);
+        if (!parsedValue.HasValue) return;
+
+        allowInputSync = false;
+        SetValueInternal(parsedValue.Value, NumberFieldChangeReason.InputPaste, null);
+        SetInputValueDirect(pastedText);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        attrs["data-scrubbing"] = state.Scrubbing;
+        attrs["data-disabled"] = state.Disabled;
+        attrs["data-readonly"] = state.ReadOnly;
+        attrs["data-required"] = state.Required;
+        if (state.Valid == true)
+            attrs["data-valid"] = true;
+        else if (state.Valid == false)
+            attrs["data-invalid"] = true;
+        attrs["data-touched"] = state.Touched;
+        attrs["data-dirty"] = state.Dirty;
+        attrs["data-filled"] = state.Filled;
+        attrs["data-focused"] = state.Focused;
+        componentAttributes = attrs;
+    }
+
+    private void InitializeValue()
+    {
+        if (Value.HasValue)
+        {
+            currentValue = Value.Value;
+        }
+        else if (DefaultValue.HasValue)
+        {
+            currentValue = DefaultValue.Value;
+        }
+        else
+        {
+            currentValue = null;
+        }
+
+        inputValue = FormatNumber(currentValue, maximumPrecision: IsControlled && Format is null);
+    }
+
+    private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
+    {
+        SetValueInternal(unvalidatedValue, reason, direction, null);
+    }
+
+    private double? GetValidatedValue(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
+    {
+        return ValidateNumber(unvalidatedValue, reason, direction, null);
+    }
+
+    private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction, double? stepAmount)
+    {
+        var validatedValue = ValidateNumber(unvalidatedValue, reason, direction, stepAmount);
+        var isInputReason = IsInputReason(reason);
+
+        if (validatedValue != currentValue || (isInputReason && unvalidatedValue != currentValue))
+        {
+            var eventArgs = new NumberFieldValueChangeEventArgs(validatedValue, reason, direction);
+            lastChangedValue = validatedValue;
+
+            if (OnValueChange.HasDelegate)
+            {
+                _ = InvokeAsync(async () =>
+                {
+                    await OnValueChange.InvokeAsync(eventArgs);
+                    if (!eventArgs.IsCanceled)
+                    {
+                        ApplyValueChange(validatedValue, reason);
+                    }
+                });
+                return;
+            }
+
+            ApplyValueChange(validatedValue, reason);
+        }
+    }
+
+    private void ApplyValueChange(double? newValue, NumberFieldChangeReason reason)
+    {
+        if (!IsControlled)
+        {
+            currentValue = newValue;
+        }
+
+        if (ValueChanged.HasDelegate)
+        {
+            _ = ValueChanged.InvokeAsync(newValue);
+        }
+
+        if (allowInputSync)
+        {
+            inputValue = FormatNumber(newValue);
+        }
+
+        hasPendingCommit = true;
+        HandleValuesChanged();
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    private void IncrementValueInternal(double amount, int direction, NumberFieldChangeReason reason)
+    {
+        var prevValue = currentValue ?? Math.Max(0, Min ?? 0);
+        var nextValue = prevValue + amount * direction;
+        SetValueInternal(nextValue, reason, direction, amount);
+    }
+
+    private double GetStepAmount(bool altKey, bool shiftKey)
+    {
+        return NumberFieldUtilities.GetStepAmount(altKey, shiftKey, SmallStep, LargeStep, StepValue);
+    }
+
+    private void StartAutoChangeInternal(bool isIncrement)
+    {
+        if (!hasRendered || !inputElement.HasValue || dotNetRef is null) return;
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, StepValue, Min ?? double.MinValue, Max ?? double.MaxValue);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        });
+    }
+
+    private void StopAutoChangeInternal()
+    {
+        if (!hasRendered || !inputElement.HasValue) return;
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("stopAutoChange", inputElement.Value);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        });
+    }
+
+    private void SetInputValueDirect(string value)
+    {
+        inputValue = value;
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    private void SetAllowInputSyncInternal(bool value)
+    {
+        allowInputSync = value;
+        context.AllowInputSync = value;
+    }
+
+    private void SetIsScrubbingInternal(bool value)
+    {
+        if (isScrubbing != value)
+        {
+            isScrubbing = value;
+            UpdateState();
+            UpdateContext();
+            BuildComponentAttributes();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleValueCommitted(double? value, NumberFieldChangeReason reason)
+    {
+        if (OnValueCommitted.HasDelegate)
+        {
+            var eventArgs = new NumberFieldValueCommittedEventArgs(value, reason);
+            _ = OnValueCommitted.InvokeAsync(eventArgs);
+        }
+
+        hasPendingCommit = false;
+        FieldContext?.SetTouched(true);
+
+        if (FieldContext?.ValidationMode == ValidationMode.OnBlur)
+        {
+            _ = FieldContext.Validation.CommitAsync(value);
+        }
+    }
+
+    private void SetInputElementInternal(ElementReference element)
+    {
+        inputElement = element;
+
+        if (hasRendered)
+        {
+            _ = InitializeInputInteropAsync();
+        }
+    }
+
+    private async Task InitializeInputInteropAsync()
+    {
+        if (!inputElement.HasValue || dotNetRef is null) return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            if (!inputInteropInitialized)
+            {
+                await module.InvokeVoidAsync("initialize", inputElement.Value, dotNetRef, BuildInputInteropConfig());
+                inputInteropInitialized = true;
+            }
+            else
+            {
+                await module.InvokeVoidAsync("updateConfig", inputElement.Value, BuildInputInteropConfig());
+            }
+
+            await UpdateWheelListenerAsync(module);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateInputInteropConfigAsync()
+    {
+        if (!hasRendered || !inputElement.HasValue || dotNetRef is null) return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            if (!inputInteropInitialized)
+            {
+                await InitializeInputInteropAsync();
+                return;
+            }
+
+            await module.InvokeVoidAsync("updateConfig", inputElement.Value, BuildInputInteropConfig());
+            await UpdateWheelListenerAsync(module);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateWheelListenerAsync(IJSObjectReference module)
+    {
+        if (!inputElement.HasValue || dotNetRef is null) return;
+
+        try
+        {
+            if (AllowWheelScrub && !ResolvedDisabled && !ReadOnly)
+            {
+                await module.InvokeVoidAsync("registerWheelListener", inputElement.Value, dotNetRef, false, false);
+                hasWheelListener = true;
+            }
+            else if (hasWheelListener)
+            {
+                await module.InvokeVoidAsync("unregisterWheelListener", inputElement.Value);
+                hasWheelListener = false;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private object BuildInputInteropConfig()
+    {
+        return new
+        {
+            disabled = ResolvedDisabled,
+            readOnly = ReadOnly,
+            minWithDefault = MinWithDefault,
+            locale = Locale,
+            format = Format is null
+                ? null
+                : new
+                {
+                    style = Format.Style,
+                    currency = Format.Currency,
+                    unit = Format.Unit,
+                    minimumFractionDigits = Format.MinimumFractionDigits,
+                    maximumFractionDigits = Format.MaximumFractionDigits,
+                    minimumIntegerDigits = Format.MinimumIntegerDigits,
+                    minimumSignificantDigits = Format.MinimumSignificantDigits,
+                    maximumSignificantDigits = Format.MaximumSignificantDigits,
+                    useGrouping = Format.UseGrouping
+                }
+        };
+    }
+
+    private async ValueTask FocusInputAsync()
+    {
+        if (!inputElement.HasValue) return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("focusInput", inputElement.Value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void HandleValuesChanged()
+    {
+        FormContext?.ClearErrors(ResolvedName);
+
+        var initialValue = FieldContext?.ValidityData.InitialValue;
+        var isDirty = initialValue is double initial ? currentValue != initial : currentValue.HasValue;
+
+        FieldContext?.SetDirty(isDirty);
+        FieldContext?.SetFilled(currentValue.HasValue);
+
+        if (FieldContext?.ShouldValidateOnChangeFunc() == true)
+        {
+            _ = FieldContext.Validation.CommitAsync(currentValue);
+        }
+        else
+        {
+            _ = FieldContext?.Validation.CommitAsync(currentValue, revalidateOnly: true);
+        }
+    }
+
+    private double? ValidateNumber(double? value, NumberFieldChangeReason reason, int? direction, double? stepAmount)
+    {
+        var shouldClamp = !AllowOutOfRange || !IsInputReason(reason);
+        var step = direction.HasValue ? (stepAmount ?? GetStepAmount(false, false)) * direction.Value : (double?)null;
+        return NumberFieldUtilities.ToValidatedNumber(
+            value,
+            step,
+            MinWithDefault,
+            MaxWithDefault,
+            MinWithZeroDefault,
+            Format,
+            SnapOnStep,
+            small: false,
+            clamp: shouldClamp);
+    }
+
+    private string FormatNumber(double? value, bool maximumPrecision = false)
+    {
+        return NumberFieldUtilities.FormatNumber(value, Locale, Format, maximumPrecision);
+    }
+
+    private void UpdateState()
+    {
+        state = NumberFieldRootState.FromFieldState(
+            FieldState,
+            currentValue,
+            inputValue,
+            Required,
+            ResolvedDisabled,
+            ReadOnly,
+            isScrubbing);
+    }
+
+    private void UpdateContext()
+    {
+        context.InputValue = inputValue;
+        context.Value = currentValue;
+        context.MinWithDefault = MinWithDefault;
+        context.MaxWithDefault = MaxWithDefault;
+        context.Min = Min;
+        context.Max = Max;
+        context.Disabled = ResolvedDisabled;
+        context.ReadOnly = ReadOnly;
+        context.Id = ResolvedId;
+        context.Name = ResolvedName;
+        context.Required = Required;
+        context.Invalid = FieldContext?.Invalid;
+        context.InputMode = "numeric";
+        context.IsScrubbing = isScrubbing;
+        context.Locale = Locale;
+        context.FormatOptions = Format;
+        context.AllowOutOfRange = AllowOutOfRange;
+        context.HasPendingCommit = hasPendingCommit;
+        context.AllowInputSync = allowInputSync;
+        context.State = state;
+        context.InputElement = inputElement;
+    }
+
+    private double ResolveStepValue()
+    {
+        if (Step is null)
+            return NumberFieldUtilities.DefaultStep;
+
+        if (Step is string text)
+        {
+            if (string.Equals(text, "any", StringComparison.OrdinalIgnoreCase))
+                return NumberFieldUtilities.DefaultStep;
+
+            if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                return parsed;
+        }
+
+        if (Step is IConvertible convertible)
+        {
+            try
+            {
+                return convertible.ToDouble(CultureInfo.InvariantCulture);
+            }
+            catch (FormatException)
+            {
+            }
+            catch (InvalidCastException)
+            {
+            }
+        }
+
+        return NumberFieldUtilities.DefaultStep;
+    }
+
+    private bool IsStepAny() =>
+        Step is string text && string.Equals(text, "any", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsInputReason(NumberFieldChangeReason reason) =>
+        reason is NumberFieldChangeReason.InputChange
+            or NumberFieldChangeReason.InputBlur
+            or NumberFieldChangeReason.InputPaste
+            or NumberFieldChangeReason.InputClear
+            or NumberFieldChangeReason.None;
+}

@@ -1,0 +1,871 @@
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Portal
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue TValue="SelectPositionerContext" Value="positionerContext" IsFixed="true">
+    @if (RootContext is not null && RootContext.Mounted && RootContext.Modal)
+    {
+        <InternalBackdrop Cutout="RootContext.GetTriggerElement()" Inert="@(!RootContext.Open)" />
+    }
+    <RenderElement TState="SelectPositionerState"
+                   Tag="div"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private PositionerInterop positionerInterop = null!;
+    private ElementReference? arrowElement;
+    private ElementReference? scrollUpArrowElement;
+    private ElementReference? scrollDownArrowElement;
+    private DotNetObjectReference<SelectPositioner>? positionerDotNetRef;
+    private Lazy<Task<IJSObjectReference>>? selectModuleTask;
+    private Lazy<Task<IJSObjectReference>>? floatingModuleTask;
+    private SelectPositionerState state;
+    internal SelectPositionerContext positionerContext = null!;
+    private RenderElement<SelectPositionerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
+    private bool controlledAlignItemWithTrigger;
+    private bool alignItemWithTriggerActive;
+    private bool lastMounted;
+    private int prevItemMapSize;
+    private List<object?> prevItemMapValues = new();
+    private bool itemMapSubscribed;
+    private string? scrollLockToken;
+    private bool scrollLockDesired;
+    private Task scrollLockOp = Task.CompletedTask;
+    private ElementReference? lastPositionerElement;
+
+    [CascadingParameter]
+    private ISelectRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets which side of the anchor element to align the popup against.
+    /// </summary>
+    [Parameter]
+    public Side Side { get; set; } = Side.Bottom;
+
+    /// <summary>
+    /// Gets or sets how to align the popup relative to the specified side.
+    /// </summary>
+    [Parameter]
+    public Align Align { get; set; } = Align.Center;
+
+    /// <summary>
+    /// Gets or sets the distance between the anchor and the popup in pixels.
+    /// </summary>
+    [Parameter]
+    public int SideOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional offset along the alignment axis in pixels.
+    /// </summary>
+    [Parameter]
+    public int AlignOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional space to maintain from the edge of the collision boundary.
+    /// </summary>
+    [Parameter]
+    public int CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets an element or rectangle that delimits the area the popup is confined to.
+    /// </summary>
+    [Parameter]
+    public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets how to handle collisions when positioning the popup.
+    /// When <see langword="null"/>, defaults to the dropdown-specific avoidance
+    /// (flip on both axes with no perpendicular fallback), mirroring the React
+    /// <c>DROPDOWN_COLLISION_AVOIDANCE</c> constant.
+    /// </summary>
+    [Parameter]
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minimum distance to maintain between the arrow and the edges of the popup.
+    /// </summary>
+    [Parameter]
+    public int ArrowPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Determines whether the popup is maintained in the viewport after the anchor element is scrolled out of view.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool Sticky { get; set; }
+
+    /// <summary>
+    /// Determines whether the popup is prevented from tracking any layout shift of its positioning anchor.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DisableAnchorTracking { get; set; }
+
+    /// <summary>
+    /// Gets or sets which CSS <c>position</c> property to use.
+    /// </summary>
+    [Parameter]
+    public PositionMethod PositionMethod { get; set; } = PositionMethod.Absolute;
+
+    /// <summary>
+    /// Determines whether the popup is positioned so the selected item aligns
+    /// vertically with the trigger, mimicking native OS select behavior.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter]
+    public bool AlignItemWithTrigger { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets an element to position the popup against.
+    /// By default, the popup will be positioned against the trigger.
+    /// </summary>
+    [Parameter]
+    public ElementReference? Anchor { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<SelectPositionerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectPositionerState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<SelectPositionerState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        positionerInterop = new PositionerInterop(
+            JSRuntime,
+            "./_content/Blazix.BaseUI/blazix-baseui-select.min.js");
+        positionerDotNetRef = DotNetObjectReference.Create(this);
+
+        controlledAlignItemWithTrigger = AlignItemWithTrigger;
+        computedSide = Side;
+        computedAlign = Align;
+
+        positionerContext = new SelectPositionerContext
+        {
+            Side = Side,
+            Align = Align,
+            AnchorHidden = false,
+            ArrowUncentered = false,
+            AlignItemWithTriggerActive = false,
+            GetArrowElement = () => arrowElement,
+            SetArrowElement = SetArrowElement,
+            SetControlledAlignItemWithTrigger = SetControlledAlignItemWithTrigger,
+            GetScrollUpArrow = () => scrollUpArrowElement,
+            SetScrollUpArrow = element => scrollUpArrowElement = element,
+            GetScrollDownArrow = () => scrollDownArrowElement,
+            SetScrollDownArrow = element => scrollDownArrowElement = element
+        };
+
+        if (RootContext is not null)
+        {
+            RootContext.ItemMapChanged += OnItemMapChanged;
+            itemMapSubscribed = true;
+        }
+
+        state = new SelectPositionerState(false, computedSide, computedAlign, false);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (RootContext is null)
+        {
+            state = new SelectPositionerState(false, computedSide, computedAlign, false);
+            return;
+        }
+
+        var open = RootContext.Open;
+        var mounted = RootContext.Mounted;
+        var modal = RootContext.Modal;
+        var openMethod = RootContext.OpenInteractionType;
+
+        // Reset the latch when unmounted so the next open picks up the current prop.
+        if (!mounted && controlledAlignItemWithTrigger != AlignItemWithTrigger)
+        {
+            controlledAlignItemWithTrigger = AlignItemWithTrigger;
+        }
+
+        alignItemWithTriggerActive =
+            mounted && controlledAlignItemWithTrigger && openMethod != InteractionType.Touch;
+
+        // When transitioning from mounted to unmounted, reset scroll arrow visibility
+        // so the next open doesn't carry stale state (React useIsoLayoutEffect).
+        if (!mounted && lastMounted)
+        {
+            if (RootContext.ScrollUpArrowVisible)
+            {
+                RootContext.ScrollUpArrowVisible = false;
+            }
+            if (RootContext.ScrollDownArrowVisible)
+            {
+                RootContext.ScrollDownArrowVisible = false;
+            }
+
+            // Intentionally do NOT reset `positionerContext.IsPositioned` here.
+            // Mirrors React's `useFloating`: `isPositioned` stays true across
+            // opens for a persistent positioner — only a true unmount (Dispose)
+            // resets it. Resetting here would close SelectPopup's align-item
+            // gate, and because `OnAfterRenderAsync` deliberately skips
+            // `UpdatePositionAsync` while `alignItemWithTriggerActive` is on,
+            // `OnPositionUpdated` would never re-fire to flip it back true,
+            // leaving every reopen stuck at the floating-default placement.
+        }
+
+        RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+
+        // Body scroll lock, per React useScrollLock((aliw || modal) && open && !touch).
+        var shouldScrollLock =
+            (alignItemWithTriggerActive || modal) && open && openMethod != InteractionType.Touch;
+
+        // Use a synchronous desired-state flag and a chained task to prevent
+        // double-acquire races when multiple renders fire before the async
+        // apply completes (e.g., SelectLabel's NotifyStateChanged triggers an
+        // extra render cycle that would otherwise enter the null-token branch
+        // twice and leave lockCount permanently elevated).
+        if (shouldScrollLock != scrollLockDesired)
+        {
+            scrollLockDesired = shouldScrollLock;
+            scrollLockOp = ScheduleScrollLockAsync(scrollLockOp, shouldScrollLock);
+        }
+
+        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
+        state = new SelectPositionerState(open, renderedSide, computedAlign, computedAnchorHidden);
+
+        positionerContext.Side = renderedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+        positionerContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+
+        BuildComponentAttributes();
+        lastMounted = mounted;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            positionerInterop.MarkRendered();
+
+            if (RootContext is not null && Element.HasValue)
+            {
+                RootContext.SetPositionerElement(Element);
+                lastPositionerElement = Element;
+            }
+        }
+        else if (RootContext is not null && Element.HasValue &&
+                 !Nullable.Equals(Element, lastPositionerElement))
+        {
+            RootContext.SetPositionerElement(Element);
+            lastPositionerElement = Element;
+        }
+
+        if (positionerInterop.HasRendered && Element.HasValue && RootContext?.Mounted == true)
+        {
+            if (!positionerInterop.IsInitialized)
+            {
+                await InitializePositionerAsync();
+            }
+            else if (!alignItemWithTriggerActive)
+            {
+                // Skip floating-ui re-positioning when alignItemWithTrigger is active.
+                // The popup-level `beginAlignItemWithTriggerPlacement` pass owns placement
+                // in that mode; running `updatePosition` here overwrites those styles
+                // with the standard bottom-of-trigger layout, producing a visible flash
+                // (notably during exit transitions, when no microtask re-applies
+                // align-item styles afterward). Mirrors React's discard of
+                // `positioning.positionerStyles` in favor of FIXED while align-item is on.
+                // `DisableAnchorTracking` only disables anchor resize/layout-shift
+                // observers in Base UI; it does not suppress mount/open/rerender
+                // position recomputation.
+                await UpdatePositionAsync();
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (itemMapSubscribed && RootContext is not null)
+        {
+            RootContext.ItemMapChanged -= OnItemMapChanged;
+            itemMapSubscribed = false;
+        }
+
+        if (RootContext is not null)
+        {
+            RootContext.SetPositionerElement(null);
+            RootContext.AlignItemWithTriggerActive = false;
+        }
+
+        positionerContext.IsPositioned = false;
+
+        // Drain any pending scroll lock reconciliation so Apply has a chance
+        // to publish its token before we attempt the final release.
+        scrollLockDesired = false;
+        try
+        {
+            await scrollLockOp;
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+        }
+
+        if (scrollLockToken is not null)
+        {
+            await ReleaseScrollLockAsync();
+        }
+
+        await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
+
+        if (floatingModuleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await floatingModuleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (IsJSInteropUnavailable(ex))
+            {
+                _ = ex;
+            }
+        }
+
+        if (selectModuleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await selectModuleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (IsJSInteropUnavailable(ex))
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Invoked by JS after every resolved placement change. Mirrors Menu's
+    /// position callback pattern so <c>data-side</c>/<c>data-align</c>/
+    /// <c>data-anchor-hidden</c> and the positioner context reflect the
+    /// post-collision values.
+    /// </summary>
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var newSide = Extensions.ParseSide(side);
+        var newAlign = Extensions.ParseAlign(align);
+
+        // Floating UI has run a pass — flip `IsPositioned` so SelectPopup can
+        // safely fire its align-item-with-trigger placement now that the popup
+        // has a resolved geometry (mirrors React's `isPositioned` from
+        // `useFloating`, consumed at SelectPopup.tsx:269).
+        var firstPositioned = !positionerContext.IsPositioned;
+        positionerContext.IsPositioned = true;
+
+        if (newSide == computedSide && newAlign == computedAlign &&
+            anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            if (firstPositioned)
+            {
+                _ = InvokeAsync(() =>
+                {
+                    StateHasChanged();
+                    RootContext?.NotifyStateChanged();
+                });
+            }
+            return;
+        }
+
+        computedSide = newSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
+        positionerContext.Side = renderedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = anchorHidden;
+        positionerContext.ArrowUncentered = arrowUncentered;
+
+        state = new SelectPositionerState(RootContext?.Open ?? false, renderedSide, computedAlign, computedAnchorHidden);
+        BuildComponentAttributes();
+
+        _ = InvokeAsync(() =>
+        {
+            StateHasChanged();
+            RootContext?.NotifyStateChanged();
+        });
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var open = RootContext?.Open ?? false;
+        var mounted = RootContext?.Mounted ?? false;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+
+        attrs["role"] = "presentation";
+        attrs["data-blazix-base-ui-positioner"] = true;
+
+        if (!mounted)
+        {
+            attrs["hidden"] = true;
+        }
+
+        attrs["data-side"] = state.Side.ToDataAttributeString()!;
+        attrs["data-align"] = state.Align.ToDataAttributeString()!;
+        attrs["data-anchor-hidden"] = state.AnchorHidden;
+
+        TransitionAttributeHelper.ApplyTransitionAttributes(attrs, open, transitionStatus);
+
+        componentAttributes = attrs;
+    }
+
+    private void SetControlledAlignItemWithTrigger(bool value)
+    {
+        if (controlledAlignItemWithTrigger == value)
+        {
+            return;
+        }
+
+        controlledAlignItemWithTrigger = value;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void SetArrowElement(ElementReference? element)
+    {
+        if (Nullable.Equals(arrowElement, element))
+        {
+            return;
+        }
+
+        arrowElement = element;
+
+        if (positionerInterop.HasRendered && positionerInterop.IsInitialized)
+        {
+            _ = UpdatePositionAsync();
+        }
+    }
+
+    private CollisionAvoidance ResolvedCollisionAvoidance =>
+        CollisionAvoidance ?? new CollisionAvoidance
+        {
+            Side = CollisionAvoidanceSideMode.Flip,
+            Align = CollisionAvoidanceAlignMode.Flip,
+            FallbackAxisSide = CollisionAvoidanceFallbackAxisSide.None
+        };
+
+    private static bool IsJSInteropUnavailable(Exception ex)
+    {
+        return ex is JSDisconnectedException or TaskCanceledException ||
+            ex is InvalidOperationException invalidOperationException &&
+            invalidOperationException.Message.Contains(
+                "JavaScript interop calls cannot be issued at this time",
+                StringComparison.Ordinal);
+    }
+
+    private PositionerConfig BuildConfig() => new()
+    {
+        Side = Side,
+        Align = Align,
+        SideOffset = SideOffset,
+        AlignOffset = AlignOffset,
+        CollisionPadding = CollisionPadding,
+        CollisionBoundary = CollisionBoundary,
+        ArrowPadding = ArrowPadding,
+        Sticky = Sticky,
+        PositionMethod = PositionMethod,
+        DisableAnchorTracking = DisableAnchorTracking || alignItemWithTriggerActive,
+        CollisionAvoidance = ResolvedCollisionAvoidance,
+        UseCollisionAvoidanceObject = true
+    };
+
+    private async Task InitializePositionerAsync()
+    {
+        if (!Element.HasValue || RootContext is null)
+        {
+            return;
+        }
+
+        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
+        if (!anchorElement.HasValue)
+        {
+            return;
+        }
+
+        // Pass the runtime computed `alignItemWithTriggerActive` (not the
+        // static `AlignItemWithTrigger` prop) so the floating positioner state
+        // reflects whether the popup-level align-item commit owns placement.
+        // floating.js uses this to skip writing position styles and the
+        // `data-positioned` attribute, keeping the FOUC CSS hide active until
+        // the align-item commit runs.
+        //
+        // RootId is forwarded so select.js's onPositionUpdated wrapper can
+        // drive the align-item commit synchronously from JS (no C# round-trip
+        // dependency on slow Server circuits).
+        await positionerInterop.InitializeAsync(
+            Element.Value,
+            anchorElement.Value,
+            BuildConfig(),
+            arrowElement,
+            alignItemWithTriggerActive,
+            positionerDotNetRef,
+            RootContext.RootId);
+    }
+
+    private async Task UpdatePositionAsync()
+    {
+        if (!positionerInterop.IsInitialized || RootContext is null)
+        {
+            return;
+        }
+
+        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
+        if (!anchorElement.HasValue)
+        {
+            return;
+        }
+
+        await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement, alignItemWithTriggerActive);
+    }
+
+    /// <summary>
+    /// CompositeList onMapChange equivalent: prunes the current selection
+    /// when the mounted item set changes (React onMapChange handler).
+    /// </summary>
+    private void OnItemMapChanged()
+    {
+        _ = HandleItemMapChangedAsync();
+    }
+
+    private async Task HandleItemMapChangedAsync()
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        var values = RootContext.RegisteredValues;
+        var size = values.Count;
+
+        if (size == 0 && prevItemMapSize == 0)
+        {
+            return;
+        }
+
+        if (size == 0)
+        {
+            prevItemMapSize = 0;
+            prevItemMapValues.Clear();
+            return;
+        }
+
+        var prev = prevItemMapSize;
+        var previousValues = prevItemMapValues;
+        var currentValues = values.ToList();
+        prevItemMapSize = size;
+        prevItemMapValues = currentValues;
+
+        // Prune is needed when the registered set changed in a way that could
+        // strand the current selection. That happens on a SHRINK (an item
+        // unregistered) or on a same-count REPLACEMENT (1:1 swap with a
+        // different value set). Pure growth never strands existing selection
+        // because `RegisterItemValue` only adds.
+        var sizeShrank = prev != 0 && size < prev;
+        var sameSizeButDifferent = prev != 0 &&
+            size == prev &&
+            !HaveSameMembership(previousValues, currentValues, RootContext.AreValuesEqual);
+
+        if (!sizeShrank && !sameSizeButDifferent)
+        {
+            return;
+        }
+
+        var equal = RootContext.AreValuesEqual;
+        var multi = RootContext.Multiple;
+
+        // Only prune when the registered set actually changed. The shrink branch
+        // exists because Blazor's `RegisterItemValue` raises `ItemMapChanged`
+        // per call (no batching, unlike React's `CompositeList`); a popup reopen
+        // can fire this handler mid-mount with a partial set ([apple] before
+        // banana/cherry have re-mounted), making the current selection
+        // (e.g. cherry) appear "missing" and triggering an incorrect
+        // `SetValueBoxedAsync(null)`. The same-size-but-different branch handles
+        // 1:1 item replacement where the count is preserved.
+        if (!multi && (sizeShrank || sameSizeButDifferent))
+        {
+            var currentBoxed = RootContext.CurrentValueBoxed;
+            if (currentBoxed is not null)
+            {
+                var found = false;
+                for (var i = 0; i < values.Count; i++)
+                {
+                    if (equal(values[i], currentBoxed))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    var initial = RootContext.InitialValueBoxed;
+                    var hasInitial = false;
+                    if (initial is not null)
+                    {
+                        for (var i = 0; i < values.Count; i++)
+                        {
+                            if (equal(values[i], initial))
+                            {
+                                hasInitial = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    var nextValue = hasInitial ? initial : null;
+                    await RootContext.SetValueBoxedAsync(nextValue, SelectOpenChangeReason.None);
+
+                    if (nextValue is null)
+                    {
+                        RootContext.ClearSelectedItemText();
+                    }
+                }
+            }
+        }
+
+        // Same reasoning as the single-select branch above: only prune on
+        // shrink or same-size replacement so partial-mount registration during
+        // reopen can't briefly erase still-valid selected values.
+        if (multi && (sizeShrank || sameSizeButDifferent))
+        {
+            var multiValues = RootContext.MultiValueBoxed;
+            if (multiValues.Count > 0)
+            {
+                var visible = new List<object?>();
+                for (var m = 0; m < multiValues.Count; m++)
+                {
+                    var v = multiValues[m];
+                    for (var i = 0; i < values.Count; i++)
+                    {
+                        if (equal(values[i], v))
+                        {
+                            visible.Add(v);
+                            break;
+                        }
+                    }
+                }
+
+                if (visible.Count != multiValues.Count)
+                {
+                    await RootContext.SetValueBoxedAsync(visible, SelectOpenChangeReason.None);
+
+                    if (visible.Count == 0)
+                    {
+                        RootContext.ClearSelectedItemText();
+                    }
+                }
+            }
+        }
+
+        if (RootContext.Open && alignItemWithTriggerActive)
+        {
+            RootContext.ScrollUpArrowVisible = false;
+            RootContext.ScrollDownArrowVisible = false;
+            await ClearHeightStylesAsync();
+        }
+    }
+
+    private static bool HaveSameMembership(
+        IReadOnlyList<object?> previous,
+        IReadOnlyList<object?> current,
+        Func<object?, object?, bool> equal)
+    {
+        if (previous.Count != current.Count)
+        {
+            return false;
+        }
+
+        var matched = new bool[current.Count];
+        for (var i = 0; i < previous.Count; i++)
+        {
+            var found = false;
+            for (var j = 0; j < current.Count; j++)
+            {
+                if (!matched[j] && equal(previous[i], current[j]))
+                {
+                    matched[j] = true;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Lazy<Task<IJSObjectReference>> FloatingModule =>
+        floatingModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js").AsTask());
+
+    private Lazy<Task<IJSObjectReference>> SelectModule =>
+        selectModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/Blazix.BaseUI/blazix-baseui-select.min.js").AsTask());
+
+    private async Task ClearHeightStylesAsync()
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await FloatingModule.Value;
+            var styles = new[] { "height" };
+
+            if (Element.HasValue)
+            {
+                await module.InvokeVoidAsync("clearStyles", Element.Value, styles); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+            }
+
+            var popup = RootContext.GetPopupElement();
+            if (popup.HasValue)
+            {
+                await module.InvokeVoidAsync("clearStyles", popup.Value, styles); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+            }
+        }
+        catch (Exception ex) when (IsJSInteropUnavailable(ex))
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task ScheduleScrollLockAsync(Task previous, bool desired)
+    {
+        try
+        {
+            await previous;
+        }
+        catch (Exception ex)
+        {
+            // Prior operation may have faulted, but any JS/circuit errors
+            // are already swallowed inside Apply/Release. Continue so the
+            // next reconcile step can still run.
+            _ = ex;
+        }
+
+        if (desired && scrollLockToken is null)
+        {
+            await ApplyScrollLockAsync();
+        }
+        else if (!desired && scrollLockToken is not null)
+        {
+            await ReleaseScrollLockAsync();
+        }
+    }
+
+    private async Task ApplyScrollLockAsync()
+    {
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await SelectModule.Value;
+            var trigger = RootContext.GetTriggerElement();
+            scrollLockToken = trigger.HasValue
+                ? await module.InvokeAsync<string>("applyScrollLock", trigger.Value) // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+                : await module.InvokeAsync<string>("applyScrollLock", (object?)null); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+        }
+        catch (Exception ex) when (IsJSInteropUnavailable(ex))
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task ReleaseScrollLockAsync()
+    {
+        if (scrollLockToken is null || selectModuleTask?.IsValueCreated != true)
+        {
+            scrollLockToken = null;
+            return;
+        }
+
+        try
+        {
+            var module = await selectModuleTask.Value;
+            await module.InvokeVoidAsync("releaseScrollLock", scrollLockToken); // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+        }
+        catch (Exception ex) when (IsJSInteropUnavailable(ex))
+        {
+            _ = ex;
+        }
+        finally
+        {
+            scrollLockToken = null;
+        }
+    }
+}

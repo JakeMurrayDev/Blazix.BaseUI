@@ -1,0 +1,387 @@
+@using Blazix.BaseUI.DirectionProvider
+
+@typeparam TValue
+
+<CascadingValue Value="rootContext">
+    <RenderElement TState="TabsRootState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private TValue? internalValue;
+    private TValue? previousValue;
+    private bool hasExplicitDefaultValue;
+    private bool hasDefaultValueParameter;
+    private bool hasValueParameter;
+    private bool shouldNotifyInitialValueChange;
+    private bool shouldHonorDisabledDefaultValue;
+    private bool didRegisterTabs;
+    private ActivationDirection activationDirection = ActivationDirection.None;
+    private TabsRootContext<TValue>? rootContext;
+    private TabsRootState state = TabsRootState.Default;
+    private RenderElement<TabsRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsControlled => hasValueParameter;
+
+    private TValue? CurrentValue => IsControlled ? Value : internalValue;
+
+    private Direction ResolvedDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the value of the currently active tab.
+    /// Use when the component is controlled.
+    /// When the value is <see langword="null"/>, no tab will be active.
+    /// </summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the default value of the initially active tab.
+    /// Use when the component is not controlled.
+    /// When the value is <see langword="null"/>, no tab will be active.
+    /// </summary>
+    [Parameter]
+    public TValue? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the component orientation (layout flow direction).
+    /// Defaults to <see cref="Tabs.Orientation.Horizontal"/>.
+    /// </summary>
+    [Parameter]
+    public Orientation Orientation { get; set; } = Orientation.Horizontal;
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the <see cref="Value"/> changes via two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TValue?> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when a new tab value is being set.
+    /// </summary>
+    [Parameter]
+    public EventCallback<TabsValueChangeEventArgs<TValue>> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Allows you to replace the component's HTML element
+    /// with a different tag, or compose it with another component.
+    /// Accepts a function that returns the element to render.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<TabsRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on the component state.
+    /// </summary>
+    [Parameter]
+    public Func<TabsRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the created element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets or sets the associated <see cref="ElementReference"/>.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        hasDefaultValueParameter = false;
+        hasValueParameter = false;
+
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Name == nameof(DefaultValue))
+            {
+                hasDefaultValueParameter = true;
+            }
+            else if (parameter.Name == nameof(Value))
+            {
+                hasValueParameter = true;
+            }
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        hasExplicitDefaultValue = hasDefaultValueParameter;
+        shouldNotifyInitialValueChange = !hasExplicitDefaultValue;
+        shouldHonorDisabledDefaultValue = hasExplicitDefaultValue;
+
+        if (!IsControlled)
+        {
+            internalValue = hasExplicitDefaultValue ? DefaultValue : default;
+        }
+
+        previousValue = CurrentValue;
+        rootContext = CreateContext();
+        rootContext.OnTabRegistered = EvaluateAutoSelection;
+        state = new TabsRootState(Orientation, activationDirection);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var currentValue = CurrentValue;
+        if (!EqualityComparer<TValue>.Default.Equals(currentValue, previousValue))
+        {
+            activationDirection = ComputeActivationDirection(previousValue, currentValue);
+            previousValue = currentValue;
+        }
+
+        if (state.Orientation != Orientation || state.ActivationDirection != activationDirection)
+        {
+            state = new TabsRootState(Orientation, activationDirection);
+        }
+
+        if (rootContext is not null)
+        {
+            rootContext.Orientation = Orientation;
+            rootContext.ActivationDirection = activationDirection;
+            rootContext.Direction = ResolvedDirection;
+        }
+
+        BuildComponentAttributes();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        attrs["data-activation-direction"] = activationDirection.ToDataAttributeString();
+        attrs["data-orientation"] = Orientation.ToDataAttributeString() ?? "horizontal";
+
+        componentAttributes = attrs;
+    }
+
+    private TabsRootContext<TValue> CreateContext() => new(
+        orientation: Orientation,
+        activationDirection: activationDirection,
+        direction: ResolvedDirection,
+        getValue: () => CurrentValue,
+        onValueChange: SetValueInternalAsync);
+
+    private void EvaluateAutoSelection()
+    {
+        if (IsControlled || rootContext is null || !rootContext.HasTabs)
+        {
+            if (!IsControlled && rootContext is not null && didRegisterTabs && CurrentValue is not null)
+            {
+                CommitAutomaticValueChange(default, TabsValueChangeReason.Missing);
+            }
+
+            return;
+        }
+
+        var currentValue = CurrentValue;
+        var hadRegisteredTabs = didRegisterTabs;
+
+        var selectionIsDisabled = currentValue is not null && rootContext.IsTabDisabled(currentValue);
+        var selectionIsMissing = hadRegisteredTabs && currentValue is not null && !rootContext.HasTab(currentValue);
+        var implicitSelectionPending = currentValue is null && !hasExplicitDefaultValue && shouldNotifyInitialValueChange;
+
+        didRegisterTabs = true;
+
+        if (!selectionIsDisabled && EqualityComparer<TValue>.Default.Equals(currentValue, DefaultValue))
+        {
+            shouldHonorDisabledDefaultValue = false;
+        }
+
+        if (shouldHonorDisabledDefaultValue &&
+            selectionIsDisabled &&
+            EqualityComparer<TValue>.Default.Equals(currentValue, DefaultValue))
+        {
+            return;
+        }
+
+        if (!selectionIsDisabled && !selectionIsMissing && !implicitSelectionPending)
+        {
+            if (shouldNotifyInitialValueChange && currentValue is not null)
+            {
+                QueueAutomaticValueChangeNotification(currentValue, TabsValueChangeReason.Initial);
+                shouldNotifyInitialValueChange = false;
+            }
+
+            return;
+        }
+
+        var firstEnabled = rootContext.GetFirstEnabledTabValue();
+        if (EqualityComparer<TValue>.Default.Equals(currentValue, firstEnabled))
+        {
+            if (shouldNotifyInitialValueChange && currentValue is not null)
+            {
+                QueueAutomaticValueChangeNotification(currentValue, TabsValueChangeReason.Initial);
+                shouldNotifyInitialValueChange = false;
+            }
+
+            return;
+        }
+
+        var reason = shouldNotifyInitialValueChange
+            ? TabsValueChangeReason.Initial
+            : selectionIsDisabled
+                ? TabsValueChangeReason.Disabled
+                : TabsValueChangeReason.Missing;
+
+        CommitAutomaticValueChange(firstEnabled, reason);
+    }
+
+    private async Task SetValueInternalAsync(
+        TValue? value,
+        ActivationDirection direction,
+        TabsValueChangeReason reason,
+        EventArgs? sourceEventArgs)
+    {
+        var eventArgs = new TabsValueChangeEventArgs<TValue>(value, direction, reason, sourceEventArgs);
+
+        if (OnValueChange.HasDelegate)
+        {
+            await OnValueChange.InvokeAsync(eventArgs);
+
+            if (eventArgs.IsCanceled)
+            {
+                StateHasChanged();
+                return;
+            }
+        }
+
+        if (!IsControlled)
+        {
+            activationDirection = direction;
+            internalValue = value;
+            previousValue = value;
+            state = new TabsRootState(Orientation, activationDirection);
+        }
+
+        if (ValueChanged.HasDelegate)
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+
+        if (rootContext is not null)
+        {
+            rootContext.Orientation = Orientation;
+            rootContext.ActivationDirection = activationDirection;
+            rootContext.Direction = ResolvedDirection;
+        }
+
+        BuildComponentAttributes();
+        StateHasChanged();
+    }
+
+    private void CommitAutomaticValueChange(TValue? value, TabsValueChangeReason reason)
+    {
+        internalValue = value;
+        previousValue = value;
+        activationDirection = ActivationDirection.None;
+        state = new TabsRootState(Orientation, activationDirection);
+
+        if (rootContext is not null)
+        {
+            rootContext.Orientation = Orientation;
+            rootContext.ActivationDirection = activationDirection;
+            rootContext.Direction = ResolvedDirection;
+        }
+
+        BuildComponentAttributes();
+        shouldNotifyInitialValueChange = false;
+        QueueAutomaticValueChangeNotification(value, reason);
+        StateHasChanged();
+    }
+
+    private void QueueAutomaticValueChangeNotification(TValue? value, TabsValueChangeReason reason)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await NotifyAutomaticValueChangeAsync(value, reason);
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        });
+    }
+
+    private async Task NotifyAutomaticValueChangeAsync(TValue? value, TabsValueChangeReason reason)
+    {
+        if (OnValueChange.HasDelegate)
+        {
+            await OnValueChange.InvokeAsync(new TabsValueChangeEventArgs<TValue>(
+                value,
+                ActivationDirection.None,
+                reason));
+        }
+
+        if (ValueChanged.HasDelegate)
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+    }
+
+    private ActivationDirection ComputeActivationDirection(TValue? oldValue, TValue? newValue)
+    {
+        if (oldValue is null || newValue is null)
+        {
+            return ActivationDirection.None;
+        }
+
+        var oldOrder = rootContext?.GetTabOrderByValue(oldValue);
+        var newOrder = rootContext?.GetTabOrderByValue(newValue);
+
+        if (oldOrder.HasValue && newOrder.HasValue && oldOrder.Value != newOrder.Value)
+        {
+            return Orientation == Orientation.Horizontal
+                ? newOrder.Value > oldOrder.Value ? ActivationDirection.Right : ActivationDirection.Left
+                : newOrder.Value > oldOrder.Value ? ActivationDirection.Down : ActivationDirection.Up;
+        }
+
+        if (oldValue is IComparable oldComparable && newValue is IComparable newComparable && oldValue.GetType() == newValue.GetType())
+        {
+            var comparison = newComparable.CompareTo(oldComparable);
+            if (comparison == 0)
+            {
+                return ActivationDirection.None;
+            }
+
+            return Orientation == Orientation.Horizontal
+                ? comparison > 0 ? ActivationDirection.Right : ActivationDirection.Left
+                : comparison > 0 ? ActivationDirection.Down : ActivationDirection.Up;
+        }
+
+        return ActivationDirection.None;
+    }
+}
