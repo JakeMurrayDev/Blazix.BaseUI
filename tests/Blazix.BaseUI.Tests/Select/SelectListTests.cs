@@ -4,7 +4,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectListTests : BunitContext, ISelectListContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public SelectListTests()
     {
@@ -17,7 +17,8 @@ public class SelectListTests : BunitContext, ISelectListContract
         bool defaultOpen = true,
         bool multiple = false,
         string? userClass = null,
-        string? userStyle = null)
+        string? userStyle = null,
+        bool includeList = true)
     {
         return builder =>
         {
@@ -36,23 +37,33 @@ public class SelectListTests : BunitContext, ISelectListContract
                     posBuilder.OpenComponent<SelectPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<SelectList>(0);
-                        if (userClass is not null)
+                        if (includeList)
                         {
-                            popupBuilder.AddAttribute(1, "class", userClass);
+                            popupBuilder.OpenComponent<SelectList>(0);
+                            if (userClass is not null)
+                            {
+                                popupBuilder.AddAttribute(1, "class", userClass);
+                            }
+                            if (userStyle is not null)
+                            {
+                                popupBuilder.AddAttribute(2, "style", userStyle);
+                            }
+                            popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(listBuilder =>
+                            {
+                                listBuilder.OpenComponent<SelectItem<string>>(0);
+                                listBuilder.AddAttribute(1, "Value", "apple");
+                                listBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
+                                listBuilder.CloseComponent();
+                            }));
+                            popupBuilder.CloseComponent();
                         }
-                        if (userStyle is not null)
+                        else
                         {
-                            popupBuilder.AddAttribute(2, "style", userStyle);
+                            popupBuilder.OpenComponent<SelectItem<string>>(0);
+                            popupBuilder.AddAttribute(1, "Value", "apple");
+                            popupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
+                            popupBuilder.CloseComponent();
                         }
-                        popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(listBuilder =>
-                        {
-                            listBuilder.OpenComponent<SelectItem<string>>(0);
-                            listBuilder.AddAttribute(1, "Value", "apple");
-                            listBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
-                            listBuilder.CloseComponent();
-                        }));
-                        popupBuilder.CloseComponent();
                     }));
                     posBuilder.CloseComponent();
                 }));
@@ -178,11 +189,7 @@ public class SelectListTests : BunitContext, ISelectListContract
     [Fact]
     public Task OmitsFunctionalStylesWhenInactive()
     {
-        var cut = Render(CreateSelectWithList());
-        var root = cut.FindComponent<SelectRoot<string>>().Instance;
-        root.typedContext.AlignItemWithTriggerActive = false;
-        root.typedContext.NotifyStateChanged();
-        cut.FindComponent<SelectList>().Render();
+        var cut = Render(CreateSelectWithList(defaultOpen: false));
 
         var list = FindList(cut);
         var style = list.GetAttribute("style") ?? string.Empty;
@@ -294,22 +301,23 @@ public class SelectListTests : BunitContext, ISelectListContract
     }
 
     [Fact]
-    public Task ClearsListElementOnDispose()
+    public async Task ClearsListElementOnDispose()
     {
-        var cut = Render(CreateSelectWithList());
+        var includeList = true;
+        RenderFragment fragment = builder => builder.AddContent(0, CreateSelectWithList(includeList: includeList));
+        var cut = Render(fragment);
         var root = cut.FindComponent<SelectRoot<string>>().Instance;
 
         // Before dispose: SelectList registered ListId on the root context.
         root.typedContext.HasList.ShouldBeTrue();
         root.typedContext.ListId.ShouldNotBeNullOrEmpty();
 
-        cut.Dispose();
+        await cut.FindComponent<SelectList>().Instance.DisposeAsync();
 
         // After dispose: ListId cleared so HasList reports false, matching
         // React's ref-detach semantics (`setListElement(null)`).
         root.typedContext.HasList.ShouldBeFalse();
         root.typedContext.ListId.ShouldBeNull();
-        return Task.CompletedTask;
     }
 
     [Fact]

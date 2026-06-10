@@ -29,11 +29,20 @@ public abstract class SelectTestsBase : TestBase
     protected async Task WaitForSelectOpenAsync()
     {
         var popup = GetByTestId("select-popup");
-        await popup.WaitForAsync(new LocatorWaitForOptions
+        try
         {
-            State = WaitForSelectorState.Visible,
-            Timeout = 5000 * TimeoutMultiplier
-        });
+            await popup.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 5000 * TimeoutMultiplier
+            });
+        }
+        catch (TimeoutException ex)
+        {
+            var diagnostics = await Page.EvaluateAsync<string>(
+                "() => { const selectState = window[Symbol.for('Blazix.BaseUI.Select.State')]; const roots = selectState ? Array.from(selectState.roots.entries()).map(([id, root]) => ({ id, isOpen: root.isOpen, hasTrigger: !!root.triggerElement, hasPopup: !!root.popupElement, hasPositioner: !!root.positionerElement, hasList: !!root.listElement, popupState: !!root.popup, alignItemWithTriggerActive: !!root.popup?.alignItemWithTriggerActive, initialPlaced: !!root.popup?.initialPlaced, watchdog: !!root.alignItemPlacementWatchdog, popupRect: root.popupElement?.getBoundingClientRect().toJSON(), positionerRect: root.positionerElement?.getBoundingClientRect().toJSON(), positionerSide: root.positionerElement?.getAttribute('data-side'), positionerPositioned: !!root.positionerElement?.hasAttribute('data-positioned') })) : []; const popup = document.querySelector('[data-testid=\"select-popup\"]'); const positioner = document.querySelector('[data-testid=\"select-positioner\"]'); return JSON.stringify({ roots, dom: { popupExists: !!popup, popupHidden: popup ? getComputedStyle(popup).visibility : null, popupRect: popup?.getBoundingClientRect().toJSON(), popupScrollHeight: popup?.scrollHeight, positionerExists: !!positioner, positionerRect: positioner?.getBoundingClientRect().toJSON(), positionerSide: positioner?.getAttribute('data-side'), positionerPositioned: !!positioner?.hasAttribute('data-positioned') } }); }");
+            throw new TimeoutException($"Select popup did not become visible. Diagnostics: {diagnostics}", ex);
+        }
     }
 
     protected async Task WaitForSelectClosedAsync()
@@ -84,8 +93,7 @@ public abstract class SelectTestsBase : TestBase
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
-        var outsideButton = GetByTestId("outside-button");
-        await outsideButton.ClickAsync();
+        await Page.Mouse.ClickAsync(500, 500);
 
         await WaitForSelectClosedAsync();
     }
@@ -136,6 +144,7 @@ public abstract class SelectTestsBase : TestBase
     public virtual async Task DisabledItemCannotBeSelected()
     {
         await NavigateAsync(CreateUrl("/tests/select").WithDefaultOpen(true));
+        await WaitForSelectOpenAsync();
 
         var disabledItem = GetByTestId("select-item-disabled");
         // Use Force because Playwright refuses to click elements with aria-disabled
@@ -338,6 +347,156 @@ public abstract class SelectTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that explicit FinalFocus directs focus to the provided element after item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusDirectsToSpecifiedElementAfterItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select").WithSelectUseFinalFocus(true));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.ClickAsync();
+
+        await WaitForSelectClosedAsync();
+        var finalFocusTarget = GetByTestId("select-final-focus-target");
+        try
+        {
+            await Assertions.Expect(finalFocusTarget).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+            {
+                Timeout = 5000 * TimeoutMultiplier
+            });
+        }
+        catch (Exception ex)
+        {
+            var diagnostics = await Page.EvaluateAsync<string>(
+                "() => JSON.stringify({ active: document.activeElement ? { tag: document.activeElement.tagName, testId: document.activeElement.getAttribute('data-testid'), text: document.activeElement.textContent, id: document.activeElement.id, role: document.activeElement.getAttribute('role') } : null, select: Array.from((window[Symbol.for('Blazix.BaseUI.Select.State')]?.roots || new Map()).values()).map(root => ({ isOpen: root.isOpen, finalFocusManaged: root.finalFocusManaged, hasTrigger: !!root.triggerElement, hasPopup: !!root.popupElement, hasPopupState: !!root.popup })) })");
+            throw new InvalidOperationException($"FinalFocus target was not focused after item selection. Diagnostics: {diagnostics}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives mouse as the close interaction type after mouse item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesMouseCloseTypeAfterMouseItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("mouse-target"));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.ClickAsync();
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Mouse");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives touch as the close interaction type after touch item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesTouchCloseTypeAfterTouchItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("touch-target"));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.DispatchEventAsync("pointerdown", new
+        {
+            pointerId = 1,
+            pointerType = "touch",
+            isPrimary = true,
+            button = 0,
+            buttons = 1,
+            bubbles = true,
+            cancelable = true
+        });
+        await bananaItem.DispatchEventAsync("touchstart", new
+        {
+            bubbles = true,
+            cancelable = true
+        });
+        await bananaItem.DispatchEventAsync("click", new
+        {
+            button = 0,
+            bubbles = true,
+            cancelable = true
+        });
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Touch");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives pen as the close interaction type after pen item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesPenCloseTypeAfterPenItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("pen-target"));
+
+        await OpenSelectAsync();
+        var appleItem = GetByTestId("select-item-apple");
+        await appleItem.DispatchEventAsync("pointerdown", new
+        {
+            pointerId = 1,
+            pointerType = "pen",
+            isPrimary = true,
+            button = 0,
+            buttons = 1,
+            bubbles = true,
+            cancelable = true
+        });
+        await appleItem.DispatchEventAsync("click", new
+        {
+            button = 0,
+            bubbles = true,
+            cancelable = true
+        });
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Pen");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives keyboard as the close interaction type after keyboard item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesKeyboardCloseTypeAfterKeyboardItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select").WithSelectUseFinalFocus(true));
+
+        await OpenSelectAsync();
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await Page.Keyboard.PressAsync("Enter");
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Keyboard");
+        await Assertions.Expect(GetByTestId("select-trigger")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
     /// Tests that the selected item is focused when the popup opens with a pre-selected value.
     /// </summary>
     [Fact]
@@ -385,8 +544,13 @@ public abstract class SelectTestsBase : TestBase
     public virtual async Task WindowResizeClosesOpenSelectWhenAligned()
     {
         await NavigateAsync(CreateUrl("/tests/select"));
+        await Page.EvaluateAsync(
+            "() => { document.querySelector('[data-testid=\"test-container\"]').style.paddingTop = '120px'; }");
 
         await OpenSelectAsync();
+
+        var positioner = GetByTestId("select-positioner");
+        await Assertions.Expect(positioner).ToHaveAttributeAsync("data-side", "none");
 
         // Trigger a resize event — the JS resize listener inside SelectPopup
         // calls back to OnWindowResize, which calls SetOpenAsync(false, WindowResize).

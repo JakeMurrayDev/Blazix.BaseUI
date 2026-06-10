@@ -21,7 +21,6 @@
 @code {
     private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
     private const int SelectedDelayMs = 400;
-    private const int UnselectedDelayMs = 200;
 
     private string triggerId = null!;
     private SelectTriggerState state;
@@ -31,10 +30,10 @@
     private Lazy<Task<IJSObjectReference>> moduleTask = null!;
     private DotNetObjectReference<SelectTrigger>? selfReference;
     private bool jsInitialized;
+    private bool initializingJs;
 
     private CancellationTokenSource? selectedDelayCts;
-    private CancellationTokenSource? unselectedDelayCts;
-    private (bool Open, bool Placeholder, bool HasNullItemLabel)? lastGatingKey;
+    private bool? lastGatingOpen;
     private bool suppressFocusCloseOnce;
 
     [CascadingParameter]
@@ -140,24 +139,10 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (RootContext is not null && Element.HasValue)
         {
-            RootContext?.SetTriggerElement(Element);
-
-            if (RootContext is not null && Element.HasValue)
-            {
-                try
-                {
-                    var module = await moduleTask.Value;
-                    selfReference = DotNetObjectReference.Create(this);
-                    await module.InvokeVoidAsync("initializeTrigger", RootContext.RootId, Element.Value, selfReference);
-                    jsInitialized = true;
-                }
-                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-                {
-                    _ = ex;
-                }
-            }
+            RootContext.SetTriggerElement(Element);
+            await InitializeTriggerJsAsync();
         }
     }
 
@@ -178,8 +163,6 @@
 
         selectedDelayCts?.Cancel();
         selectedDelayCts?.Dispose();
-        unselectedDelayCts?.Cancel();
-        unselectedDelayCts?.Dispose();
 
         if (jsInitialized && moduleTask.IsValueCreated && RootContext is not null)
         {
@@ -213,7 +196,10 @@
         var readOnly = RootContext?.ReadOnly ?? false;
         var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
         var value = RootContext?.CurrentValueBoxed;
-        state = SelectTriggerState.FromFieldState(fieldState, open, disabled, placeholder, readOnly, value);
+        var popupSide = RootContext?.Mounted == true && RootContext.GetPositionerElement().HasValue
+            ? RootContext.PopupSide
+            : null;
+        state = SelectTriggerState.FromFieldState(fieldState, open, disabled, placeholder, readOnly, popupSide, value);
     }
 
     private void BuildComponentAttributes()
@@ -282,6 +268,11 @@
             attrs["data-placeholder"] = true;
         }
 
+        if (state.PopupSide is { } popupSide)
+        {
+            attrs["data-popup-side"] = popupSide.ToDataAttributeString()!;
+        }
+
         if (open)
         {
             attrs["data-popup-open"] = true;
@@ -321,18 +312,21 @@
     {
         if (state.Disabled || RootContext is null)
         {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
             return;
         }
 
         // Match React's `useClick({ enabled: !readOnly && !disabled })`.
         if (RootContext.ReadOnly)
         {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
             return;
         }
 
         // Match React's `useClick({ event: 'mousedown' })`: only primary button toggles.
         if (e.Button != 0)
         {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -354,6 +348,7 @@
             suppressFocusCloseOnce = true;
         }
         await RootContext.SetOpenAsync(nextOpen, SelectOpenChangeReason.TriggerPress);
+        await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
@@ -391,6 +386,7 @@
     {
         if (RootContext is null)
         {
+            await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -415,6 +411,8 @@
                 RootContext.NotifyStateChanged();
             }
         });
+
+        await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
     }
 
     [JSInvokable]
@@ -463,9 +461,8 @@
     }
 
     /// <summary>
-    /// Mirrors the React <c>useEffect</c> that opens/closes the mouse-up gating
-    /// windows: a single 400 ms window when no selected item exists, or a 200 ms
-    /// (unselected) → 400 ms (selected) pair when one does.
+    /// Mirrors the React <c>useEffect</c> that enables mouse-up selection after
+    /// the popup has been open for the 400 ms selected-item delay.
     /// </summary>
     private void SyncSelectionGating()
     {
@@ -475,66 +472,34 @@
         }
 
         var open = RootContext.GetOpen();
-        var placeholder = RootContext.IsPlaceholder;
-        var hasNullItemLabel = RootContext.HasNullItemLabel;
-        var key = (open, placeholder, hasNullItemLabel);
-
-        if (lastGatingKey == key)
+        if (lastGatingOpen == open)
         {
             return;
         }
 
-        lastGatingKey = key;
+        lastGatingOpen = open;
 
         selectedDelayCts?.Cancel();
         selectedDelayCts?.Dispose();
         selectedDelayCts = null;
 
-        unselectedDelayCts?.Cancel();
-        unselectedDelayCts?.Dispose();
-        unselectedDelayCts = null;
+        RootContext.AllowSelectedMouseUp = false;
+        RootContext.AllowUnselectedMouseUp = false;
 
         if (!open)
         {
-            RootContext.AllowSelectedMouseUp = false;
-            RootContext.AllowUnselectedMouseUp = false;
             return;
         }
 
-        var hasSelectedItemInList = !placeholder || hasNullItemLabel;
-
-        if (!hasSelectedItemInList)
+        selectedDelayCts = new CancellationTokenSource();
+        var token = selectedDelayCts.Token;
+        _ = DelayThenAsync(SelectedDelayMs, token, () =>
         {
-            selectedDelayCts = new CancellationTokenSource();
-            var token = selectedDelayCts.Token;
-            _ = DelayThenAsync(SelectedDelayMs, token, () =>
-            {
-                if (RootContext is null || token.IsCancellationRequested) return;
-                RootContext.AllowSelectedMouseUp = true;
-                RootContext.AllowUnselectedMouseUp = true;
-                RootContext.NotifyStateChanged();
-            });
-        }
-        else
-        {
-            unselectedDelayCts = new CancellationTokenSource();
-            var unselectedToken = unselectedDelayCts.Token;
-            _ = DelayThenAsync(UnselectedDelayMs, unselectedToken, () =>
-            {
-                if (RootContext is null || unselectedToken.IsCancellationRequested) return;
-                RootContext.AllowUnselectedMouseUp = true;
-                RootContext.NotifyStateChanged();
-
-                selectedDelayCts = new CancellationTokenSource();
-                var selectedToken = selectedDelayCts.Token;
-                _ = DelayThenAsync(UnselectedDelayMs, selectedToken, () =>
-                {
-                    if (RootContext is null || selectedToken.IsCancellationRequested) return;
-                    RootContext.AllowSelectedMouseUp = true;
-                    RootContext.NotifyStateChanged();
-                });
-            });
-        }
+            if (RootContext is null || token.IsCancellationRequested) return;
+            RootContext.AllowSelectedMouseUp = true;
+            RootContext.AllowUnselectedMouseUp = true;
+            RootContext.NotifyStateChanged();
+        });
     }
 
     private async Task DelayThenAsync(int delayMs, CancellationToken token, Action action)
@@ -555,6 +520,31 @@
         catch (Exception ex)
         {
             await DispatchExceptionAsync(ex);
+        }
+    }
+
+    private async Task InitializeTriggerJsAsync()
+    {
+        if (jsInitialized || initializingJs || RootContext is null || !Element.HasValue)
+        {
+            return;
+        }
+
+        initializingJs = true;
+        try
+        {
+            var module = await moduleTask.Value;
+            selfReference ??= DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("initializeTrigger", RootContext.RootId, Element.Value, selfReference);
+            jsInitialized = true;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+        finally
+        {
+            initializingJs = false;
         }
     }
 }

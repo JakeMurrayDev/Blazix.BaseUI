@@ -16,6 +16,8 @@ import {
 } from './blazix-baseui-floating.min.js';
 
 const BOUNDARY_OFFSET = 2;
+const ALIGN_ITEM_PLACEMENT_MAX_ATTEMPTS = 3600;
+const ALIGN_ITEM_PLACEMENT_PROBE_DELAYS = [0, 50, 250, 1000];
 
 // ─── Popup Placement Constants & Helpers ──────────────────────────────
 // alignItemWithTrigger measurement, scroll-growth, and CSS variable
@@ -170,6 +172,8 @@ function ensurePopupState(rootState) {
             scrollArrowRaf: 0,
             pointerLeaveTimer: null,
             pointerLeaveHandler: null,
+            pointerDownHandler: null,
+            touchStartHandler: null,
             keyDownHandler: null,
             mouseMoveHandler: null,
             scrollHandler: null,
@@ -210,6 +214,12 @@ function getPseudoElementBounds(el) {
     };
 }
 
+function normalizeInteractionType(pointerType) {
+    if (pointerType === 'touch') return 'touch';
+    if (pointerType === 'pen') return 'pen';
+    return 'mouse';
+}
+
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Select.State');
 
 if (!window[STATE_KEY]) {
@@ -239,6 +249,8 @@ function handleGlobalKeyDown(e) {
     }
 
     if (!topmostRoot) return;
+
+    topmostRoot.lastInteractionType = 'keyboard';
 
     if (!topmostRoot.keyboardActive) {
         topmostRoot.keyboardActive = true;
@@ -321,6 +333,8 @@ function handleGlobalKeyDown(e) {
 function handleGlobalMouseDown(e) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.dotNetRef) continue;
+
+        rootState.lastInteractionType = 'mouse';
 
         if (rootState.keyboardActive) {
             rootState.keyboardActive = false;
@@ -425,6 +439,148 @@ function setActiveItem(rootState, items, index) {
 
     rootState.activeIndex = index;
     rootState.dotNetRef.invokeMethodAsync('OnActiveIndexChange', index).catch(() => { });
+}
+
+function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !rootState.isOpen) return;
+
+    const popupState = rootState.popup;
+    const popupElement = popupState?.popupElement || rootState.popupElement;
+    const positionerElement = rootState.positionerElement;
+    const alignItemDomActive =
+        positionerElement?.getAttribute('data-side') === 'none' ||
+        popupElement?.classList.contains('blazix-base-ui-disable-scrollbar');
+    if (attempt > ALIGN_ITEM_PLACEMENT_MAX_ATTEMPTS) return;
+    if (!popupState && !alignItemDomActive) {
+        requestAnimationFrame(() => scheduleOpenAlignItemPlacement(rootId, attempt + 1));
+        return;
+    }
+    if (popupState && !popupState.alignItemWithTriggerActive && !alignItemDomActive) {
+        requestAnimationFrame(() => scheduleOpenAlignItemPlacement(rootId, attempt + 1));
+        return;
+    }
+
+    requestAnimationFrame(() => {
+        const nextPopupState = rootState.popup;
+        const nextPopupElement = nextPopupState?.popupElement || rootState.popupElement;
+        const nextPositionerElement = rootState.positionerElement;
+        const nextAlignItemDomActive =
+            nextPositionerElement?.getAttribute('data-side') === 'none' ||
+            nextPopupElement?.classList.contains('blazix-base-ui-disable-scrollbar');
+        if (!rootState.isOpen) return;
+        if (nextPopupState && !nextPopupState.alignItemWithTriggerActive && !nextAlignItemDomActive) {
+            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
+            return;
+        }
+        if (!nextPopupState && !nextAlignItemDomActive) {
+            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
+            return;
+        }
+
+        const triggerElement = rootState.triggerElement;
+        if (!nextPopupElement || !nextPositionerElement || !triggerElement) {
+            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
+            return;
+        }
+
+        const positionerRect = nextPositionerElement.getBoundingClientRect();
+        const popupRect = nextPopupElement.getBoundingClientRect();
+        const scroller = rootState.listElement || nextPopupElement;
+        if (
+            positionerRect.width === 0 ||
+            positionerRect.height === 0 ||
+            popupRect.width === 0 ||
+            popupRect.height === 0 ||
+            scroller.scrollHeight === 0
+        ) {
+            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
+            return;
+        }
+
+        beginAlignItemWithTriggerPlacement(rootId, true);
+    });
+}
+
+function queueOpenAlignItemPlacement(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !rootState.isOpen) return;
+
+    scheduleOpenAlignItemPlacement(rootId);
+    startOpenAlignItemPlacementWatchdog(rootId);
+    for (const delay of ALIGN_ITEM_PLACEMENT_PROBE_DELAYS) {
+        setTimeout(() => scheduleOpenAlignItemPlacement(rootId), delay);
+    }
+}
+
+function startOpenAlignItemPlacementWatchdog(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !rootState.isOpen || rootState.alignItemPlacementWatchdog) return;
+
+    rootState.alignItemPlacementWatchdog = true;
+    const startedAt = performance.now();
+
+    const tick = () => {
+        const currentRootState = state.roots.get(rootId);
+        if (!currentRootState || !currentRootState.isOpen) {
+            if (currentRootState) currentRootState.alignItemPlacementWatchdog = false;
+            return;
+        }
+
+        const popupState = currentRootState.popup;
+        const popupElement = popupState?.popupElement || currentRootState.popupElement;
+        const positionerElement = currentRootState.positionerElement;
+        const alignItemDomActive =
+            positionerElement?.getAttribute('data-side') === 'none' ||
+            popupElement?.classList.contains('blazix-base-ui-disable-scrollbar');
+        const alignItemActive =
+            !!popupState?.alignItemWithTriggerActive || alignItemDomActive;
+        const positioned = !!positionerElement?.hasAttribute('data-positioned');
+
+        if (
+            alignItemActive &&
+            !positioned &&
+            popupElement &&
+            positionerElement &&
+            currentRootState.triggerElement
+        ) {
+            try {
+                beginAlignItemWithTriggerPlacement(rootId, true);
+            } catch {
+                // Placement is idempotent and retried below while the popup stays open.
+            }
+
+            const elapsed = performance.now() - startedAt;
+            const positionerRect = positionerElement.getBoundingClientRect();
+            const popupRect = popupElement.getBoundingClientRect();
+            const hasStableGeometry =
+                positionerRect.width > 0 &&
+                positionerRect.height > 0 &&
+                popupRect.width > 0 &&
+                popupRect.height > 0 &&
+                popupElement.scrollHeight > 0;
+            const isTopLeftPlaceholder = positionerRect.left === 0 && positionerRect.top === 0;
+            if (elapsed > 250 && hasStableGeometry && !isTopLeftPlaceholder) {
+                positionerElement.setAttribute('data-positioned', '');
+                if (popupState) {
+                    popupState.initialPlaced = true;
+                }
+                notifyScrollArrowVisibility(currentRootState);
+                currentRootState.alignItemPlacementWatchdog = false;
+                return;
+            }
+        }
+
+        const elapsed = performance.now() - startedAt;
+        if (!positioned && elapsed < 30000) {
+            requestAnimationFrame(tick);
+            return;
+        }
+
+        currentRootState.alignItemPlacementWatchdog = false;
+    };
+
+    requestAnimationFrame(tick);
 }
 
 // ─── Popup Placement ──────────────────────────────────────────────────
@@ -584,7 +740,10 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         scrollUpArrow: null,
         scrollDownArrow: null,
         transitionCleanup: null,
-        fallbackTimeoutId: null
+        fallbackTimeoutId: null,
+        finalFocusManaged: false,
+        lastInteractionType: 'none',
+        alignItemPlacementWatchdog: false
     });
 }
 
@@ -622,6 +781,8 @@ export function setRootOpen(rootId, isOpen, reason) {
     rootState.isOpen = isOpen;
 
     if (isOpen) {
+        queueOpenAlignItemPlacement(rootId);
+
         // Scroll lock is owned exclusively by SelectPositioner (C#-side) to cover
         // both modal and alignItemWithTrigger cases, and to avoid double-locking.
 
@@ -693,6 +854,8 @@ export function setRootOpen(rootId, isOpen, reason) {
             }
         });
     } else {
+        rootState.alignItemPlacementWatchdog = false;
+
         // Safety net: release any legacy scroll lock that may have been set prior to
         // the positioner taking exclusive ownership. New code paths never set this.
         if (rootState.scrollLockCleanup) {
@@ -706,7 +869,7 @@ export function setRootOpen(rootId, isOpen, reason) {
 
         rootState.activeIndex = -1;
 
-        if (reason !== 'outside-press') {
+        if (reason !== 'outside-press' && !rootState.finalFocusManaged) {
             requestAnimationFrame(() => {
                 if (rootState.triggerElement) {
                     rootState.triggerElement.focus();
@@ -725,15 +888,19 @@ export function setRootOpen(rootId, isOpen, reason) {
 
 export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
-    if (rootState) {
-        rootState.triggerElement = element;
+    if (!rootState) return;
+    rootState.triggerElement = element;
+    if (element && !rootState.triggerCleanup && rootState.dotNetRef) {
+        initializeTrigger(rootId, element, rootState.dotNetRef);
     }
+    queueOpenAlignItemPlacement(rootId);
 }
 
 export function setPopupElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.popupElement = element;
+        queueOpenAlignItemPlacement(rootId);
     }
 }
 
@@ -760,6 +927,7 @@ export function registerPositioner(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.positionerElement = element;
+        queueOpenAlignItemPlacement(rootId);
     }
 }
 
@@ -793,26 +961,37 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
     };
 
     const onPointerDown = (event) => {
+        rootState.lastInteractionType = normalizeInteractionType(event.pointerType);
         if (event.pointerType === 'touch') {
             triggerDotNetRef.invokeMethodAsync('NotifyTouchOpen').catch(() => { });
         }
     };
 
-    const onMouseDown = () => {
-        if (rootState.isOpen) return;
+    const onMouseDown = (event) => {
+        if (event.button !== 0) return;
+
+        const notifyCancelOpen = () => {
+            const dotNetRef = rootState.triggerDotNetRef || triggerDotNetRef;
+            dotNetRef?.invokeMethodAsync('NotifyCancelOpen').catch(() => { });
+        };
 
         // Firefox can fire `mouseup` synchronously with `mousedown`; defer the
         // one-shot listener registration by a tick to match the React source.
         setTimeout(() => {
             const doc = triggerElement.ownerDocument;
             const handler = (mu) => {
-                if (!triggerElement.isConnected) return;
+                const currentTrigger = rootState.triggerElement || triggerElement;
+                if (!currentTrigger || !currentTrigger.isConnected) {
+                    notifyCancelOpen();
+                    return;
+                }
+
                 const tgt = mu.target;
 
-                if (contains(triggerElement, tgt) || tgt === triggerElement) return;
+                if (contains(currentTrigger, tgt) || tgt === currentTrigger) return;
                 if (rootState.positionerElement && contains(rootState.positionerElement, tgt)) return;
 
-                const b = getPseudoElementBounds(triggerElement);
+                const b = getPseudoElementBounds(currentTrigger);
                 if (mu.clientX >= b.left - BOUNDARY_OFFSET &&
                     mu.clientX <= b.right + BOUNDARY_OFFSET &&
                     mu.clientY >= b.top - BOUNDARY_OFFSET &&
@@ -820,7 +999,7 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
                     return;
                 }
 
-                triggerDotNetRef.invokeMethodAsync('NotifyCancelOpen').catch(() => { });
+                notifyCancelOpen();
             };
             doc.addEventListener('mouseup', handler, { once: true });
         }, 0);
@@ -835,15 +1014,20 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
 
     triggerElement.addEventListener('pointermove', onPointerMove);
     triggerElement.addEventListener('pointerdown', onPointerDown);
-    triggerElement.addEventListener('mousedown', onMouseDown);
+    triggerElement.addEventListener('mousedown', onMouseDown, true);
     triggerElement.addEventListener('focusout', onFocusOut);
 
     rootState.triggerCleanup = () => {
         triggerElement.removeEventListener('pointermove', onPointerMove);
         triggerElement.removeEventListener('pointerdown', onPointerDown);
-        triggerElement.removeEventListener('mousedown', onMouseDown);
+        triggerElement.removeEventListener('mousedown', onMouseDown, true);
         triggerElement.removeEventListener('focusout', onFocusOut);
     };
+}
+
+export function getLastInteractionType(rootId) {
+    const rootState = state.roots.get(rootId);
+    return rootState?.lastInteractionType || 'none';
 }
 
 export function disposeTrigger(rootId) {
@@ -1213,7 +1397,7 @@ export function disposePositioner(positionerId) {
 
 // ─── Popup Placement Public API ───────────────────────────────────────
 
-export function initializePopup(rootId, popupElement, dotNetRef) {
+export function initializePopup(rootId, popupElement, dotNetRef, finalFocusManaged = false) {
     const rootState = state.roots.get(rootId);
     if (!rootState || !popupElement) return;
 
@@ -1222,14 +1406,18 @@ export function initializePopup(rootId, popupElement, dotNetRef) {
     // Idempotent: re-registration replaces handlers but keeps saved styles / flags.
     if (popupState.pointerLeaveHandler && popupState.popupElement) {
         popupState.popupElement.removeEventListener('pointerleave', popupState.pointerLeaveHandler);
+        popupState.popupElement.removeEventListener('pointerdown', popupState.pointerDownHandler);
+        popupState.popupElement.removeEventListener('touchstart', popupState.touchStartHandler);
         popupState.popupElement.removeEventListener('keydown', popupState.keyDownHandler);
         popupState.popupElement.removeEventListener('mousemove', popupState.mouseMoveHandler);
         popupState.popupElement.removeEventListener('scroll', popupState.scrollHandler);
     }
 
     rootState.popupElement = popupElement;
+    rootState.finalFocusManaged = !!finalFocusManaged;
     popupState.popupElement = popupElement;
     popupState.dotNetRef = dotNetRef;
+    queueOpenAlignItemPlacement(rootId);
 
     popupState.pointerLeaveHandler = (event) => {
         const dotNet = popupState.dotNetRef;
@@ -1249,8 +1437,17 @@ export function initializePopup(rootId, popupElement, dotNetRef) {
         }, 0);
     };
 
+    popupState.pointerDownHandler = (event) => {
+        rootState.lastInteractionType = normalizeInteractionType(event.pointerType);
+    };
+
+    popupState.touchStartHandler = () => {
+        rootState.lastInteractionType = 'touch';
+    };
+
     popupState.keyDownHandler = (event) => {
         rootState.keyboardActive = true;
+        rootState.lastInteractionType = 'keyboard';
         if (rootState.dotNetRef) {
             rootState.dotNetRef.invokeMethodAsync('OnKeyboardActiveChange', true).catch(() => { });
         }
@@ -1285,9 +1482,46 @@ export function initializePopup(rootId, popupElement, dotNetRef) {
     };
 
     popupElement.addEventListener('pointerleave', popupState.pointerLeaveHandler);
+    popupElement.addEventListener('pointerdown', popupState.pointerDownHandler);
+    popupElement.addEventListener('touchstart', popupState.touchStartHandler, { passive: true });
     popupElement.addEventListener('keydown', popupState.keyDownHandler);
     popupElement.addEventListener('mousemove', popupState.mouseMoveHandler);
     popupElement.addEventListener('scroll', popupState.scrollHandler, { passive: true });
+}
+
+export function setFinalFocusManaged(rootId, managed) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.finalFocusManaged = !!managed;
+    }
+}
+
+export function focusElement(rootId, element) {
+    if (!(element instanceof HTMLElement)) return;
+
+    const rootState = state.roots.get(rootId);
+    const active = document.activeElement;
+    if (rootState && active && active !== document.body && active !== rootState.triggerElement) {
+        const popup = rootState.popupElement;
+        if (popup && !popup.contains(active)) return;
+    }
+
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    const applyFocus = () => {
+        attempts++;
+        if (document.contains(element)) {
+            element.focus();
+            if (document.activeElement === element || attempts >= maxAttempts) return;
+        }
+
+        if (attempts < maxAttempts) {
+            requestAnimationFrame(applyFocus);
+        }
+    };
+
+    requestAnimationFrame(applyFocus);
 }
 
 export function disposePopup(rootId) {
@@ -1304,6 +1538,12 @@ export function disposePopup(rootId) {
     if (popupState.popupElement) {
         if (popupState.pointerLeaveHandler) {
             popupState.popupElement.removeEventListener('pointerleave', popupState.pointerLeaveHandler);
+        }
+        if (popupState.pointerDownHandler) {
+            popupState.popupElement.removeEventListener('pointerdown', popupState.pointerDownHandler);
+        }
+        if (popupState.touchStartHandler) {
+            popupState.popupElement.removeEventListener('touchstart', popupState.touchStartHandler);
         }
         if (popupState.keyDownHandler) {
             popupState.popupElement.removeEventListener('keydown', popupState.keyDownHandler);
@@ -1334,6 +1574,8 @@ export function disposePopup(rootId) {
     popupState.popupElement = null;
     popupState.dotNetRef = null;
     popupState.pointerLeaveHandler = null;
+    popupState.pointerDownHandler = null;
+    popupState.touchStartHandler = null;
     popupState.keyDownHandler = null;
     popupState.mouseMoveHandler = null;
     popupState.scrollHandler = null;
@@ -1342,6 +1584,7 @@ export function disposePopup(rootId) {
     popupState.reachedMaxHeight = false;
     popupState.savedPositionerStyles = false;
     popupState.originalPositionerStyles = {};
+    rootState.finalFocusManaged = false;
 
     rootState.popup = null;
 }
@@ -1353,11 +1596,15 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
 
     popupState.alignItemWithTriggerActive = !!alignItemWithTriggerActive;
 
-    const popupElement = popupState.popupElement;
+    const popupElement = popupState.popupElement || rootState.popupElement;
     const positionerElement = rootState.positionerElement;
     const triggerElement = rootState.triggerElement;
+    if (popupElement && !popupState.popupElement) {
+        popupState.popupElement = popupElement;
+    }
 
     if (!rootState.isOpen || !popupElement || !positionerElement || !triggerElement) {
+        scheduleOpenAlignItemPlacement(rootId);
         return;
     }
 
@@ -1393,6 +1640,15 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             const isRtl = rootState.direction === 'rtl';
             const scroller = rootState.listElement || popupElement;
             const scrollHeight = scroller.scrollHeight;
+
+            if (
+                positionerRect.width === 0 ||
+                positionerRect.height === 0 ||
+                scrollHeight === 0
+            ) {
+                scheduleOpenAlignItemPlacement(rootId);
+                return;
+            }
 
             const borderBottom = parseFloat(popupStyles.borderBottomWidth) || 0;
             const marginTop = parseFloat(positionerStyles.marginTop) || 10;
@@ -1479,16 +1735,21 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             const isPinchZoomed = visualScale !== 1 && isWebKit();
 
             if (fallbackToAlignPopupToTrigger || isPinchZoomed) {
+                if (!popupState.dotNetRef) {
+                    scheduleOpenAlignItemPlacement(rootId);
+                    return;
+                }
+
                 // Fallback BEFORE committing any style mutations so the popup has
                 // clean inline styles for the standard floating-positioner path.
                 popupState.initialPlaced = true;
                 clearPopupStylesInternal(rootState);
                 popupState.alignItemWithTriggerActive = false;
-                if (popupState.dotNetRef) {
-                    popupState.dotNetRef.invokeMethodAsync('OnFallbackToAlignPopupToTrigger').catch(() => { });
-                }
+                popupState.dotNetRef.invokeMethodAsync('OnFallbackToAlignPopupToTrigger').catch(() => { });
                 return;
             }
+
+            attachWindowResizeListener(rootId);
 
             // === Commit phase: apply all layout mutations together ===
             // Force `position: fixed` so the placement coordinates are resolved
@@ -1549,6 +1810,9 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             setTimeout(() => {
                 popupState.initialPlaced = true;
             }, 0);
+        } catch (error) {
+            void error;
+            scheduleOpenAlignItemPlacement(rootId);
         } finally {
             restoreTransformStyles();
         }

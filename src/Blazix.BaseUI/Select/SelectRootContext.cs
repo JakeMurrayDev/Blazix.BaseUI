@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Field;
+using Blazix.BaseUI.FloatingFocusManager;
 using Microsoft.AspNetCore.Components;
 
 namespace Blazix.BaseUI.Select;
@@ -61,7 +62,10 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public string? ListId { get; set; }
 
     /// <inheritdoc />
-    public bool HasList => !string.IsNullOrEmpty(ListId);
+    public bool ListElementPresent { get; set; }
+
+    /// <inheritdoc />
+    public bool HasList => ListElementPresent;
 
     /// <inheritdoc />
     public bool ScrollUpArrowVisible { get; set; }
@@ -180,6 +184,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public InteractionType OpenInteractionType { get; set; }
 
     /// <inheritdoc />
+    public InteractionType CloseInteractionType { get; set; }
+
+    /// <inheritdoc />
     public int SelectedIndex { get; set; } = -1;
 
     /// <inheritdoc />
@@ -205,6 +212,12 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
 
     /// <inheritdoc />
     public bool Modal { get; set; }
+
+    /// <inheritdoc />
+    public Side? PopupSide { get; set; }
+
+    /// <inheritdoc />
+    public FinalFocusTarget? FinalFocus { get; set; }
 
     /// <summary>
     /// Gets or sets the boxed initial value captured by <see cref="SelectRoot{TValue}"/>

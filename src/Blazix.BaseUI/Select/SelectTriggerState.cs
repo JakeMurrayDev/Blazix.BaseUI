@@ -14,6 +14,7 @@ namespace Blazix.BaseUI.Select;
 /// <param name="Dirty">Whether the trigger's value has changed from its initial value.</param>
 /// <param name="Filled">Whether the trigger has a value (is filled).</param>
 /// <param name="Focused">Whether the trigger is focused.</param>
+/// <param name="PopupSide">Which side the popup is positioned relative to the trigger, or <see langword="null"/> when not mounted.</param>
 /// <param name="Value">The currently selected value (boxed). Never emitted as a DOM attribute; exposed so
 /// <see cref="SelectTrigger.Render"/> consumers can branch on the value.</param>
 public readonly record struct SelectTriggerState(
@@ -26,6 +27,7 @@ public readonly record struct SelectTriggerState(
     bool Dirty,
     bool Filled,
     bool Focused,
+    Side? PopupSide,
     object? Value)
 {
     internal static SelectTriggerState FromFieldState(
@@ -34,6 +36,7 @@ public readonly record struct SelectTriggerState(
         bool isDisabled,
         bool isPlaceholder,
         bool isReadOnly,
+        Side? popupSide,
         object? value) => new(
             Open: isOpen,
             Disabled: isDisabled,
@@ -44,5 +47,6 @@ public readonly record struct SelectTriggerState(
             Dirty: fieldState.Dirty,
             Filled: fieldState.Filled,
             Focused: fieldState.Focused,
+            PopupSide: popupSide,
             Value: value);
 }

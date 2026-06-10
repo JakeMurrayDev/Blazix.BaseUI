@@ -195,6 +195,9 @@ public enum InteractionType
     /// <summary>Mouse click.</summary>
     Click,
 
+    /// <summary>Mouse pointer.</summary>
+    Mouse,
+
     /// <summary>Keyboard.</summary>
     Keyboard,
 

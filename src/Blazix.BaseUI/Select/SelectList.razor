@@ -27,6 +27,7 @@
     private bool subscribedToStateChanged;
     private ElementReference? lastRegisteredElement;
     private bool injectedScrollbarStyle;
+    private bool disposed;
 
     public SelectList()
     {
@@ -97,6 +98,11 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (disposed)
+        {
+            return;
+        }
+
         if (RootContext is null) return;
 
         if (firstRender)
@@ -129,6 +135,12 @@
 
     private void BuildComponentAttributes()
     {
+        if (disposed)
+        {
+            componentAttributes = new Dictionary<string, object>();
+            return;
+        }
+
         var attrs = new Dictionary<string, object>();
 
         // Match the React `${id}-list` convention so `aria-controls` on the trigger
@@ -143,6 +155,7 @@
             if (RootContext is not null && RootContext.ListId != listId)
             {
                 RootContext.ListId = listId;
+                RootContext.NotifyStateChanged();
             }
         }
 
@@ -205,6 +218,8 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
+
         if (subscribedToStateChanged && RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
@@ -217,12 +232,13 @@
             lastRegisteredElement = null;
         }
 
-        if (RootContext is not null && RootContext.ListId == listId)
+        if (RootContext is not null)
         {
             // Clear the root context's list id so downstream consumers (e.g.
             // SelectTrigger's aria-controls + SelectPopup's HasList branch)
             // stop treating a missing list as present.
             RootContext.ListId = null;
+            RootContext.NotifyStateChanged();
         }
 
         if (moduleTask.IsValueCreated)

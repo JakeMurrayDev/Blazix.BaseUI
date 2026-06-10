@@ -6,6 +6,7 @@ public interface ISelectTriggerContract
     Task Placeholder_ShouldHaveDataPlaceholderWhenNoValue();
     Task Placeholder_ShouldNotHaveDataPlaceholderWhenValueProvided();
     Task StyleHooks_ShouldHaveDataPopupOpenAndPressedWhenOpen();
+    Task StyleHooks_ShouldExposeResolvedPopupSideOnTrigger();
     Task Required_SetsAriaRequiredAttribute();
 
     // Disabled
@@ -45,7 +46,7 @@ public interface ISelectTriggerContract
 
     // Selection mouseup gating
     Task SelectionGating_PlaceholderOnly_OpensBothFlagsAfterSelectedDelay();
-    Task SelectionGating_WithSelectedItem_OpensUnselectedThenSelected();
+    Task SelectionGating_WithSelectedItem_OpensSelectedAndUnselectedTogether();
     Task SelectionGating_ClosedResetsFlags();
 
     // State record

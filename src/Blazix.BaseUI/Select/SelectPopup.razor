@@ -39,6 +39,8 @@
     private bool previousOpen;
     private bool previousAlignActive;
     private bool? previousHighlightItemOnHover;
+    private bool? previousFinalFocusManaged;
+    private bool subscribedToStateChanged;
 
     public SelectPopup()
     {
@@ -113,6 +115,8 @@
             // Trigger's aria-controls targets `<RootId>-list`; assign deterministically
             // so the trigger and popup ids line up without an extra render cycle.
             RootContext.PopupId = $"{RootContext.RootId}-list";
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribedToStateChanged = true;
         }
         dotNetRef = DotNetObjectReference.Create(this);
     }
@@ -120,14 +124,12 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var open = RootContext?.GetOpen() ?? false;
-        var side = PositionerContext?.Side ?? Side.Bottom;
-        var align = PositionerContext?.Align ?? Align.Center;
-        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        var alignActive = PositionerContext?.AlignItemWithTriggerActive ?? false;
+        if (RootContext is not null)
+        {
+            RootContext.FinalFocus = FinalFocus;
+        }
 
-        state = new SelectPopupState(open, side, align, transitionStatus, alignActive);
-        BuildComponentAttributes();
+        BuildStateAndAttributes();
     }
 
     /// <inheritdoc />
@@ -137,6 +139,7 @@
 
         var open = state.Open;
         var alignActive = state.AlignItemWithTriggerActive;
+        var finalFocusManaged = FinalFocus.HasValue;
 
         if (firstRender && Element.HasValue && !jsInitialized)
         {
@@ -145,13 +148,16 @@
             try
             {
                 var module = await moduleTask.Value;
-                if (CspContext?.DisableStyleElements != true)
+                if (CspContext?.DisableStyleElements != true &&
+                    state.AlignItemWithTriggerActive &&
+                    string.IsNullOrEmpty(RootContext.ListId))
                 {
                     await module.InvokeVoidAsync("injectScrollbarDisableStyle", CspContext?.Nonce);
                 }
                 await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, RootContext.HighlightItemOnHover);
                 previousHighlightItemOnHover = RootContext.HighlightItemOnHover;
-                await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!);
+                await module.InvokeVoidAsync("initializePopup", RootContext.RootId, Element.Value, dotNetRef!, finalFocusManaged);
+                previousFinalFocusManaged = finalFocusManaged;
                 jsInitialized = true;
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -171,6 +177,17 @@
                 var module = await moduleTask.Value;
                 await module.InvokeVoidAsync("setHighlightItemOnHover", RootContext.RootId, hov);
                 previousHighlightItemOnHover = hov;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
+        }
+
+        if (previousFinalFocusManaged != finalFocusManaged)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("setFinalFocusManaged", RootContext.RootId, finalFocusManaged);
+                previousFinalFocusManaged = finalFocusManaged;
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
         }
@@ -239,6 +256,18 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (subscribedToStateChanged && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+            subscribedToStateChanged = false;
+        }
+
+        RootContext?.SetPopupElement(null);
+        if (RootContext is not null && Equals(RootContext.FinalFocus, FinalFocus))
+        {
+            RootContext.FinalFocus = null;
+        }
+
         if (jsInitialized && moduleTask.IsValueCreated && RootContext is not null)
         {
             try
@@ -278,7 +307,7 @@
         {
             _ = ex;
         }
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -303,7 +332,25 @@
     public void OnFallbackToAlignPopupToTrigger()
     {
         PositionerContext?.SetControlledAlignItemWithTrigger(false);
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var open = RootContext?.GetOpen() ?? false;
+        var side = PositionerContext?.Side ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? Align.Center;
+        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
+        var alignActive = PositionerContext?.AlignItemWithTriggerActive ?? false;
+
+        state = new SelectPopupState(open, side, align, transitionStatus, alignActive);
+        BuildComponentAttributes();
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()

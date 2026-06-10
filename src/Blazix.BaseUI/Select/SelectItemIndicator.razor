@@ -23,6 +23,7 @@
     private Dictionary<string, object> componentAttributes = new();
     private bool previousSelected;
     private TransitionStatus previousTransitionStatus = TransitionStatus.Undefined;
+    private bool hasInitializedTransition;
 
     private bool Rendered => ItemContext?.Selected ?? false;
 
@@ -124,6 +125,14 @@
     {
         var wasRendered = isMounted;
         var isRendered = Rendered;
+
+        if (!hasInitializedTransition)
+        {
+            isMounted = isRendered;
+            transitionStatus = TransitionStatus.Undefined;
+            hasInitializedTransition = true;
+            return;
+        }
 
         if (isRendered && !wasRendered)
         {

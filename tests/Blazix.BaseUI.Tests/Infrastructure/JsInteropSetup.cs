@@ -201,7 +201,7 @@ public static class JsInteropSetup
             module.SetupVoid("setHoverInteractionOpen", _ => true).SetVoidResult();
             module.SetupVoid("updateScrollLock", _ => true).SetVoidResult();
             module.SetupVoid("setInternalBackdrop", _ => true).SetVoidResult();
-            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.Setup<string>("initializePositioner", _ => true).SetResult("positioner-id");
             module.SetupVoid("updatePosition", _ => true).SetVoidResult();
             module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
             module.SetupVoid("initializePopup", _ => true).SetVoidResult();
@@ -241,7 +241,7 @@ public static class JsInteropSetup
             module.SetupVoid("disposeHoverInteraction", _ => true).SetVoidResult();
             module.SetupVoid("cancelPendingHoverOpen", _ => true).SetVoidResult();
             module.SetupVoid("updateHoverInteractionDelays", _ => true).SetVoidResult();
-            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.Setup<string>("initializePositioner", _ => true).SetResult("positioner-id");
             module.SetupVoid("updatePosition", _ => true).SetVoidResult();
             module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
             module.SetupVoid("setPositionerId", _ => true).SetVoidResult();
@@ -295,14 +295,21 @@ public static class JsInteropSetup
     }
 
     private const string LabelModule = "./_content/Blazix.BaseUI/blazix-baseui-label.js";
+    private const string LabelMinModule = "./_content/Blazix.BaseUI/blazix-baseui-label.min.js";
 
     public static void SetupLabelModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(LabelModule);
-        module.SetupVoid("addLabelMouseDownListener", _ => true);
-        module.SetupVoid("removeLabelMouseDownListener", _ => true);
-        module.SetupVoid("focusControlById", _ => true);
-        module.SetupVoid("focusSliderControl", _ => true);
+        SetupLabelModulePath(LabelModule);
+        SetupLabelModulePath(LabelMinModule);
+
+        void SetupLabelModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("addLabelMouseDownListener", _ => true);
+            module.SetupVoid("removeLabelMouseDownListener", _ => true);
+            module.SetupVoid("focusControlById", _ => true);
+            module.SetupVoid("focusSliderControl", _ => true);
+        }
     }
 
     private const string DialogModule = "./_content/Blazix.BaseUI/blazix-baseui-dialog.js";
@@ -606,47 +613,58 @@ public static class JsInteropSetup
     }
 
     private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectMinModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public static void SetupSelectModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(SelectModule);
-        module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
-        module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
-        module.SetupVoid("setListElement", _ => true).SetVoidResult();
-        module.SetupVoid("setActiveIndex", _ => true).SetVoidResult();
-        module.SetupVoid("clearHighlights", _ => true).SetVoidResult();
-        module.SetupVoid("focusTrigger", _ => true).SetVoidResult();
-        module.SetupVoid("startContinuousScroll", _ => true).SetVoidResult();
-        module.SetupVoid("stopContinuousScroll", _ => true).SetVoidResult();
-        module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
-        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
-        module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
-        module.SetupVoid("registerPositioner", _ => true).SetVoidResult();
-        module.SetupVoid("unregisterPositioner", _ => true).SetVoidResult();
-        module.SetupVoid("initializeTrigger", _ => true).SetVoidResult();
-        module.SetupVoid("disposeTrigger", _ => true).SetVoidResult();
-        module.Setup<string>("applyScrollLock", _ => true).SetResult("scroll-lock-token");
-        module.SetupVoid("releaseScrollLock", _ => true).SetVoidResult();
-        module.SetupVoid("initializePopup", _ => true).SetVoidResult();
-        module.SetupVoid("disposePopup", _ => true).SetVoidResult();
-        module.SetupVoid("beginAlignItemWithTriggerPlacement", _ => true).SetVoidResult();
-        module.SetupVoid("handlePopupScroll", _ => true).SetVoidResult();
-        module.SetupVoid("clearPopupStyles", _ => true).SetVoidResult();
-        module.SetupVoid("attachWindowResizeListener", _ => true).SetVoidResult();
-        module.SetupVoid("detachWindowResizeListener", _ => true).SetVoidResult();
-        module.SetupVoid("injectScrollbarDisableStyle", _ => true).SetVoidResult();
-        module.SetupVoid("setSelectedItemTextElement", _ => true).SetVoidResult();
-        module.SetupVoid("setValueElement", _ => true).SetVoidResult();
-        module.SetupVoid("setHighlightItemOnHover", _ => true).SetVoidResult();
-        module.SetupVoid("setDisabled", _ => true).SetVoidResult();
-        module.SetupVoid("setDirection", _ => true).SetVoidResult();
-        module.Setup<string?>("getElementText", _ => true).SetResult(null);
+        SetupSelectModulePath(SelectModule);
+        SetupSelectModulePath(SelectMinModule);
 
         var floating = jsInterop.SetupModule(FloatingModule);
         floating.SetupVoid("clearStyles", _ => true).SetVoidResult();
+
+        void SetupSelectModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
+            module.SetupVoid("setListElement", _ => true).SetVoidResult();
+            module.SetupVoid("setActiveIndex", _ => true).SetVoidResult();
+            module.SetupVoid("setReadOnly", _ => true).SetVoidResult();
+            module.SetupVoid("clearHighlights", _ => true).SetVoidResult();
+            module.SetupVoid("focusTrigger", _ => true).SetVoidResult();
+            module.SetupVoid("startContinuousScroll", _ => true).SetVoidResult();
+            module.SetupVoid("stopContinuousScroll", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+            module.SetupVoid("registerPositioner", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterPositioner", _ => true).SetVoidResult();
+            module.SetupVoid("initializeTrigger", _ => true).SetVoidResult();
+            module.SetupVoid("disposeTrigger", _ => true).SetVoidResult();
+            module.Setup<string>("getLastInteractionType", _ => true).SetResult("none");
+            module.Setup<string>("applyScrollLock", _ => true).SetResult("scroll-lock-token");
+            module.SetupVoid("releaseScrollLock", _ => true).SetVoidResult();
+            module.SetupVoid("initializePopup", _ => true).SetVoidResult();
+            module.SetupVoid("setFinalFocusManaged", _ => true).SetVoidResult();
+            module.SetupVoid("focusElement", _ => true).SetVoidResult();
+            module.SetupVoid("disposePopup", _ => true).SetVoidResult();
+            module.SetupVoid("beginAlignItemWithTriggerPlacement", _ => true).SetVoidResult();
+            module.SetupVoid("handlePopupScroll", _ => true).SetVoidResult();
+            module.SetupVoid("clearPopupStyles", _ => true).SetVoidResult();
+            module.SetupVoid("attachWindowResizeListener", _ => true).SetVoidResult();
+            module.SetupVoid("detachWindowResizeListener", _ => true).SetVoidResult();
+            module.SetupVoid("injectScrollbarDisableStyle", _ => true).SetVoidResult();
+            module.SetupVoid("setSelectedItemTextElement", _ => true).SetVoidResult();
+            module.SetupVoid("setValueElement", _ => true).SetVoidResult();
+            module.SetupVoid("setHighlightItemOnHover", _ => true).SetVoidResult();
+            module.SetupVoid("setDisabled", _ => true).SetVoidResult();
+            module.SetupVoid("setDirection", _ => true).SetVoidResult();
+            module.Setup<string?>("getElementText", _ => true).SetResult(null);
+        }
     }
 
     private const string ScrollAreaModule = "./_content/Blazix.BaseUI/blazix-baseui-scroll-area.js";

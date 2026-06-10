@@ -57,8 +57,9 @@ public class SelectGroupTests : BunitContext, ISelectGroupContract
         var group = cut.Find("[role='group']");
         group.ShouldNotBeNull();
 
-        var label = group.QuerySelector("[role='presentation']");
+        var label = cut.FindComponent<SelectGroupLabel>().Find("div");
         label.ShouldNotBeNull();
+        label.TextContent.ShouldContain("Fruits");
 
         return Task.CompletedTask;
     }
@@ -76,7 +77,7 @@ public class SelectGroupTests : BunitContext, ISelectGroupContract
         var group = cut.Find("[role='group']");
         group.HasAttribute("aria-labelledby").ShouldBeTrue();
 
-        var label = group.QuerySelector("[role='presentation']");
+        var label = cut.FindComponent<SelectGroupLabel>().Find("div");
         label.ShouldNotBeNull();
         var labelId = label!.GetAttribute("id");
         labelId.ShouldNotBeNullOrEmpty();
