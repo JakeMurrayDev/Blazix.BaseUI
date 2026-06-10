@@ -2709,7 +2709,7 @@ function createFocusOutHandler(mgr, interactionCtx) {
         queueMicrotask(() => {
             // Suppress during pointer interactions
             if (interactionCtx?.isPointerDown) return;
-            if (mgr.floatingElement?.__blazorBaseUISuppressFocusOutOnce) {
+            if (mgr.floatingElement?.__blazixBaseUISuppressFocusOutOnce) {
                 return;
             }
 

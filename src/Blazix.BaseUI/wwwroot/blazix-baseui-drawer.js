@@ -1069,10 +1069,10 @@ function applyOutsidePressSuppression(root) {
     }
 
     if (root.popupElement) {
-        root.popupElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = until;
+        root.popupElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = until;
     }
     if (root.backdropElement) {
-        root.backdropElement.__blazorBaseUIDrawerSuppressOutsidePressUntil = until;
+        root.backdropElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = until;
     }
 }
 

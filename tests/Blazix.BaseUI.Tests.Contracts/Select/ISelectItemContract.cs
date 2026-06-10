@@ -21,7 +21,7 @@ public interface ISelectItemContract
 
     // React parity additions
     Task ShouldNotEmitDataLabel();
-    Task ShouldEmitDataBlazorBaseUiLabelWhenLabelSet();
+    Task ShouldEmitDataBlazixBaseUiLabelWhenLabelSet();
     Task ShouldRejectMouseClickOnUnhighlightedItem();
     Task NativeButton_ShouldRenderAsButtonElementWithTypeButton();
     Task NonNativeButton_ShouldRenderAsDivWithRoleOption();

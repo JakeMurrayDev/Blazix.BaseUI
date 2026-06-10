@@ -219,7 +219,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     }
 
     [Fact]
-    public Task ShouldEmitDataBlazorBaseUiLabelWhenLabelSet()
+    public Task ShouldEmitDataBlazixBaseUiLabelWhenLabelSet()
     {
         var cut = Render(CreateSelectWithItems(defaultOpen: true, firstItemLabel: "Apple"));
 
