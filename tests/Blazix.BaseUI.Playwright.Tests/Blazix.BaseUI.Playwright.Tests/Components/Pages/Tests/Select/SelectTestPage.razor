@@ -1,5 +1,6 @@
 @page "/tests/select/server"
 @using Blazix.BaseUI.Select
+@using Blazix.BaseUI.FloatingFocusManager
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
 <PageTitle>Select Test Page (Server)</PageTitle>
@@ -23,7 +24,8 @@
         </SelectTrigger>
         <SelectPortal>
             <SelectPositioner data-testid="select-positioner">
-                <SelectPopup data-testid="select-popup">
+                <SelectPopup data-testid="select-popup"
+                             FinalFocus="ResolveFinalFocus()">
                     @if (ShowGroups)
                     {
                         <SelectGroup>
@@ -76,10 +78,13 @@
         </SelectPortal>
     </SelectRoot>
 
+    <button @ref="finalFocusTarget" data-testid="select-final-focus-target" style="margin-top: 10px;">Final Focus Target</button>
+
     <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
         <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
         <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
         <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Last Final Focus Type: <span data-testid="last-final-focus-type">@lastFinalFocusType</span></div>
         <div>Selected Value: <span data-testid="selected-value">@selectedValue</span></div>
         <div>Value Change Count: <span data-testid="value-change-count">@valueChangeCount</span></div>
     </div>
@@ -109,11 +114,19 @@
     [SupplyParameterFromQuery(Name = "showGroups")]
     public bool ShowGroups { get; set; }
 
+    [SupplyParameterFromQuery(Name = "useFinalFocus")]
+    public bool UseFinalFocus { get; set; }
+
+    [SupplyParameterFromQuery(Name = "finalFocusMode")]
+    public string? FinalFocusMode { get; set; }
+
     private bool isOpen;
     private int changeCount;
     private string lastReason = "";
+    private string lastFinalFocusType = "";
     private string selectedValue = "";
     private int valueChangeCount;
+    private ElementReference finalFocusTarget;
 
     protected override void OnInitialized()
     {
@@ -131,5 +144,33 @@
     {
         valueChangeCount++;
         selectedValue = args.Value ?? "";
+    }
+
+    private FinalFocusTarget? ResolveFinalFocus()
+    {
+        if (!UseFinalFocus)
+        {
+            return null;
+        }
+
+        return FinalFocusTarget.From(closeType =>
+        {
+            lastFinalFocusType = closeType.ToString();
+            return FinalFocusMode switch
+            {
+                "mouse-target" => closeType == InteractionType.Mouse
+                    ? FinalFocusResult.To(finalFocusTarget)
+                    : FinalFocusResult.Default,
+                "touch-target" => closeType == InteractionType.Touch
+                    ? FinalFocusResult.To(finalFocusTarget)
+                    : FinalFocusResult.Default,
+                "pen-target" => closeType == InteractionType.Pen
+                    ? FinalFocusResult.To(finalFocusTarget)
+                    : FinalFocusResult.Default,
+                _ => closeType == InteractionType.Keyboard
+                    ? FinalFocusResult.Default
+                    : FinalFocusResult.To(finalFocusTarget)
+            };
+        });
     }
 }

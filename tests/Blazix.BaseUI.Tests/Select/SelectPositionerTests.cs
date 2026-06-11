@@ -6,7 +6,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectPositionerTests : BunitContext, ISelectPositionerContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public SelectPositionerTests()
     {
@@ -199,23 +199,26 @@ public class SelectPositionerTests : BunitContext, ISelectPositionerContract
     }
 
     [Fact]
-    public Task RerenderUpdatesPositionWhenAnchorTrackingDisabled()
+    public async Task RerenderUpdatesPositionWhenAnchorTrackingDisabled()
     {
         var module = JSInterop.SetupModule(SelectModule);
+        module.Setup<string>("initializePositioner", _ => true).SetResult("positioner-id");
+        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
         var cut = Render(Wrap(
             defaultOpen: true,
             alignItemWithTrigger: false,
             disableAnchorTracking: true));
+        cut.Render();
+        cut.WaitForAssertion(() =>
+            module.Invocations.Any(i => i.Identifier == "initializePositioner").ShouldBeTrue());
 
         var initialUpdateCount = module.Invocations.Count(i => i.Identifier == "updatePosition");
 
-        cut.FindComponent<SelectPositioner>().Render();
+        await InvokeUpdatePositionAsync(cut.FindComponent<SelectPositioner>().Instance);
 
         module.Invocations
             .Count(i => i.Identifier == "updatePosition")
             .ShouldBe(initialUpdateCount + 1);
-
-        return Task.CompletedTask;
     }
 
     [Fact]
@@ -497,6 +500,25 @@ public class SelectPositionerTests : BunitContext, ISelectPositionerContract
         if (task is null)
         {
             throw new InvalidOperationException("HandleItemMapChangedAsync did not return a Task.");
+        }
+
+        await task;
+    }
+
+    private static async Task InvokeUpdatePositionAsync(SelectPositioner positioner)
+    {
+        var method = typeof(SelectPositioner).GetMethod(
+            "UpdatePositionAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (method is null)
+        {
+            throw new InvalidOperationException("Could not find UpdatePositionAsync.");
+        }
+
+        var task = (Task?)method.Invoke(positioner, null);
+        if (task is null)
+        {
+            throw new InvalidOperationException("UpdatePositionAsync did not return a Task.");
         }
 
         await task;

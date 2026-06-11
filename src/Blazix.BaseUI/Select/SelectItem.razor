@@ -36,7 +36,8 @@
 
     // Pointer/drag tracking, mirroring React `pointerTypeRef` + `didPointerDownRef`.
     private string pointerType = "mouse";
-    private bool didPointerDown;
+    private bool allowMouseSelection;
+    private double dragY;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", SelectModule).AsTask());
@@ -433,6 +434,7 @@
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onpointerenter"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEnter);
+        attrs["onpointermove"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerMove);
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
         attrs["ontouchstart"] = EventCallback.Factory.Create<TouchEventArgs>(this, HandleTouchStartAsync);
         attrs["onmouseup"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseUpAsync);
@@ -446,38 +448,68 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        didPointerDown = false;
+        var isInvalidMouseClick = pointerType != "touch" && !highlighted && !allowMouseSelection;
+        allowMouseSelection = false;
 
-        if (Disabled || TypedRootContext is null)
+        if (Disabled || TypedRootContext is null || RootContext is null)
+        {
+            await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        // With alignItemWithTrigger, opening can place an item under the cursor.
+        // Real mouse clicks must start on the item, while keyboard/JS clicks use
+        // the highlighted item that JS already focused.
+        if (isInvalidMouseClick)
         {
             return;
         }
 
-        // React parity: for mouse, require the item to already be highlighted
-        // (it was hovered/focused first). Touch skips this check — a tap commits directly.
-        if (pointerType != "touch" && !highlighted)
-        {
-            return;
-        }
-
+        RootContext.CloseInteractionType = RootContext.KeyboardActive
+            ? InteractionType.Keyboard
+            : ResolvePointerInteractionType(pointerType);
         await TypedRootContext.SelectValueAsync(Value);
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private void HandlePointerEnter(PointerEventArgs e)
+    private async Task HandlePointerEnter(PointerEventArgs e)
     {
         pointerType = string.IsNullOrEmpty(e.PointerType) ? "mouse" : e.PointerType;
+        await EventUtilities.InvokeOnPointerEnterAsync(AdditionalAttributes, e);
     }
 
-    private void HandlePointerDown(PointerEventArgs e)
+    private async Task HandlePointerMove(PointerEventArgs e)
     {
         pointerType = string.IsNullOrEmpty(e.PointerType) ? pointerType : e.PointerType;
-        didPointerDown = true;
+
+        if (RootContext is null || pointerType != "mouse" || e.Buttons != 1)
+        {
+            await EventUtilities.InvokeOnPointerMoveAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        dragY += e.MovementY;
+        if (dragY * dragY >= 64)
+        {
+            RootContext.AllowUnselectedMouseUp = true;
+        }
+
+        await EventUtilities.InvokeOnPointerMoveAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerDown(PointerEventArgs e)
+    {
+        pointerType = string.IsNullOrEmpty(e.PointerType) ? pointerType : e.PointerType;
+        allowMouseSelection = true;
+        ResetDragMovement();
+        await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleTouchStartAsync(TouchEventArgs e)
     {
         pointerType = "touch";
+        allowMouseSelection = false;
+        ResetDragMovement();
 
         if (RootContext is not null)
         {
@@ -490,6 +522,8 @@
 
     private async Task HandleMouseUpAsync(MouseEventArgs e)
     {
+        ResetDragMovement();
+
         if (Disabled || TypedRootContext is null || RootContext is null)
         {
             return;
@@ -497,22 +531,35 @@
 
         // React parity: if the user pressed and released on the same item, `onclick`
         // will fire next and handle the commit. Skip the drag-to-select path here.
-        if (didPointerDown)
+        if (pointerType == "touch" || allowMouseSelection)
         {
-            didPointerDown = false;
             return;
         }
 
         var disallowSelected = !RootContext.AllowSelectedMouseUp && selected;
         var disallowUnselected = !RootContext.AllowUnselectedMouseUp && !selected;
 
-        if (disallowSelected || disallowUnselected || (pointerType != "touch" && !highlighted))
+        if (disallowSelected || disallowUnselected)
         {
             return;
         }
 
+        allowMouseSelection = true;
+        RootContext.CloseInteractionType = ResolvePointerInteractionType(pointerType);
         await TypedRootContext.SelectValueAsync(Value);
+        allowMouseSelection = false;
         await EventUtilities.InvokeOnMouseUpAsync(AdditionalAttributes, e);
+    }
+
+    private static InteractionType ResolvePointerInteractionType(string? value)
+    {
+        return value switch
+        {
+            "mouse" => InteractionType.Mouse,
+            "touch" => InteractionType.Touch,
+            "pen" => InteractionType.Pen,
+            _ => InteractionType.Mouse
+        };
     }
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
@@ -570,5 +617,10 @@
         }
 
         await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private void ResetDragMovement()
+    {
+        dragY = 0;
     }
 }

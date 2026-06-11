@@ -1,6 +1,7 @@
 @typeparam TValue
 @using Blazix.BaseUI.DirectionProvider
 @using Blazix.BaseUI.Field
+@using Blazix.BaseUI.FloatingFocusManager
 @using Blazix.BaseUI.Form
 @using Blazix.BaseUI.Utilities
 @using Blazix.BaseUI.Utilities.LabelableProvider
@@ -401,6 +402,7 @@
             OnTriggerFocusAction = HandleTriggerFocus,
             OnTriggerBlurAction = HandleTriggerBlur,
             OpenInteractionType = InteractionType.None,
+            CloseInteractionType = InteractionType.None,
             AllowSelectedMouseUp = false,
             AllowUnselectedMouseUp = false,
             KeyboardActive = false,
@@ -422,12 +424,14 @@
     {
         var currentOpen = CurrentOpen;
         var effectiveDirection = EffectiveDirection;
+        var reconciledMountedOpen = false;
         if (state.Open != currentOpen)
         {
             if (currentOpen)
             {
                 transition.BeginOpen();
                 activeIndex = 0;
+                context.CloseInteractionType = InteractionType.None;
             }
             else
             {
@@ -446,6 +450,24 @@
             {
                 _ = SyncRootOpenAsync(currentOpen, SelectOpenChangeReason.None);
             }
+        }
+        else if (currentOpen && !transition.IsMounted)
+        {
+            // Controlled @bind-Open can publish Open=true after a force-mounted
+            // render already set state.Open=true. Reconcile the transition mount
+            // flag so descendants do not retain the closed hidden attributes.
+            transition.BeginOpen();
+            if (activeIndex < 0)
+            {
+                activeIndex = 0;
+            }
+
+            context.TransitionStatus = transition.TransitionStatus;
+            context.Open = true;
+            context.Mounted = transition.IsMounted;
+            context.ActiveIndex = activeIndex;
+            context.OpenChangeReason = SelectOpenChangeReason.None;
+            reconciledMountedOpen = true;
         }
 
         context.Disabled = ResolvedDisabled;
@@ -493,6 +515,11 @@
         }
 
         SyncActionsRef();
+
+        if (hasRendered && reconciledMountedOpen)
+        {
+            typedContext.NotifyStateChanged();
+        }
     }
 
     private async Task SyncReadOnlyAsync(bool readOnly)
@@ -622,6 +649,45 @@
     }
 
     /// <summary>
+    /// Invoked from JavaScript when pointer movement switches the select out of keyboard mode.
+    /// </summary>
+    [JSInvokable]
+    public void NotifyPointerMove()
+    {
+        context.KeyboardActive = false;
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when touch input opens the select.
+    /// </summary>
+    [JSInvokable]
+    public void NotifyTouchOpen()
+    {
+        context.OpenInteractionType = InteractionType.Touch;
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when trigger mouseup outside bounds cancels an opening select.
+    /// </summary>
+    [JSInvokable]
+    public async Task NotifyCancelOpen()
+    {
+        if (CurrentOpen)
+        {
+            await SetOpenAsync(false, SelectOpenChangeReason.CancelOpen);
+        }
+    }
+
+    /// <summary>
+    /// Invoked from JavaScript when focus leaves the trigger and does not move into the popup.
+    /// </summary>
+    [JSInvokable]
+    public void NotifyRealBlur()
+    {
+        HandleTriggerBlur();
+    }
+
+    /// <summary>
     /// Invoked from JavaScript after the opening starting styles have been applied.
     /// </summary>
     [JSInvokable]
@@ -634,7 +700,7 @@
 
         context.TransitionStatus = transition.TransitionStatus;
         typedContext.NotifyStateChanged();
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -643,6 +709,11 @@
     [JSInvokable]
     public void OnTransitionEnd(bool open)
     {
+        if (open != CurrentOpen)
+        {
+            return;
+        }
+
         var unmounted = transition.HandleTransitionEnd(open);
         context.TransitionStatus = transition.TransitionStatus;
 
@@ -665,7 +736,7 @@
         }
 
         _ = InvokeOpenChangeCompleteAsync(open);
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -679,7 +750,7 @@
             context.ScrollUpArrowVisible = up;
             context.ScrollDownArrowVisible = down;
             typedContext.NotifyStateChanged();
-            StateHasChanged();
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -695,7 +766,7 @@
             context.ActiveIndex = index;
             typedContext.NotifyHighlightCleared();
             typedContext.NotifyStateChanged();
-            StateHasChanged();
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -724,10 +795,15 @@
         {
             transition.BeginOpen();
             activeIndex = 0;
+            context.CloseInteractionType = InteractionType.None;
         }
         else
         {
             transition.BeginClose();
+            if (context.CloseInteractionType == InteractionType.None)
+            {
+                context.CloseInteractionType = ResolveCloseInteractionType(reason);
+            }
             context.OpenInteractionType = InteractionType.None;
             SyncSelectedIndex();
 
@@ -758,12 +834,16 @@
         if (hasRendered)
         {
             await SyncRootOpenAsync(nextOpen, reason);
+            if (!nextOpen && context.FinalFocus is { } finalFocus)
+            {
+                await ApplyFinalFocusAsync(finalFocus, reason);
+            }
         }
 
         await OpenChanged.InvokeAsync(nextOpen);
 
         typedContext.NotifyStateChanged();
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SyncRootOpenAsync(bool open, SelectOpenChangeReason reason)
@@ -833,7 +913,7 @@
             HandleValueChanged();
 
             typedContext.NotifyStateChanged();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -904,7 +984,7 @@
 
             HandleValueChanged();
             typedContext.NotifyStateChanged();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -930,7 +1010,7 @@
 
             HandleValueChanged();
             typedContext.NotifyStateChanged();
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -1003,7 +1083,7 @@
 
     private async Task HandleHiddenInputChange(ChangeEventArgs e)
     {
-        if (Multiple || ReadOnly || typedContext is null)
+        if (Multiple || ReadOnly || ResolvedDisabled || typedContext is null)
         {
             return;
         }
@@ -1110,7 +1190,14 @@
             return GetCurrentValues().Count == 0;
         }
 
-        return CurrentValue is null;
+        var value = CurrentValue;
+        if (value is null)
+        {
+            return true;
+        }
+
+        var serialized = ItemToStringValue?.Invoke(value) ?? value.ToString();
+        return string.IsNullOrEmpty(serialized);
     }
 
     private bool IsValuesControlled => hasValuesParameter;
@@ -1149,6 +1236,11 @@
                 await module.InvokeVoidAsync("setListElement", rootId, listElement.Value);
             }
 
+            if (positionerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("registerPositioner", rootId, positionerElement.Value);
+            }
+
             if (CurrentOpen)
             {
                 await module.InvokeVoidAsync("setRootOpen", rootId, true, (string?)null);
@@ -1160,9 +1252,93 @@
         }
     }
 
+    private async Task ApplyFinalFocusAsync(FinalFocusTarget finalFocus, SelectOpenChangeReason reason)
+    {
+        var closeInteractionType = await ResolveFinalFocusInteractionTypeAsync(reason);
+        context.CloseInteractionType = closeInteractionType;
+        var resolved = finalFocus.Resolve(closeInteractionType);
+        if (resolved.Suppress)
+        {
+            return;
+        }
+
+        var target = resolved.Target ?? triggerElement;
+        if (target is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("focusElement", rootId, target.Value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async Task<InteractionType> ResolveFinalFocusInteractionTypeAsync(SelectOpenChangeReason reason)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            var lastInteractionType = await module.InvokeAsync<string>("getLastInteractionType", rootId);
+            var resolved = ParseInteractionType(lastInteractionType);
+            if (resolved != InteractionType.None)
+            {
+                return resolved;
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+
+        if (context.CloseInteractionType != InteractionType.None)
+        {
+            return context.CloseInteractionType;
+        }
+
+        return ResolveCloseInteractionType(reason);
+    }
+
+    private static InteractionType ParseInteractionType(string? value)
+    {
+        return value switch
+        {
+            "keyboard" => InteractionType.Keyboard,
+            "mouse" => InteractionType.Mouse,
+            "touch" => InteractionType.Touch,
+            "pen" => InteractionType.Pen,
+            _ => InteractionType.None
+        };
+    }
+
+    private static InteractionType ResolveCloseInteractionType(SelectOpenChangeReason reason)
+    {
+        return reason switch
+        {
+            SelectOpenChangeReason.TriggerPress => InteractionType.Mouse,
+            SelectOpenChangeReason.OutsidePress => InteractionType.Mouse,
+            SelectOpenChangeReason.ItemPress => InteractionType.Mouse,
+            SelectOpenChangeReason.CancelOpen => InteractionType.Mouse,
+            SelectOpenChangeReason.EscapeKey => InteractionType.Keyboard,
+            SelectOpenChangeReason.ListNavigation => InteractionType.Keyboard,
+            _ => InteractionType.None
+        };
+    }
+
     private void SetTriggerElement(ElementReference? element)
     {
+        if (SameElement(triggerElement, element))
+        {
+            return;
+        }
+
         triggerElement = element;
+        typedContext.NotifyStateChanged();
 
         if (hasRendered && element.HasValue)
         {
@@ -1194,7 +1370,7 @@
         activeIndex = -1;
         context.ActiveIndex = activeIndex;
         typedContext.NotifyStateChanged();
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void NotifyInputRefIfNeeded()
@@ -1240,15 +1416,23 @@
 
     private void SetListElement(ElementReference? element)
     {
+        var hadListElement = listElement.HasValue;
         listElement = element;
+        var hasListElement = element.HasValue;
+        context.ListElementPresent = hasListElement;
 
-        if (hasRendered && element.HasValue)
+        if (hadListElement != hasListElement)
         {
-            _ = SetListElementAsync(element.Value);
+            typedContext.NotifyStateChanged();
+        }
+
+        if (hasRendered)
+        {
+            _ = SetListElementAsync(element);
         }
     }
 
-    private async Task SetListElementAsync(ElementReference element)
+    private async Task SetListElementAsync(ElementReference? element)
     {
         try
         {
@@ -1378,7 +1562,7 @@
 
     private void SetActiveIndex(int index)
     {
-        if (activeIndex == index)
+        if (activeIndex == index && context.ActiveIndex == index)
         {
             return;
         }

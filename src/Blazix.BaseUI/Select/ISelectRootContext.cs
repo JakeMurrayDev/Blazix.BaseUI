@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Field;
+using Blazix.BaseUI.FloatingFocusManager;
 using Microsoft.AspNetCore.Components;
 
 namespace Blazix.BaseUI.Select;
@@ -68,6 +69,11 @@ internal interface ISelectRootContext
     /// Gets or sets the ID of the list element (when SelectList is used).
     /// </summary>
     string? ListId { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a SelectList element is currently mounted.
+    /// </summary>
+    bool ListElementPresent { get; set; }
 
     /// <summary>
     /// Gets whether a SelectList is present.
@@ -250,6 +256,11 @@ internal interface ISelectRootContext
     InteractionType OpenInteractionType { get; set; }
 
     /// <summary>
+    /// Gets or sets the interaction type that most recently closed the select.
+    /// </summary>
+    InteractionType CloseInteractionType { get; set; }
+
+    /// <summary>
     /// Gets the index of the currently selected item.
     /// </summary>
     int SelectedIndex { get; }
@@ -301,6 +312,20 @@ internal interface ISelectRootContext
     /// scroll lock.
     /// </summary>
     bool Modal { get; set; }
+
+    /// <summary>
+    /// Gets or sets the resolved side of the popup before align-item-with-trigger
+    /// maps the rendered positioner side to <see cref="Side.None"/>.
+    /// Consumed by <see cref="SelectTrigger"/> for <c>data-popup-side</c>.
+    /// </summary>
+    Side? PopupSide { get; set; }
+
+    /// <summary>
+    /// Gets or sets the popup's explicit final focus behavior, when provided.
+    /// Registered by <see cref="SelectPopup"/> so the root can apply close-time
+    /// focus even if the popup unmounts before its own after-render lifecycle runs.
+    /// </summary>
+    FinalFocusTarget? FinalFocus { get; set; }
 
     /// <summary>
     /// Gets the ordered list of currently-mounted item values. Mirrors the

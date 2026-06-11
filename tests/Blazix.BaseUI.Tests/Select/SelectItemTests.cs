@@ -14,7 +14,9 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         bool defaultOpen = false,
         bool disabledItem = false,
         bool useNativeButton = false,
-        string? firstItemLabel = null)
+        string? firstItemLabel = null,
+        bool highlightItemOnHover = true,
+        IReadOnlyDictionary<string, object>? firstItemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -22,6 +24,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
             var i = 1;
             if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
+            builder.AddAttribute(i++, "HighlightItemOnHover", highlightItemOnHover);
             builder.AddAttribute(i++, "ChildContent", (RenderFragment)(innerBuilder =>
             {
                 innerBuilder.OpenComponent<SelectTrigger>(0);
@@ -45,7 +48,11 @@ public class SelectItemTests : BunitContext, ISelectItemContract
                         {
                             popupBuilder.AddAttribute(3, "NativeButton", true);
                         }
-                        popupBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
+                        if (firstItemAdditionalAttributes is not null)
+                        {
+                            popupBuilder.AddMultipleAttributes(4, firstItemAdditionalAttributes);
+                        }
+                        popupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Apple")));
                         popupBuilder.CloseComponent();
 
                         popupBuilder.OpenComponent<SelectItem<string>>(10);
@@ -247,6 +254,70 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task PointerDownStartedMouseClick_ShouldSelectUnhighlightedItem()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true));
+
+        var items = cut.FindAll("[role='option']");
+        await items[0].TriggerEventAsync("onpointerdown", new PointerEventArgs { PointerType = "mouse" });
+        items = cut.FindAll("[role='option']");
+        items[0].Click();
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-selected").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DragToSelect_ShouldSelectUnhighlightedItemWhenHoverHighlightingDisabled()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, highlightItemOnHover: false));
+
+        var items = cut.FindAll("[role='option']");
+        await items[0].TriggerEventAsync("onpointermove", new PointerEventArgs
+        {
+            PointerType = "mouse",
+            Buttons = 1,
+            MovementY = 8
+        });
+        await items[0].TriggerEventAsync("onmouseup", new MouseEventArgs());
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-selected").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task EventHandlers_ForwardsPointerHandlers()
+    {
+        var pointerEnterCalled = false;
+        var pointerDownCalled = false;
+        var pointerMoveCalled = false;
+
+        var cut = Render(CreateSelectWithItems(
+            defaultOpen: true,
+            firstItemAdditionalAttributes: new Dictionary<string, object>
+            {
+                ["onpointerenter"] = EventCallback.Factory.Create<PointerEventArgs>(
+                    this,
+                    _ => pointerEnterCalled = true),
+                ["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(
+                    this,
+                    _ => pointerDownCalled = true),
+                ["onpointermove"] = EventCallback.Factory.Create<PointerEventArgs>(
+                    this,
+                    _ => pointerMoveCalled = true)
+            }));
+
+        var item = cut.FindAll("[role='option']")[0];
+        await item.TriggerEventAsync("onpointerenter", new PointerEventArgs { PointerType = "mouse" });
+        await item.TriggerEventAsync("onpointerdown", new PointerEventArgs { PointerType = "mouse" });
+        await item.TriggerEventAsync("onpointermove", new PointerEventArgs { PointerType = "mouse" });
+
+        pointerEnterCalled.ShouldBeTrue();
+        pointerDownCalled.ShouldBeTrue();
+        pointerMoveCalled.ShouldBeTrue();
     }
 
     [Fact]

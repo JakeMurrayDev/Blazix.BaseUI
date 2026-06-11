@@ -1,3 +1,4 @@
+using AngleSharp.Dom;
 using Blazix.BaseUI.DirectionProvider;
 using Blazix.BaseUI.Field;
 using Blazix.BaseUI.Form;
@@ -9,7 +10,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectRootTests : BunitContext, ISelectRootContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public SelectRootTests()
     {
@@ -102,6 +103,12 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         };
     }
 
+    private static void MouseClickItem(IElement item)
+    {
+        item.TriggerEvent("onpointerdown", new PointerEventArgs { PointerType = "mouse" });
+        item.Click();
+    }
+
     private static RenderFragment CreateChildrenWithBackdrop()
     {
         return builder =>
@@ -172,12 +179,11 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var items = cut.FindAll("[role='option']");
         items.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
 
-        items.First(i => i.TextContent.Contains("Banana")).Click();
-        cut.FindComponent<SelectRoot<string>>().Render();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Banana")));
 
-        var updatedItems = cut.FindAll("[role='option']");
-        updatedItems.First(i => i.TextContent.Contains("Cherry")).HasAttribute("data-selected").ShouldBeTrue();
-        updatedItems.First(i => i.TextContent.Contains("Banana")).HasAttribute("data-selected").ShouldBeFalse();
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("value").ShouldBe("cherry");
+        cut.FindComponent<SelectValue<string>>().Markup.ShouldContain("Cherry");
 
         return Task.CompletedTask;
     }
@@ -218,15 +224,11 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         // Click on banana item
         var items = cut.FindAll("[role='option']");
         var bananaItem = items.First(i => i.TextContent.Contains("Banana"));
-        bananaItem.Click();
+        MouseClickItem(bananaItem);
 
-        // Since it's controlled and valueChanged doesn't update the value prop,
-        // re-render to pick up state - apple should still be selected
-        cut.FindComponent<SelectRoot<string>>().Render();
-
-        var updatedItems = cut.FindAll("[role='option']");
-        var appleItem = updatedItems.First(i => i.TextContent.Contains("Apple"));
-        appleItem.HasAttribute("data-selected").ShouldBeTrue();
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("value").ShouldBe("apple");
+        cut.FindComponent<SelectValue<string>>().Markup.ShouldContain("Apple");
 
         return Task.CompletedTask;
     }
@@ -239,8 +241,8 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             defaultValue: "apple",
             itemToStringValue: v => v?.ToUpper()));
 
-        var hiddenInput = cut.Find("input[type='hidden']");
-        hiddenInput.GetAttribute("value").ShouldBe("APPLE");
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("value").ShouldBe("APPLE");
 
         return Task.CompletedTask;
     }
@@ -253,8 +255,8 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             form: "checkout",
             defaultValue: "apple"));
 
-        var hiddenInput = cut.Find("input[type='hidden']");
-        hiddenInput.GetAttribute("form").ShouldBe("checkout");
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("form").ShouldBe("checkout");
 
         return Task.CompletedTask;
     }
@@ -304,7 +306,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         var items = cut.FindAll("[role='option']");
         var bananaItem = items.First(i => i.TextContent.Contains("Banana"));
-        bananaItem.Click();
+        MouseClickItem(bananaItem);
 
         invoked.ShouldBeTrue();
         receivedValue.ShouldBe("banana");
@@ -313,18 +315,16 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
-    public Task OnStartingStyleApplied_ClearsStartingTransitionStatus()
+    public async Task OnStartingStyleApplied_ClearsStartingTransitionStatus()
     {
         var cut = Render(CreateSelect(defaultOpen: true));
         var root = cut.FindComponent<SelectRoot<string>>().Instance;
 
         root.typedContext.TransitionStatus.ShouldBe(TransitionStatus.Starting);
 
-        root.OnStartingStyleApplied();
+        await cut.InvokeAsync(() => root.OnStartingStyleApplied());
 
         root.typedContext.TransitionStatus.ShouldBe(TransitionStatus.Undefined);
-
-        return Task.CompletedTask;
     }
 
     [Fact]
@@ -383,7 +383,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         var items = cut.FindAll("[role='option']");
         var appleItem = items.First(i => i.TextContent.Contains("Apple"));
-        appleItem.Click();
+        MouseClickItem(appleItem);
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
@@ -564,6 +564,61 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         };
     }
 
+    private RenderFragment CreateSelectForHiddenInputAutofill(bool disabled = false)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "Name", "fruit");
+            builder.AddAttribute(2, "Disabled", disabled);
+            builder.AddAttribute(3, "Items", new[]
+            {
+                new SelectOption<string>("apple", "Apple"),
+                new SelectOption<string>("banana", "Banana")
+            });
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SelectTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b =>
+                {
+                    b.OpenComponent<SelectValue<string>>(0);
+                    b.AddAttribute(1, "Placeholder", "Select...");
+                    b.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private RenderFragment CreateFieldSelectWithEmptySerializedValue()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "Name", "fruit");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SelectRoot<string>>(0);
+                fieldBuilder.AddAttribute(1, "DefaultValue", string.Empty);
+                fieldBuilder.AddAttribute(2, "ItemToStringValue", (Func<string?, string?>)(value => value));
+                fieldBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(selectBuilder =>
+                {
+                    selectBuilder.OpenComponent<SelectTrigger>(0);
+                    selectBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b =>
+                    {
+                        b.OpenComponent<SelectValue<string>>(0);
+                        b.AddAttribute(1, "Placeholder", "Select...");
+                        b.CloseComponent();
+                    }));
+                    selectBuilder.CloseComponent();
+                }));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     private RenderFragment CreateSelectWithDisabledItems(bool defaultOpen = false)
     {
         return builder =>
@@ -654,6 +709,36 @@ public class SelectRootTests : BunitContext, ISelectRootContract
     }
 
     [Fact]
+    public async Task HiddenInputChange_DoesNotSelectWhenDisabled()
+    {
+        var cut = Render(CreateSelectForHiddenInputAutofill(disabled: true));
+
+        var hiddenInput = cut.Find("input[aria-hidden='true']");
+        await hiddenInput.TriggerEventAsync("onchange", new ChangeEventArgs { Value = "apple" });
+
+        hiddenInput = cut.Find("input[aria-hidden='true']");
+        hiddenInput.GetAttribute("value").ShouldBe("");
+
+        var value = cut.FindComponent<SelectValue<string>>();
+        value.Markup.ShouldContain("Select...");
+    }
+
+    [Fact]
+    public Task EmptySerializedSingleValue_RemainsPlaceholderAndUnfilled()
+    {
+        var cut = Render(CreateFieldSelectWithEmptySerializedValue());
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-placeholder").ShouldBeTrue();
+        trigger.HasAttribute("data-filled").ShouldBeFalse();
+
+        var hiddenInput = cut.Find("input[aria-hidden='true']");
+        hiddenInput.GetAttribute("value").ShouldBe("");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task MultipleHiddenInputs_ForwardFormAttribute()
     {
         var cut = Render(CreateMultipleSelect(
@@ -680,8 +765,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         cut.FindAll("input[type='hidden']").Single().GetAttribute("value").ShouldBe("apple");
 
         var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
-        banana.Click();
-        cut.FindComponent<SelectRoot<string>>().Render();
+        MouseClickItem(banana);
 
         var hiddenInputs = cut.FindAll("input[type='hidden']");
         hiddenInputs.Count.ShouldBe(1);
@@ -704,7 +788,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var banana = cut.FindAll("[role='option']").First(i => i.TextContent.Contains("Banana"));
-        banana.Click();
+        MouseClickItem(banana);
 
         receivedValues.ShouldNotBeNull();
         receivedValues.ShouldBe(["apple", "banana"]);
@@ -722,7 +806,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             itemToStringLabel: v => $"Fruit: {v}"));
 
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         var valueSpan = cut.FindComponent<SelectValue<string>>();
         valueSpan.Markup.ShouldContain("Fruit: apple");
@@ -745,7 +829,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             })));
 
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         callCount.ShouldBe(1);
 
@@ -814,7 +898,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var items = cut.FindAll("[role='option']");
         if (items.Count > 0)
         {
-            items[0].Click();
+            MouseClickItem(items[0]);
         }
 
         // Value should remain null since readOnly blocks selection
@@ -835,7 +919,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var items = cut.FindAll("[role='option']");
         if (items.Count > 0)
         {
-            items[0].Click();
+            MouseClickItem(items[0]);
         }
 
         var valueSpan = cut.FindComponent<SelectValue<string>>();
@@ -888,10 +972,10 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var cut = Render(CreateMultipleSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Banana")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Banana")));
 
         // Both items should be selected in uncontrolled multi-select
         items = cut.FindAll("[role='option']");
@@ -910,7 +994,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Click apple again to deselect it
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         items = cut.FindAll("[role='option']");
         items.First(i => i.TextContent.Contains("Apple")).HasAttribute("data-selected").ShouldBeFalse();
@@ -954,8 +1038,10 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var cut = Render(CreateMultipleSelect(name: "fruits"));
 
         var hiddenInputs = cut.FindAll("input[type='hidden']");
-        hiddenInputs.Count.ShouldBe(1);
-        hiddenInputs[0].GetAttribute("value").ShouldBe("");
+        hiddenInputs.Count.ShouldBe(0);
+
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("value").ShouldBe("");
 
         return Task.CompletedTask;
     }
@@ -984,9 +1070,11 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             required: true));
 
         var hiddenInputs = cut.FindAll("input[type='hidden']");
-        hiddenInputs.Count.ShouldBe(1);
-        // The empty placeholder input; required is on the trigger, not the hidden input
-        // This test verifies the trigger has aria-required
+        hiddenInputs.Count.ShouldBe(0);
+
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.HasAttribute("required").ShouldBeTrue();
+
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-required").ShouldBe("true");
 
@@ -999,7 +1087,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var cut = Render(CreateMultipleSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         // Popup should remain open in multi-select mode
         var trigger = cut.Find("button");
@@ -1015,7 +1103,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         var cut = Render(CreateSelect(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
@@ -1161,12 +1249,12 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         var cut = Render(fragment);
 
-        // Simulate JS calling OnTransitionEnd through the component's dispatcher
+        // Simulate JS calling OnTransitionEnd through the component's dispatcher.
         var root = cut.FindComponent<SelectRoot<string>>();
-        await root.InvokeAsync(() => root.Instance.OnTransitionEnd(false));
+        await root.InvokeAsync(() => root.Instance.OnTransitionEnd(true));
 
         invoked.ShouldBeTrue();
-        receivedOpen.ShouldBeFalse();
+        receivedOpen.ShouldBeTrue();
     }
 
     // --- Id prop (root level) ---
@@ -1404,10 +1492,10 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item to make the hidden input appear with the field name
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
-        var hiddenInput = cut.Find("input[type='hidden']");
-        hiddenInput.GetAttribute("name").ShouldBe("fruit");
+        var formInput = cut.Find("input[aria-hidden='true']");
+        formInput.GetAttribute("name").ShouldBe("fruit");
 
         return Task.CompletedTask;
     }
@@ -1435,7 +1523,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         trigger = cut.Find("button");
         trigger.HasAttribute("data-filled").ShouldBeTrue();
@@ -1454,7 +1542,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         trigger = cut.Find("button");
         trigger.HasAttribute("data-dirty").ShouldBeTrue();
@@ -1474,7 +1562,7 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         // Select an item — this should clear form errors
         var items = cut.FindAll("[role='option']");
-        items.First(i => i.TextContent.Contains("Apple")).Click();
+        MouseClickItem(items.First(i => i.TextContent.Contains("Apple")));
 
         // After selecting, the error should be cleared
         // We verify the trigger no longer has aria-invalid

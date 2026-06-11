@@ -148,7 +148,7 @@ public class SelectLabelTests : BunitContext, ISelectLabelContract
     [Fact]
     public Task RegistersNonNativePointerDownPrevention()
     {
-        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-label.js");
+        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-label.min.js");
 
         Render(CreateSelectWithLabel());
 

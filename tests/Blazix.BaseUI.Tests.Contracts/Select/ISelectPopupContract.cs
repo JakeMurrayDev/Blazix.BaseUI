@@ -10,6 +10,7 @@ public interface ISelectPopupContract
     Task OmitsAriaMultiselectableWhenSingleSelect();
     Task AppliesDataSideAndDataAlign();
     Task ForwardsFinalFocusToFloatingFocusManager();
+    Task MarksSelectJsFinalFocusAsManagedWhenFinalFocusIsExplicit();
     Task DefaultsFinalFocusToNullSoFocusManagerKeepsLegacyBehavior();
     Task CallsInitializePopupOnFirstRender();
     Task CallsDisposePopupOnDispose();

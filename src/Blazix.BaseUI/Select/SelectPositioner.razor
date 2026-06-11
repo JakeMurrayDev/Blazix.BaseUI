@@ -49,6 +49,7 @@
     private bool scrollLockDesired;
     private Task scrollLockOp = Task.CompletedTask;
     private ElementReference? lastPositionerElement;
+    private bool rootStateSubscribed;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -205,6 +206,8 @@
 
         if (RootContext is not null)
         {
+            RootContext.StateChanged += OnRootStateChanged;
+            rootStateSubscribed = true;
             RootContext.ItemMapChanged += OnItemMapChanged;
             itemMapSubscribed = true;
         }
@@ -216,77 +219,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (RootContext is null)
-        {
-            state = new SelectPositionerState(false, computedSide, computedAlign, false);
-            return;
-        }
-
-        var open = RootContext.Open;
-        var mounted = RootContext.Mounted;
-        var modal = RootContext.Modal;
-        var openMethod = RootContext.OpenInteractionType;
-
-        // Reset the latch when unmounted so the next open picks up the current prop.
-        if (!mounted && controlledAlignItemWithTrigger != AlignItemWithTrigger)
-        {
-            controlledAlignItemWithTrigger = AlignItemWithTrigger;
-        }
-
-        alignItemWithTriggerActive =
-            mounted && controlledAlignItemWithTrigger && openMethod != InteractionType.Touch;
-
-        // When transitioning from mounted to unmounted, reset scroll arrow visibility
-        // so the next open doesn't carry stale state (React useIsoLayoutEffect).
-        if (!mounted && lastMounted)
-        {
-            if (RootContext.ScrollUpArrowVisible)
-            {
-                RootContext.ScrollUpArrowVisible = false;
-            }
-            if (RootContext.ScrollDownArrowVisible)
-            {
-                RootContext.ScrollDownArrowVisible = false;
-            }
-
-            // Intentionally do NOT reset `positionerContext.IsPositioned` here.
-            // Mirrors React's `useFloating`: `isPositioned` stays true across
-            // opens for a persistent positioner — only a true unmount (Dispose)
-            // resets it. Resetting here would close SelectPopup's align-item
-            // gate, and because `OnAfterRenderAsync` deliberately skips
-            // `UpdatePositionAsync` while `alignItemWithTriggerActive` is on,
-            // `OnPositionUpdated` would never re-fire to flip it back true,
-            // leaving every reopen stuck at the floating-default placement.
-        }
-
-        RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
-
-        // Body scroll lock, per React useScrollLock((aliw || modal) && open && !touch).
-        var shouldScrollLock =
-            (alignItemWithTriggerActive || modal) && open && openMethod != InteractionType.Touch;
-
-        // Use a synchronous desired-state flag and a chained task to prevent
-        // double-acquire races when multiple renders fire before the async
-        // apply completes (e.g., SelectLabel's NotifyStateChanged triggers an
-        // extra render cycle that would otherwise enter the null-token branch
-        // twice and leave lockCount permanently elevated).
-        if (shouldScrollLock != scrollLockDesired)
-        {
-            scrollLockDesired = shouldScrollLock;
-            scrollLockOp = ScheduleScrollLockAsync(scrollLockOp, shouldScrollLock);
-        }
-
-        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
-        state = new SelectPositionerState(open, renderedSide, computedAlign, computedAnchorHidden);
-
-        positionerContext.Side = renderedSide;
-        positionerContext.Align = computedAlign;
-        positionerContext.AnchorHidden = computedAnchorHidden;
-        positionerContext.ArrowUncentered = computedArrowUncentered;
-        positionerContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
-
-        BuildComponentAttributes();
-        lastMounted = mounted;
+        SyncRootState();
     }
 
     /// <inheritdoc />
@@ -335,6 +268,12 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (rootStateSubscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+            rootStateSubscribed = false;
+        }
+
         if (itemMapSubscribed && RootContext is not null)
         {
             RootContext.ItemMapChanged -= OnItemMapChanged;
@@ -345,6 +284,7 @@
         {
             RootContext.SetPositionerElement(null);
             RootContext.AlignItemWithTriggerActive = false;
+            RootContext.PopupSide = null;
         }
 
         positionerContext.IsPositioned = false;
@@ -414,11 +354,38 @@
         // `useFloating`, consumed at SelectPopup.tsx:269).
         var firstPositioned = !positionerContext.IsPositioned;
         positionerContext.IsPositioned = true;
+        if (RootContext is not null)
+        {
+            alignItemWithTriggerActive =
+                RootContext.Mounted &&
+                controlledAlignItemWithTrigger &&
+                RootContext.OpenInteractionType != InteractionType.Touch;
+            RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+            RootContext.PopupSide = newSide;
+        }
 
+        var renderedSide = alignItemWithTriggerActive ? Side.None : newSide;
         if (newSide == computedSide && newAlign == computedAlign &&
             anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
         {
-            if (firstPositioned)
+            var renderedStateChanged =
+                state.Side != renderedSide ||
+                positionerContext.Side != renderedSide ||
+                positionerContext.Align != newAlign ||
+                positionerContext.AnchorHidden != anchorHidden ||
+                positionerContext.ArrowUncentered != arrowUncentered;
+            if (renderedStateChanged)
+            {
+                positionerContext.Side = renderedSide;
+                positionerContext.Align = newAlign;
+                positionerContext.AnchorHidden = anchorHidden;
+                positionerContext.ArrowUncentered = arrowUncentered;
+
+                state = new SelectPositionerState(RootContext?.Open ?? false, renderedSide, newAlign, anchorHidden);
+                BuildComponentAttributes();
+            }
+
+            if (firstPositioned || renderedStateChanged)
             {
                 _ = InvokeAsync(() =>
                 {
@@ -434,7 +401,6 @@
         computedAnchorHidden = anchorHidden;
         computedArrowUncentered = arrowUncentered;
 
-        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
         positionerContext.Side = renderedSide;
         positionerContext.Align = computedAlign;
         positionerContext.AnchorHidden = anchorHidden;
@@ -448,6 +414,82 @@
             StateHasChanged();
             RootContext?.NotifyStateChanged();
         });
+    }
+
+    private void SyncRootState()
+    {
+        if (RootContext is null)
+        {
+            state = new SelectPositionerState(false, computedSide, computedAlign, false);
+            return;
+        }
+
+        var open = RootContext.Open;
+        var mounted = RootContext.Mounted;
+        var modal = RootContext.Modal;
+        var openMethod = RootContext.OpenInteractionType;
+
+        // Reset the latch when unmounted so the next open picks up the current prop.
+        if (!mounted && controlledAlignItemWithTrigger != AlignItemWithTrigger)
+        {
+            controlledAlignItemWithTrigger = AlignItemWithTrigger;
+        }
+
+        alignItemWithTriggerActive =
+            mounted && controlledAlignItemWithTrigger && openMethod != InteractionType.Touch;
+
+        // When transitioning from mounted to unmounted, reset scroll arrow visibility
+        // so the next open doesn't carry stale state (React useIsoLayoutEffect).
+        if (!mounted && lastMounted)
+        {
+            if (RootContext.ScrollUpArrowVisible)
+            {
+                RootContext.ScrollUpArrowVisible = false;
+            }
+            if (RootContext.ScrollDownArrowVisible)
+            {
+                RootContext.ScrollDownArrowVisible = false;
+            }
+
+            // Intentionally do NOT reset `positionerContext.IsPositioned` here.
+            // Mirrors React's `useFloating`: `isPositioned` stays true across
+            // opens for a persistent positioner — only a true unmount (Dispose)
+            // resets it. Resetting here would close SelectPopup's align-item
+            // gate, and because `OnAfterRenderAsync` deliberately skips
+            // `UpdatePositionAsync` while `alignItemWithTriggerActive` is on,
+            // `OnPositionUpdated` would never re-fire to flip it back true,
+            // leaving every reopen stuck at the floating-default placement.
+        }
+
+        RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+        RootContext.PopupSide = computedSide;
+
+        // Body scroll lock, per React useScrollLock((aliw || modal) && open && !touch).
+        var shouldScrollLock =
+            (alignItemWithTriggerActive || modal) && open && openMethod != InteractionType.Touch;
+
+        // Use a synchronous desired-state flag and a chained task to prevent
+        // double-acquire races when multiple renders fire before the async
+        // apply completes (e.g., SelectLabel's NotifyStateChanged triggers an
+        // extra render cycle that would otherwise enter the null-token branch
+        // twice and leave lockCount permanently elevated).
+        if (shouldScrollLock != scrollLockDesired)
+        {
+            scrollLockDesired = shouldScrollLock;
+            scrollLockOp = ScheduleScrollLockAsync(scrollLockOp, shouldScrollLock);
+        }
+
+        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
+        state = new SelectPositionerState(open, renderedSide, computedAlign, computedAnchorHidden);
+
+        positionerContext.Side = renderedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+        positionerContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+
+        BuildComponentAttributes();
+        lastMounted = mounted;
     }
 
     private void BuildComponentAttributes()
@@ -482,7 +524,40 @@
         }
 
         controlledAlignItemWithTrigger = value;
-        _ = InvokeAsync(StateHasChanged);
+        alignItemWithTriggerActive =
+            RootContext?.Mounted == true && value && RootContext.OpenInteractionType != InteractionType.Touch;
+
+        var renderedSide = alignItemWithTriggerActive ? Side.None : computedSide;
+        if (RootContext is not null)
+        {
+            RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+        }
+        positionerContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
+        positionerContext.Side = renderedSide;
+
+        state = new SelectPositionerState(RootContext?.Open ?? false, renderedSide, computedAlign, computedAnchorHidden);
+        BuildComponentAttributes();
+
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            RootContext?.NotifyStateChanged();
+
+            if (!alignItemWithTriggerActive &&
+                RootContext?.Mounted == true &&
+                positionerInterop.HasRendered &&
+                positionerInterop.IsInitialized)
+            {
+                try
+                {
+                    await UpdatePositionAsync();
+                }
+                catch (Exception ex) when (IsJSInteropUnavailable(ex))
+                {
+                    _ = ex;
+                }
+            }
+        });
     }
 
     private void SetArrowElement(ElementReference? element)
@@ -589,6 +664,15 @@
     private void OnItemMapChanged()
     {
         _ = HandleItemMapChangedAsync();
+    }
+
+    private void OnRootStateChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            SyncRootState();
+            StateHasChanged();
+        });
     }
 
     private async Task HandleItemMapChangedAsync()

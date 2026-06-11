@@ -4,7 +4,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectPopupTests : BunitContext, ISelectPopupContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public SelectPopupTests()
     {
@@ -111,7 +111,7 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
         var listboxElements = cut.FindAll("[role='listbox']");
         var listElement = listboxElements.First(el => el.HasAttribute("id"));
         listElement.GetAttribute("role").ShouldBe("listbox");
-        listElement.GetAttribute("tabindex").ShouldBe("-1");
+        listElement.HasAttribute("tabindex").ShouldBeFalse();
         listElement.GetAttribute("id").ShouldNotBeNullOrEmpty();
 
         return Task.CompletedTask;
@@ -188,6 +188,19 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
     }
 
     [Fact]
+    public Task MarksSelectJsFinalFocusAsManagedWhenFinalFocusIsExplicit()
+    {
+        var module = JSInterop.SetupModule(SelectModule);
+        _ = Render(CreateSelectWithPopupNoList(
+            defaultOpen: true,
+            finalFocus: FinalFocusTarget.None));
+
+        var invocation = module.Invocations.Single(i => i.Identifier == "initializePopup");
+        invocation.Arguments[3].ShouldBe(true);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task DefaultsFinalFocusToNullSoFocusManagerKeepsLegacyBehavior()
     {
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true));
@@ -216,20 +229,21 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
         var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true, alignItemWithTrigger: true));
 
-        module.VerifyInvoke("beginAlignItemWithTriggerPlacement");
+        module.Invocations
+            .Any(i => i.Identifier == "beginAlignItemWithTriggerPlacement")
+            .ShouldBeTrue();
         return Task.CompletedTask;
     }
 
     [Fact]
-    public Task CallsDisposePopupOnDispose()
+    public async Task CallsDisposePopupOnDispose()
     {
         var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true));
 
-        cut.Dispose();
+        await cut.FindComponent<SelectPopup>().Instance.DisposeAsync();
 
         module.VerifyInvoke("disposePopup");
-        return Task.CompletedTask;
     }
 
     [Fact]

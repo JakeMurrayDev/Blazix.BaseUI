@@ -1137,6 +1137,18 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithSelectUseFinalFocus(bool value)
+    {
+        queryParams["useFinalFocus"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithSelectFinalFocusMode(string value)
+    {
+        queryParams["finalFocusMode"] = value;
+        return this;
+    }
+
     // Autocomplete-specific parameters
     public TestPageUrlBuilder WithAutocompleteDefaultValue(string value)
     {

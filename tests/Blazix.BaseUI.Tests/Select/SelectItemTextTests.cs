@@ -2,7 +2,7 @@ namespace Blazix.BaseUI.Tests.Select;
 
 public class SelectItemTextTests : BunitContext, ISelectItemTextContract
 {
-    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.js";
+    private const string SelectModule = "./_content/Blazix.BaseUI/blazix-baseui-select.min.js";
 
     public SelectItemTextTests()
     {

@@ -29,11 +29,20 @@ public abstract class SelectTestsBase : TestBase
     protected async Task WaitForSelectOpenAsync()
     {
         var popup = GetByTestId("select-popup");
-        await popup.WaitForAsync(new LocatorWaitForOptions
+        try
         {
-            State = WaitForSelectorState.Visible,
-            Timeout = 5000 * TimeoutMultiplier
-        });
+            await popup.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 5000 * TimeoutMultiplier
+            });
+        }
+        catch (TimeoutException ex)
+        {
+            var diagnostics = await Page.EvaluateAsync<string>(
+                "() => { const selectState = window[Symbol.for('Blazix.BaseUI.Select.State')]; const roots = selectState ? Array.from(selectState.roots.entries()).map(([id, root]) => ({ id, isOpen: root.isOpen, hasTrigger: !!root.triggerElement, hasPopup: !!root.popupElement, hasPositioner: !!root.positionerElement, hasList: !!root.listElement, popupState: !!root.popup, alignItemWithTriggerActive: !!root.popup?.alignItemWithTriggerActive, initialPlaced: !!root.popup?.initialPlaced, watchdog: !!root.alignItemPlacementWatchdog, popupRect: root.popupElement?.getBoundingClientRect().toJSON(), positionerRect: root.positionerElement?.getBoundingClientRect().toJSON(), positionerSide: root.positionerElement?.getAttribute('data-side'), positionerPositioned: !!root.positionerElement?.hasAttribute('data-positioned') })) : []; const popup = document.querySelector('[data-testid=\"select-popup\"]'); const positioner = document.querySelector('[data-testid=\"select-positioner\"]'); return JSON.stringify({ roots, dom: { popupExists: !!popup, popupHidden: popup ? getComputedStyle(popup).visibility : null, popupRect: popup?.getBoundingClientRect().toJSON(), popupScrollHeight: popup?.scrollHeight, positionerExists: !!positioner, positionerRect: positioner?.getBoundingClientRect().toJSON(), positionerSide: positioner?.getAttribute('data-side'), positionerPositioned: !!positioner?.hasAttribute('data-positioned') } }); }");
+            throw new TimeoutException($"Select popup did not become visible. Diagnostics: {diagnostics}", ex);
+        }
     }
 
     protected async Task WaitForSelectClosedAsync()
@@ -85,6 +94,7 @@ public abstract class SelectTestsBase : TestBase
         await Assertions.Expect(openState).ToHaveTextAsync("true");
 
         var outsideButton = GetByTestId("outside-button");
+        await Assertions.Expect(outsideButton).ToBeVisibleAsync();
         await outsideButton.ClickAsync();
 
         await WaitForSelectClosedAsync();
@@ -136,6 +146,7 @@ public abstract class SelectTestsBase : TestBase
     public virtual async Task DisabledItemCannotBeSelected()
     {
         await NavigateAsync(CreateUrl("/tests/select").WithDefaultOpen(true));
+        await WaitForSelectOpenAsync();
 
         var disabledItem = GetByTestId("select-item-disabled");
         // Use Force because Playwright refuses to click elements with aria-disabled
@@ -338,6 +349,193 @@ public abstract class SelectTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that explicit FinalFocus directs focus to the provided element after item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusDirectsToSpecifiedElementAfterItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select").WithSelectUseFinalFocus(true));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.ClickAsync();
+
+        await WaitForSelectClosedAsync();
+        var finalFocusTarget = GetByTestId("select-final-focus-target");
+        try
+        {
+            await Assertions.Expect(finalFocusTarget).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+            {
+                Timeout = 5000 * TimeoutMultiplier
+            });
+        }
+        catch (Exception ex)
+        {
+            var diagnostics = await Page.EvaluateAsync<string>(
+                "() => JSON.stringify({ active: document.activeElement ? { tag: document.activeElement.tagName, testId: document.activeElement.getAttribute('data-testid'), text: document.activeElement.textContent, id: document.activeElement.id, role: document.activeElement.getAttribute('role') } : null, select: Array.from((window[Symbol.for('Blazix.BaseUI.Select.State')]?.roots || new Map()).values()).map(root => ({ isOpen: root.isOpen, finalFocusManaged: root.finalFocusManaged, hasTrigger: !!root.triggerElement, hasPopup: !!root.popupElement, hasPopupState: !!root.popup })) })");
+            throw new InvalidOperationException($"FinalFocus target was not focused after item selection. Diagnostics: {diagnostics}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives mouse as the close interaction type after mouse item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesMouseCloseTypeAfterMouseItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("mouse-target"));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.ClickAsync();
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Mouse");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives touch as the close interaction type after touch item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesTouchCloseTypeAfterTouchItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("touch-target"));
+
+        await OpenSelectAsync();
+        var bananaItem = GetByTestId("select-item-banana");
+        await bananaItem.DispatchEventAsync("pointerdown", new
+        {
+            pointerId = 1,
+            pointerType = "touch",
+            isPrimary = true,
+            button = 0,
+            buttons = 1,
+            bubbles = true,
+            cancelable = true
+        });
+        await bananaItem.DispatchEventAsync("touchstart", new
+        {
+            bubbles = true,
+            cancelable = true
+        });
+        await bananaItem.DispatchEventAsync("click", new
+        {
+            button = 0,
+            bubbles = true,
+            cancelable = true
+        });
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Touch");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives touch as the close interaction type after touch outside press.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesTouchCloseTypeAfterTouchOutsidePress()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("touch-target"));
+
+        await OpenSelectAsync();
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.DispatchEventAsync("pointerdown", new
+        {
+            pointerId = 1,
+            pointerType = "touch",
+            isPrimary = true,
+            button = 0,
+            buttons = 1,
+            bubbles = true,
+            cancelable = true
+        });
+        await outsideButton.DispatchEventAsync("mousedown", new
+        {
+            button = 0,
+            bubbles = true,
+            cancelable = true
+        });
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Touch");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives pen as the close interaction type after pen item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesPenCloseTypeAfterPenItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select")
+            .WithSelectUseFinalFocus(true)
+            .WithSelectFinalFocusMode("pen-target"));
+
+        await OpenSelectAsync();
+        var appleItem = GetByTestId("select-item-apple");
+        await appleItem.DispatchEventAsync("pointerdown", new
+        {
+            pointerId = 1,
+            pointerType = "pen",
+            isPrimary = true,
+            button = 0,
+            buttons = 1,
+            bubbles = true,
+            cancelable = true
+        });
+        await appleItem.DispatchEventAsync("click", new
+        {
+            button = 0,
+            bubbles = true,
+            cancelable = true
+        });
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Pen");
+        await Assertions.Expect(GetByTestId("select-final-focus-target")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus receives keyboard as the close interaction type after keyboard item selection.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusReceivesKeyboardCloseTypeAfterKeyboardItemSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/select").WithSelectUseFinalFocus(true));
+
+        await OpenSelectAsync();
+        await Page.Keyboard.PressAsync("ArrowDown");
+        await Page.Keyboard.PressAsync("Enter");
+
+        await WaitForSelectClosedAsync();
+        await Assertions.Expect(GetByTestId("last-final-focus-type")).ToHaveTextAsync("Keyboard");
+        await Assertions.Expect(GetByTestId("select-trigger")).ToBeFocusedAsync(new LocatorAssertionsToBeFocusedOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
     /// Tests that the selected item is focused when the popup opens with a pre-selected value.
     /// </summary>
     [Fact]
@@ -385,8 +583,13 @@ public abstract class SelectTestsBase : TestBase
     public virtual async Task WindowResizeClosesOpenSelectWhenAligned()
     {
         await NavigateAsync(CreateUrl("/tests/select"));
+        await Page.EvaluateAsync(
+            "() => { document.querySelector('[data-testid=\"test-container\"]').style.paddingTop = '120px'; }");
 
         await OpenSelectAsync();
+
+        var positioner = GetByTestId("select-positioner");
+        await Assertions.Expect(positioner).ToHaveAttributeAsync("data-side", "none");
 
         // Trigger a resize event — the JS resize listener inside SelectPopup
         // calls back to OnWindowResize, which calls SetOpenAsync(false, WindowResize).
@@ -412,6 +615,265 @@ public abstract class SelectTestsBase : TestBase
         await Assertions.Expect(popup).ToHaveAttributeAsync(
             "data-align",
             new System.Text.RegularExpressions.Regex("^(start|center|end)$"));
+    }
+
+    #endregion
+
+    #region Select JS Regression Tests
+
+    /// <summary>
+    /// Tests that root-trigger registration rebinds JS listeners when the DOM element changes.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_RebindsTriggerListenersWhenTriggerElementChanges()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var rebound = await Page.EvaluateAsync<bool>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+                const rootId = `trigger-rebind-${crypto.randomUUID()}`;
+                const calls = [];
+                const dotNetRef = {
+                    invokeMethodAsync: async (name) => {
+                        calls.push(name);
+                    },
+                };
+                const first = document.createElement('button');
+                const second = document.createElement('button');
+                first.type = 'button';
+                second.type = 'button';
+                document.body.append(first, second);
+
+                try {
+                    select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                    select.setTriggerElement(rootId, first);
+                    select.setTriggerElement(rootId, second);
+
+                    second.dispatchEvent(new PointerEvent('pointerdown', {
+                        pointerId: 1,
+                        pointerType: 'touch',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        bubbles: true,
+                        cancelable: true,
+                    }));
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+
+                    return calls.includes('NotifyTouchOpen');
+                } finally {
+                    select.disposeRoot(rootId);
+                    first.remove();
+                    second.remove();
+                }
+            }
+            """);
+
+        Assert.True(rebound);
+    }
+
+    /// <summary>
+    /// Tests that positioner-owned DOM outside the popup is treated as inside the select for outside press dismissal.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_PositionerOwnedDomDoesNotDismissAsOutsidePress()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var outsidePressCalled = await Page.EvaluateAsync<bool>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+                const rootId = `positioner-containment-${crypto.randomUUID()}`;
+                const calls = [];
+                const dotNetRef = {
+                    invokeMethodAsync: async (name) => {
+                        calls.push(name);
+                    },
+                };
+                const trigger = document.createElement('button');
+                const positioner = document.createElement('div');
+                const popup = document.createElement('div');
+                const positionerOwned = document.createElement('div');
+                trigger.type = 'button';
+                popup.textContent = 'Popup';
+                positionerOwned.textContent = 'Positioner-owned';
+                positioner.append(popup, positionerOwned);
+                document.body.append(trigger, positioner);
+
+                try {
+                    select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                    select.setTriggerElement(rootId, trigger);
+                    select.initializePopup(rootId, popup, dotNetRef, false);
+                    select.setPopupElement(rootId, popup);
+                    select.registerPositioner(rootId, positioner);
+                    select.setRootOpen(rootId, true, null);
+
+                    positionerOwned.dispatchEvent(new PointerEvent('pointerdown', {
+                        pointerId: 1,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        bubbles: true,
+                        cancelable: true,
+                    }));
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+
+                    return calls.includes('OnOutsidePress');
+                } finally {
+                    select.disposeRoot(rootId);
+                    positioner.remove();
+                    trigger.remove();
+                }
+            }
+            """);
+
+        Assert.False(outsidePressCalled);
+    }
+
+    /// <summary>
+    /// Tests that inside compatibility mousedown does not overwrite the preceding touch or pen pointer modality.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_InsideCompatibilityMouseDownPreservesPointerInteractionType()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var interactionTypes = await Page.EvaluateAsync<string[]>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+
+                async function run(pointerType, includeTouchStart) {
+                    const rootId = `inside-modality-${pointerType}-${crypto.randomUUID()}`;
+                    const dotNetRef = {
+                        invokeMethodAsync: async () => {},
+                    };
+                    const trigger = document.createElement('button');
+                    const positioner = document.createElement('div');
+                    const popup = document.createElement('div');
+                    const item = document.createElement('div');
+                    trigger.type = 'button';
+                    item.setAttribute('role', 'option');
+                    item.textContent = pointerType;
+                    popup.append(item);
+                    positioner.append(popup);
+                    document.body.append(trigger, positioner);
+
+                    try {
+                        select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                        select.setTriggerElement(rootId, trigger);
+                        select.initializePopup(rootId, popup, dotNetRef, false);
+                        select.setPopupElement(rootId, popup);
+                        select.registerPositioner(rootId, positioner);
+                        select.setRootOpen(rootId, true, null);
+
+                        item.dispatchEvent(new PointerEvent('pointerdown', {
+                            pointerId: 1,
+                            pointerType,
+                            isPrimary: true,
+                            button: 0,
+                            buttons: 1,
+                            bubbles: true,
+                            cancelable: true,
+                        }));
+                        if (includeTouchStart) {
+                            item.dispatchEvent(new TouchEvent('touchstart', {
+                                bubbles: true,
+                                cancelable: true,
+                            }));
+                        }
+                        item.dispatchEvent(new MouseEvent('mousedown', {
+                            button: 0,
+                            bubbles: true,
+                            cancelable: true,
+                        }));
+                        await new Promise((resolve) => setTimeout(resolve, 0));
+
+                        return select.getLastInteractionType(rootId);
+                    } finally {
+                        select.disposeRoot(rootId);
+                        positioner.remove();
+                        trigger.remove();
+                    }
+                }
+
+                return [
+                    await run('touch', true),
+                    await run('pen', false),
+                ];
+            }
+            """);
+
+        Assert.Equal(["touch", "pen"], interactionTypes);
+    }
+
+    /// <summary>
+    /// Tests that normal floating opens do not keep the align-item placement probe alive.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_NormalFloatingOpenDoesNotContinueAlignItemPlacementProbe()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var probeRafCount = await Page.EvaluateAsync<int>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.js');
+                const rootId = `normal-floating-${crypto.randomUUID()}`;
+                const calls = [];
+                const dotNetRef = {
+                    invokeMethodAsync: async (name) => {
+                        calls.push(name);
+                    },
+                };
+                const trigger = document.createElement('button');
+                const positioner = document.createElement('div');
+                const popup = document.createElement('div');
+                trigger.type = 'button';
+                trigger.style.cssText = 'position:absolute;left:20px;top:20px;width:100px;height:30px;';
+                positioner.style.cssText = 'position:absolute;left:20px;top:60px;width:120px;height:80px;';
+                positioner.setAttribute('data-side', 'bottom');
+                popup.style.cssText = 'width:120px;height:80px;';
+                popup.innerHTML = '<div role="option">Apple</div>';
+                positioner.append(popup);
+                document.body.append(trigger, positioner);
+
+                const originalRaf = window.requestAnimationFrame;
+                let probeRafCount = 0;
+                let counting = true;
+                window.requestAnimationFrame = (callback) => {
+                    if (counting && Function.prototype.toString.call(callback).includes('scheduleOpenAlignItemPlacement')) {
+                        probeRafCount += 1;
+                    }
+                    return originalRaf.call(window, callback);
+                };
+
+                try {
+                    select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                    select.setTriggerElement(rootId, trigger);
+                    select.initializePopup(rootId, popup, dotNetRef, false);
+                    select.setPopupElement(rootId, popup);
+                    select.registerPositioner(rootId, positioner);
+                    select.setRootOpen(rootId, true, null);
+
+                    await new Promise((resolve) => setTimeout(resolve, 120));
+                    counting = false;
+                    return probeRafCount;
+                } finally {
+                    counting = false;
+                    window.requestAnimationFrame = originalRaf;
+                    select.disposeRoot(rootId);
+                    positioner.remove();
+                    trigger.remove();
+                }
+            }
+            """);
+
+        Assert.Equal(0, probeRafCount);
     }
 
     #endregion

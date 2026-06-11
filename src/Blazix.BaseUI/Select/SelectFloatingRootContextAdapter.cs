@@ -31,14 +31,5 @@ internal sealed class SelectFloatingRootContextAdapter : IFloatingRootContext
     public Task SetOpenAsync(bool open) => rootContext.SetOpenAsync(open, SelectOpenChangeReason.FocusOut);
 
     /// <inheritdoc />
-    public InteractionType CloseInteractionType => rootContext.OpenChangeReason switch
-    {
-        SelectOpenChangeReason.TriggerPress => InteractionType.Click,
-        SelectOpenChangeReason.OutsidePress => InteractionType.Click,
-        SelectOpenChangeReason.ItemPress => InteractionType.Click,
-        SelectOpenChangeReason.CancelOpen => InteractionType.Click,
-        SelectOpenChangeReason.EscapeKey => InteractionType.Keyboard,
-        SelectOpenChangeReason.ListNavigation => InteractionType.Keyboard,
-        _ => InteractionType.None
-    };
+    public InteractionType CloseInteractionType => rootContext.CloseInteractionType;
 }
