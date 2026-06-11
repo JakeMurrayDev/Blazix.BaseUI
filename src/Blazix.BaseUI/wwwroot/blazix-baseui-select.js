@@ -18,6 +18,7 @@ import {
 const BOUNDARY_OFFSET = 2;
 const ALIGN_ITEM_PLACEMENT_MAX_ATTEMPTS = 3600;
 const ALIGN_ITEM_PLACEMENT_PROBE_DELAYS = [0, 50, 250, 1000];
+const POINTER_COMPATIBILITY_WINDOW_MS = 750;
 
 // ─── Popup Placement Constants & Helpers ──────────────────────────────
 // alignItemWithTrigger measurement, scroll-growth, and CSS variable
@@ -338,8 +339,13 @@ function handleGlobalKeyDown(e) {
     }
 }
 
-function setPointerInteraction(rootState, interactionType) {
+function setPointerInteraction(rootState, interactionType, event = null) {
     rootState.lastInteractionType = interactionType;
+
+    if (event) {
+        rootState.lastPointerInteractionType = interactionType;
+        rootState.lastPointerInteractionTime = getEventTimestamp(event);
+    }
 
     if (rootState.keyboardActive) {
         rootState.keyboardActive = false;
@@ -350,9 +356,11 @@ function setPointerInteraction(rootState, interactionType) {
 function isEventInsideSelect(rootId, rootState, target) {
     const triggerEl = rootState.triggerElement;
     const popupEl = rootState.popupElement;
+    const positionerEl = rootState.positionerElement;
 
     if (triggerEl && triggerEl.contains(target)) return true;
     if (popupEl && popupEl.contains(target)) return true;
+    if (positionerEl && positionerEl.contains(target)) return true;
 
     for (const [posId, posState] of state.positioners) {
         if (posState.rootId === rootId && posState.element && posState.element.contains(target)) {
@@ -373,12 +381,21 @@ function getRecentOutsidePointer(rootState, event) {
     if (!rootState.lastOutsidePointerType) return null;
 
     const elapsed = getEventTimestamp(event) - rootState.lastOutsidePointerTime;
-    if (elapsed < 0 || elapsed > 750) return null;
+    if (elapsed < 0 || elapsed > POINTER_COMPATIBILITY_WINDOW_MS) return null;
 
     return {
         interactionType: rootState.lastOutsidePointerType,
         handled: rootState.lastOutsidePointerHandled
     };
+}
+
+function getRecentPointerInteraction(rootState, event) {
+    if (!rootState.lastPointerInteractionType) return null;
+
+    const elapsed = getEventTimestamp(event) - rootState.lastPointerInteractionTime;
+    if (elapsed < 0 || elapsed > POINTER_COMPATIBILITY_WINDOW_MS) return null;
+
+    return rootState.lastPointerInteractionType;
 }
 
 function clearOutsidePointer(rootState) {
@@ -392,7 +409,7 @@ function handleGlobalPointerDown(e) {
         if (!rootState.dotNetRef) continue;
 
         const interactionType = normalizeInteractionType(e.pointerType);
-        setPointerInteraction(rootState, interactionType);
+        setPointerInteraction(rootState, interactionType, e);
 
         if (!rootState.isOpen) continue;
         if (isEventInsideSelect(id, rootState, e.target)) continue;
@@ -406,7 +423,7 @@ function handleGlobalTouchStart(e) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.dotNetRef) continue;
 
-        setPointerInteraction(rootState, 'touch');
+        setPointerInteraction(rootState, 'touch', e);
 
         if (!rootState.isOpen) continue;
         if (isEventInsideSelect(id, rootState, e.target)) continue;
@@ -422,8 +439,9 @@ function handleGlobalMouseDown(e) {
         if (!rootState.dotNetRef) continue;
 
         const recentOutsidePointer = getRecentOutsidePointer(rootState, e);
-        const interactionType = recentOutsidePointer?.interactionType || 'mouse';
-        setPointerInteraction(rootState, interactionType);
+        const recentPointerInteraction = recentOutsidePointer ? null : getRecentPointerInteraction(rootState, e);
+        const interactionType = recentOutsidePointer?.interactionType || recentPointerInteraction || 'mouse';
+        setPointerInteraction(rootState, interactionType, interactionType === 'mouse' ? e : null);
 
         if (recentOutsidePointer?.handled) {
             clearOutsidePointer(rootState);
@@ -821,6 +839,8 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         fallbackTimeoutId: null,
         finalFocusManaged: false,
         lastInteractionType: 'none',
+        lastPointerInteractionType: null,
+        lastPointerInteractionTime: 0,
         lastOutsidePointerType: null,
         lastOutsidePointerTime: 0,
         lastOutsidePointerHandled: false,
@@ -1052,7 +1072,7 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
     };
 
     const onPointerDown = (event) => {
-        rootState.lastInteractionType = normalizeInteractionType(event.pointerType);
+        setPointerInteraction(rootState, normalizeInteractionType(event.pointerType), event);
         if (event.pointerType === 'touch') {
             triggerDotNetRef.invokeMethodAsync('NotifyTouchOpen').catch(() => { });
         }
@@ -1533,11 +1553,11 @@ export function initializePopup(rootId, popupElement, dotNetRef, finalFocusManag
     };
 
     popupState.pointerDownHandler = (event) => {
-        rootState.lastInteractionType = normalizeInteractionType(event.pointerType);
+        setPointerInteraction(rootState, normalizeInteractionType(event.pointerType), event);
     };
 
-    popupState.touchStartHandler = () => {
-        rootState.lastInteractionType = 'touch';
+    popupState.touchStartHandler = (event) => {
+        setPointerInteraction(rootState, 'touch', event);
     };
 
     popupState.keyDownHandler = (event) => {

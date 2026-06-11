@@ -675,6 +675,143 @@ public abstract class SelectTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that positioner-owned DOM outside the popup is treated as inside the select for outside press dismissal.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_PositionerOwnedDomDoesNotDismissAsOutsidePress()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var outsidePressCalled = await Page.EvaluateAsync<bool>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+                const rootId = `positioner-containment-${crypto.randomUUID()}`;
+                const calls = [];
+                const dotNetRef = {
+                    invokeMethodAsync: async (name) => {
+                        calls.push(name);
+                    },
+                };
+                const trigger = document.createElement('button');
+                const positioner = document.createElement('div');
+                const popup = document.createElement('div');
+                const positionerOwned = document.createElement('div');
+                trigger.type = 'button';
+                popup.textContent = 'Popup';
+                positionerOwned.textContent = 'Positioner-owned';
+                positioner.append(popup, positionerOwned);
+                document.body.append(trigger, positioner);
+
+                try {
+                    select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                    select.setTriggerElement(rootId, trigger);
+                    select.initializePopup(rootId, popup, dotNetRef, false);
+                    select.setPopupElement(rootId, popup);
+                    select.registerPositioner(rootId, positioner);
+                    select.setRootOpen(rootId, true, null);
+
+                    positionerOwned.dispatchEvent(new PointerEvent('pointerdown', {
+                        pointerId: 1,
+                        pointerType: 'mouse',
+                        isPrimary: true,
+                        button: 0,
+                        buttons: 1,
+                        bubbles: true,
+                        cancelable: true,
+                    }));
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+
+                    return calls.includes('OnOutsidePress');
+                } finally {
+                    select.disposeRoot(rootId);
+                    positioner.remove();
+                    trigger.remove();
+                }
+            }
+            """);
+
+        Assert.False(outsidePressCalled);
+    }
+
+    /// <summary>
+    /// Tests that inside compatibility mousedown does not overwrite the preceding touch or pen pointer modality.
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_InsideCompatibilityMouseDownPreservesPointerInteractionType()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var interactionTypes = await Page.EvaluateAsync<string[]>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+
+                async function run(pointerType, includeTouchStart) {
+                    const rootId = `inside-modality-${pointerType}-${crypto.randomUUID()}`;
+                    const dotNetRef = {
+                        invokeMethodAsync: async () => {},
+                    };
+                    const trigger = document.createElement('button');
+                    const positioner = document.createElement('div');
+                    const popup = document.createElement('div');
+                    const item = document.createElement('div');
+                    trigger.type = 'button';
+                    item.setAttribute('role', 'option');
+                    item.textContent = pointerType;
+                    popup.append(item);
+                    positioner.append(popup);
+                    document.body.append(trigger, positioner);
+
+                    try {
+                        select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                        select.setTriggerElement(rootId, trigger);
+                        select.initializePopup(rootId, popup, dotNetRef, false);
+                        select.setPopupElement(rootId, popup);
+                        select.registerPositioner(rootId, positioner);
+                        select.setRootOpen(rootId, true, null);
+
+                        item.dispatchEvent(new PointerEvent('pointerdown', {
+                            pointerId: 1,
+                            pointerType,
+                            isPrimary: true,
+                            button: 0,
+                            buttons: 1,
+                            bubbles: true,
+                            cancelable: true,
+                        }));
+                        if (includeTouchStart) {
+                            item.dispatchEvent(new TouchEvent('touchstart', {
+                                bubbles: true,
+                                cancelable: true,
+                            }));
+                        }
+                        item.dispatchEvent(new MouseEvent('mousedown', {
+                            button: 0,
+                            bubbles: true,
+                            cancelable: true,
+                        }));
+                        await new Promise((resolve) => setTimeout(resolve, 0));
+
+                        return select.getLastInteractionType(rootId);
+                    } finally {
+                        select.disposeRoot(rootId);
+                        positioner.remove();
+                        trigger.remove();
+                    }
+                }
+
+                return [
+                    await run('touch', true),
+                    await run('pen', false),
+                ];
+            }
+            """);
+
+        Assert.Equal(["touch", "pen"], interactionTypes);
+    }
+
+    /// <summary>
     /// Tests that normal floating opens do not keep the align-item placement probe alive.
     /// </summary>
     [Fact]
@@ -685,7 +822,7 @@ public abstract class SelectTestsBase : TestBase
         var probeRafCount = await Page.EvaluateAsync<int>(
             """
             async () => {
-                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.js');
                 const rootId = `normal-floating-${crypto.randomUUID()}`;
                 const calls = [];
                 const dotNetRef = {
