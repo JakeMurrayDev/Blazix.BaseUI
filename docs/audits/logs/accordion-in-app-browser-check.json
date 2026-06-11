@@ -1,0 +1,28 @@
+{
+  "target": "http://127.0.0.1:5110/tests/accordion/server",
+  "checks": {
+    "hiddenUntilFoundClosedState": {
+      "panelHidden": "until-found",
+      "panelDataHidden": "",
+      "triggerDataHidden": "",
+      "triggerDataIndex": "0",
+      "triggerDataOrientation": "vertical",
+      "expanded": "false",
+      "visible": false
+    },
+    "hiddenUntilFoundOpenState": {
+      "panelHidden": null,
+      "panelDataHidden": null,
+      "triggerDataHidden": null,
+      "expanded": "true",
+      "visible": true
+    },
+    "verticalFocusLoop": [
+      "accordion-trigger-2",
+      "accordion-trigger-3",
+      "accordion-trigger-1",
+      "accordion-trigger-3"
+    ]
+  },
+  "result": "passed"
+}

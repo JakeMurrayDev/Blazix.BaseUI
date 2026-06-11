@@ -1,4 +1,0 @@
-OK node --check src/BlazorBaseUI/wwwroot/blazor-baseui-tabs.js
-OK node --check src/BlazorBaseUI/wwwroot/blazor-baseui-tabs.min.js
-OK node --check src/BlazorBaseUI/wwwroot/blazor-baseui-scroll-area.js
-OK node --check src/BlazorBaseUI/wwwroot/blazor-baseui-scroll-area.min.js
