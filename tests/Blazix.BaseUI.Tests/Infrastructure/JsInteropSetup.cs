@@ -620,8 +620,14 @@ public static class JsInteropSetup
         SetupSelectModulePath(SelectModule);
         SetupSelectModulePath(SelectMinModule);
 
-        var floating = jsInterop.SetupModule(FloatingModule);
-        floating.SetupVoid("clearStyles", _ => true).SetVoidResult();
+        SetupFloatingPath(FloatingModule);
+        SetupFloatingPath(FloatingMinModule);
+
+        void SetupFloatingPath(string path)
+        {
+            var floating = jsInterop.SetupModule(path);
+            floating.SetupVoid("clearStyles", _ => true).SetVoidResult();
+        }
 
         void SetupSelectModulePath(string path)
         {

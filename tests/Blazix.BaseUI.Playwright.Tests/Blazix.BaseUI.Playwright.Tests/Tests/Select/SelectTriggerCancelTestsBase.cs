@@ -51,7 +51,8 @@ public abstract class SelectTriggerCancelTestsBase : TestBase
 
         // data-touched must remain absent because the blur containment check
         // skipped the real-blur callback.
-        await Assertions.Expect(trigger).Not.ToHaveAttributeAsync("data-touched", "");
+        var touched = await trigger.GetAttributeAsync("data-touched");
+        Assert.Null(touched);
     }
 
     private async Task WaitForSelectTriggerJsAsync()

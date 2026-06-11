@@ -817,12 +817,8 @@ async function updatePositionInternal(positionerState) {
             positionerElement.setAttribute('data-positioned', '');
         }
 
-        // Set data attributes. Select align-item mode renders `data-side="none"`
-        // on the positioner while still reporting the resolved physical side to
-        // C# through `onPositionUpdated`.
-        positionerElement.setAttribute(
-            'data-side',
-            positionerState.alignItemWithTriggerActive ? 'none' : effectiveSide);
+        // Set data attributes
+        positionerElement.setAttribute('data-side', effectiveSide);
         positionerElement.setAttribute('data-align', effectiveAlign);
 
         // Handle anchor hidden state

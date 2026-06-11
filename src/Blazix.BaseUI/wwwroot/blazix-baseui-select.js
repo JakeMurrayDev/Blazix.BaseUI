@@ -220,6 +220,12 @@ function normalizeInteractionType(pointerType) {
     return 'mouse';
 }
 
+function getEventTimestamp(event) {
+    return typeof event.timeStamp === 'number' && event.timeStamp > 0
+        ? event.timeStamp
+        : performance.now();
+}
+
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Select.State');
 
 if (!window[STATE_KEY]) {
@@ -235,6 +241,8 @@ function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
     document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
+    document.addEventListener('pointerdown', handleGlobalPointerDown, { capture: true });
+    document.addEventListener('touchstart', handleGlobalTouchStart, { capture: true, passive: true });
     document.addEventListener('mousedown', handleGlobalMouseDown);
     state.globalListenersInitialized = true;
 }
@@ -330,30 +338,102 @@ function handleGlobalKeyDown(e) {
     }
 }
 
+function setPointerInteraction(rootState, interactionType) {
+    rootState.lastInteractionType = interactionType;
+
+    if (rootState.keyboardActive) {
+        rootState.keyboardActive = false;
+        rootState.dotNetRef.invokeMethodAsync('OnKeyboardActiveChange', false).catch(() => { });
+    }
+}
+
+function isEventInsideSelect(rootId, rootState, target) {
+    const triggerEl = rootState.triggerElement;
+    const popupEl = rootState.popupElement;
+
+    if (triggerEl && triggerEl.contains(target)) return true;
+    if (popupEl && popupEl.contains(target)) return true;
+
+    for (const [posId, posState] of state.positioners) {
+        if (posState.rootId === rootId && posState.element && posState.element.contains(target)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function rememberOutsidePointer(rootState, event, interactionType, handled) {
+    rootState.lastOutsidePointerType = interactionType;
+    rootState.lastOutsidePointerTime = getEventTimestamp(event);
+    rootState.lastOutsidePointerHandled = handled;
+}
+
+function getRecentOutsidePointer(rootState, event) {
+    if (!rootState.lastOutsidePointerType) return null;
+
+    const elapsed = getEventTimestamp(event) - rootState.lastOutsidePointerTime;
+    if (elapsed < 0 || elapsed > 750) return null;
+
+    return {
+        interactionType: rootState.lastOutsidePointerType,
+        handled: rootState.lastOutsidePointerHandled
+    };
+}
+
+function clearOutsidePointer(rootState) {
+    rootState.lastOutsidePointerType = null;
+    rootState.lastOutsidePointerTime = 0;
+    rootState.lastOutsidePointerHandled = false;
+}
+
+function handleGlobalPointerDown(e) {
+    for (const [id, rootState] of state.roots) {
+        if (!rootState.dotNetRef) continue;
+
+        const interactionType = normalizeInteractionType(e.pointerType);
+        setPointerInteraction(rootState, interactionType);
+
+        if (!rootState.isOpen) continue;
+        if (isEventInsideSelect(id, rootState, e.target)) continue;
+
+        rememberOutsidePointer(rootState, e, interactionType, true);
+        rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
+    }
+}
+
+function handleGlobalTouchStart(e) {
+    for (const [id, rootState] of state.roots) {
+        if (!rootState.dotNetRef) continue;
+
+        setPointerInteraction(rootState, 'touch');
+
+        if (!rootState.isOpen) continue;
+        if (isEventInsideSelect(id, rootState, e.target)) continue;
+
+        if (getRecentOutsidePointer(rootState, e)?.handled) continue;
+
+        rememberOutsidePointer(rootState, e, 'touch', false);
+    }
+}
+
 function handleGlobalMouseDown(e) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.dotNetRef) continue;
 
-        rootState.lastInteractionType = 'mouse';
+        const recentOutsidePointer = getRecentOutsidePointer(rootState, e);
+        const interactionType = recentOutsidePointer?.interactionType || 'mouse';
+        setPointerInteraction(rootState, interactionType);
 
-        if (rootState.keyboardActive) {
-            rootState.keyboardActive = false;
-            rootState.dotNetRef.invokeMethodAsync('OnKeyboardActiveChange', false).catch(() => { });
+        if (recentOutsidePointer?.handled) {
+            clearOutsidePointer(rootState);
+            continue;
         }
+
+        clearOutsidePointer(rootState);
 
         if (!rootState.isOpen) continue;
-
-        const triggerEl = rootState.triggerElement;
-        const popupEl = rootState.popupElement;
-
-        if (triggerEl && triggerEl.contains(e.target)) continue;
-        if (popupEl && popupEl.contains(e.target)) continue;
-
-        for (const [posId, posState] of state.positioners) {
-            if (posState.rootId === id && posState.element && posState.element.contains(e.target)) {
-                return;
-            }
-        }
+        if (isEventInsideSelect(id, rootState, e.target)) continue;
 
         rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
     }
@@ -457,7 +537,6 @@ function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
         return;
     }
     if (popupState && !popupState.alignItemWithTriggerActive && !alignItemDomActive) {
-        requestAnimationFrame(() => scheduleOpenAlignItemPlacement(rootId, attempt + 1));
         return;
     }
 
@@ -470,7 +549,6 @@ function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
             nextPopupElement?.classList.contains('blazix-base-ui-disable-scrollbar');
         if (!rootState.isOpen) return;
         if (nextPopupState && !nextPopupState.alignItemWithTriggerActive && !nextAlignItemDomActive) {
-            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
             return;
         }
         if (!nextPopupState && !nextAlignItemDomActive) {
@@ -743,6 +821,9 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         fallbackTimeoutId: null,
         finalFocusManaged: false,
         lastInteractionType: 'none',
+        lastOutsidePointerType: null,
+        lastOutsidePointerTime: 0,
+        lastOutsidePointerHandled: false,
         alignItemPlacementWatchdog: false
     });
 }
@@ -889,8 +970,18 @@ export function setRootOpen(rootId, isOpen, reason) {
 export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
+
+    const previousElement = rootState.triggerElement;
+    const triggerChanged = previousElement !== element;
+
+    if (triggerChanged && rootState.triggerCleanup) {
+        rootState.triggerCleanup();
+        rootState.triggerCleanup = null;
+    }
+
     rootState.triggerElement = element;
-    if (element && !rootState.triggerCleanup && rootState.dotNetRef) {
+
+    if (element && rootState.dotNetRef && (!rootState.triggerCleanup || triggerChanged)) {
         initializeTrigger(rootId, element, rootState.dotNetRef);
     }
     queueOpenAlignItemPlacement(rootId);
@@ -1317,6 +1408,10 @@ export async function initializePositioner(positionerElement, triggerElement, si
     let onPositionUpdated = null;
     if (dotNetRef) {
         onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
+            if (alignItemWithTrigger) {
+                positionerElement.setAttribute('data-side', 'none');
+            }
+
             dotNetRef.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden, arrowUncentered).catch(() => { });
 
             // When align-item-with-trigger is active, immediately drive the
@@ -1606,6 +1701,10 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
     if (!rootState.isOpen || !popupElement || !positionerElement || !triggerElement) {
         scheduleOpenAlignItemPlacement(rootId);
         return;
+    }
+
+    if (popupState.alignItemWithTriggerActive) {
+        positionerElement.setAttribute('data-side', 'none');
     }
 
     saveOriginalPositionerStyles(popupState, positionerElement);
