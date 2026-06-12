@@ -10,6 +10,7 @@ public static class DocsNav
     [
         new("Overview", "overview",
         [
+            // Quick start renders at the site root; nav consumers must match it with NavLinkMatch.All.
             new("Quick start", "quick-start", "/", "A quick guide to getting started with Blazix.BaseUI.", IsDocumented: true),
             new("About", "about", "/overview/about", "An overview of the project and its goals."),
             new("Accessibility", "accessibility", "/overview/accessibility", "How Blazix.BaseUI approaches accessibility."),
@@ -76,7 +77,7 @@ public static class DocsNav
             return null;
         }
 
-        var section = Sections.FirstOrDefault(s => s.Area == area);
+        var section = Sections.FirstOrDefault(s => string.Equals(s.Area, area, StringComparison.OrdinalIgnoreCase));
         return section?.Links.FirstOrDefault(l => string.Equals(l.Slug, slug, StringComparison.OrdinalIgnoreCase));
     }
 }
