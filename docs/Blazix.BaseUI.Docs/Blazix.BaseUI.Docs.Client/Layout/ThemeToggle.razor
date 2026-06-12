@@ -40,10 +40,21 @@
     {
         if (!firstRender)
         {
-            // The initial theme sync has painted without a transition; enable
-            // the thumb transition for user-driven toggles from here on.
+            // Enable the thumb transition only after the synced position has
+            // actually painted — under WASM, consecutive renders can land in
+            // the same frame, which would animate the initial sync.
             if (!transitionsEnabled)
             {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    await module.InvokeVoidAsync("afterPaint");
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+
                 transitionsEnabled = true;
                 StateHasChanged();
             }

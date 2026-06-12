@@ -16,6 +16,10 @@ export function setDocsTheme(theme) {
   applyTheme(normalizedTheme);
 }
 
+export function afterPaint() {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
 function applyTheme(theme) {
   document.documentElement.classList.toggle('dark', theme === 'dark');
   document.documentElement.dataset.theme = theme;
