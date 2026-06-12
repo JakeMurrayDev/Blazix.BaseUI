@@ -12,6 +12,7 @@ The docs app uses an Apple Liquid Glass-inspired material system: floating trans
 - Use light translucent surfaces, white borders, layered shadows, `backdrop-blur`, and restrained cyan/sky tinting.
 - Glass (`liquid-glass` / `backdrop-filter`) is reserved for chrome (header, nav, window shells) and transient surfaces (dialogs, popups, scrims). Everything inside a glass shell is content layer: opaque fills only, never a nested `backdrop-blur`.
 - Animate glass with ambient background movement, materialization, hover lift on cards, and pressed gel feedback on controls. The sheen runs only as a hover one-shot; the ambient wallpaper is the only persistent animation. Window shells do not lift on hover.
+- `liquid-distort` adds refraction (SVG displacement filter `#blx-liquid-distortion` on hover) and a gel wobble on press; reserve it for playful one-off controls like the demo code expander. It falls back to the plain control under `prefers-reduced-motion`.
 - Respect `prefers-reduced-motion`, `prefers-reduced-transparency`, and `prefers-contrast` (glass falls back to near-opaque fills in both themes).
 - Do not stack glass on glass where it muddies hierarchy; use more opaque content panels inside glass shells.
 - Prefer dense documentation screens over marketing pages.

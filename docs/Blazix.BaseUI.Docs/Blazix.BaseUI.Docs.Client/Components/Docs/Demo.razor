@@ -69,7 +69,7 @@
             @if (IsCollapsible)
             {
                 <div class="@(ShouldCollapse ? "absolute inset-x-0 bottom-3 flex justify-center" : "flex justify-center pb-3")">
-                    <CollapsibleTrigger ClassValue="@(_ => LiquidGlassClasses.Button)">
+                    <CollapsibleTrigger ClassValue="@(_ => $"{LiquidGlassClasses.Button} liquid-distort")">
                         @(isExpanded ? "Hide code" : "Show code")
                     </CollapsibleTrigger>
                 </div>
