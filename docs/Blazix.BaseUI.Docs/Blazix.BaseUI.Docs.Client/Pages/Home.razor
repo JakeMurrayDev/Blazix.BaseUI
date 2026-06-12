@@ -1,26 +1,55 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Blazix.BaseUI Docs</PageTitle>
+<PageTitle>Quick start · Blazix.BaseUI</PageTitle>
 
-<div class="grid gap-4">
-    <section class="@LiquidGlassClasses.InsetPanel">
-        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Blazor primitives for design systems</p>
-        <h1 tabindex="-1" class="mb-3 text-3xl font-semibold tracking-normal text-slate-950 focus:outline-none dark:text-white">Blazix.BaseUI component documentation</h1>
-        <p class="max-w-3xl text-sm leading-6">
-            This documentation app mirrors the Base UI route shape while showing Blazor-first examples.
-            Component pages are available at <code class="@LiquidGlassClasses.CodeInline">/components/name</code>,
-            with matching markdown source at <code class="@LiquidGlassClasses.CodeInline">/components/name.md</code>.
-        </p>
-    </section>
+<DocsPageIntro Eyebrow="Overview"
+               Title="Quick start"
+               Subtitle="A quick guide to getting started with Blazix.BaseUI." />
 
-    <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        @foreach (var item in ComponentCatalog.All)
-        {
-            <a class="@LiquidGlassClasses.CardLink" href="@($"components/{item.Slug}")">
-                <span class="text-[11px] uppercase">@item.Status</span>
-                <strong class="text-base">@item.Name</strong>
-                <span class="text-sm leading-5">@item.Summary</span>
-            </a>
+<DocsHeading Title="Install the package" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Add the package to your Blazor project:
+</p>
+<CodeBlock Code="dotnet add package Blazix.BaseUI" Language="bash" />
+
+<DocsHeading Title="Import the namespaces" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Each component family lives in its own namespace. Add the ones you use to <code class="@LiquidGlassClasses.CodeInline">_Imports.razor</code>:
+</p>
+<CodeBlock Code="@ImportsCode" />
+
+<DocsHeading Title="Assemble a component" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Components are unstyled parts that you compose and style yourself — with plain CSS classes through
+    <code class="@LiquidGlassClasses.CodeInline">class</code>, or state-driven classes through
+    <code class="@LiquidGlassClasses.CodeInline">ClassValue</code>:
+</p>
+<CodeBlock Code="@ExampleCode" />
+
+<DocsHeading Title="Explore the components" />
+<p class="max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Every component is listed in the sidebar. Documented pages show a live demo with CSS and Tailwind source,
+    anatomy, and a full API reference — <a href="/components/accordion">start with the Accordion</a>.
+    Each documented component also serves its markdown source at
+    <code class="@LiquidGlassClasses.CodeInline">/components/name.md</code>.
+</p>
+
+@code {
+    private const string ImportsCode =
+        """
+        @using Blazix.BaseUI.Accordion
+        @using Blazix.BaseUI.Switch
+        @using Blazix.BaseUI.Tooltip
+        """;
+
+    private const string ExampleCode =
+        """
+        <SwitchRoot @bind-Checked="enabled" class="switch">
+            <SwitchThumb class="thumb" />
+        </SwitchRoot>
+
+        @code {
+            private bool enabled;
         }
-    </section>
-</div>
+        """;
+}

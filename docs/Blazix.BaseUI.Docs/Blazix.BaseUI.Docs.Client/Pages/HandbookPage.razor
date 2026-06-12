@@ -1,6 +1,6 @@
-@page "/components/{Slug}"
+@page "/handbook/{Slug}"
 
-<DocStub Area="Components" Link="@link" />
+<DocStub Area="Handbook" Link="@link" />
 
 @code {
     [Parameter]
@@ -10,6 +10,6 @@
 
     protected override void OnParametersSet()
     {
-        link = DocsNav.Find("components", Slug);
+        link = DocsNav.Find("handbook", Slug);
     }
 }
