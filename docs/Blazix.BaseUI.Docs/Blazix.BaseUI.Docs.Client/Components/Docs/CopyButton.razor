@@ -61,11 +61,13 @@
         resetCts?.Dispose();
         resetCts = new CancellationTokenSource();
         copied = true;
+        StateHasChanged();
 
         try
         {
             await Task.Delay(2000, resetCts.Token);
             copied = false;
+            StateHasChanged();
         }
         catch (TaskCanceledException)
         {
