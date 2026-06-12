@@ -267,12 +267,22 @@
     </style>
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveAuto" />
+    <HeadOutlet @rendermode="ActiveRenderMode" />
 </head>
 
 <body class="liquid-grain m-0 min-h-screen overflow-x-hidden text-[15px] leading-normal text-slate-950 antialiased dark:text-slate-100">
-    <Routes @rendermode="InteractiveAuto" />
+    <Routes @rendermode="ActiveRenderMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter]
+    public HttpContext? HttpContext { get; set; }
+
+    private IComponentRenderMode ActiveRenderMode =>
+        string.Equals(HttpContext?.Request.Cookies["blazix-docs-render-mode"], "wasm", StringComparison.OrdinalIgnoreCase)
+            ? InteractiveWebAssembly
+            : InteractiveServer;
+}
