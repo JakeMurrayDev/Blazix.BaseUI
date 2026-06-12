@@ -21,6 +21,7 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private bool isDarkTheme;
+    private bool transitionsEnabled;
 
     private string ContainerClass => Compact ? "inline-flex items-center" : "flex items-center justify-between gap-3";
 
@@ -39,6 +40,14 @@
     {
         if (!firstRender)
         {
+            // The initial theme sync has painted without a transition; enable
+            // the thumb transition for user-driven toggles from here on.
+            if (!transitionsEnabled)
+            {
+                transitionsEnabled = true;
+                StateHasChanged();
+            }
+
             return;
         }
 
@@ -51,8 +60,9 @@
             if (isDarkTheme != nextIsDarkTheme)
             {
                 isDarkTheme = nextIsDarkTheme;
-                StateHasChanged();
             }
+
+            StateHasChanged();
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -94,9 +104,10 @@
         return $"liquid-control inline-flex h-8 w-14 items-center rounded-full border p-1 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400 dark:border-white/15 dark:bg-white/10 {stateClass}";
     }
 
-    private static string SwitchThumbClass(bool isChecked)
+    private string SwitchThumbClass(bool isChecked)
     {
         var stateClass = isChecked ? "translate-x-6 bg-white" : "translate-x-0 bg-white";
-        return $"block size-6 rounded-full shadow-[0_6px_16px_rgba(15,23,42,0.22)] transition-transform duration-300 ease-out {stateClass}";
+        var transitionClass = transitionsEnabled ? "transition-transform duration-300 ease-out" : null;
+        return $"block size-6 rounded-full shadow-[0_6px_16px_rgba(15,23,42,0.22)] {transitionClass} {stateClass}";
     }
 }
