@@ -77,7 +77,7 @@
         }
 
         activeId = id;
-        StateHasChanged();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
