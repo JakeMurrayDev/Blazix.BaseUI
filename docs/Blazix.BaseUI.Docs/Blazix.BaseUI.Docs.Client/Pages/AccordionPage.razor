@@ -1,0 +1,79 @@
+@page "/components/accordion"
+
+<PageTitle>Accordion · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Accordion"
+               Subtitle="A set of collapsible panels with headings."
+               MarkdownHref="/components/accordion.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <AccordionHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Open multiple panels" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    By default only one panel is open at a time. Set <code class="@LiquidGlassClasses.CodeInline">Multiple="true"</code> to let the user open several panels at once.
+</p>
+<div class="mb-2">
+    <Demo Variants="@MultipleVariants">
+        <AccordionMultipleCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in AccordionApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Accordion
+
+        <AccordionRoot TValue="string">
+            <AccordionItem>
+                <AccordionHeader>
+                    <AccordionTrigger />
+                </AccordionHeader>
+                <AccordionPanel />
+            </AccordionItem>
+        </AccordionRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Accordion.razor", "xml", "Components.Demos.Accordion.Hero.Css.AccordionHeroCss.razor"),
+            new DemoFile("accordion.css", "css", "wwwroot.demos.accordion.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Accordion.razor", "xml", "Components.Demos.Accordion.Hero.Tailwind.AccordionHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> MultipleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Accordion.razor", "xml", "Components.Demos.Accordion.Multiple.Css.AccordionMultipleCss.razor"),
+            new DemoFile("accordion.css", "css", "wwwroot.demos.accordion.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Accordion.razor", "xml", "Components.Demos.Accordion.Multiple.Tailwind.AccordionMultipleTailwind.razor"),
+        ]),
+    ];
+}
