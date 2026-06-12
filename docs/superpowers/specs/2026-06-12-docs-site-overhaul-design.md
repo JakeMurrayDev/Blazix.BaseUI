@@ -26,8 +26,24 @@ wherever an interactive primitive is needed.
 Mimics base-ui.com structure; Liquid Glass stays the material language (glass =
 chrome and transient surfaces, opaque content layer, ambient wallpaper kept).
 
-- **Header:** slim fixed glass bar — wordmark (links home), GitHub link,
-  `ThemeToggle`. On mobile, a menu button opens the nav in a Blazix **Drawer**.
+- **Header:** slim fixed glass bar — wordmark (links home), GitHub link, the
+  **dark mode switch**, and the **Server/WASM runtime switch**. On mobile, a
+  menu button opens the nav in a Blazix **Drawer** (which also hosts both
+  switches).
+- **Dark mode switch:** the existing `ThemeToggle` behavior, rebuilt on the
+  Blazix **Switch** component. Persistence stays as-is: `blazix-docs-theme` in
+  localStorage plus the inline boot script that applies the class before first
+  paint (no FOUC); system preference is the fallback.
+- **Server/WASM runtime switch:** a Blazix **ToggleGroup** with two items,
+  "Server" and "WASM", showing the active runtime. Render mode is site-wide:
+  selecting a runtime writes a `blazix-docs-render-mode` cookie via the docs JS
+  module and reloads; `App.razor` reads the cookie during static rendering and
+  applies `InteractiveServer` (default, no cookie) or
+  `InteractiveWebAssembly` to `Routes`/`HeadOutlet`. The current fixed
+  `InteractiveAuto` is dropped — the switch must truthfully display the active
+  runtime, and Auto's server-then-WASM handoff can't. Per-demo render-mode
+  islands were rejected: they'd force a static shell and break interactive nav
+  components.
 - **Three-column grid (desktop):**
   - Left: **SideNav**, ~17.5rem, sticky, scrollable via Blazix **ScrollArea**.
   - Center: content column, max-width ~48rem.
@@ -146,6 +162,8 @@ rules) providing:
 - TOC scroll-spy — `IntersectionObserver` over registered heading ids,
   callback to .NET for active-link highlight.
 - `highlight(element)` — invoke highlight.js on swapped code blocks.
+- `setRenderMode(mode)` — write the `blazix-docs-render-mode` cookie and
+  reload.
 
 ## 7. Verification Criteria
 
@@ -160,4 +178,8 @@ rules) providing:
   - Stub pages render for undocumented links; `/components/accordion.md`
     still serves markdown.
   - Mobile width: Drawer nav works; quick-nav hidden.
-  - Dark mode toggle and `prefers-reduced-motion` fallbacks still behave.
+  - Dark mode switch toggles and persists the theme;
+    `prefers-reduced-motion` fallbacks still behave.
+  - Runtime switch: site loads as Server by default; selecting WASM reloads
+    and the demos run under WebAssembly (verify via the switch state and
+    interactivity after reload); selection persists across navigation.
