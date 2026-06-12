@@ -1,6 +1,71 @@
-<pre class="@LiquidGlassClasses.CodeBlock"><code>@Code</code></pre>
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="relative" @key="@Code">
+    <pre class="@LiquidGlassClasses.CodeBlock"><code class="@($"language-{Language}")" @ref="codeElement">@Code</code></pre>
+    @if (ShowCopy)
+    {
+        <div class="absolute right-2.5 top-2.5">
+            <CopyButton Text="@Code" />
+        </div>
+    }
+</div>
 
 @code {
+    private const string JsModulePath = "/docs-interop.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private ElementReference codeElement;
+    private string? highlightedCode;
+
     [Parameter]
     public string Code { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Language { get; set; } = "xml";
+
+    [Parameter]
+    public bool ShowCopy { get; set; } = true;
+
+    public CodeBlock()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (highlightedCode == Code)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("highlightElement", codeElement);
+            highlightedCode = Code;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+        }
+    }
 }

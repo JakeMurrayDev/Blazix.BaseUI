@@ -1,0 +1,94 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<TooltipProvider>
+    <TooltipRoot>
+        <TooltipTrigger aria-label="Copy code"
+                        ClassValue="@(_ => ButtonClass)"
+                        @onclick="CopyAsync">
+            @if (copied)
+            {
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2.5 8.5 6 12l7.5-8" /></svg>
+            }
+            else
+            {
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path d="M10.5 5.5v-2a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3.5V9A1.5 1.5 0 0 0 4 10.5h1.5" /></svg>
+            }
+        </TooltipTrigger>
+        <TooltipPortal>
+            <TooltipPositioner SideOffset="6">
+                <TooltipPopup ClassValue="@(_ => PopupClass)">@(copied ? "Copied" : "Copy code")</TooltipPopup>
+            </TooltipPositioner>
+        </TooltipPortal>
+    </TooltipRoot>
+</TooltipProvider>
+
+@code {
+    private const string JsModulePath = "/docs-interop.js";
+    private const string ButtonClass = "liquid-control inline-flex size-8 items-center justify-center rounded-full border border-white/45 bg-white/55 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] hover:bg-white/70 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15";
+    private const string PopupClass = "liquid-glass rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-medium text-slate-900 shadow-[0_10px_28px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-slate-950/80 dark:text-slate-100";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool copied;
+    private CancellationTokenSource? resetCts;
+
+    /// <summary>
+    /// Gets or sets the text copied to the clipboard.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string Text { get; set; } = string.Empty;
+
+    public CopyButton()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    private async Task CopyAsync()
+    {
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("copyText", Text);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
+        {
+            return;
+        }
+
+        resetCts?.Cancel();
+        resetCts?.Dispose();
+        resetCts = new CancellationTokenSource();
+        copied = true;
+
+        try
+        {
+            await Task.Delay(2000, resetCts.Token);
+            copied = false;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        resetCts?.Cancel();
+        resetCts?.Dispose();
+
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+        }
+    }
+}
