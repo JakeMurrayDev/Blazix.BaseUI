@@ -1,0 +1,26 @@
+﻿@page "/"
+
+<PageTitle>Blazix.BaseUI Docs</PageTitle>
+
+<div class="grid gap-4">
+    <section class="@LiquidGlassClasses.InsetPanel">
+        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">Blazor primitives for design systems</p>
+        <h1 tabindex="-1" class="mb-3 text-3xl font-semibold tracking-normal text-slate-950 focus:outline-none dark:text-white">Blazix.BaseUI component documentation</h1>
+        <p class="max-w-3xl text-sm leading-6">
+            This documentation app mirrors the Base UI route shape while showing Blazor-first examples.
+            Component pages are available at <code class="@LiquidGlassClasses.CodeInline">/components/name</code>,
+            with matching markdown source at <code class="@LiquidGlassClasses.CodeInline">/components/name.md</code>.
+        </p>
+    </section>
+
+    <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        @foreach (var item in ComponentCatalog.All)
+        {
+            <a class="@LiquidGlassClasses.CardLink" href="@($"components/{item.Slug}")">
+                <span class="text-[11px] uppercase">@item.Status</span>
+                <strong class="text-base">@item.Name</strong>
+                <span class="text-sm leading-5">@item.Summary</span>
+            </a>
+        }
+    </section>
+</div>

@@ -1,0 +1,190 @@
+<div class="grid min-w-0 gap-4">
+    <DocsSection Title="Anatomy">
+        <div class="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="grid min-w-0 gap-4">
+                <p class="text-sm leading-6 text-slate-800 dark:text-slate-200">
+                    Accordion is a set of collapsible panels with headings. Import the component namespace and assemble Root, Item, Header, Trigger, and Panel in the same order as the source docs.
+                </p>
+                <CodeBlock Code="@basicExample" />
+            </div>
+
+            <div class="grid gap-3">
+                <DocsCallout Title="Use For">
+                    <p>FAQs, settings groups, release notes, or any page where compact headings should reveal supporting content without navigating away.</p>
+                </DocsCallout>
+                <DocsCallout Title="Raw Markdown">
+                    <p>The source for this page is routable at <a class="font-semibold text-sky-700 underline decoration-sky-300 underline-offset-4 dark:text-sky-300" href="/components/accordion.md">/components/accordion.md</a>.</p>
+                </DocsCallout>
+            </div>
+        </div>
+    </DocsSection>
+
+    <DocsSection Title="Examples">
+        <div class="mb-4 grid gap-2">
+            <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">Open multiple panels</h3>
+            <p class="text-sm leading-6 text-slate-700 dark:text-slate-200">Set <code class="@LiquidGlassClasses.CodeInline">Multiple</code> so each trigger appends or removes its value instead of replacing the current open item.</p>
+        </div>
+        <div class="grid min-w-0 gap-4 xl:grid-cols-3">
+            <div class="@LiquidGlassClasses.InsetPanel">
+                <h3 class="mb-2 text-sm font-semibold text-slate-950 dark:text-slate-50">Uncontrolled</h3>
+                <p class="text-sm leading-6 text-slate-700 dark:text-slate-200">Use <code class="@LiquidGlassClasses.CodeInline">DefaultValue</code> when the accordion can manage its own open items after the first render.</p>
+            </div>
+            <div class="@LiquidGlassClasses.InsetPanel">
+                <h3 class="mb-2 text-sm font-semibold text-slate-950 dark:text-slate-50">Controlled</h3>
+                <p class="text-sm leading-6 text-slate-700 dark:text-slate-200">Use <code class="@LiquidGlassClasses.CodeInline">Value</code> and <code class="@LiquidGlassClasses.CodeInline">ValueChanged</code> when app state owns the open items.</p>
+            </div>
+            <div class="@LiquidGlassClasses.InsetPanel">
+                <h3 class="mb-2 text-sm font-semibold text-slate-950 dark:text-slate-50">Multiple</h3>
+                <p class="text-sm leading-6 text-slate-700 dark:text-slate-200">Set <code class="@LiquidGlassClasses.CodeInline">Multiple</code> to append and remove values instead of replacing the previous open panel.</p>
+            </div>
+        </div>
+        <div class="mt-4">
+            <CodeBlock Code="@controlledExample" />
+        </div>
+    </DocsSection>
+
+    <DocsSection Title="API Reference">
+        <div class="grid min-w-0 gap-6">
+            <div class="grid min-w-0 gap-3">
+                <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">AccordionRoot</h3>
+                <ApiTable Rows="@rootRows" />
+            </div>
+
+            <div class="grid min-w-0 gap-3">
+                <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">AccordionItem</h3>
+                <ApiTable Rows="@itemRows" />
+            </div>
+
+            <div class="grid min-w-0 gap-3">
+                <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">AccordionHeader</h3>
+                <ApiTable Rows="@headerRows" />
+            </div>
+
+            <div class="grid min-w-0 gap-3">
+                <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">AccordionTrigger</h3>
+                <ApiTable Rows="@triggerRows" />
+            </div>
+
+            <div class="grid min-w-0 gap-3">
+                <h3 class="text-base font-semibold text-slate-950 dark:text-slate-50">AccordionPanel</h3>
+                <ApiTable Rows="@panelRows" />
+            </div>
+        </div>
+    </DocsSection>
+
+    <DocsSection Title="Styling Hooks">
+        <div class="grid gap-4 md:grid-cols-2">
+            <div>
+                <h3 class="mb-2 text-sm font-semibold text-slate-950 dark:text-slate-50">Data Attributes</h3>
+                <ul class="grid gap-2">
+                    @foreach (var item in dataAttributes)
+                    {
+                        <li class="@LiquidGlassClasses.ListItem">@item</li>
+                    }
+                </ul>
+            </div>
+            <div>
+                <h3 class="mb-2 text-sm font-semibold text-slate-950 dark:text-slate-50">Motion Variables</h3>
+                <ul class="grid gap-2">
+                    @foreach (var item in motionHooks)
+                    {
+                        <li class="@LiquidGlassClasses.ListItem">@item</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </DocsSection>
+</div>
+
+@code {
+    private const string basicExample =
+        """
+        <AccordionRoot TValue="string" DefaultValue="@(["install"])">
+            <AccordionItem TValue="string" Value="install">
+                <AccordionHeader>
+                    <AccordionTrigger>Install</AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel>
+                    dotnet add package Blazix.BaseUI
+                </AccordionPanel>
+            </AccordionItem>
+        </AccordionRoot>
+        """;
+
+    private const string controlledExample =
+        """
+        <AccordionRoot TValue="string"
+                       Value="@openPanels"
+                       ValueChanged="@(next => openPanels = next)"
+                       Multiple>
+            <AccordionItem TValue="string" Value="accessibility">
+                <AccordionHeader>
+                    <AccordionTrigger>Accessibility</AccordionTrigger>
+                </AccordionHeader>
+                <AccordionPanel KeepMounted="true">
+                    Trigger and panel IDs are linked automatically.
+                </AccordionPanel>
+            </AccordionItem>
+        </AccordionRoot>
+
+        @code {
+            private string[] openPanels = ["accessibility"];
+        }
+        """;
+
+    private static readonly ApiRow[] rootRows =
+    [
+        new("Value", "TValue[]?", "null", "Controlled array of open item values. Use this with ValueChanged when parent state owns the accordion."),
+        new("DefaultValue", "TValue[]", "[]", "Initial open item values for uncontrolled usage."),
+        new("Multiple", "bool", "false", "Allows more than one item value to remain open at the same time."),
+        new("Disabled", "bool", "false", "Disables user interaction for all items in the accordion."),
+        new("Orientation", "Orientation", "Vertical", "Controls whether roving focus uses up/down or left/right arrow keys."),
+        new("LoopFocus", "bool", "true", "Wraps arrow-key focus from the last trigger to the first trigger and back."),
+        new("KeepMounted", "bool", "false", "Keeps closed panels in the DOM unless a panel overrides it."),
+        new("HiddenUntilFound", "bool", "false", "Uses hidden=\"until-found\" so browser find-in-page can reveal closed content."),
+        new("OnValueChange", "EventCallback", "-", "Cancelable callback invoked with the next value array before state and binding callbacks update.")
+    ];
+
+    private static readonly ApiRow[] itemRows =
+    [
+        new("Value", "TValue?", "generated string", "Unique item value. Non-string TValue items must provide a value."),
+        new("Disabled", "bool", "false", "Disables this item while preserving the root's disabled state."),
+        new("OnOpenChange", "EventCallback", "-", "Cancelable callback invoked when this item is opened or closed.")
+    ];
+
+    private static readonly ApiRow[] headerRows =
+    [
+        new("Render", "RenderFragment<RenderProps<AccordionHeaderState>>?", "null", "Replaces the default h3 element or composes the header with another component."),
+        new("ClassValue", "Func<AccordionHeaderState, string?>?", "null", "Styles the header using item state such as Open, Disabled, Index, Orientation, and Hidden."),
+        new("StyleValue", "Func<AccordionHeaderState, string?>?", "null", "Adds state-based inline styles to the rendered header.")
+    ];
+
+    private static readonly ApiRow[] triggerRows =
+    [
+        new("Disabled", "bool?", "null", "Overrides the inherited item disabled state when set."),
+        new("NativeButton", "bool", "true", "Renders native button attributes by default; turn off when rendering another element."),
+        new("ClassValue", "Func<AccordionTriggerState, string?>?", "null", "Styles the trigger using state such as Open, Disabled, Index, Orientation, and Hidden.")
+    ];
+
+    private static readonly ApiRow[] panelRows =
+    [
+        new("KeepMounted", "bool?", "null", "Overrides root KeepMounted for this panel."),
+        new("HiddenUntilFound", "bool?", "null", "Overrides root HiddenUntilFound for this panel."),
+        new("ClassValue", "Func<AccordionPanelState, string?>?", "null", "Styles the panel using Open, Hidden, Orientation, Index, Disabled, and TransitionStatus."),
+        new("StyleValue", "Func<AccordionPanelState, string?>?", "null", "Adds custom style while preserving measured accordion panel CSS variables.")
+    ];
+
+    private static readonly string[] dataAttributes =
+    [
+        "Item, header, and panel expose data-open, data-closed, data-disabled, data-hidden, data-index, and data-orientation.",
+        "Trigger exposes data-panel-open, data-disabled, data-hidden, data-index, data-orientation, and data-value.",
+        "Panel exposes data-starting-style and data-ending-style while the measured height animation is running."
+    ];
+
+    private static readonly string[] motionHooks =
+    [
+        "Panel height is available as --accordion-panel-height.",
+        "Panel width is available as --accordion-panel-width.",
+        "Use Tailwind arbitrary values such as h-[var(--accordion-panel-height)] and data-[ending-style]:h-0 for smooth open and close motion."
+    ];
+}

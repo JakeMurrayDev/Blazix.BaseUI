@@ -1,0 +1,83 @@
+@page "/components/{Slug}"
+
+<PageTitle>@(component is null ? "Component not found" : $"{component.Name} - Blazix.BaseUI Docs")</PageTitle>
+
+@if (component is null)
+{
+    <DocsSection Title="Not Found">
+        <p>No component documentation exists for <code class="@LiquidGlassClasses.CodeInline">@Slug</code>.</p>
+    </DocsSection>
+}
+else
+{
+    <div class="grid min-w-0 gap-4">
+        <section class="@LiquidGlassClasses.InsetPanel">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">@component.Status</p>
+                    <h1 tabindex="-1" class="text-3xl font-semibold tracking-normal text-slate-950 focus:outline-none dark:text-white">@component.Name</h1>
+                </div>
+                <a class="@LiquidGlassClasses.Button" href="@($"/components/{component.Slug}.md")">Open .md</a>
+            </div>
+            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">@component.Summary</p>
+        </section>
+
+        <ComponentDemo Slug="@component.Slug" />
+
+        <div class="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <DocsSection Title="Usage">
+                <p class="mb-3 text-sm leading-6 text-slate-700 dark:text-slate-200">@component.Usage</p>
+                <CodeBlock Code="@component.Example" />
+            </DocsSection>
+
+            <DocsSection Title="Parts">
+                <ul class="grid gap-2">
+                    @foreach (var part in component.Parts)
+                    {
+                        <li class="@LiquidGlassClasses.ListItem">@part</li>
+                    }
+                </ul>
+            </DocsSection>
+        </div>
+
+        <DocsSection Title="Keyboard And Notes">
+            <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                    <h2 class="mb-2 font-bold">Keyboard</h2>
+                    <ul class="grid gap-2">
+                        @foreach (var note in component.Keyboard)
+                        {
+                            <li class="@LiquidGlassClasses.ListItem">@note</li>
+                        }
+                    </ul>
+                </div>
+                <div>
+                    <h2 class="mb-2 font-bold">Notes</h2>
+                    <ul class="grid gap-2">
+                        @foreach (var note in component.Notes)
+                        {
+                            <li class="@LiquidGlassClasses.ListItem">@note</li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </DocsSection>
+
+        @if (component.Slug == "accordion")
+        {
+            <AccordionDocs />
+        }
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; }
+
+    private ComponentDoc? component;
+
+    protected override void OnParametersSet()
+    {
+        component = ComponentCatalog.Find(Slug);
+    }
+}
