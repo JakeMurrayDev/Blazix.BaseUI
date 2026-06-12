@@ -1,0 +1,131 @@
+<div class="overflow-clip rounded-[28px] border border-white/60 bg-white/80 shadow-[0_14px_34px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.86)] dark:border-white/10 dark:bg-slate-900/70">
+    <div class="flex min-h-32 items-center justify-center px-6 py-10">
+        @ChildContent
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-white/45 px-3 py-2 dark:border-white/10">
+        <div class="min-w-0">
+            @if (ActiveVariant.Files.Count > 1)
+            {
+                <TabsRoot TValue="string" Value="@ActiveFile.Name" ValueChanged="HandleFileChanged">
+                    <TabsList TValue="string" ClassValue="@(_ => "flex items-center gap-1")">
+                        @foreach (var file in ActiveVariant.Files)
+                        {
+                            <TabsTab TValue="string"
+                                     Value="@file.Name"
+                                     ClassValue="@(state => FileTabClass(state.Active))">
+                                @file.Name
+                            </TabsTab>
+                        }
+                    </TabsList>
+                </TabsRoot>
+            }
+            else
+            {
+                <span class="px-2 font-mono text-xs text-slate-700 dark:text-slate-300">@ActiveFile.Name</span>
+            }
+        </div>
+        <div class="flex items-center gap-2">
+            @if (Variants.Count > 1)
+            {
+                <SelectRoot TValue="string" Value="@ActiveVariant.Name" ValueChanged="HandleVariantChanged">
+                    <SelectTrigger aria-label="Styling variant"
+                                   ClassValue="@(_ => "liquid-control inline-flex h-8 items-center gap-2 rounded-full border border-white/45 bg-white/55 px-3 text-xs font-semibold text-slate-900 hover:bg-white/70 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15")">
+                        <SelectValue TValue="string" />
+                        <SelectIcon>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m1.5 3.5 3.5 3.5L8.5 3.5" /></svg>
+                        </SelectIcon>
+                    </SelectTrigger>
+                    <SelectPortal>
+                        <SelectPositioner SideOffset="4">
+                            <SelectPopup ClassValue="@(_ => "liquid-glass z-50 overflow-clip rounded-[20px] border border-white/50 bg-white/80 p-1 text-sm shadow-[0_18px_46px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-slate-950/80")">
+                                @foreach (var variant in Variants)
+                                {
+                                    <SelectItem TValue="string"
+                                                Value="@variant.Name"
+                                                Label="@variant.Name"
+                                                ClassValue="@(state => VariantItemClass(state.Selected))">
+                                        <SelectItemText>@variant.Name</SelectItemText>
+                                    </SelectItem>
+                                }
+                            </SelectPopup>
+                        </SelectPositioner>
+                    </SelectPortal>
+                </SelectRoot>
+            }
+            <CopyButton Text="@ActiveFile.Code" />
+        </div>
+    </div>
+
+    <CollapsibleRoot Open="@isExpanded" OpenChanged="@(open => isExpanded = open)">
+        <div class="relative">
+            <div class="@(ShouldCollapse ? "max-h-[16.5rem] overflow-hidden" : null)">
+                <CodeBlock Code="@ActiveFile.Code" Language="@ActiveFile.Language" ShowCopy="false" />
+            </div>
+            @if (ShouldCollapse)
+            {
+                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 rounded-b-[24px] bg-gradient-to-t from-slate-950 to-transparent"></div>
+            }
+            @if (IsCollapsible)
+            {
+                <div class="@(ShouldCollapse ? "absolute inset-x-0 bottom-3 flex justify-center" : "flex justify-center pb-3")">
+                    <CollapsibleTrigger ClassValue="@(_ => LiquidGlassClasses.Button)">
+                        @(isExpanded ? "Hide code" : "Show code")
+                    </CollapsibleTrigger>
+                </div>
+            }
+        </div>
+    </CollapsibleRoot>
+</div>
+
+@code {
+    private string? activeVariantName;
+    private string? activeFileName;
+    private bool isExpanded;
+
+    /// <summary>
+    /// Gets or sets the code variants (e.g. CSS and Tailwind) shown for this demo.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<DemoVariant> Variants { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the live demo content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private DemoVariant ActiveVariant =>
+        Variants.FirstOrDefault(v => v.Name == activeVariantName) ?? Variants[0];
+
+    private DemoFile ActiveFile =>
+        ActiveVariant.Files.FirstOrDefault(f => f.Name == activeFileName) ?? ActiveVariant.Files[0];
+
+    private bool IsCollapsible => ActiveFile.Code.Count(c => c == '\n') > 12;
+
+    private bool ShouldCollapse => IsCollapsible && !isExpanded;
+
+    private void HandleFileChanged(string? value) => activeFileName = value;
+
+    private void HandleVariantChanged(string? value)
+    {
+        activeVariantName = value;
+        activeFileName = null;
+    }
+
+    private static string FileTabClass(bool selected)
+    {
+        var state = selected
+            ? "border-sky-200/70 bg-sky-100/65 text-slate-950 dark:border-sky-300/30 dark:bg-sky-400/20 dark:text-sky-50"
+            : "border-transparent text-slate-700 hover:bg-white/50 dark:text-slate-300 dark:hover:bg-white/10";
+        return $"liquid-control inline-flex h-8 items-center rounded-full border px-3 font-mono text-xs {state}";
+    }
+
+    private static string VariantItemClass(bool selected)
+    {
+        var state = selected
+            ? "bg-sky-100/65 text-slate-950 dark:bg-sky-400/20 dark:text-sky-50"
+            : "text-slate-800 hover:bg-white/60 dark:text-slate-200 dark:hover:bg-white/10";
+        return $"flex cursor-default items-center rounded-[14px] px-3 py-1.5 text-xs font-semibold {state}";
+    }
+}

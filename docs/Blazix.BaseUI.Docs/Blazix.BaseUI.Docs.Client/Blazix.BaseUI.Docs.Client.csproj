@@ -17,4 +17,9 @@
     <ProjectReference Include="..\..\..\src\Blazix.BaseUI\Blazix.BaseUI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Components\Demos\**\*.razor" />
+    <EmbeddedResource Include="wwwroot\demos\**\*.css" />
+  </ItemGroup>
+
 </Project>
