@@ -26,7 +26,7 @@ public static class DocsNav
         new("Components", "components",
         [
             new("Accordion", "accordion", "/components/accordion", "A set of collapsible panels with headings.", IsDocumented: true),
-            new("Alert Dialog", "alert-dialog", "/components/alert-dialog", "A dialog that requires a response from the user."),
+            new("Alert Dialog", "alert-dialog", "/components/alert-dialog", "A dialog that requires a response from the user.", IsDocumented: true),
             new("Autocomplete", "autocomplete", "/components/autocomplete", "An input that suggests options as you type."),
             new("Avatar", "avatar", "/components/avatar", "An image with a textual fallback."),
             new("Button", "button", "/components/button", "An accessible button with full styling freedom."),

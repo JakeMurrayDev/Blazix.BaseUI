@@ -1,0 +1,198 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-alert-dialog-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  margin: 0;
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  border-radius: 0.5rem;
+  background: none;
+  color: #b91c1c;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+
+.blx-alert-dialog-trigger:hover {
+  background-color: rgba(148, 163, 184, 0.15);
+}
+
+.blx-alert-dialog-trigger:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.dark .blx-alert-dialog-trigger {
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #f87171;
+}
+
+.blx-alert-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background-color: rgba(2, 6, 23, 0.5);
+  opacity: 1;
+  transition: opacity 150ms ease-out;
+}
+
+.blx-alert-dialog-backdrop[data-starting-style],
+.blx-alert-dialog-backdrop[data-ending-style] {
+  opacity: 0;
+}
+
+.blx-alert-dialog-popup {
+  box-sizing: border-box;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  width: 24rem;
+  max-width: calc(100vw - 3rem);
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background-color: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.blx-alert-dialog-popup:focus-visible {
+  outline: none;
+}
+
+.blx-alert-dialog-popup[data-starting-style],
+.blx-alert-dialog-popup[data-ending-style] {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.dark .blx-alert-dialog-popup {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.blx-alert-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.blx-alert-dialog-title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  color: inherit;
+}
+
+.blx-alert-dialog-description {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #475569;
+}
+
+.dark .blx-alert-dialog-description {
+  color: #94a3b8;
+}
+
+.blx-alert-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.blx-alert-dialog-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  margin: 0;
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  border-radius: 0.5rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease;
+}
+
+.blx-alert-dialog-button:hover {
+  background-color: rgba(148, 163, 184, 0.15);
+}
+
+.blx-alert-dialog-button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.dark .blx-alert-dialog-button {
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.blx-alert-dialog-button-danger {
+  border-color: transparent;
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.blx-alert-dialog-button-danger:hover {
+  background-color: #ef4444;
+}
+
+.dark .blx-alert-dialog-button-danger {
+  border-color: transparent;
+}
+
+.blx-alert-dialog-controlled {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.blx-alert-dialog-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: rgba(148, 163, 184, 0.2);
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dark .blx-alert-dialog-status {
+  color: #cbd5e1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blx-alert-dialog-backdrop,
+  .blx-alert-dialog-popup {
+    transition: none;
+  }
+}
