@@ -16,15 +16,18 @@
 
     private IReadOnlyList<string> currentValue = ["server"];
 
+    [CascadingParameter(Name = "RequestedRenderMode")]
+    public string? RequestedRenderMode { get; set; }
+
     public RuntimeSwitch()
     {
         moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
             JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
     }
 
-    protected override void OnInitialized()
+    protected override void OnParametersSet()
     {
-        currentValue = [RendererInfo.Name == "WebAssembly" ? "wasm" : "server"];
+        currentValue = [NormalizeRenderMode(RequestedRenderMode)];
     }
 
     public async ValueTask DisposeAsync()
@@ -69,4 +72,9 @@
             : "border-transparent text-slate-700 hover:bg-white/50 dark:text-slate-300 dark:hover:bg-white/10";
         return $"liquid-control inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold {state}";
     }
+
+    private static string NormalizeRenderMode(string? value) =>
+        string.Equals(value, "wasm", StringComparison.OrdinalIgnoreCase)
+            ? "wasm"
+            : "server";
 }
