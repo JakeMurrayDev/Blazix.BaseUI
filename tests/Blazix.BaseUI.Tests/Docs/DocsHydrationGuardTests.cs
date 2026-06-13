@@ -8,10 +8,16 @@ public class DocsHydrationGuardTests
         var app = ReadRepoFile("docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Components/App.razor");
 
         app.ShouldContain("blazix-docs-preinteractive");
+        app.ShouldContain("blazix-docs-hydration-rail");
+        app.ShouldContain("Preparing controls");
+        app.ShouldContain("blazix-docs-hydration-sweep");
+        app.ShouldContain("animation: none");
+        app.ShouldContain(".blazix-docs-preinteractive .liquid-materialize");
         app.ShouldContain("window.blazixDocs");
         app.ShouldContain("markInteractive");
         app.ShouldContain("stopImmediatePropagation");
         app.ShouldContain("button, input, select, textarea");
+        app.ShouldContain("opacity: 0.62");
     }
 
     [Fact]
