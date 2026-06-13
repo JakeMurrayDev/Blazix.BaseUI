@@ -33,6 +33,7 @@
     {
         if (!string.IsNullOrEmpty(MarkdownHref))
         {
+            // Force a browser request so the raw markdown endpoint handles the .md route.
             NavigationManager.NavigateTo(MarkdownHref, forceLoad: true);
         }
     }
