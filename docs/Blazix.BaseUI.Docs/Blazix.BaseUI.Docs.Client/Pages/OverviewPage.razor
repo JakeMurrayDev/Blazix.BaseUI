@@ -1,0 +1,17 @@
+@page "/overview/{Slug}"
+
+<DocStub Area="Overview" Link="@link" />
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; }
+
+    private DocsNavLink? link;
+
+    protected override void OnParametersSet()
+    {
+        // Quick start lives at "/", so /overview/quick-start is not a valid address.
+        var found = DocsNav.Find("overview", Slug);
+        link = found is { Slug: "quick-start" } ? null : found;
+    }
+}

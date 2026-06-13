@@ -1,0 +1,72 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<ToggleGroup Value="@currentValue"
+             OnValueChange="HandleValueChangeAsync"
+             aria-label="Interactive render mode"
+             ClassValue="@(_ => "inline-flex items-center gap-1 rounded-full border border-white/45 bg-white/40 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:border-white/10 dark:bg-white/10")">
+    <Toggle Value="server" ClassValue="@(state => ToggleClass(state.Pressed))">Server</Toggle>
+    <Toggle Value="wasm" ClassValue="@(state => ToggleClass(state.Pressed))">WASM</Toggle>
+</ToggleGroup>
+
+@code {
+    private const string JsModulePath = "/runtime-switch-interop.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private IReadOnlyList<string> currentValue = ["server"];
+
+    public RuntimeSwitch()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override void OnInitialized()
+    {
+        currentValue = [RendererInfo.Name == "WebAssembly" ? "wasm" : "server"];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
+        {
+        }
+    }
+
+    private async Task HandleValueChangeAsync(ToggleGroupValueChangeEventArgs args)
+    {
+        var next = args.Value.FirstOrDefault();
+        if (next is null || currentValue.Contains(next))
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("setRenderMode", next);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
+        {
+        }
+    }
+
+    private static string ToggleClass(bool pressed)
+    {
+        var state = pressed
+            ? "border-sky-200/70 bg-sky-200/50 text-slate-950 dark:border-sky-300/30 dark:bg-sky-400/25 dark:text-sky-50"
+            : "border-transparent text-slate-700 hover:bg-white/50 dark:text-slate-300 dark:hover:bg-white/10";
+        return $"liquid-control inline-flex h-7 items-center rounded-full border px-3 text-xs font-semibold {state}";
+    }
+}

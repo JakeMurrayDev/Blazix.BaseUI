@@ -1,0 +1,106 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager NavigationManager
+
+<CascadingValue Value="toc" IsFixed="true">
+    <div class="mx-auto min-h-screen max-w-[100rem] px-3 sm:px-5">
+        <header class="liquid-glass liquid-materialize sticky top-3 z-30 flex items-center justify-between gap-3 rounded-[28px] border border-white/45 bg-white/50 px-3 py-2 shadow-[0_18px_54px_rgba(15,23,42,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/10 dark:bg-slate-950/60 dark:shadow-[0_18px_54px_rgba(0,0,0,0.32)]">
+            <div class="flex min-w-0 items-center gap-2">
+                <DrawerRoot @bind-Open="isNavOpen">
+                    <DrawerTrigger aria-label="Open navigation"
+                                   ClassValue="@(_ => $"{LiquidGlassClasses.IconButton} lg:hidden")">
+                        <span class="grid gap-1.5" aria-hidden="true">
+                            <span class="block h-0.5 w-5 rounded-full bg-current"></span>
+                            <span class="block h-0.5 w-5 rounded-full bg-current"></span>
+                            <span class="block h-0.5 w-5 rounded-full bg-current"></span>
+                        </span>
+                    </DrawerTrigger>
+                    <DrawerPortal>
+                        <DrawerBackdrop ClassValue="@(_ => LiquidGlassClasses.MobileNavBackdrop)" />
+                        <DrawerViewport ClassValue="@(_ => "fixed inset-0 z-50")">
+                            <DrawerPopup ClassValue="@(_ => LiquidGlassClasses.MobileNavPopup)">
+                                <DrawerContent ClassValue="@(_ => "flex h-full flex-col gap-4")">
+                                    <DrawerTitle ClassValue="@(_ => "m-0 text-sm font-semibold text-slate-950 dark:text-white")">Navigation</DrawerTitle>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <RuntimeSwitch />
+                                        <ThemeToggle Compact="true" />
+                                    </div>
+                                    <div class="min-h-0 flex-1">
+                                        <SideNav OnNavigate="CloseNav" />
+                                    </div>
+                                </DrawerContent>
+                            </DrawerPopup>
+                        </DrawerViewport>
+                    </DrawerPortal>
+                </DrawerRoot>
+                <a href="/" class="flex min-w-0 items-center gap-2 no-underline">
+                    <span class="truncate text-sm font-semibold text-slate-950 dark:text-white">Blazix.BaseUI</span>
+                    <span class="hidden text-[11px] font-medium uppercase tracking-[0.14em] text-sky-700 sm:inline dark:text-sky-300">Docs</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="hidden lg:inline-flex"><RuntimeSwitch /></span>
+                <span class="hidden lg:inline-flex"><ThemeToggle Compact="true" /></span>
+                <a class="@LiquidGlassClasses.IconButton"
+                   href="https://github.com/JakeMurrayDev/Blazix.BaseUI"
+                   target="_blank"
+                   rel="noreferrer"
+                   aria-label="GitHub repository">
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+                </a>
+            </div>
+        </header>
+
+        <div class="grid gap-6 py-6 lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,1fr)_15rem]">
+            <aside class="hidden lg:block">
+                <div class="sticky top-[5.25rem] h-[calc(100vh-6.5rem)]">
+                    <SideNav />
+                </div>
+            </aside>
+            <main class="min-w-0">
+                <article class="@LiquidGlassClasses.ContentSurface">
+                    @Body
+                </article>
+            </main>
+            <aside class="hidden xl:block">
+                <div class="sticky top-[5.25rem] max-h-[calc(100vh-6.5rem)] overflow-y-auto">
+                    <QuickNav />
+                </div>
+            </aside>
+        </div>
+    </div>
+</CascadingValue>
+
+<div id="blazor-error-ui"
+     data-nosnippet
+     class="liquid-glass fixed bottom-3 left-3 right-3 z-50 hidden rounded-[24px] border border-white/50 bg-white/75 p-3 shadow-[0_18px_54px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-slate-950/80">
+    An unhandled error has occurred.
+    <a href="." class="@LiquidGlassClasses.Button">Reload</a>
+    <span class="dismiss">x</span>
+</div>
+
+@code {
+    private readonly TocContext toc = new();
+
+    private bool isNavOpen;
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        toc.Clear();
+    }
+
+    private void CloseNav()
+    {
+        isNavOpen = false;
+    }
+}

@@ -1,0 +1,102 @@
+namespace Blazix.BaseUI.Docs.Client.Data;
+
+public static class AccordionApi
+{
+    public static IReadOnlyList<ComponentPart> Parts { get; } =
+    [
+        new("Root",
+            "Groups all parts of the accordion. Renders a <div> element by default.",
+            [
+                new ApiRow("Value", "TValue[]?", "null", "The controlled value of the item(s) that should be expanded. To render an uncontrolled accordion, use DefaultValue instead."),
+                new ApiRow("DefaultValue", "TValue[]", "[]", "The uncontrolled value of the item(s) that should be initially expanded. To render a controlled accordion, use Value instead."),
+                new ApiRow("Disabled", "bool", "false", "Determines whether the component should ignore user interaction."),
+                new ApiRow("Multiple", "bool", "false", "Determines whether multiple items can be open at the same time."),
+                new ApiRow("Orientation", "Orientation", "Vertical", "The visual orientation of the accordion. Controls whether roving focus uses left/right or up/down arrow keys."),
+                new ApiRow("LoopFocus", "bool", "true", "Determines whether focus loops back to the first item when the end of the list is reached while using the arrow keys."),
+                new ApiRow("HiddenUntilFound", "bool", "false", "Allows the browser's built-in page search to find and expand panel contents. Overrides KeepMounted and uses hidden=\"until-found\" to hide the element without removing it from the DOM."),
+                new ApiRow("KeepMounted", "bool", "false", "Determines whether closed panels stay in the DOM. Ignored when HiddenUntilFound is used."),
+                new ApiRow("ValueChanged", "EventCallback<TValue[]>", "—", "Callback invoked when the value changes, supporting two-way binding."),
+                new ApiRow("OnValueChange", "EventCallback<AccordionValueChangeEventArgs<TValue>>", "—", "Callback invoked when an accordion item is expanded or collapsed."),
+                new ApiRow("Render", "RenderFragment<RenderProps<AccordionRootState<TValue>>>?", "null", "Replaces the rendered element with a different tag or composes it with another component."),
+                new ApiRow("ClassValue", "Func<AccordionRootState<TValue>, string?>?", "null", "Returns a CSS class based on the component's state."),
+                new ApiRow("StyleValue", "Func<AccordionRootState<TValue>, string?>?", "null", "Returns a CSS style based on the component's state."),
+            ],
+            [
+                new ApiRow("data-orientation", "", "", "Indicates the orientation of the accordion: \"vertical\" or \"horizontal\"."),
+                new ApiRow("data-disabled", "", "", "Present when the accordion is disabled."),
+            ],
+            []),
+        new("Item",
+            "Groups an accordion header with the corresponding panel. Renders a <div> element by default.",
+            [
+                new ApiRow("Value", "TValue?", "auto", "A unique value identifying this accordion item. A unique id is generated automatically when omitted (string values)."),
+                new ApiRow("Disabled", "bool", "false", "Determines whether the component should ignore user interaction."),
+                new ApiRow("OnOpenChange", "EventCallback<CollapsibleOpenChangeEventArgs>", "—", "Callback invoked when the panel is opened or closed."),
+                new ApiRow("Render", "RenderFragment<RenderProps<AccordionItemState<TValue>>>?", "null", "Replaces the rendered element with a different tag or composes it with another component."),
+                new ApiRow("ClassValue", "Func<AccordionItemState<TValue>, string?>?", "null", "Returns a CSS class based on the component's state."),
+                new ApiRow("StyleValue", "Func<AccordionItemState<TValue>, string?>?", "null", "Returns a CSS style based on the component's state."),
+            ],
+            [
+                new ApiRow("data-open", "", "", "Present when the item's panel is open."),
+                new ApiRow("data-closed", "", "", "Present when the item's panel is closed."),
+                new ApiRow("data-disabled", "", "", "Present when the item is disabled."),
+                new ApiRow("data-index", "", "", "The zero-based index of the item."),
+                new ApiRow("data-orientation", "", "", "Indicates the orientation of the accordion."),
+            ],
+            []),
+        new("Header",
+            "A heading that labels the corresponding panel. Renders an <h3> element by default.",
+            [
+                new ApiRow("Render", "RenderFragment<RenderProps<AccordionHeaderState>>?", "null", "Replaces the rendered element with a different tag or composes it with another component."),
+                new ApiRow("ClassValue", "Func<AccordionHeaderState, string?>?", "null", "Returns a CSS class based on the component's state."),
+                new ApiRow("StyleValue", "Func<AccordionHeaderState, string?>?", "null", "Returns a CSS style based on the component's state."),
+            ],
+            [
+                new ApiRow("data-open", "", "", "Present when the item's panel is open."),
+                new ApiRow("data-closed", "", "", "Present when the item's panel is closed."),
+                new ApiRow("data-disabled", "", "", "Present when the item is disabled."),
+                new ApiRow("data-index", "", "", "The zero-based index of the item."),
+                new ApiRow("data-orientation", "", "", "Indicates the orientation of the accordion."),
+            ],
+            []),
+        new("Trigger",
+            "A button that opens and closes the corresponding panel. Renders a <button> element by default.",
+            [
+                new ApiRow("Disabled", "bool?", "null", "Determines whether the trigger ignores user interaction. Inherits from the parent item when null."),
+                new ApiRow("NativeButton", "bool", "true", "Determines whether the component renders a native <button> element."),
+                new ApiRow("Render", "RenderFragment<RenderProps<AccordionTriggerState>>?", "null", "Replaces the rendered element with a different tag or composes it with another component."),
+                new ApiRow("ClassValue", "Func<AccordionTriggerState, string?>?", "null", "Returns a CSS class based on the component's state."),
+                new ApiRow("StyleValue", "Func<AccordionTriggerState, string?>?", "null", "Returns a CSS style based on the component's state."),
+            ],
+            [
+                new ApiRow("data-panel-open", "", "", "Present when the corresponding panel is open."),
+                new ApiRow("data-disabled", "", "", "Present when the trigger is disabled."),
+                new ApiRow("data-index", "", "", "The zero-based index of the item."),
+                new ApiRow("data-orientation", "", "", "Indicates the orientation of the accordion."),
+                new ApiRow("data-value", "", "", "The value of the accordion item."),
+            ],
+            []),
+        new("Panel",
+            "A collapsible panel with the accordion item contents. Renders a <div> element by default.",
+            [
+                new ApiRow("KeepMounted", "bool?", "null", "Determines whether the panel stays in the DOM while closed. Inherits from Root when null."),
+                new ApiRow("HiddenUntilFound", "bool?", "null", "Allows the browser's built-in page search to find and expand the panel contents. Inherits from Root when null."),
+                new ApiRow("Render", "RenderFragment<RenderProps<AccordionPanelState>>?", "null", "Replaces the rendered element with a different tag or composes it with another component."),
+                new ApiRow("ClassValue", "Func<AccordionPanelState, string?>?", "null", "Returns a CSS class based on the component's state."),
+                new ApiRow("StyleValue", "Func<AccordionPanelState, string?>?", "null", "Returns a CSS style based on the component's state."),
+            ],
+            [
+                new ApiRow("data-open", "", "", "Present when the panel is open."),
+                new ApiRow("data-closed", "", "", "Present when the panel is closed."),
+                new ApiRow("data-disabled", "", "", "Present when the item is disabled."),
+                new ApiRow("data-index", "", "", "The zero-based index of the item."),
+                new ApiRow("data-orientation", "", "", "Indicates the orientation of the accordion."),
+                new ApiRow("data-starting-style", "", "", "Present when the panel is animating in."),
+                new ApiRow("data-ending-style", "", "", "Present when the panel is animating out."),
+            ],
+            [
+                new ApiRow("--accordion-panel-height", "", "", "The measured height of the panel content; used to animate the open and close transitions."),
+                new ApiRow("--accordion-panel-width", "", "", "The measured width of the panel content; used for horizontal animations."),
+            ]),
+    ];
+}

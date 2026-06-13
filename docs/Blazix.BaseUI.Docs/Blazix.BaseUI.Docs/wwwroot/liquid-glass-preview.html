@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blazix.BaseUI Liquid Glass Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html {
+            background: #eaf7ff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(219, 234, 254, 0.5) 34%, rgba(240, 253, 244, 0.5) 64%, rgba(253, 244, 255, 0.62)),
+                conic-gradient(from 220deg at 50% 28%, rgba(56, 189, 248, 0.32), rgba(244, 114, 182, 0.2), rgba(250, 204, 21, 0.2), rgba(45, 212, 191, 0.24), rgba(56, 189, 248, 0.32));
+            background-size: 130% 130%, 190% 190%;
+            animation: liquid-ambient 22s ease-in-out infinite alternate;
+        }
+
+        .liquid-glass {
+            position: relative;
+            isolation: isolate;
+            overflow: hidden;
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            backdrop-filter: blur(20px) saturate(160%);
+        }
+
+        .liquid-glass::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            border-radius: inherit;
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.56)),
+                radial-gradient(120% 120% at 12% 0%, rgba(255, 255, 255, 0.72), transparent 48%);
+            box-shadow:
+                inset 0 1px 1px rgba(255, 255, 255, 0.55),
+                inset 0 -1px 1px rgba(255, 255, 255, 0.2),
+                inset 1px 0 1px rgba(255, 255, 255, 0.18),
+                inset -1px 0 1px rgba(255, 255, 255, 0.18);
+            opacity: 0.78;
+        }
+
+        .liquid-glass::after {
+            content: "";
+            position: absolute;
+            inset: -20%;
+            z-index: -1;
+            border-radius: inherit;
+            background: linear-gradient(110deg, transparent 24%, rgba(255, 255, 255, 0.74) 42%, transparent 58%);
+            opacity: 0;
+            transform: translateX(-115%) rotate(8deg);
+        }
+
+        .liquid-glass:hover::after {
+            animation: liquid-sheen 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        @keyframes liquid-ambient {
+            0% { background-position: 0% 0%, 18% 24%; }
+            100% { background-position: 100% 76%, 82% 64%; }
+        }
+
+        @keyframes liquid-sheen {
+            0% { transform: translateX(-115%) rotate(8deg); opacity: 0; }
+            12% { opacity: 0.42; }
+            100% { transform: translateX(115%) rotate(8deg); opacity: 0; }
+        }
+
+        .prism-backdrop {
+            background:
+                repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.9) 0 26px, rgba(14, 165, 233, 0.85) 26px 52px, rgba(2, 6, 23, 0.9) 52px 78px, rgba(244, 114, 182, 0.85) 78px 104px),
+                conic-gradient(from 200deg at 50% 30%, #38bdf8, #f472b6, #facc15, #2dd4bf, #38bdf8);
+            background-size: 240% 240%, 200% 200%;
+            animation: prism-loop 14s linear infinite alternate;
+        }
+
+        @keyframes prism-loop {
+            0% { background-position: 0% 0%, 0% 0%; }
+            100% { background-position: 100% 100%, 100% 80%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            body,
+            .prism-backdrop,
+            .liquid-glass:hover::after {
+                animation: none !important;
+            }
+        }
+
+        @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+            .liquid-glass {
+                -webkit-backdrop-filter: none;
+                backdrop-filter: none;
+                background-color: rgba(255, 255, 255, 0.95) !important;
+            }
+
+            .liquid-glass::before,
+            .liquid-glass::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-5 text-slate-950 antialiased">
+    <main class="liquid-glass mx-auto grid max-w-5xl gap-5 rounded-[36px] border border-white/45 bg-white/30 p-5 shadow-[0_28px_90px_rgba(15,23,42,0.2),inset_0_1px_0_rgba(255,255,255,0.72)]">
+        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-white/25 pb-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Style contract</p>
+                <h1 class="text-3xl font-semibold tracking-normal">Liquid Glass docs chrome</h1>
+            </div>
+            <div class="flex gap-2">
+                <button type="button" class="rounded-full border border-white/45 bg-white/55 px-4 py-2 shadow-[0_12px_32px_rgba(14,116,144,0.14),inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 hover:bg-white/70 active:translate-y-0 active:scale-[0.98]">Browse</button>
+                <button type="button" class="rounded-full border border-sky-200/70 bg-sky-200/50 px-4 py-2 font-semibold shadow-[0_12px_32px_rgba(14,116,144,0.18),inset_0_1px_0_rgba(255,255,255,0.78)] transition hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]">Demos</button>
+            </div>
+        </header>
+        <section class="grid gap-4 md:grid-cols-[260px_1fr]">
+            <nav class="rounded-[28px] border border-white/55 bg-white/75 p-4 shadow-[0_16px_44px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.82)]">
+                <a class="mb-2 flex rounded-[22px] border border-sky-200/70 bg-sky-100/60 px-3 py-2 font-medium text-slate-950" href="/components/accordion">Accordion</a>
+                <a class="mb-2 flex rounded-[22px] px-3 py-2 font-medium text-slate-800 transition hover:bg-white/45" href="/components/button">Button</a>
+                <a class="flex rounded-[22px] px-3 py-2 font-medium text-slate-800 transition hover:bg-white/45" href="/components/checkbox">Checkbox</a>
+            </nav>
+            <article class="rounded-[28px] border border-white/55 bg-white/75 p-5 shadow-[0_16px_44px_rgba(15,23,42,0.1),inset_0_1px_0_rgba(255,255,255,0.82)]">
+                <p class="mb-3 leading-7">Floating navigation and controls use the glass layer. Documentation content stays quieter and more opaque for legibility.</p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-[24px] border border-white/45 bg-white/55 p-4 shadow-[0_14px_38px_rgba(14,116,144,0.14),inset_0_1px_0_rgba(255,255,255,0.72)]">Lensing</div>
+                    <div class="rounded-[24px] border border-white/45 bg-white/55 p-4 shadow-[0_14px_38px_rgba(14,116,144,0.14),inset_0_1px_0_rgba(255,255,255,0.72)]">Lift</div>
+                    <div class="rounded-[24px] border border-white/45 bg-white/55 p-4 shadow-[0_14px_38px_rgba(14,116,144,0.14),inset_0_1px_0_rgba(255,255,255,0.72)]">Glow</div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <section class="relative mx-auto mt-5 max-w-5xl overflow-hidden rounded-[36px] border border-white/45 shadow-[0_28px_90px_rgba(15,23,42,0.25)]" aria-label="Liquid prism comparison">
+        <div class="prism-backdrop absolute inset-0" aria-hidden="true"></div>
+        <div class="relative grid gap-6 p-6 md:grid-cols-2 md:p-10">
+            <div class="rounded-3xl [backdrop-filter:url(#liquid-prism-intense)]">
+                <div class="rounded-3xl border border-white/45 bg-white/25 p-6">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white [text-shadow:0_1px_8px_rgba(2,6,23,0.6)]">Variant A</p>
+                    <h2 class="mt-1 text-2xl font-semibold text-white [text-shadow:0_1px_8px_rgba(2,6,23,0.6)]">Refractory Glass</h2>
+                    <p class="mt-2 text-sm leading-6 text-white/90 [text-shadow:0_1px_6px_rgba(2,6,23,0.6)]">
+                        A single displacement pass at scale 200 bends the backdrop through the panel.
+                        The content layer stays sharp; only what's behind the glass refracts.
+                    </p>
+                    <button type="button"
+                            class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full border border-white/45 bg-white/25 px-5 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-transform duration-300 ease-out [backdrop-filter:url(#liquid-prism-intense)] hover:scale-[1.02] [text-shadow:0_1px_6px_rgba(2,6,23,0.6)]">
+                        Refract me
+                    </button>
+                </div>
+            </div>
+            <div class="rounded-3xl">
+                <div class="rounded-3xl border border-white/45 bg-white/25 p-6 [backdrop-filter:blur(8px)_saturate(160%)]">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white [text-shadow:0_1px_8px_rgba(2,6,23,0.6)]">Variant B</p>
+                    <h2 class="mt-1 text-2xl font-semibold text-white [text-shadow:0_1px_8px_rgba(2,6,23,0.6)]">Fluid Skew Blur</h2>
+                    <p class="mt-2 text-sm leading-6 text-white/90 [text-shadow:0_1px_6px_rgba(2,6,23,0.6)]">
+                        A two-stage displacement chain (scale 30 then 20) smears the element itself.
+                        Hover the button to run the chain against its own rendering.
+                    </p>
+                    <button type="button"
+                            class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full border border-white/45 bg-white/25 px-5 py-2 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] transition-transform duration-300 ease-out hover:scale-[1.02] hover:[filter:url(#liquid-prism-intense-2)] [text-shadow:0_1px_6px_rgba(2,6,23,0.6)]">
+                        Skew me
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <svg aria-hidden="true" focusable="false" style="position: absolute; width: 0; height: 0">
+        <filter id="liquid-prism-intense" x="-35%" y="-35%" width="170%" height="170%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.004 0.009" numOctaves="1" seed="3" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="200" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="liquid-prism-intense-2" x="-25%" y="-25%" width="150%" height="150%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.015 0.045" numOctaves="2" seed="11" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="G" result="pass1" />
+            <feDisplacementMap in="pass1" in2="noise" scale="20" xChannelSelector="B" yChannelSelector="R" />
+        </filter>
+    </svg>
+</body>
+</html>

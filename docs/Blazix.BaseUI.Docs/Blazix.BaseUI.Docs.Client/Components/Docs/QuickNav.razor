@@ -1,0 +1,121 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<nav aria-label="On this page" class="text-sm">
+    @if (Toc is not null && Toc.Entries.Count > 0)
+    {
+        <div class="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 dark:text-slate-300">On this page</div>
+        <ul class="m-0 grid list-none gap-0.5 p-0">
+            @foreach (var entry in Toc.Entries)
+            {
+                <li>
+                    <a href="@($"{PathWithoutFragment()}#{entry.Id}")"
+                       class="@TocLinkClass(entry)"
+                       style="@(entry.Level == 3 ? "padding-left: 1.75rem;" : null)">
+                        @entry.Title
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</nav>
+
+@code {
+    private const string JsModulePath = "/quick-nav-interop.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private DotNetObjectReference<QuickNav>? selfReference;
+    private string? activeId;
+    private int version;
+    private int observedVersion = -1;
+
+    [CascadingParameter]
+    public TocContext? Toc { get; set; }
+
+    public QuickNav()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override void OnInitialized()
+    {
+        if (Toc is not null)
+        {
+            Toc.Changed += HandleTocChanged;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Toc is null || Toc.Entries.Count == 0 || observedVersion == version)
+        {
+            return;
+        }
+
+        try
+        {
+            selfReference ??= DotNetObjectReference.Create(this);
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("observeHeadings", selfReference, Toc.Entries.Select(e => e.Id).ToArray());
+            observedVersion = version;
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
+        {
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Toc is not null)
+        {
+            Toc.Changed -= HandleTocChanged;
+        }
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disconnectHeadings");
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
+            {
+            }
+        }
+
+        selfReference?.Dispose();
+    }
+
+    [JSInvokable]
+    public void SetActiveHeading(string id)
+    {
+        if (activeId == id)
+        {
+            return;
+        }
+
+        activeId = id;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTocChanged()
+    {
+        version++;
+        activeId = null;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private string PathWithoutFragment() => new Uri(NavigationManager.Uri).AbsolutePath;
+
+    private string TocLinkClass(TocEntry entry)
+    {
+        var state = activeId == entry.Id
+            ? "border-sky-200/70 bg-sky-100/65 text-slate-950 dark:border-sky-300/30 dark:bg-sky-400/20 dark:text-sky-50"
+            : "border-transparent text-slate-700 hover:bg-white/50 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white";
+        return $"liquid-control block rounded-[18px] border px-3 py-1.5 no-underline {state}";
+    }
+}

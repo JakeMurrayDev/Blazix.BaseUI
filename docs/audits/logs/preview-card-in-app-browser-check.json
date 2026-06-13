@@ -1,0 +1,31 @@
+{
+  "target": "http://127.0.0.1:5261/tests/preview-card/server?delay=100&closeDelay=100&showArrow=true&showBackdrop=true",
+  "server": "ASPNETCORE_ENVIRONMENT=Development dotnet run --project tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --no-build --no-launch-profile --urls http://127.0.0.1:5261",
+  "browser": "Codex in-app browser",
+  "result": "passed",
+  "checks": {
+    "actionOpen": {
+      "open": "true",
+      "reason": "ImperativeAction",
+      "popupOpen": "",
+      "popupFocusable": "",
+      "popupTabIndex": "-1",
+      "popupInstant": null,
+      "positionerSide": "bottom",
+      "positionerInstant": null,
+      "arrowInstant": null,
+      "backdropStyle": "pointer-events: none; user-select: none; -webkit-user-select: none;"
+    },
+    "actionClose": {
+      "open": "false",
+      "reason": "OutsidePress",
+      "triggerOpenAttr": false,
+      "popupExists": false,
+      "positionerHidden": null
+    }
+  },
+  "notes": [
+    "The in-app browser coordinate and keyboard input surfaces did not deliver hover/focus events reliably in this session.",
+    "Hover, focus, escape, outside-press, timing, and safe-polygon behavior are covered by the Playwright CLI log preview-card-playwright-2.log."
+  ]
+}

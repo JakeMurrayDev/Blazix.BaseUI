@@ -1,0 +1,15 @@
+@page "/components/{Slug}"
+
+<DocStub Area="Components" Link="@link" />
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; }
+
+    private DocsNavLink? link;
+
+    protected override void OnParametersSet()
+    {
+        link = DocsNav.Find("components", Slug);
+    }
+}

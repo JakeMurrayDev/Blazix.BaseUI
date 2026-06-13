@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-06-07T10:31:07.384Z",
+  "cssRootCount": 1,
+  "cssButton100Count": 1,
+  "snapshotExcerpt": [
+    "- progressbar \"Downloading\":",
+    "  - text: Downloading30%",
+    "- button \"Set 100%\""
+  ],
+  "before": {
+    "helper": {
+      "exists": true,
+      "role": "presentation",
+      "style": "clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0",
+      "text": "x"
+    },
+    "indicator": {
+      "dataProgressing": true,
+      "style": "inset-inline-start:0;height:inherit;width:30%"
+    },
+    "label": {
+      "id": "9f57eafc",
+      "role": "presentation",
+      "text": "Downloading"
+    },
+    "root": {
+      "ariaLabelledBy": "9f57eafc",
+      "ariaValueMax": "100",
+      "ariaValueMin": "0",
+      "ariaValueNow": "30",
+      "ariaValueText": "30%",
+      "dataComplete": false,
+      "dataIndeterminate": false,
+      "dataProgressing": true,
+      "role": "progressbar"
+    },
+    "url": "http://127.0.0.1:5128/tests/progress/server?value=30&showLabel=true&showValue=true&labelText=Downloading",
+    "value": {
+      "ariaHidden": "true",
+      "text": "30%"
+    }
+  },
+  "after": {
+    "indicator": {
+      "dataComplete": true,
+      "style": "inset-inline-start:0;height:inherit;width:100%"
+    },
+    "root": {
+      "ariaValueNow": "100",
+      "dataComplete": true,
+      "dataIndeterminate": false,
+      "dataProgressing": false
+    },
+    "value": {
+      "dataComplete": true,
+      "text": "100%"
+    }
+  }
+}

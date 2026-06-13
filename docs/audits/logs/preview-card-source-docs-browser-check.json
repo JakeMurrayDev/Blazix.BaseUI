@@ -1,0 +1,14 @@
+{
+  "target": "http://127.0.0.1:3005/react/components/preview-card",
+  "server": "pnpm --filter docs dev",
+  "browser": "Codex in-app browser",
+  "result": "passed",
+  "checks": {
+    "title": "Preview Card · Base UI",
+    "firstHeading": "Preview Card",
+    "hasAnatomy": true,
+    "hasDetachedTriggers": true,
+    "hasMultipleTriggers": true,
+    "hasViewportCurrentPrevious": true
+  }
+}

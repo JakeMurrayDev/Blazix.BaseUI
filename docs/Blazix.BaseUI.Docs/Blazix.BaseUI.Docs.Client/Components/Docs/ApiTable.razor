@@ -1,0 +1,50 @@
+<div class="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-[24px] border border-white/55 bg-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.78),0_14px_36px_rgba(15,23,42,0.08)] dark:border-white/10 dark:bg-slate-950/60">
+    <table class="@($"w-full border-collapse text-left text-sm {(ShowType ? "min-w-[720px] table-fixed" : "min-w-[420px]")}")">
+        <thead class="bg-white/50 text-[11px] uppercase tracking-[0.14em] text-slate-600 dark:bg-white/10 dark:text-slate-300">
+            <tr>
+                <th class="@($"{(ShowType ? "w-[22%]" : "w-[30%]")} border-b border-white/45 px-4 py-3 font-semibold dark:border-white/10")">Name</th>
+                @if (ShowType)
+                {
+                    <th class="w-[28%] border-b border-white/45 px-4 py-3 font-semibold dark:border-white/10">Type</th>
+                }
+                @if (ShowDefault)
+                {
+                    <th class="w-[12%] border-b border-white/45 px-4 py-3 font-semibold dark:border-white/10">Default</th>
+                }
+                <th class="border-b border-white/45 px-4 py-3 font-semibold dark:border-white/10">Description</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-white/45 dark:divide-white/10">
+            @foreach (var row in Rows)
+            {
+                <tr class="align-top">
+                    <td class="break-words px-4 py-3 font-mono text-[12px] font-semibold text-slate-950 dark:text-slate-50">@row.Name</td>
+                    @if (ShowType)
+                    {
+                        <td class="px-4 py-3 [overflow-wrap:anywhere]">
+                            <code class="@LiquidGlassClasses.CodeInline">@row.Type</code>
+                        </td>
+                    }
+                    @if (ShowDefault)
+                    {
+                        <td class="px-4 py-3 [overflow-wrap:anywhere]">
+                            <code class="@LiquidGlassClasses.CodeInline">@row.DefaultValue</code>
+                        </td>
+                    }
+                    <td class="whitespace-normal px-4 py-3 leading-6 text-slate-700 [overflow-wrap:anywhere] dark:text-slate-200">@row.Description</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<ApiRow> Rows { get; set; } = [];
+
+    [Parameter]
+    public bool ShowType { get; set; } = true;
+
+    [Parameter]
+    public bool ShowDefault { get; set; } = true;
+}

@@ -1,0 +1,125 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+@inject Microsoft.Extensions.Logging.ILogger<ThemeToggle> Logger
+
+<label class="@ContainerClass">
+    @if (!Compact)
+    {
+        <span class="text-sm font-medium text-slate-800 dark:text-slate-200">@ThemeLabel</span>
+    }
+    <SwitchRoot Checked="@isDarkTheme"
+                NativeButton="true"
+                OnCheckedChange="HandleCheckedChangeAsync"
+                ClassValue="@(state => SwitchClass(state.Checked))"
+                aria-label="Toggle dark mode">
+        <SwitchThumb ClassValue="@(state => SwitchThumbClass(state.Checked))" />
+    </SwitchRoot>
+</label>
+
+@code {
+    private const string JsModulePath = "/docs-theme.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private bool isDarkTheme;
+    private bool transitionsEnabled;
+
+    private string ContainerClass => Compact ? "inline-flex items-center" : "flex items-center justify-between gap-3";
+
+    private string ThemeLabel => isDarkTheme ? "Dark mode" : "Light mode";
+
+    [Parameter]
+    public bool Compact { get; set; }
+
+    public ThemeToggle()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            // Enable the thumb transition only after the synced position has
+            // actually painted — under WASM, consecutive renders can land in
+            // the same frame, which would animate the initial sync.
+            if (!transitionsEnabled)
+            {
+                try
+                {
+                    var module = await moduleTask.Value;
+                    await module.InvokeVoidAsync("afterPaint");
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    Logger.LogDebug(ex, "ThemeToggle after-paint interop call was interrupted.");
+                }
+
+                transitionsEnabled = true;
+                StateHasChanged();
+            }
+
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var theme = await module.InvokeAsync<string>("getDocsTheme");
+            var nextIsDarkTheme = string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase);
+
+            if (isDarkTheme != nextIsDarkTheme)
+            {
+                isDarkTheme = nextIsDarkTheme;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "ThemeToggle initial theme sync interop call was interrupted.");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (!moduleTask.IsValueCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "ThemeToggle module dispose interop call was interrupted.");
+        }
+    }
+
+    private async Task HandleCheckedChangeAsync(SwitchCheckedChangeEventArgs args)
+    {
+        isDarkTheme = args.Checked;
+
+        var module = await moduleTask.Value;
+        await module.InvokeVoidAsync("setDocsTheme", args.Checked ? "dark" : "light");
+    }
+
+    private static string SwitchClass(bool isChecked)
+    {
+        var stateClass = isChecked
+            ? "border-sky-300/70 bg-sky-400/40 shadow-[0_12px_32px_rgba(14,165,233,0.22),inset_0_1px_0_rgba(255,255,255,0.72)]"
+            : "border-white/55 bg-white/50 shadow-[0_12px_32px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.72)]";
+        return $"liquid-control inline-flex h-8 w-14 items-center rounded-full border p-1 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400 dark:border-white/15 dark:bg-white/10 {stateClass}";
+    }
+
+    private string SwitchThumbClass(bool isChecked)
+    {
+        var stateClass = isChecked ? "translate-x-6 bg-white" : "translate-x-0 bg-white";
+        var transitionClass = transitionsEnabled ? "transition-transform duration-300 ease-out" : null;
+        return $"block size-6 rounded-full shadow-[0_6px_16px_rgba(15,23,42,0.22)] {transitionClass} {stateClass}";
+    }
+}

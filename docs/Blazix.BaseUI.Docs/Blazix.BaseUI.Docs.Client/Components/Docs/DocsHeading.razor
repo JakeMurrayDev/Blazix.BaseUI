@@ -1,0 +1,59 @@
+@implements IDisposable
+
+@if (Level == 3)
+{
+    <h3 id="@ResolvedId" class="mb-3 mt-8 scroll-mt-24 text-lg font-semibold tracking-normal text-slate-950 dark:text-white">@Title</h3>
+}
+else
+{
+    <h2 id="@ResolvedId" class="mb-4 mt-10 scroll-mt-24 border-b border-white/45 pb-2 text-xl font-semibold tracking-normal text-slate-950 dark:border-white/10 dark:text-white">@Title</h2>
+}
+
+@code {
+    private TocEntry? entry;
+
+    private string ResolvedId => Id ?? Slugify(Title);
+
+    [CascadingParameter]
+    public TocContext? Toc { get; set; }
+
+    /// <summary>
+    /// Gets or sets the heading text.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets an explicit anchor id. Defaults to a slug of <see cref="Title"/>.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the heading level (2 or 3). Defaults to 2.
+    /// </summary>
+    [Parameter]
+    public int Level { get; set; } = 2;
+
+    protected override void OnInitialized()
+    {
+        if (Toc is null)
+        {
+            return;
+        }
+
+        entry = new TocEntry(ResolvedId, Title, Level);
+        Toc.Register(entry);
+    }
+
+    public void Dispose()
+    {
+        if (entry is not null)
+        {
+            Toc?.Unregister(entry);
+        }
+    }
+
+    private static string Slugify(string value) =>
+        string.Concat(value.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-')).Trim('-');
+}

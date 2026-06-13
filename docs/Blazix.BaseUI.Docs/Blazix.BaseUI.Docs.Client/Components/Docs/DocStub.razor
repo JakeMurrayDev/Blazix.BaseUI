@@ -1,0 +1,26 @@
+<PageTitle>@(Link is null ? "Not found · Blazix.BaseUI" : $"{Link.Name} · Blazix.BaseUI")</PageTitle>
+
+@if (Link is null)
+{
+    <DocsPageIntro Eyebrow="404" Title="Not found" Subtitle="No documentation exists at this address." />
+    <p class="mt-6 text-sm leading-6 text-slate-700 dark:text-slate-200">
+        Pick a page from the sidebar, or head back to the <a href="/">Quick start</a>.
+    </p>
+}
+else
+{
+    <DocsPageIntro Eyebrow="@Area" Title="@Link.Name" Subtitle="@Link.Summary" />
+    <div class="mt-8">
+        <DocsCallout Title="In progress">
+            <p class="m-0">This page hasn't been written yet — documentation is on the way. The component itself ships in the current Blazix.BaseUI package.</p>
+        </DocsCallout>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public DocsNavLink? Link { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Area { get; set; } = string.Empty;
+}
