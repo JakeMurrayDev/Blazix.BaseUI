@@ -37,8 +37,8 @@
                         </SelectIcon>
                     </SelectTrigger>
                     <SelectPortal>
-                        <SelectPositioner SideOffset="4">
-                            <SelectPopup ClassValue="@(_ => "liquid-glass z-50 overflow-clip rounded-[20px] border border-white/50 bg-white/80 p-1 text-sm shadow-[0_18px_46px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-slate-950/80")">
+                        <SelectPositioner SideOffset="4" AlignItemWithTrigger="false">
+                            <SelectPopup ClassValue="@(_ => LiquidGlassClasses.FloatingPopup)">
                                 @foreach (var variant in Variants)
                                 {
                                     <SelectItem TValue="string"
@@ -59,16 +59,16 @@
 
     <CollapsibleRoot Open="@isExpanded" OpenChanged="@(open => isExpanded = open)">
         <div class="relative">
-            <div class="@(ShouldCollapse ? "max-h-[16.5rem] overflow-hidden" : null)">
-                <CodeBlock Code="@ActiveFile.Code" Language="@ActiveFile.Language" ShowCopy="false" />
+            <div class="@CodeViewportClass">
+                <CodeBlock Code="@ActiveFile.Code" Language="@ActiveFile.Language" ShowCopy="false" Scrollable="@(!ShouldCollapse)" />
             </div>
-            @if (ShouldCollapse)
+            @if (IsCollapsible)
             {
-                <div class="pointer-events-none absolute inset-x-0 bottom-0 h-28 rounded-b-[24px] bg-gradient-to-t from-slate-950 to-transparent dark:from-[#07111f]"></div>
+                <div class="@CodeFadeClass"></div>
             }
             @if (IsCollapsible)
             {
-                <div class="@(ShouldCollapse ? "absolute inset-x-0 bottom-3 flex justify-center" : "flex justify-center pb-3")">
+                <div class="absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">
                     <CollapsibleTrigger ClassValue="@(_ => ShowCodeTriggerClass)">
                         @(isExpanded ? "Hide code" : "Show code")
                     </CollapsibleTrigger>
@@ -113,6 +113,29 @@
     private bool IsCollapsible => ActiveFile.Code.Count(c => c == '\n') > 12;
 
     private bool ShouldCollapse => IsCollapsible && !isExpanded;
+
+    private string? CodeViewportClass
+    {
+        get
+        {
+            if (!IsCollapsible)
+            {
+                return null;
+            }
+
+            var state = ShouldCollapse ? "max-h-[16.5rem]" : "max-h-[36rem] pb-16";
+            return $"{state} overflow-hidden transition-[max-height,padding-bottom] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
+        }
+    }
+
+    private string CodeFadeClass
+    {
+        get
+        {
+            var state = ShouldCollapse ? "opacity-100" : "opacity-0";
+            return $"pointer-events-none absolute inset-x-0 bottom-0 h-28 rounded-b-[24px] bg-gradient-to-t from-slate-950 to-transparent transition-opacity duration-300 ease-out dark:from-[#07111f] {state}";
+        }
+    }
 
     private void HandleFileChanged(string? value) => activeFileName = value;
 

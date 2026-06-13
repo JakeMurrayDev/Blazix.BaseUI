@@ -1,25 +1,27 @@
-<DocsHeading Level="3" Title="@Part.Name" Id="@($"api-{Part.Name.ToLowerInvariant().Replace(' ', '-')}")" />
-<p class="mb-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">@Part.Description</p>
-<div class="grid gap-4">
-    @if (Part.Parameters.Count > 0)
-    {
-        <ApiTable Rows="@Part.Parameters" />
-    }
-    @if (Part.DataAttributes.Count > 0)
-    {
-        <div>
-            <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 dark:text-slate-300">Data attributes</div>
-            <ApiTable Rows="@Part.DataAttributes" ShowType="false" ShowDefault="false" />
-        </div>
-    }
-    @if (Part.CssVariables.Count > 0)
-    {
-        <div>
-            <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 dark:text-slate-300">CSS variables</div>
-            <ApiTable Rows="@Part.CssVariables" ShowType="false" ShowDefault="false" />
-        </div>
-    }
-</div>
+<section class="min-w-0">
+    <DocsHeading Level="3" Title="@Part.Name" Id="@($"api-{Part.Name.ToLowerInvariant().Replace(' ', '-')}")" />
+    <p class="mb-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">@Part.Description</p>
+    <div class="grid min-w-0 gap-4">
+        @if (Part.Parameters.Count > 0)
+        {
+            <ApiTable Rows="@Part.Parameters" />
+        }
+        @if (Part.DataAttributes.Count > 0)
+        {
+            <div class="min-w-0">
+                <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 dark:text-slate-300">Data attributes</div>
+                <ApiTable Rows="@Part.DataAttributes" ShowType="false" ShowDefault="false" />
+            </div>
+        }
+        @if (Part.CssVariables.Count > 0)
+        {
+            <div class="min-w-0">
+                <div class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 dark:text-slate-300">CSS variables</div>
+                <ApiTable Rows="@Part.CssVariables" ShowType="false" ShowDefault="false" />
+            </div>
+        }
+    </div>
+</section>
 
 @code {
     [Parameter, EditorRequired]

@@ -2,7 +2,7 @@
 @inject IJSRuntime JSRuntime
 
 <div class="relative" @key="@Code">
-    <pre class="@LiquidGlassClasses.CodeBlock"><code class="@($"language-{Language}")" @ref="codeElement">@Code</code></pre>
+    <pre class="@PreClass"><code class="@($"language-{Language}")" @ref="codeElement">@Code</code></pre>
     @if (ShowCopy)
     {
         <div class="absolute right-2.5 top-2.5">
@@ -19,6 +19,9 @@
     private ElementReference codeElement;
     private string? highlightedCode;
 
+    private string PreClass =>
+        Scrollable ? LiquidGlassClasses.CodeBlock : $"{LiquidGlassClasses.CodeBlock} !overflow-hidden";
+
     [Parameter]
     public string Code { get; set; } = string.Empty;
 
@@ -27,6 +30,9 @@
 
     [Parameter]
     public bool ShowCopy { get; set; } = true;
+
+    [Parameter]
+    public bool Scrollable { get; set; } = true;
 
     public CodeBlock()
     {
