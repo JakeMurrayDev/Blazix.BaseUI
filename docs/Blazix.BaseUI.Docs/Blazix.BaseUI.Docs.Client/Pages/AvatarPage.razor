@@ -1,0 +1,51 @@
+@page "/components/avatar"
+
+<PageTitle>Avatar · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Avatar"
+               Subtitle="An image with a textual fallback."
+               MarkdownHref="/components/avatar.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <AvatarHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts. The fallback shows whenever the image is missing or fails to load.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in AvatarApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Avatar
+
+        <AvatarRoot>
+            <AvatarImage src="" alt="" />
+            <AvatarFallback>LT</AvatarFallback>
+        </AvatarRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Avatar.razor", "xml", "Components.Demos.Avatar.Hero.Css.AvatarHeroCss.razor"),
+            new DemoFile("avatar.css", "css", "wwwroot.demos.avatar.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Avatar.razor", "xml", "Components.Demos.Avatar.Hero.Tailwind.AvatarHeroTailwind.razor"),
+        ]),
+    ];
+}

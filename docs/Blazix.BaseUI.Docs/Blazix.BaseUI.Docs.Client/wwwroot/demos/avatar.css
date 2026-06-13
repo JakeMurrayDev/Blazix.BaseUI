@@ -1,0 +1,46 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-avatar-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.blx-avatar {
+  box-sizing: border-box;
+  display: inline-flex;
+  width: 3rem;
+  height: 3rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: #e2e8f0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
+.dark .blx-avatar {
+  background-color: #334155;
+  color: #ffffff;
+}
+
+.blx-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blx-avatar-fallback {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-weight: 500;
+}
