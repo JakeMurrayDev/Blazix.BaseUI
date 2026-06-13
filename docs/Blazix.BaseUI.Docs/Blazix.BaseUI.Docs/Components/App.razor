@@ -17,6 +17,44 @@
             document.documentElement.dataset.theme = theme;
         })();
     </script>
+    <script>
+        (() => {
+            const interactiveSelector = 'button, input, select, textarea, form, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="combobox"], [role="menuitem"]';
+            const gatedEvents = ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'keydown', 'keyup', 'submit'];
+            const getTarget = event => event.target instanceof Element
+                ? event.target
+                : event.target?.parentElement;
+            const shouldGate = event => {
+                if (!document.body?.classList.contains('blazix-docs-preinteractive')) {
+                    return false;
+                }
+
+                const target = getTarget(event);
+                if (!target || target.closest('a[href]')) {
+                    return false;
+                }
+
+                return Boolean(target.closest(interactiveSelector));
+            };
+            const gateEvent = event => {
+                if (!shouldGate(event)) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            };
+
+            gatedEvents.forEach(eventName => document.addEventListener(eventName, gateEvent, true));
+            window.blazixDocs = {
+                ...(window.blazixDocs || {}),
+                markInteractive() {
+                    document.body?.classList.remove('blazix-docs-preinteractive');
+                    document.documentElement.dataset.blazixInteractive = 'true';
+                }
+            };
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -176,6 +214,24 @@
             .liquid-control:active {
                 transform: translateY(1px) scale(0.985);
                 animation: liquid-press 260ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .blazix-docs-preinteractive {
+                cursor: progress;
+            }
+
+            .blazix-docs-preinteractive button,
+            .blazix-docs-preinteractive input,
+            .blazix-docs-preinteractive select,
+            .blazix-docs-preinteractive textarea,
+            .blazix-docs-preinteractive [role="button"],
+            .blazix-docs-preinteractive [role="tab"],
+            .blazix-docs-preinteractive [role="switch"],
+            .blazix-docs-preinteractive [role="checkbox"],
+            .blazix-docs-preinteractive [role="radio"],
+            .blazix-docs-preinteractive [role="combobox"],
+            .blazix-docs-preinteractive [role="menuitem"] {
+                pointer-events: none;
             }
 
             @@keyframes liquid-ambient {
@@ -347,7 +403,7 @@
     <HeadOutlet @rendermode="ActiveRenderMode" />
 </head>
 
-<body class="liquid-grain m-0 min-h-screen overflow-x-hidden text-[15px] leading-normal text-slate-950 antialiased dark:text-slate-100">
+<body class="blazix-docs-preinteractive liquid-grain m-0 min-h-screen overflow-x-hidden text-[15px] leading-normal text-slate-950 antialiased dark:text-slate-100">
     <svg aria-hidden="true" focusable="false" style="position: absolute; width: 0; height: 0">
         <filter id="liquid-prism-intense" x="-35%" y="-35%" width="170%" height="170%">
             <feTurbulence type="fractalNoise" baseFrequency="0.004 0.009" numOctaves="1" seed="3" result="noise" />
