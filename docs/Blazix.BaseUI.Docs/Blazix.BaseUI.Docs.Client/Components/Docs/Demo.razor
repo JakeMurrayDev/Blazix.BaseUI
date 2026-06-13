@@ -69,7 +69,7 @@
             @if (IsCollapsible)
             {
                 <div class="@(ShouldCollapse ? "absolute inset-x-0 bottom-3 flex justify-center" : "flex justify-center pb-3")">
-                    <CollapsibleTrigger ClassValue="@(_ => $"{LiquidGlassClasses.Button} liquid-distort")">
+                    <CollapsibleTrigger ClassValue="@(_ => ShowCodeTriggerClass)">
                         @(isExpanded ? "Hide code" : "Show code")
                     </CollapsibleTrigger>
                 </div>
@@ -79,6 +79,13 @@
 </div>
 
 @code {
+    // Liquid prism treatment: Variant A (#liquid-prism-intense) refracts the code
+    // behind the pill at rest via backdrop-filter (Chromium; others fall back to the
+    // translucent pill), Variant B (#liquid-prism-intense-2) skew-blurs on hover.
+    // Border radius is applied inline per the liquid-prism shape contract.
+    private const string ShowCodeTriggerClass =
+        "liquid-prism liquid-wobble inline-flex min-h-10 items-center justify-center rounded-full border border-white/45 bg-white/55 px-4 py-2 text-sm font-medium text-slate-900 shadow-[0_14px_38px_rgba(14,116,144,0.14),inset_0_1px_0_rgba(255,255,255,0.72)] transition-transform duration-300 ease-out hover:scale-[1.02] hover:bg-white/70 [backdrop-filter:url(#liquid-prism-intense)] hover:[filter:url(#liquid-prism-intense-2)] focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-400 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15";
+
     private string? activeVariantName;
     private string? activeFileName;
     private bool isExpanded;
