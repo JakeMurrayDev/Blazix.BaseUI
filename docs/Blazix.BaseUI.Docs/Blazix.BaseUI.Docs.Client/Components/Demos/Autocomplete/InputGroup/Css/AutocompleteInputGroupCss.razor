@@ -1,0 +1,35 @@
+<AutocompleteRoot TValue="string" Items="@Tags" OpenOnInputClick="true">
+    <AutocompleteInputGroup class="blx-autocomplete-input-group">
+        <AutocompleteInput class="blx-autocomplete-group-input" placeholder="e.g. feature" />
+        <AutocompleteClear class="blx-autocomplete-adornment" aria-label="Clear">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+        </AutocompleteClear>
+        <AutocompleteTrigger class="blx-autocomplete-adornment" aria-label="Open">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+        </AutocompleteTrigger>
+    </AutocompleteInputGroup>
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="6">
+            <AutocompletePopup class="blx-autocomplete-popup">
+                <AutocompleteEmpty class="blx-autocomplete-empty">No tags found.</AutocompleteEmpty>
+                <AutocompleteList class="blx-autocomplete-list">
+                    <AutocompleteCollection TValue="string" Context="entry">
+                        <AutocompleteItem TValue="string" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private static readonly IReadOnlyList<string> Tags =
+    [
+        "feature", "fix", "bug", "docs", "internal", "mobile",
+        "component: accordion", "component: alert dialog", "component: autocomplete",
+        "component: avatar", "component: button", "component: checkbox",
+        "component: dialog", "component: select", "component: tooltip",
+    ];
+}

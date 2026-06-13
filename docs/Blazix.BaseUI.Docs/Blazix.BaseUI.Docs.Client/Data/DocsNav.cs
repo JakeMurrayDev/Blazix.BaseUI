@@ -26,9 +26,9 @@ public static class DocsNav
         new("Components", "components",
         [
             new("Accordion", "accordion", "/components/accordion", "A set of collapsible panels with headings.", IsDocumented: true),
-            new("Alert Dialog", "alert-dialog", "/components/alert-dialog", "A dialog that requires a response from the user."),
-            new("Autocomplete", "autocomplete", "/components/autocomplete", "An input that suggests options as you type."),
-            new("Avatar", "avatar", "/components/avatar", "An image with a textual fallback."),
+            new("Alert Dialog", "alert-dialog", "/components/alert-dialog", "A dialog that requires a response from the user.", IsDocumented: true),
+            new("Autocomplete", "autocomplete", "/components/autocomplete", "An input that suggests options as you type.", IsDocumented: true),
+            new("Avatar", "avatar", "/components/avatar", "An image with a textual fallback.", IsDocumented: true),
             new("Button", "button", "/components/button", "An accessible button with full styling freedom."),
             new("Checkbox", "checkbox", "/components/checkbox", "A control for toggling between checked states."),
             new("Checkbox Group", "checkbox-group", "/components/checkbox-group", "Manages shared state for a series of checkboxes."),

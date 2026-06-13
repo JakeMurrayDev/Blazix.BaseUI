@@ -1,3 +1,5 @@
+@inject NavigationManager NavigationManager
+
 @if (!string.IsNullOrWhiteSpace(Eyebrow))
 {
     <p class="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">@Eyebrow</p>
@@ -6,7 +8,7 @@
     <h1 tabindex="-1" class="m-0 text-3xl font-semibold tracking-normal text-slate-950 focus:outline-none dark:text-white">@Title</h1>
     @if (!string.IsNullOrEmpty(MarkdownHref))
     {
-        <a class="@LiquidGlassClasses.Button" href="@MarkdownHref">Open .md</a>
+        <a class="@LiquidGlassClasses.Button" href="@MarkdownHref" @onclick="OpenMarkdown" @onclick:preventDefault="true">Open .md</a>
     }
 </div>
 @if (!string.IsNullOrEmpty(Subtitle))
@@ -26,4 +28,13 @@
 
     [Parameter]
     public string? MarkdownHref { get; set; }
+
+    private void OpenMarkdown()
+    {
+        if (!string.IsNullOrEmpty(MarkdownHref))
+        {
+            // Force a browser request so the raw markdown endpoint handles the .md route.
+            NavigationManager.NavigateTo(MarkdownHref, forceLoad: true);
+        }
+    }
 }

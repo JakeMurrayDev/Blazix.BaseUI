@@ -1,6 +1,4 @@
 @inherits LayoutComponentBase
-@implements IDisposable
-@inject NavigationManager NavigationManager
 
 <CascadingValue Value="toc" IsFixed="true">
     <div class="mx-auto min-h-screen max-w-[100rem] px-3 sm:px-5">
@@ -63,7 +61,7 @@
                 </article>
             </main>
             <aside class="hidden xl:block">
-                <div class="sticky top-[5.25rem] max-h-[calc(100vh-6.5rem)] overflow-y-auto">
+                <div class="sticky top-[5.25rem] max-h-[calc(100vh-6.5rem)] overflow-y-auto px-1.5 py-1">
                     <QuickNav />
                 </div>
             </aside>
@@ -83,21 +81,6 @@
     private readonly TocContext toc = new();
 
     private bool isNavOpen;
-
-    protected override void OnInitialized()
-    {
-        NavigationManager.LocationChanged += HandleLocationChanged;
-    }
-
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= HandleLocationChanged;
-    }
-
-    private void HandleLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-    {
-        toc.Clear();
-    }
 
     private void CloseNav()
     {

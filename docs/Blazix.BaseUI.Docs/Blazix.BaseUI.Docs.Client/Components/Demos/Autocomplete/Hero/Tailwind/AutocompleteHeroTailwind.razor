@@ -1,0 +1,30 @@
+<AutocompleteRoot TValue="string" Items="@Tags">
+    <label class="flex w-64 flex-col gap-1.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
+        Search tags
+        <AutocompleteInput class="box-border h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-slate-400 focus:border-sky-400 focus:shadow-[0_0_0_3px_rgba(56,189,248,0.35)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" placeholder="e.g. feature" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner class="z-50 outline-none" SideOffset="6">
+            <AutocompletePopup class="box-border w-[var(--anchor-width)] max-w-[var(--available-width)] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_48px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                <AutocompleteEmpty class="box-border px-2.5 py-4 text-sm text-slate-500 dark:text-slate-400">No tags found.</AutocompleteEmpty>
+                <AutocompleteList class="box-border max-h-[min(18rem,var(--available-height))] overflow-y-auto overscroll-contain p-1 outline-0 data-[empty]:p-0">
+                    <AutocompleteCollection TValue="string" Context="entry">
+                        <AutocompleteItem TValue="string" class="box-border flex cursor-default select-none items-center rounded-md px-2.5 py-2 text-sm outline-0 data-[highlighted]:bg-sky-100 data-[highlighted]:text-slate-950 dark:data-[highlighted]:bg-sky-400/20 dark:data-[highlighted]:text-sky-50" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private static readonly IReadOnlyList<string> Tags =
+    [
+        "feature", "fix", "bug", "docs", "internal", "mobile",
+        "component: accordion", "component: alert dialog", "component: autocomplete",
+        "component: avatar", "component: button", "component: checkbox",
+        "component: dialog", "component: select", "component: tooltip",
+    ];
+}

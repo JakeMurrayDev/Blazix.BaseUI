@@ -1,0 +1,82 @@
+@page "/components/alert-dialog"
+
+<PageTitle>Alert Dialog · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Alert Dialog"
+               Subtitle="A dialog that requires a response from the user."
+               MarkdownHref="/components/alert-dialog.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <AlertDialogHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts. The popup renders through a portal to the <code class="@LiquidGlassClasses.CodeInline">&lt;body&gt;</code>, so it overlays the whole page.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Control the open state" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Bind <code class="@LiquidGlassClasses.CodeInline">Open</code> and <code class="@LiquidGlassClasses.CodeInline">OpenChanged</code> to drive the dialog from your own state. This lets you open it from anywhere — here an external button does it, and the badge tracks the live state.
+</p>
+<div class="mb-2">
+    <Demo Variants="@ControlledVariants">
+        <AlertDialogControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in AlertDialogApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.AlertDialog
+
+        <AlertDialogRoot>
+            <AlertDialogTrigger />
+            <AlertDialogPortal>
+                <AlertDialogBackdrop />
+                <AlertDialogPopup>
+                    <AlertDialogTitle />
+                    <AlertDialogDescription />
+                    <AlertDialogClose />
+                </AlertDialogPopup>
+            </AlertDialogPortal>
+        </AlertDialogRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("AlertDialog.razor", "xml", "Components.Demos.AlertDialog.Hero.Css.AlertDialogHeroCss.razor"),
+            new DemoFile("alert-dialog.css", "css", "wwwroot.demos.alert-dialog.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("AlertDialog.razor", "xml", "Components.Demos.AlertDialog.Hero.Tailwind.AlertDialogHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> ControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("AlertDialog.razor", "xml", "Components.Demos.AlertDialog.Controlled.Css.AlertDialogControlledCss.razor"),
+            new DemoFile("alert-dialog.css", "css", "wwwroot.demos.alert-dialog.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("AlertDialog.razor", "xml", "Components.Demos.AlertDialog.Controlled.Tailwind.AlertDialogControlledTailwind.razor"),
+        ]),
+    ];
+}

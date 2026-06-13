@@ -340,7 +340,10 @@
     </style>
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <link rel="stylesheet" href="@Assets["demos/accordion.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/accordion.min.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/alert-dialog.min.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/avatar.min.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/autocomplete.min.css"]" />
     <HeadOutlet @rendermode="ActiveRenderMode" />
 </head>
 
@@ -356,7 +359,7 @@
             <feDisplacementMap in="pass1" in2="noise" scale="20" xChannelSelector="B" yChannelSelector="R" />
         </filter>
     </svg>
-    <Routes @rendermode="ActiveRenderMode" />
+    <Routes RequestedRenderMode="@RequestedRenderMode" @rendermode="ActiveRenderMode" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
@@ -366,8 +369,13 @@
     [CascadingParameter]
     public HttpContext? HttpContext { get; set; }
 
-    private IComponentRenderMode ActiveRenderMode =>
+    private string RequestedRenderMode =>
         string.Equals(HttpContext?.Request.Cookies["blazix-docs-render-mode"], "wasm", StringComparison.OrdinalIgnoreCase)
+            ? "wasm"
+            : "server";
+
+    private IComponentRenderMode ActiveRenderMode =>
+        RequestedRenderMode == "wasm"
             ? InteractiveWebAssembly
             : InteractiveServer;
 }

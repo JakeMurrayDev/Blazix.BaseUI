@@ -1,0 +1,35 @@
+<AutocompleteRoot TValue="string" Items="@Tags" OpenOnInputClick="true">
+    <AutocompleteInputGroup class="box-border inline-flex h-10 w-64 items-center rounded-lg border border-slate-300 bg-white pr-1 transition-[border-color,box-shadow] duration-150 focus-within:border-sky-400 focus-within:shadow-[0_0_0_3px_rgba(56,189,248,0.35)] dark:border-slate-700 dark:bg-slate-900">
+        <AutocompleteInput class="h-full min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100" placeholder="e.g. feature" />
+        <AutocompleteClear class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Clear">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+        </AutocompleteClear>
+        <AutocompleteTrigger class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent text-slate-500 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 dark:text-slate-400 dark:hover:bg-slate-800" aria-label="Open">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+        </AutocompleteTrigger>
+    </AutocompleteInputGroup>
+    <AutocompletePortal>
+        <AutocompletePositioner class="z-50 outline-none" SideOffset="6">
+            <AutocompletePopup class="box-border w-[var(--anchor-width)] max-w-[var(--available-width)] overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-[0_18px_48px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                <AutocompleteEmpty class="box-border px-2.5 py-4 text-sm text-slate-500 dark:text-slate-400">No tags found.</AutocompleteEmpty>
+                <AutocompleteList class="box-border max-h-[min(18rem,var(--available-height))] overflow-y-auto overscroll-contain p-1 outline-0 data-[empty]:p-0">
+                    <AutocompleteCollection TValue="string" Context="entry">
+                        <AutocompleteItem TValue="string" class="box-border flex cursor-default select-none items-center rounded-md px-2.5 py-2 text-sm outline-0 data-[highlighted]:bg-sky-100 data-[highlighted]:text-slate-950 dark:data-[highlighted]:bg-sky-400/20 dark:data-[highlighted]:text-sky-50" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private static readonly IReadOnlyList<string> Tags =
+    [
+        "feature", "fix", "bug", "docs", "internal", "mobile",
+        "component: accordion", "component: alert dialog", "component: autocomplete",
+        "component: avatar", "component: button", "component: checkbox",
+        "component: dialog", "component: select", "component: tooltip",
+    ];
+}

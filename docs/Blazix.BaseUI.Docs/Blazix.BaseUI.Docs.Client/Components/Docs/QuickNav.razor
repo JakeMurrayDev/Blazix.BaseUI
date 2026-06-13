@@ -12,6 +12,7 @@
                 <li>
                     <a href="@($"{PathWithoutFragment()}#{entry.Id}")"
                        class="@TocLinkClass(entry)"
+                       @onclick="@(() => SetActiveHeading(entry.Id))"
                        style="@(entry.Level == 3 ? "padding-left: 1.75rem;" : null)">
                         @entry.Title
                     </a>
@@ -22,7 +23,7 @@
 </nav>
 
 @code {
-    private const string JsModulePath = "/quick-nav-interop.js";
+    private const string JsModulePath = "/quick-nav-interop.min.js";
 
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
@@ -58,9 +59,16 @@
         try
         {
             selfReference ??= DotNetObjectReference.Create(this);
+            var versionToObserve = version;
+            var headingIds = Toc.Entries.Select(e => e.Id).ToArray();
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("observeHeadings", selfReference, Toc.Entries.Select(e => e.Id).ToArray());
-            observedVersion = version;
+            await module.InvokeVoidAsync("observeHeadings", selfReference, headingIds);
+            observedVersion = versionToObserve;
+
+            if (version != versionToObserve)
+            {
+                _ = InvokeAsync(StateHasChanged);
+            }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
         {
