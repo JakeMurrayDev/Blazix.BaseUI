@@ -137,6 +137,7 @@ Groups all parts of the autocomplete and manages its state. Generic over the ite
 | `SubmitOnItemClick` | `bool` | `false` | Whether pressing an item submits the owning form. |
 | `ActionsRef` | `AutocompleteRootActions?` | `null` | A reference to imperative root actions. |
 | `InputRef` | `Action<ElementReference?>?` | `null` | Receives the hidden form input reference. |
+| `ChildContent` | `RenderFragment?` | `null` | The parts of the autocomplete. |
 
 ### InputGroup
 
