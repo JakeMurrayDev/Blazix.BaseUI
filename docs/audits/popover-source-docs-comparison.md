@@ -79,9 +79,9 @@ Local source-level consumers of Popover types outside `src/BlazorBaseUI/Popover`
 
 | Consumer | Popover dependency | Test command | Result |
 | --- | --- | --- | --- |
-| Tooltip | Uses Popover state/enumeration types for popup, trigger, arrow, positioner, and context parity. | `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Tests.Tooltip|FullyQualifiedName~BlazorBaseUI.Tests.PreviewCard" -v minimal` | GREEN: 171 passed |
+| Tooltip | Uses Popover state/enumeration types for popup, trigger, arrow, positioner, and context parity. | `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Tests.Tooltip\|FullyQualifiedName~BlazorBaseUI.Tests.PreviewCard" -v minimal` | GREEN: 171 passed |
 | PreviewCard | Uses Popover state/enumeration types for popup, arrow, and positioner parity. | Same bUnit command above. | GREEN: included in 171 passed |
-| Tooltip | Browser behavior for hover, focus, close, actions, portal, and positioning. | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.Tooltip|FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.PreviewCard" -v minimal` | GREEN: 124 passed |
+| Tooltip | Browser behavior for hover, focus, close, actions, portal, and positioning. | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.Tooltip\|FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.PreviewCard" -v minimal` | GREEN: 124 passed |
 | PreviewCard | Browser behavior for hover, focus, close, actions, portal, and positioning. | Same Playwright command above. | GREEN: included in 124 passed |
 
 An exploratory broad bUnit command was also run for `Tooltip|PreviewCard|Select|Toolbar|Tabs|NavigationMenu`. It failed with 49 unrelated failures because the filter selected entire non-consumer suites, including `Select` and `NavigationMenu`, and also matched substring names such as `Selector`. The failing broad log is preserved as `docs/audits/logs/popover-consumers-bunit.log` but is not used as the Popover consumer verdict.

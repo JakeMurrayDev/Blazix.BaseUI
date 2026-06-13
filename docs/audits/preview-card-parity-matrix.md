@@ -37,7 +37,7 @@
 
 | React source | Blazor equivalent | Status |
 |---|---|---|
-| renders children when `mounted || keepMounted` | `PreviewCardPortal` existing mounted/keep-mounted behavior | Verified |
+| renders children when `mounted \|\| keepMounted` | `PreviewCardPortal` existing mounted/keep-mounted behavior | Verified |
 
 ## Positioner
 

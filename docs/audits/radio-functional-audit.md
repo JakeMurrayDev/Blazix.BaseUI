@@ -70,7 +70,7 @@ Tool note: Serena and Context7 tools were not exposed in this session after tool
 | Command | Result | Log |
 | --- | --- | --- |
 | `dotnet build BlazorBaseUI.slnx` | Passed, 0 warnings, 0 errors | `docs/audits/logs/radio-dotnet-build.log` |
-| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~RadioGroup|FullyQualifiedName~RadioRoot|FullyQualifiedName~RadioIndicator"` | Passed, 112/112 | `docs/audits/logs/radio-bunit-tests.log` |
+| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~RadioGroup\|FullyQualifiedName~RadioRoot\|FullyQualifiedName~RadioIndicator"` | Passed, 112/112 | `docs/audits/logs/radio-bunit-tests.log` |
 | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~RadioGroup"` | Passed, 52/52, 0 skipped | `docs/audits/logs/radio-playwright-tests.log` |
 | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName=BlazorBaseUI.Playwright.Tests.Tests.RadioGroup.RadioGroupTestsWasm.ArrowUp_MovesToPreviousRadio"` | Passed, 1/1 diagnostic reproduction | `docs/audits/logs/radio-playwright-wasm-arrowup-single.log` |
 | `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-radio.js` and `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-radio.min.js` | Passed | `docs/audits/logs/radio-js-syntax-check.log` |

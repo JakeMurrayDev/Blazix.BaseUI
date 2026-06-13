@@ -82,7 +82,7 @@ Tool note: Serena and Context7 tools were not exposed in this session. The audit
 | Command | Result | Log |
 | --- | --- | --- |
 | `dotnet build BlazorBaseUI.slnx` | Passed, 0 warnings, 0 errors | `docs/audits/logs/checkbox-dotnet-build.log` |
-| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~CheckboxRootTests|FullyQualifiedName~CheckboxIndicatorTests|FullyQualifiedName~CheckboxGroupTests"` | Passed, 114/114 | `docs/audits/logs/checkbox-bunit-tests.log` |
+| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~CheckboxRootTests\|FullyQualifiedName~CheckboxIndicatorTests\|FullyQualifiedName~CheckboxGroupTests"` | Passed, 114/114 | `docs/audits/logs/checkbox-bunit-tests.log` |
 | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~Checkbox"` | Passed, 140/140, 0 skipped | `docs/audits/logs/checkbox-playwright-tests.log` |
 | `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-checkbox.js` and `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-checkbox.min.js` | Passed | `docs/audits/logs/checkbox-js-syntax-check.log` |
 | `bash scripts/lint-rules.sh` | Passed, 0 violations | `docs/audits/logs/checkbox-lint-rules.log` |

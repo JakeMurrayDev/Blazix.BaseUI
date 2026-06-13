@@ -4,13 +4,13 @@
 
 | React source behavior | Blazor equivalent | Verification |
 | --- | --- | --- |
-| `valueProp || undefined` feeds `useBaseUiId`; empty string generates an ID. | `ResolveValue()` treats null and empty as generated stable IDs. | `GroupedEmptyStringValues_AreResolvedToUniqueGeneratedValues` |
+| `valueProp \|\| undefined` feeds `useBaseUiId`; empty string generates an ID. | `ResolveValue()` treats null and empty as generated stable IDs. | `GroupedEmptyStringValues_AreResolvedToUniqueGeneratedValues` |
 | Standalone controlled/uncontrolled pressed state via `useControlled`. | `Pressed` controls state; `DefaultPressed` initializes local state. | Existing and refreshed Toggle bUnit/Playwright tests |
 | Grouped pressed state derives from `groupContext.value.includes(value)`. | `CurrentPressed` checks `GroupContext.Value.Contains(resolvedValue)`. | `ControlledValue_SetsPressedToggles`, `UncontrolledDefaultValue_SetsPressedToggles` |
 | `form` is consumed and never reaches DOM. | `BuildForwardedAdditionalAttributes()` strips `form`. | `NativeButton_OverridesUserTypeAndOmitsForm` |
 | User `type` cannot override `type="button"`. | Component attributes win over additional attributes. | `NativeButton_OverridesUserTypeAndOmitsForm` |
 | Native standalone disabled uses `disabled`, not `aria-disabled`. | Standalone native disabled emits `disabled`; no `aria-disabled`. | Existing Toggle tests |
-| Grouped native disabled exposes `aria-disabled`. | Grouped native toggles emit `aria-disabled="true|false"`. | `GroupedNativeToggle_ExposesAriaDisabledState` |
+| Grouped native disabled exposes `aria-disabled`. | Grouped native toggles emit `aria-disabled="true\|false"`. | `GroupedNativeToggle_ExposesAriaDisabledState` |
 | Non-native button emits role, tab index, keyboard activation. | Non-native mode emits `role="button"`, `tabindex`, JS keydown/keyup activation. | Toggle Playwright keyboard tests |
 | `data-pressed` and `data-disabled` are presence-only. | Attributes are emitted only when true. | Toggle bUnit and Playwright attribute tests |
 | Click creates Base UI change details with reason `none`, event, cancellation, propagation state. | `TogglePressedChangeEventArgs` exposes `Reason`, `Event`, `Cancel`, `AllowPropagation`, state flags. | Event args construction and grouped callback tests |
@@ -25,7 +25,7 @@
 | Default element `div`, root role `group`. | `RenderElement` default tag `div`, `role="group"`. | `RendersAsDivByDefault`, `HasRoleGroup` |
 | Controlled `value` or uncontrolled `defaultValue`; missing default is empty array. | `Value`, `DefaultValue`, `internalValue`. | Value control bUnit tests |
 | `isValueInitialized` true when `value` or `defaultValue` supplied. | `SetParametersAsync` tracks supplied parameters and exposes `IsValueInitialized`. | Context and missing value coverage |
-| Disabled resolves from local prop or Toolbar root. | `ResolvedDisabled => Disabled || ToolbarContext.Disabled`. | `ToolbarDisabled_DisablesToggleGroupAndChildren` |
+| Disabled resolves from local prop or Toolbar root. | `ResolvedDisabled => Disabled \|\| ToolbarContext.Disabled`. | `ToolbarDisabled_DisablesToggleGroupAndChildren` |
 | `multiple=false`: new value is `[newValue]` or `[]`. | `SetGroupValueInternalAsync` writes single-item or empty list. | Single-mode bUnit/Playwright tests |
 | `multiple=true`: append on press; remove first matching value on depress. | No dedupe on press; `RemoveAt(index)` on depress. | `Multiple_AllowsMultiplePressed` |
 | `onValueChange` receives event details and can cancel internal update. | `ToggleGroupValueChangeEventArgs` supports event detail parity and `Cancel()`. | `OnValueChange_CanBeCanceled` |

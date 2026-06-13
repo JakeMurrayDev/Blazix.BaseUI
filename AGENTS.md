@@ -42,12 +42,13 @@ Blazix.BaseUI/
 
 ### Documentation and Audit Artifact Placement
 
-- Place durable audit reports in `docs/audits/` using the component name, for example `docs/audits/toolbar-functional-audit.md`. These are local-only working artifacts and must not be committed.
-- Store durable parity matrices in `docs/audits/` using the component name, for example `docs/audits/toolbar-parity-matrix.md`. These are local-only working artifacts and must not be committed.
-- Keep durable audit logs under `docs/audits/logs/` with the component name as a prefix, for example `docs/audits/logs/toolbar-playwright-server.log`. These are local-only working artifacts and must not be committed.
-- Source documentation comparison reports belong in `docs/audits/`, for example `docs/audits/toggle-toggle-group-source-docs-comparison.md`. These are local-only working artifacts and must not be committed.
-- Temporary/generated run output belongs in `output/` only while work is in progress. Before finishing an audit, move durable local-only reports and logs to `docs/audits/` and `docs/audits/logs/`.
-- Framework-agnostic behavioral specs belong in `../base-ui-specs/<component>/`, not in this repository's `docs/` or `output/` folders, and are the audit artifacts intended to be committed.
+- Project documentation belongs in `docs/` and may be committed when it is durable source material for the repository, including documentation-site content, design guidance, plans, and component documentation.
+- Place durable audit reports in `docs/audits/` using the component name, for example `docs/audits/toolbar-functional-audit.md`. These files may be committed when they are intended as reviewable audit evidence or source documentation.
+- Store durable parity matrices in `docs/audits/` using the component name, for example `docs/audits/toolbar-parity-matrix.md`. These files may be committed when they describe component behavior or source parity.
+- Source documentation comparison reports belong in `docs/audits/`, for example `docs/audits/toggle-toggle-group-source-docs-comparison.md`, and may be committed when they are part of the audit record.
+- Durable non-log evidence such as JSON summaries, screenshots, and traces may live under `docs/audits/logs/` with the component name as a prefix. Do not commit `*.log` files.
+- Temporary/generated run output belongs in `output/` only while work is in progress and should not be committed unless explicitly requested.
+- Framework-agnostic behavioral specs belong in `../base-ui-specs/<component>/`. Keep those specs updated when an audit discovers reusable behavior or pitfalls, while repository-specific documentation and audits may live in `docs/`.
 - Do not commit `.DS_Store` files or other local filesystem metadata.
 
 ---

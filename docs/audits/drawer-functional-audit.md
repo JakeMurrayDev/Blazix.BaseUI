@@ -128,7 +128,7 @@ Commands:
 
 ```bash
 dotnet run --project demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo.csproj --urls http://127.0.0.1:5124
-PWCLI=/Users/jakemurray/.codex/skills/playwright/scripts/playwright_cli.sh
+PWCLI="${PWCLI:-playwright-cli}"
 "$PWCLI" open http://127.0.0.1:5124/drawer
 "$PWCLI" snapshot
 "$PWCLI" click e267
@@ -155,7 +155,7 @@ Commands:
 
 ```bash
 dotnet run --project demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo/BlazorBaseUI.Demo.csproj --urls http://127.0.0.1:5124
-PWCLI=/Users/jakemurray/.codex/skills/playwright/scripts/playwright_cli.sh
+PWCLI="${PWCLI:-playwright-cli}"
 "$PWCLI" open http://127.0.0.1:5124/drawer
 "$PWCLI" resize 1280 720
 "$PWCLI" run-code "desktop drawer demo geometry/assertions"

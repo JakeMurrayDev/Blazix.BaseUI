@@ -22,7 +22,7 @@
 </nav>
 
 @code {
-    private const string JsModulePath = "/docs-interop.js";
+    private const string JsModulePath = "/quick-nav-interop.js";
 
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
@@ -55,29 +55,16 @@
             return;
         }
 
-        observedVersion = version;
-
         try
         {
             selfReference ??= DotNetObjectReference.Create(this);
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("observeHeadings", selfReference, Toc.Entries.Select(e => e.Id).ToArray());
+            observedVersion = version;
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
         {
         }
-    }
-
-    [JSInvokable]
-    public void SetActiveHeading(string id)
-    {
-        if (activeId == id)
-        {
-            return;
-        }
-
-        activeId = id;
-        _ = InvokeAsync(StateHasChanged);
     }
 
     public async ValueTask DisposeAsync()
@@ -95,12 +82,24 @@
                 await module.InvokeVoidAsync("disconnectHeadings");
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or JSException)
             {
             }
         }
 
         selfReference?.Dispose();
+    }
+
+    [JSInvokable]
+    public void SetActiveHeading(string id)
+    {
+        if (activeId == id)
+        {
+            return;
+        }
+
+        activeId = id;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void HandleTocChanged()

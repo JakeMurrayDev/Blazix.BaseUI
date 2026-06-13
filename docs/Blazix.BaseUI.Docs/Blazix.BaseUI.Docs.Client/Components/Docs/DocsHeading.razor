@@ -12,6 +12,8 @@ else
 @code {
     private TocEntry? entry;
 
+    private string ResolvedId => Id ?? Slugify(Title);
+
     [CascadingParameter]
     public TocContext? Toc { get; set; }
 
@@ -32,8 +34,6 @@ else
     /// </summary>
     [Parameter]
     public int Level { get; set; } = 2;
-
-    private string ResolvedId => Id ?? Slugify(Title);
 
     protected override void OnInitialized()
     {

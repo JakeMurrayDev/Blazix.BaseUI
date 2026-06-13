@@ -56,7 +56,7 @@ React source audited:
 | `Checkbox.Root` root | id on internal root for non-native mode | Present |
 | `Checkbox.Root` root | explicit/generated control id on native button mode | Present |
 | `Checkbox.Root` root | `role="checkbox"` unless overridden | Present |
-| `Checkbox.Root` root | `aria-checked="true|false|mixed"` unless overridden | Present |
+| `Checkbox.Root` root | `aria-checked="true\|false\|mixed"` unless overridden | Present |
 | `Checkbox.Root` root | `aria-disabled="true"` for non-native disabled | Present |
 | `Checkbox.Root` root | native button `disabled` when disabled | Present |
 | `Checkbox.Root` root | `aria-readonly`, `aria-required`, `aria-invalid` | Present |

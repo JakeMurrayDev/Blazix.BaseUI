@@ -67,8 +67,8 @@ Tool note: Serena and Context7 tools were not exposed in this session. The audit
 | Command | Result | Log |
 | --- | --- | --- |
 | `dotnet build BlazorBaseUI.slnx -v minimal` | Passed, 0 warnings, 0 errors | `docs/audits/logs/field-fieldset-form-dotnet-build.log` |
-| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --no-build --filter "FullyQualifiedName~BlazorBaseUI.Tests.Field|FullyQualifiedName~BlazorBaseUI.Tests.Fieldset|FullyQualifiedName~BlazorBaseUI.Tests.Form" -v minimal` | Passed, 42/42 | `docs/audits/logs/field-fieldset-form-bunit-tests.log` |
-| `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --no-build --filter "FullyQualifiedName~FieldTests|FullyQualifiedName~FieldErrorTests|FullyQualifiedName~FieldValidityTests|FullyQualifiedName~FormTests" -v minimal` | Passed, 140/140 | `docs/audits/logs/field-fieldset-form-playwright-tests.log` |
+| `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --no-build --filter "FullyQualifiedName~BlazorBaseUI.Tests.Field\|FullyQualifiedName~BlazorBaseUI.Tests.Fieldset\|FullyQualifiedName~BlazorBaseUI.Tests.Form" -v minimal` | Passed, 42/42 | `docs/audits/logs/field-fieldset-form-bunit-tests.log` |
+| `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --no-build --filter "FullyQualifiedName~FieldTests\|FullyQualifiedName~FieldErrorTests\|FullyQualifiedName~FieldValidityTests\|FullyQualifiedName~FormTests" -v minimal` | Passed, 140/140 | `docs/audits/logs/field-fieldset-form-playwright-tests.log` |
 | `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-field.js` and `node --check src/BlazorBaseUI/wwwroot/blazor-baseui-field.min.js` | Passed | `docs/audits/logs/field-fieldset-form-js-syntax-check.log` |
 | `bash scripts/lint-rules.sh` | Passed, 0 violations. macOS `grep -P` warnings are recorded before the zero-violation summary. | `docs/audits/logs/field-fieldset-form-lint-rules.log` |
 | `git diff --check` | Passed, no whitespace errors | `docs/audits/logs/field-fieldset-form-git-diff-check.log` |

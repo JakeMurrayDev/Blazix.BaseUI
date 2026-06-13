@@ -1,7 +1,7 @@
 # Select Verification Report
 
 Date: 2026-06-10
-Repository: `/Users/jakemurray/RiderProjects/Blazix.BaseUI`
+Repository: `Blazix.BaseUI`
 
 ## Local Blazor Verification
 

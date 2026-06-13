@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-12
 **Status:** Approved
-**App:** `docs/Blazix.BaseUI.Docs` (Blazor Web App, InteractiveAuto, Tailwind Play CDN)
+**App:** `docs/Blazix.BaseUI.Docs` (Blazor Web App, cookie-selected `InteractiveServer` / `InteractiveWebAssembly`, Tailwind Play CDN)
 
 ## Goal
 
@@ -134,7 +134,7 @@ Mirrors the Base UI demo UX, built from Blazix components:
   `{ Variant, Files: [{ Name, Language, ResourcePath }] }` passed to the Demo
   component alongside the live `ChildContent`.
 - **Syntax highlighting:** highlight.js from CDN; re-highlight on tab/variant
-  switch through the docs JS module.
+  switch through the component-specific code-block JS module.
 
 ## 5. Accordion Content
 
@@ -154,16 +154,18 @@ Ported from the Base UI accordion page plus existing `AccordionDocs.razor` /
 
 ## 6. JS Interop
 
-One docs JS module (lazy `Lazy<Task<IJSObjectReference>>`, circuit-safe
-try/catch guards, `Element.HasValue` guards, dispose pattern per project
-rules) providing:
+Component-specific JS modules (lazy `Lazy<Task<IJSObjectReference>>`,
+circuit-safe try/catch guards, DOM truthiness checks, dispose pattern per
+project rules) providing:
 
-- `copyText(text)` — clipboard write.
-- TOC scroll-spy — `IntersectionObserver` over registered heading ids,
-  callback to .NET for active-link highlight.
-- `highlight(element)` — invoke highlight.js on swapped code blocks.
-- `setRenderMode(mode)` — write the `blazix-docs-render-mode` cookie and
-  reload.
+- CopyButton: `copyText(text)` — clipboard write.
+- QuickNav: `observeHeadings(dotnet, ids)` / `disconnectHeadings()` — an
+  `IntersectionObserver` over registered heading ids with callback to .NET for
+  active-link highlight.
+- CodeBlock: `highlightElement(element)` — invoke highlight.js on swapped code
+  blocks.
+- RuntimeSwitch: `setRenderMode(mode)` — write the
+  `blazix-docs-render-mode` cookie and reload.
 
 ## 7. Verification Criteria
 

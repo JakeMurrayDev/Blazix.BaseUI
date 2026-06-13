@@ -8,7 +8,7 @@
 
 ## Resolved Gaps
 
-- Added grouped native `aria-disabled="true|false"` parity.
+- Added grouped native `aria-disabled="true\|false"` parity.
 - Removed forwarded `form` from `Toggle` and preserved component-owned `type="button"` override.
 - Resolved missing and empty-string grouped values through stable generated IDs.
 - Fired grouped `Toggle.OnPressedChange` with shared cancellation state after group value handling.
@@ -21,9 +21,9 @@
 - Kept DOM-order focus, active focus, preventDefault, and key activation behavior in JS interop.
 - Added source-docs parity fixes to the Blazor demo: accessible names for icon-only controls, an RTL `DirectionProvider` ToggleGroup example, and a controlled required-selection example matching the upstream private experiment pattern.
 - Updated out-of-repository specs:
-  - `/Users/jakemurray/RiderProjects/base-ui-specs/toggle/SPEC.md`
-  - `/Users/jakemurray/RiderProjects/base-ui-specs/toggle-group/SPEC.md`
-  - `/Users/jakemurray/RiderProjects/base-ui-specs/toggle-group/pitfalls.md`
+  - `../base-ui-specs/toggle/SPEC.md`
+  - `../base-ui-specs/toggle-group/SPEC.md`
+  - `../base-ui-specs/toggle-group/pitfalls.md`
 
 ## Verification Commands
 
@@ -61,5 +61,5 @@
 
 ## Notes
 
-- `docs/audits/logs/toggle-toggle-group-*.log` is ignored by `.gitignore`; the final stage operation must force-add these proof logs.
-- Files under `/Users/jakemurray/RiderProjects/base-ui-specs` are outside the BlazorBaseUI Git repository and cannot be staged from this repo.
+- `*.log` files are not committed; audit proof logs are referenced by path only.
+- Files under `../base-ui-specs` are outside the BlazorBaseUI Git repository and cannot be staged from this repo.

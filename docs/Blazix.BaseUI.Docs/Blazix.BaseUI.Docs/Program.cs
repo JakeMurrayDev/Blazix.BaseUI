@@ -29,7 +29,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
-app.MapGet("/components/{slug}.md", (string slug, IWebHostEnvironment environment) =>
+app.MapGet("/components/{slug}.md", async (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
 {
     if (slug.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
     {
@@ -42,7 +42,8 @@ app.MapGet("/components/{slug}.md", (string slug, IWebHostEnvironment environmen
         return Results.NotFound();
     }
 
-    return Results.Text(File.ReadAllText(markdownPath), "text/markdown; charset=utf-8");
+    var markdown = await File.ReadAllTextAsync(markdownPath, cancellationToken);
+    return Results.Text(markdown, "text/markdown; charset=utf-8");
 });
 
 app.MapRazorComponents<App>()

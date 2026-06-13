@@ -59,7 +59,7 @@ React source audited:
 | `Switch.Root` root | internal id for non-native mode | Present |
 | `Switch.Root` root | explicit/generated control id for native button mode | Present |
 | `Switch.Root` root | `role="switch"` unless overridden | Present |
-| `Switch.Root` root | `aria-checked="true|false"` unless overridden | Present |
+| `Switch.Root` root | `aria-checked="true\|false"` unless overridden | Present |
 | `Switch.Root` root | `aria-disabled="true"` for disabled non-native root | Present |
 | `Switch.Root` root | native `disabled` on native button mode | Present |
 | `Switch.Root` root | `aria-readonly="true"` when read-only | Present |
