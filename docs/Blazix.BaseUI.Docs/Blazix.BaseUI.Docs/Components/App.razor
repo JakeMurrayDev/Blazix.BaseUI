@@ -17,6 +17,44 @@
             document.documentElement.dataset.theme = theme;
         })();
     </script>
+    <script>
+        (() => {
+            const interactiveSelector = 'button, input, select, textarea, form, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="combobox"], [role="menuitem"]';
+            const gatedEvents = ['click', 'dblclick', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'keydown', 'keyup', 'submit'];
+            const getTarget = event => event.target instanceof Element
+                ? event.target
+                : event.target?.parentElement;
+            const shouldGate = event => {
+                if (!document.body?.classList.contains('blazix-docs-preinteractive')) {
+                    return false;
+                }
+
+                const target = getTarget(event);
+                if (!target || target.closest('a[href]')) {
+                    return false;
+                }
+
+                return Boolean(target.closest(interactiveSelector));
+            };
+            const gateEvent = event => {
+                if (!shouldGate(event)) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopImmediatePropagation();
+            };
+
+            gatedEvents.forEach(eventName => document.addEventListener(eventName, gateEvent, true));
+            window.blazixDocs = {
+                ...(window.blazixDocs || {}),
+                markInteractive() {
+                    document.body?.classList.remove('blazix-docs-preinteractive');
+                    document.documentElement.dataset.blazixInteractive = 'true';
+                }
+            };
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -138,6 +176,13 @@
             }
 
             .liquid-materialize {
+                opacity: 1;
+                transform: none;
+                filter: none;
+                animation: none;
+            }
+
+            .blazix-docs-preinteractive .liquid-materialize {
                 animation: liquid-materialize 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
             }
 
@@ -178,6 +223,104 @@
                 animation: liquid-press 260ms cubic-bezier(0.16, 1, 0.3, 1);
             }
 
+            .blazix-docs-preinteractive {
+                cursor: progress;
+            }
+
+            .blazix-docs-hydration-rail {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 10000;
+                height: 3px;
+                overflow: hidden;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 180ms ease;
+            }
+
+            .blazix-docs-hydration-rail::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                width: 45%;
+                background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.92), rgba(45, 212, 191, 0.9), transparent);
+                box-shadow: 0 0 24px rgba(14, 165, 233, 0.46);
+                transform: translateX(-120%);
+                animation: blazix-docs-hydration-sweep 1.15s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+            }
+
+            .blazix-docs-hydration-status {
+                position: fixed;
+                top: 0.75rem;
+                left: 50%;
+                z-index: 10000;
+                pointer-events: none;
+                opacity: 0;
+                transform: translateX(-50%) translateY(-0.25rem);
+                transition: opacity 180ms ease, transform 180ms ease;
+            }
+
+            .blazix-docs-preinteractive .blazix-docs-hydration-rail,
+            .blazix-docs-preinteractive .blazix-docs-hydration-status {
+                opacity: 1;
+            }
+
+            .blazix-docs-preinteractive .blazix-docs-hydration-status {
+                transform: translateX(-50%) translateY(0);
+            }
+
+            .blazix-docs-preinteractive button,
+            .blazix-docs-preinteractive input,
+            .blazix-docs-preinteractive select,
+            .blazix-docs-preinteractive textarea,
+            .blazix-docs-preinteractive [role="button"],
+            .blazix-docs-preinteractive [role="tab"],
+            .blazix-docs-preinteractive [role="switch"],
+            .blazix-docs-preinteractive [role="checkbox"],
+            .blazix-docs-preinteractive [role="radio"],
+            .blazix-docs-preinteractive [role="combobox"],
+            .blazix-docs-preinteractive [role="menuitem"] {
+                pointer-events: none;
+                opacity: 0.62;
+                filter: saturate(0.82);
+                transform: none !important;
+                animation: none !important;
+            }
+
+            .blazix-docs-hydration-status__pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                min-height: 2rem;
+                border-radius: 999px;
+                border: 1px solid rgba(255, 255, 255, 0.5);
+                background: rgba(255, 255, 255, 0.66);
+                padding: 0 0.75rem;
+                color: #0f172a;
+                font-size: 0.75rem;
+                font-weight: 650;
+                box-shadow: 0 16px 38px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+                -webkit-backdrop-filter: blur(18px) saturate(160%);
+                backdrop-filter: blur(18px) saturate(160%);
+            }
+
+            .blazix-docs-hydration-status__dot {
+                width: 0.45rem;
+                height: 0.45rem;
+                border-radius: 999px;
+                background: #0ea5e9;
+                box-shadow: 0 0 18px rgba(14, 165, 233, 0.75);
+                animation: blazix-docs-hydration-pulse 1s ease-in-out infinite alternate;
+            }
+
+            .dark .blazix-docs-hydration-status__pill {
+                border-color: rgba(255, 255, 255, 0.12);
+                background: rgba(15, 23, 42, 0.72);
+                color: #f8fafc;
+            }
+
             @@keyframes liquid-ambient {
                 0% {
                     background-position: 0% 0%, 18% 24%;
@@ -185,6 +328,28 @@
 
                 100% {
                     background-position: 100% 76%, 82% 64%;
+                }
+            }
+
+            @@keyframes blazix-docs-hydration-sweep {
+                0% {
+                    transform: translateX(-120%);
+                }
+
+                100% {
+                    transform: translateX(260%);
+                }
+            }
+
+            @@keyframes blazix-docs-hydration-pulse {
+                0% {
+                    opacity: 0.48;
+                    transform: scale(0.82);
+                }
+
+                100% {
+                    opacity: 1;
+                    transform: scale(1);
                 }
             }
 
@@ -347,7 +512,14 @@
     <HeadOutlet @rendermode="ActiveRenderMode" />
 </head>
 
-<body class="liquid-grain m-0 min-h-screen overflow-x-hidden text-[15px] leading-normal text-slate-950 antialiased dark:text-slate-100">
+<body class="blazix-docs-preinteractive liquid-grain m-0 min-h-screen overflow-x-hidden text-[15px] leading-normal text-slate-950 antialiased dark:text-slate-100">
+    <div class="blazix-docs-hydration-rail" aria-hidden="true"></div>
+    <div class="blazix-docs-hydration-status" aria-hidden="true">
+        <span class="blazix-docs-hydration-status__pill">
+            <span class="blazix-docs-hydration-status__dot"></span>
+            Preparing controls...
+        </span>
+    </div>
     <svg aria-hidden="true" focusable="false" style="position: absolute; width: 0; height: 0">
         <filter id="liquid-prism-intense" x="-35%" y="-35%" width="170%" height="170%">
             <feTurbulence type="fractalNoise" baseFrequency="0.004 0.009" numOctaves="1" seed="3" result="noise" />

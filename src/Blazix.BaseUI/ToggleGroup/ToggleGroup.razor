@@ -27,6 +27,7 @@
 
     private List<string> internalValue = [];
     private bool hasRendered;
+    private bool isDisposed;
     private Orientation previousOrientation;
     private bool previousLoopFocus;
     private Direction previousDirection;
@@ -222,7 +223,7 @@
             groupContext.IsInToolbar = ToolbarContext is not null;
         }
 
-        if (hasRendered && (Orientation != previousOrientation || LoopFocus != previousLoopFocus || resolvedDirection != previousDirection))
+        if (hasRendered && !isDisposed && (Orientation != previousOrientation || LoopFocus != previousLoopFocus || resolvedDirection != previousDirection))
         {
             previousOrientation = Orientation;
             previousLoopFocus = LoopFocus;
@@ -236,6 +237,11 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (firstRender)
         {
             hasRendered = true;
@@ -246,6 +252,13 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
+
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
             try
@@ -254,7 +267,7 @@
                 await module.InvokeVoidAsync("disposeGroup", Element.Value);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -294,7 +307,7 @@
 
     private async Task InitializeJsAsync()
     {
-        if (!Element.HasValue || ToolbarContext is not null)
+        if (isDisposed || !Element.HasValue || ToolbarContext is not null)
         {
             return;
         }
@@ -302,6 +315,12 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync(
                 "initializeGroup",
@@ -310,7 +329,7 @@
                 LoopFocus,
                 ResolvedDirection.ToAttributeString() ?? "ltr");
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -318,7 +337,7 @@
 
     private async Task UpdateJsStateAsync()
     {
-        if (!hasRendered || !Element.HasValue || ToolbarContext is not null)
+        if (isDisposed || !hasRendered || !Element.HasValue || ToolbarContext is not null)
         {
             return;
         }
@@ -326,6 +345,12 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             var orientationString = Orientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync(
                 "updateGroup",
@@ -334,7 +359,7 @@
                 LoopFocus,
                 ResolvedDirection.ToAttributeString() ?? "ltr");
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

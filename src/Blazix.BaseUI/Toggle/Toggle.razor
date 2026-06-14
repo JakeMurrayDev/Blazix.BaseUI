@@ -27,6 +27,7 @@
     private readonly string itemId = Guid.NewGuid().ToIdString();
 
     private bool hasRendered;
+    private bool isDisposed;
     private bool isPressed;
     private bool previousPressed;
     private bool previousDisabled;
@@ -229,7 +230,7 @@
             state = new ToggleState(currentPressed, resolvedDisabled);
         }
 
-        if (hasRendered)
+        if (hasRendered && !isDisposed)
         {
             if (previousPressed != currentPressed)
             {
@@ -261,6 +262,11 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (firstRender)
         {
             hasRendered = true;
@@ -301,6 +307,11 @@
             await UpdateGroupTabIndexesAsync();
         }
 
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (!firstRender && IsInToolbarGroup)
         {
             RegisterWithToolbar();
@@ -310,6 +321,12 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
         UnregisterFromGroupContext();
         UnregisterFromToolbar();
 
@@ -328,7 +345,7 @@
 
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -407,6 +424,11 @@
 
     private async Task RegisterWithGroupAsync()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (!IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
         {
             await UnregisterFromGroupAsync();
@@ -428,12 +450,18 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             await module.InvokeVoidAsync("registerToggle", groupElement, toggleElement, resolvedValue);
             registeredGroupElement = groupElement;
             registeredGroupToggleElement = toggleElement;
             previousResolvedValue = resolvedValue;
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -457,7 +485,7 @@
 
     private void RegisterWithToolbar()
     {
-        if (!Element.HasValue || ToolbarContext is null)
+        if (isDisposed || !Element.HasValue || ToolbarContext is null)
         {
             return;
         }
@@ -491,7 +519,7 @@
 
     private async Task UpdateGroupTabIndexesAsync()
     {
-        if (!hasRendered || !IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
+        if (isDisposed || !hasRendered || !IsInGroup || !Element.HasValue || !GroupContext!.GroupElement.HasValue)
         {
             return;
         }
@@ -499,9 +527,15 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             await module.InvokeVoidAsync("syncGroupTabIndexes", GroupContext.GroupElement.Value);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -524,7 +558,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("unregisterToggle", groupElement, toggleElement);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -535,7 +569,7 @@
 
     private async Task InitializeJsAsync()
     {
-        if (!Element.HasValue)
+        if (isDisposed || !Element.HasValue)
         {
             return;
         }
@@ -543,9 +577,15 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             await module.InvokeVoidAsync("initialize", Element.Value, ResolvedDisabled);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -553,6 +593,11 @@
 
     private async Task InitializeGroupItemAsync()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (!Element.HasValue)
         {
             await DisposeGroupItemAsync();
@@ -569,11 +614,17 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             var orientationString = CurrentOrientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync("initializeGroupItem", Element.Value, orientationString);
             initializedGroupItemElement = Element;
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -593,7 +644,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("disposeGroupItem", groupItemElement);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -603,7 +654,7 @@
 
     private async Task UpdateJsStateAsync()
     {
-        if (!hasRendered || NativeButton || !Element.HasValue)
+        if (isDisposed || !hasRendered || NativeButton || !Element.HasValue)
         {
             return;
         }
@@ -611,9 +662,15 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             await module.InvokeVoidAsync("updateState", Element.Value, ResolvedDisabled);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -621,7 +678,7 @@
 
     private async Task UpdateGroupItemOrientationAsync()
     {
-        if (!hasRendered || !IsInGroup || !Element.HasValue)
+        if (isDisposed || !hasRendered || !IsInGroup || !Element.HasValue)
         {
             return;
         }
@@ -629,10 +686,16 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             var orientationString = CurrentOrientation.ToDataAttributeString() ?? "horizontal";
             await module.InvokeVoidAsync("updateGroupItemOrientation", Element.Value, orientationString);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -703,7 +766,7 @@
 
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
-        if (!IsInGroup || ResolvedDisabled || !GroupContext!.GroupElement.HasValue || !Element.HasValue)
+        if (isDisposed || !IsInGroup || ResolvedDisabled || !GroupContext!.GroupElement.HasValue || !Element.HasValue)
         {
             return;
         }
@@ -724,6 +787,12 @@
         try
         {
             var module = await moduleTask.Value;
+
+            if (isDisposed)
+            {
+                return;
+            }
+
             if (shouldNavigatePrevious)
             {
                 await module.InvokeVoidAsync("navigateToPrevious", GroupContext.GroupElement.Value, Element.Value);
@@ -741,7 +810,7 @@
                 await module.InvokeVoidAsync("navigateToLast", GroupContext.GroupElement.Value);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
