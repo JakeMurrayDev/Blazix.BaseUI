@@ -1,0 +1,82 @@
+@page "/components/dialog"
+
+<PageTitle>Dialog · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Dialog"
+               Subtitle="A popup that opens on top of the page."
+               MarkdownHref="/components/dialog.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <DialogHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the trigger, portal, backdrop, popup, title, description, and close button. The popup renders through a portal to the <code class="@LiquidGlassClasses.CodeInline">&lt;body&gt;</code> by default.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Control the open state" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Bind <code class="@LiquidGlassClasses.CodeInline">Open</code> and <code class="@LiquidGlassClasses.CodeInline">OpenChanged</code> when the dialog should be opened from app state or from a control outside the trigger.
+</p>
+<div class="mb-2">
+    <Demo Variants="@ControlledVariants">
+        <DialogControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in DialogApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Dialog
+
+        <DialogRoot>
+            <DialogTrigger />
+            <DialogPortal>
+                <DialogBackdrop />
+                <DialogPopup>
+                    <DialogTitle />
+                    <DialogDescription />
+                    <DialogClose />
+                </DialogPopup>
+            </DialogPortal>
+        </DialogRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Dialog.razor", "xml", "Components.Demos.Dialog.Hero.Css.DialogHeroCss.razor"),
+            new DemoFile("dialog.css", "css", "wwwroot.demos.dialog.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Dialog.razor", "xml", "Components.Demos.Dialog.Hero.Tailwind.DialogHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> ControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Dialog.razor", "xml", "Components.Demos.Dialog.Controlled.Css.DialogControlledCss.razor"),
+            new DemoFile("dialog.css", "css", "wwwroot.demos.dialog.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Dialog.razor", "xml", "Components.Demos.Dialog.Controlled.Tailwind.DialogControlledTailwind.razor"),
+        ]),
+    ];
+}
