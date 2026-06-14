@@ -1,0 +1,55 @@
+<div class="blx-form-demo-stack">
+    <Form Model="@model"
+          OnFormSubmit="HandleSubmitAsync"
+          class="blx-form">
+        <FieldRoot Name="name" class="blx-form-field">
+            <FieldLabel class="blx-form-label">Name</FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Name"
+                          placeholder="Ada Lovelace"
+                          class="blx-form-input" />
+        </FieldRoot>
+
+        <FieldRoot Name="quantity" class="blx-form-field">
+            <FieldLabel class="blx-form-label">Quantity</FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Quantity"
+                          type="number"
+                          placeholder="3"
+                          class="blx-form-input" />
+        </FieldRoot>
+
+        <button type="submit" class="blx-form-button">Submit</button>
+    </Form>
+
+    @if (submittedValues is not null)
+    {
+        <div class="blx-form-values" aria-live="polite">
+            @foreach (var item in submittedValues)
+            {
+                <div class="blx-form-value-row">
+                    <span>@item.Key</span>
+                    <strong>@item.Value</strong>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly OrderModel model = new() { Name = "Ada Lovelace", Quantity = "3" };
+    private IReadOnlyDictionary<string, object?>? submittedValues;
+
+    private Task HandleSubmitAsync(FormSubmitEventArgs args)
+    {
+        submittedValues = args.Values;
+        return Task.CompletedTask;
+    }
+
+    private sealed class OrderModel
+    {
+        public string Name { get; set; } = "";
+
+        public string Quantity { get; set; } = "";
+    }
+}

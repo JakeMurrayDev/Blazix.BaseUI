@@ -1,0 +1,63 @@
+<Form Model="@model"
+      Errors="@errors"
+      OnSubmit="HandleSubmitAsync"
+      class="blx-form">
+    <FieldRoot Name="url" class="blx-form-field">
+        <FieldLabel class="blx-form-label">Homepage</FieldLabel>
+        <FieldControl TValue="string"
+                      @bind-Value="model.Url"
+                      type="url"
+                      required="true"
+                      pattern="https?://.*"
+                      placeholder="https://example.com"
+                      class="blx-form-input" />
+        <FieldError class="blx-form-error" />
+    </FieldRoot>
+
+    <button type="submit"
+            disabled="@loading"
+            class="blx-form-button">
+        @(loading ? "Checking..." : "Submit")
+    </button>
+
+    @if (!string.IsNullOrEmpty(result))
+    {
+        <div class="blx-form-result">@result</div>
+    }
+</Form>
+
+@code {
+    private readonly UrlModel model = new() { Url = "https://example.com" };
+    private Dictionary<string, string[]> errors = new();
+    private string? result;
+    private bool loading;
+
+    private async Task HandleSubmitAsync(EditContext context)
+    {
+        loading = true;
+        result = null;
+        errors = new();
+
+        await Task.Delay(650);
+
+        if (Uri.TryCreate(model.Url, UriKind.Absolute, out var uri) &&
+            uri.Host.EndsWith("example.com", StringComparison.OrdinalIgnoreCase))
+        {
+            errors = new Dictionary<string, string[]>
+            {
+                ["url"] = ["The example domain is not allowed."]
+            };
+        }
+        else
+        {
+            result = "Homepage saved.";
+        }
+
+        loading = false;
+    }
+
+    private sealed class UrlModel
+    {
+        public string Url { get; set; } = "";
+    }
+}

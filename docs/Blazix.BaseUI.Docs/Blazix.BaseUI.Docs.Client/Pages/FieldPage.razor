@@ -1,0 +1,65 @@
+@page "/components/field"
+
+<PageTitle>Field · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Field"
+               Subtitle="Provides labeling, descriptions, validation messages, and state hooks for form controls."
+               MarkdownHref="/components/field.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <FieldHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">FieldLabel</code> for the visible label and let Field wire the control id.</li>
+    <li>Put helper text in <code class="@LiquidGlassClasses.CodeInline">FieldDescription</code> so it is included in <code class="@LiquidGlassClasses.CodeInline">aria-describedby</code>.</li>
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">FieldError</code> for native, custom, Blazor, or form-level validation messages.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import Field, then assemble the parts around a labelable control:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in FieldApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Field
+
+        <FieldRoot>
+            <FieldItem>
+                <FieldLabel>Name</FieldLabel>
+                <FieldControl TValue="string" />
+            </FieldItem>
+            <FieldDescription>Visible on your profile.</FieldDescription>
+            <FieldError />
+            <FieldValidity>
+                <span>@context.Error</span>
+            </FieldValidity>
+        </FieldRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Field.razor", "xml", "Components.Demos.Field.Hero.Css.FieldHeroCss.razor"),
+            new DemoFile("field.css", "css", "wwwroot.demos.field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Field.razor", "xml", "Components.Demos.Field.Hero.Tailwind.FieldHeroTailwind.razor"),
+        ]),
+    ];
+}
