@@ -1,0 +1,67 @@
+<Form Model="@model"
+      Errors="@errors"
+      OnSubmit="HandleSubmitAsync"
+      class="flex w-full max-w-64 flex-col gap-4">
+    <FieldRoot Name="url" class="flex flex-col items-start gap-1">
+        <FieldLabel class="text-sm font-bold text-slate-950 dark:text-white">
+            Homepage
+        </FieldLabel>
+        <FieldControl TValue="string"
+                      @bind-Value="model.Url"
+                      type="url"
+                      required="true"
+                      pattern="https?://.*"
+                      placeholder="https://example.com"
+                      class="h-8 w-full border border-slate-950 bg-white px-2 text-sm font-normal text-slate-950 placeholder:text-slate-500 focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-slate-950 data-[invalid]:border-red-700 data-[invalid]:focus:outline-red-700 dark:border-white dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400 dark:focus:outline-white dark:data-[invalid]:border-red-400 dark:data-[invalid]:focus:outline-red-400" />
+        <FieldError class="text-sm text-red-700 dark:text-red-400" />
+    </FieldRoot>
+
+    <button type="submit"
+            disabled="@loading"
+            class="flex h-8 items-center justify-center border border-slate-950 bg-white px-3 text-sm font-normal leading-none text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 disabled:border-slate-500 disabled:text-slate-500 [&:hover:not(:disabled)]:bg-slate-100 [&:active:not(:disabled)]:bg-slate-200 dark:border-white dark:bg-slate-950 dark:text-white dark:focus-visible:outline-white dark:disabled:border-slate-400 dark:disabled:text-slate-400 dark:[&:hover:not(:disabled)]:bg-slate-800 dark:[&:active:not(:disabled)]:bg-slate-700">
+        @(loading ? "Checking..." : "Submit")
+    </button>
+
+    @if (!string.IsNullOrEmpty(result))
+    {
+        <div class="border border-emerald-600 bg-emerald-50 px-2 py-1 text-sm text-emerald-800 dark:border-emerald-400 dark:bg-emerald-950 dark:text-emerald-200">
+            @result
+        </div>
+    }
+</Form>
+
+@code {
+    private readonly UrlModel model = new() { Url = "https://example.com" };
+    private Dictionary<string, string[]> errors = new();
+    private string? result;
+    private bool loading;
+
+    private async Task HandleSubmitAsync(EditContext context)
+    {
+        loading = true;
+        result = null;
+        errors = new();
+
+        await Task.Delay(650);
+
+        if (Uri.TryCreate(model.Url, UriKind.Absolute, out var uri) &&
+            uri.Host.EndsWith("example.com", StringComparison.OrdinalIgnoreCase))
+        {
+            errors = new Dictionary<string, string[]>
+            {
+                ["url"] = ["The example domain is not allowed."]
+            };
+        }
+        else
+        {
+            result = "Homepage saved.";
+        }
+
+        loading = false;
+    }
+
+    private sealed class UrlModel
+    {
+        public string Url { get; set; } = "";
+    }
+}

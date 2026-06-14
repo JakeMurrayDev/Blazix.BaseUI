@@ -1,0 +1,62 @@
+<div class="flex w-full max-w-64 flex-col gap-3">
+    <Form Model="@model"
+          OnFormSubmit="HandleSubmitAsync"
+          class="flex w-full flex-col gap-4">
+        <FieldRoot Name="name" class="flex flex-col items-start gap-1">
+            <FieldLabel class="text-sm font-bold text-slate-950 dark:text-white">
+                Name
+            </FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Name"
+                          placeholder="Ada Lovelace"
+                          class="h-8 w-full border border-slate-950 bg-white px-2 text-sm font-normal text-slate-950 placeholder:text-slate-500 focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400 dark:focus:outline-white" />
+        </FieldRoot>
+
+        <FieldRoot Name="quantity" class="flex flex-col items-start gap-1">
+            <FieldLabel class="text-sm font-bold text-slate-950 dark:text-white">
+                Quantity
+            </FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Quantity"
+                          type="number"
+                          placeholder="3"
+                          class="h-8 w-full border border-slate-950 bg-white px-2 text-sm font-normal text-slate-950 placeholder:text-slate-500 focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400 dark:focus:outline-white" />
+        </FieldRoot>
+
+        <button type="submit"
+                class="flex h-8 items-center justify-center border border-slate-950 bg-white px-3 text-sm font-normal leading-none text-slate-950 hover:bg-slate-100 active:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:focus-visible:outline-white">
+            Submit
+        </button>
+    </Form>
+
+    @if (submittedValues is not null)
+    {
+        <div class="grid gap-1 border border-slate-300 bg-slate-50 p-2 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-live="polite">
+            @foreach (var item in submittedValues)
+            {
+                <div class="flex justify-between gap-3">
+                    <span>@item.Key</span>
+                    <strong>@item.Value</strong>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly OrderModel model = new() { Name = "Ada Lovelace", Quantity = "3" };
+    private IReadOnlyDictionary<string, object?>? submittedValues;
+
+    private Task HandleSubmitAsync(FormSubmitEventArgs args)
+    {
+        submittedValues = args.Values;
+        return Task.CompletedTask;
+    }
+
+    private sealed class OrderModel
+    {
+        public string Name { get; set; } = "";
+
+        public string Quantity { get; set; } = "";
+    }
+}

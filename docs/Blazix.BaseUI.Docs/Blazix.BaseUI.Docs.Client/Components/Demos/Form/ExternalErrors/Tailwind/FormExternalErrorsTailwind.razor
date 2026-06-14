@@ -1,0 +1,52 @@
+<div class="flex w-full max-w-64 flex-col gap-3">
+    <div class="flex flex-wrap gap-2">
+        <button type="button"
+                @onclick="SetServerError"
+                class="flex h-8 items-center justify-center border border-slate-950 bg-white px-3 text-sm font-normal leading-none text-slate-950 hover:bg-slate-100 active:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:focus-visible:outline-white">
+            Set server error
+        </button>
+        <button type="button"
+                @onclick="ClearServerError"
+                class="flex h-8 items-center justify-center border border-slate-400 bg-transparent px-3 text-sm font-normal leading-none text-slate-700 hover:bg-slate-100 active:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:focus-visible:outline-white">
+            Clear
+        </button>
+    </div>
+
+    <Form Model="@model"
+          Errors="@errors"
+          class="flex w-full flex-col gap-4">
+        <FieldRoot Name="username" class="flex flex-col items-start gap-1">
+            <FieldLabel class="text-sm font-bold text-slate-950 dark:text-white">
+                Username
+            </FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Username"
+                          placeholder="admin"
+                          class="h-8 w-full border border-slate-950 bg-white px-2 text-sm font-normal text-slate-950 placeholder:text-slate-500 focus:outline focus:outline-2 focus:-outline-offset-1 focus:outline-slate-950 data-[invalid]:border-red-700 data-[invalid]:focus:outline-red-700 dark:border-white dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-400 dark:focus:outline-white dark:data-[invalid]:border-red-400 dark:data-[invalid]:focus:outline-red-400" />
+            <FieldError class="text-sm text-red-700 dark:text-red-400" />
+        </FieldRoot>
+    </Form>
+</div>
+
+@code {
+    private readonly UsernameModel model = new() { Username = "admin" };
+    private Dictionary<string, string[]> errors = new();
+
+    private void SetServerError()
+    {
+        errors = new Dictionary<string, string[]>
+        {
+            ["username"] = ["Username 'admin' is already taken."]
+        };
+    }
+
+    private void ClearServerError()
+    {
+        errors = new();
+    }
+
+    private sealed class UsernameModel
+    {
+        public string Username { get; set; } = "";
+    }
+}

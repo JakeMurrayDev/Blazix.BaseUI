@@ -1,0 +1,57 @@
+@page "/components/fieldset"
+
+<PageTitle>Fieldset · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Fieldset"
+               Subtitle="Groups related form controls with an accessible legend."
+               MarkdownHref="/components/fieldset.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <FieldsetHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Use one <code class="@LiquidGlassClasses.CodeInline">FieldsetLegend</code> to label the group.</li>
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">Disabled</code> on the root when the whole group should stop accepting input.</li>
+    <li>Compose Field parts inside the fieldset so labels, descriptions, and errors stay local to each control.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import Fieldset and place a legend inside the root:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in FieldsetApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Fieldset
+
+        <FieldsetRoot>
+            <FieldsetLegend>Billing details</FieldsetLegend>
+        </FieldsetRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Fieldset.razor", "xml", "Components.Demos.Fieldset.Hero.Css.FieldsetHeroCss.razor"),
+            new DemoFile("fieldset.css", "css", "wwwroot.demos.fieldset.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Fieldset.razor", "xml", "Components.Demos.Fieldset.Hero.Tailwind.FieldsetHeroTailwind.razor"),
+        ]),
+    ];
+}

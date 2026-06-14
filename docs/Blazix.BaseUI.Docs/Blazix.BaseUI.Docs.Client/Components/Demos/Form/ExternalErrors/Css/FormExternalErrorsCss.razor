@@ -1,0 +1,46 @@
+<div class="blx-form-demo-stack">
+    <div class="blx-form-actions">
+        <button type="button" @onclick="SetServerError" class="blx-form-button">
+            Set server error
+        </button>
+        <button type="button" @onclick="ClearServerError" class="blx-form-button blx-form-button-secondary">
+            Clear
+        </button>
+    </div>
+
+    <Form Model="@model"
+          Errors="@errors"
+          class="blx-form">
+        <FieldRoot Name="username" class="blx-form-field">
+            <FieldLabel class="blx-form-label">Username</FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Username"
+                          placeholder="admin"
+                          class="blx-form-input" />
+            <FieldError class="blx-form-error" />
+        </FieldRoot>
+    </Form>
+</div>
+
+@code {
+    private readonly UsernameModel model = new() { Username = "admin" };
+    private Dictionary<string, string[]> errors = new();
+
+    private void SetServerError()
+    {
+        errors = new Dictionary<string, string[]>
+        {
+            ["username"] = ["Username 'admin' is already taken."]
+        };
+    }
+
+    private void ClearServerError()
+    {
+        errors = new();
+    }
+
+    private sealed class UsernameModel
+    {
+        public string Username { get; set; } = "";
+    }
+}

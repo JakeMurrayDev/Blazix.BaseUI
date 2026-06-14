@@ -1,0 +1,98 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-field {
+  display: flex;
+  width: 100%;
+  max-width: 16rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.blx-field-label {
+  color: #020617;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+
+.dark .blx-field-label {
+  color: #ffffff;
+}
+
+.blx-field-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.5rem;
+  border: 1px solid #020617;
+  border-radius: 0;
+  background-color: #ffffff;
+  color: #020617;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+}
+
+.dark .blx-field-input {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #ffffff;
+}
+
+.blx-field-input::placeholder {
+  color: #64748b;
+}
+
+.dark .blx-field-input::placeholder {
+  color: #94a3b8;
+}
+
+.blx-field-input:focus {
+  outline: 2px solid #020617;
+  outline-offset: -1px;
+}
+
+.dark .blx-field-input:focus {
+  outline-color: #ffffff;
+}
+
+.blx-field-input[data-invalid] {
+  border-color: #b91c1c;
+}
+
+.blx-field-input[data-invalid]:focus {
+  outline-color: #b91c1c;
+}
+
+.dark .blx-field-input[data-invalid] {
+  border-color: #f87171;
+}
+
+.dark .blx-field-input[data-invalid]:focus {
+  outline-color: #f87171;
+}
+
+.blx-field-error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.dark .blx-field-error {
+  color: #f87171;
+}
+
+.blx-field-description {
+  margin: 0;
+  color: #475569;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.dark .blx-field-description {
+  color: #94a3b8;
+}
