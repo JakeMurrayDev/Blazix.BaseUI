@@ -1,0 +1,63 @@
+<div class="flex flex-wrap items-center gap-2">
+    <MenuTypedTrigger TPayload="string" Handle="animatedMenu" Payload="@("library")" class="box-border inline-flex h-8 items-center justify-center gap-1.5 border border-slate-950 bg-white px-3 text-sm leading-none text-slate-950 outline-0 select-none hover:bg-slate-100 active:bg-slate-200 data-[popup-open]:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:data-[popup-open]:bg-slate-800 dark:focus-visible:outline-white">Library</MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string" Handle="animatedMenu" Payload="@("playback")" class="box-border inline-flex h-8 items-center justify-center gap-1.5 border border-slate-950 bg-white px-3 text-sm leading-none text-slate-950 outline-0 select-none hover:bg-slate-100 active:bg-slate-200 data-[popup-open]:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:data-[popup-open]:bg-slate-800 dark:focus-visible:outline-white">Playback</MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string" Handle="animatedMenu" Payload="@("share")" class="box-border inline-flex h-8 items-center justify-center gap-1.5 border border-slate-950 bg-white px-3 text-sm leading-none text-slate-950 outline-0 select-none hover:bg-slate-100 active:bg-slate-200 data-[popup-open]:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-slate-950 dark:border-white dark:bg-slate-950 dark:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700 dark:data-[popup-open]:bg-slate-800 dark:focus-visible:outline-white">Share</MenuTypedTrigger>
+
+    <MenuRoot Handle="animatedMenu" Modal="MenuModalMode.False" Context="menu">
+        <MenuPortal>
+            <MenuPositioner SideOffset="8" class="outline-0 transition-[inset,top,left,right,bottom] duration-200 ease-out">
+                <MenuPopup class="relative box-border min-w-44 border border-slate-950 bg-white py-1 text-slate-950 shadow-[0.25rem_0.25rem_0_rgba(0,0,0,0.12)] outline-0 transition-[width,height,transform,opacity] duration-200 ease-out [transform-origin:var(--transform-origin)] data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 dark:border-white dark:bg-slate-950 dark:text-white dark:shadow-none">
+                    <MenuViewport class="overflow-hidden data-[activation-direction=left]:[--slide-start:-0.5rem] data-[activation-direction=right]:[--slide-start:0.5rem] [&>[data-current]]:transition-[transform,opacity] [&>[data-current]]:duration-200 [&>[data-previous]]:absolute [&>[data-previous]]:inset-0 [&>[data-previous]]:transition-[transform,opacity] [&>[data-previous]]:duration-200 [&>[data-previous]]:opacity-0 [&>[data-previous]]:translate-x-[calc(var(--slide-start,0.5rem)*-1)] [&>[data-current][data-transitioning]]:translate-x-[var(--slide-start,0.5rem)] [&>[data-current][data-transitioning]]:opacity-0">
+                        @if (TryGetAnimatedMenu(menu.Payload as string, out var content))
+                        {
+                            @for (var groupIndex = 0; groupIndex < content.Groups.Length; groupIndex++)
+                            {
+                                var group = content.Groups[groupIndex];
+                                <MenuGroup>
+                                    @if (groupIndex == 0)
+                                    {
+                                        <MenuGroupLabel class="select-none px-4 py-2 text-sm leading-4 text-slate-500 dark:text-slate-400">@content.Heading</MenuGroupLabel>
+                                    }
+
+                                    @foreach (var item in group)
+                                    {
+                                        <MenuItem class="relative z-0 flex cursor-default select-none px-4 py-2 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">@item</MenuItem>
+                                    }
+                                </MenuGroup>
+
+                                @if (groupIndex < content.Groups.Length - 1)
+                                {
+                                    <Blazix.BaseUI.Separator.Separator class="m-1 h-px bg-slate-950 dark:bg-white" />
+                                }
+                            }
+                        }
+                    </MenuViewport>
+                </MenuPopup>
+            </MenuPositioner>
+        </MenuPortal>
+    </MenuRoot>
+</div>
+
+@code {
+    private readonly MenuHandle<string> animatedMenu = MenuHandleFactory.CreateHandle<string>();
+
+    private static readonly IReadOnlyDictionary<string, AnimatedMenuContent> Menus = new Dictionary<string, AnimatedMenuContent>
+    {
+        ["library"] = new("Library", [["Add to library", "Add to favorites"], ["Create playlist", "Create station"]]),
+        ["playback"] = new("Playback", [["Play now", "Add to queue"], ["Play next", "Play last", "Sleep timer"]]),
+        ["share"] = new("Share", [["Copy link", "Copy embed code"], ["Share to contacts", "Share to social"]]),
+    };
+
+    private static bool TryGetAnimatedMenu(string? key, out AnimatedMenuContent content)
+    {
+        if (key is not null && Menus.TryGetValue(key, out content!))
+        {
+            return true;
+        }
+
+        content = Menus["library"];
+        return true;
+    }
+
+    private sealed record AnimatedMenuContent(string Heading, string[][] Groups);
+}

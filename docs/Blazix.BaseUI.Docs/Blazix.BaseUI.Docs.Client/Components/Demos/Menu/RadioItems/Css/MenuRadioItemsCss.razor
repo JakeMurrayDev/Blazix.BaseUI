@@ -1,0 +1,48 @@
+<MenuRoot Context="_">
+    <MenuTrigger class="blx-menu-button">
+        Sort
+        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M12 6H4l4 4.5z" />
+        </svg>
+    </MenuTrigger>
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuRadioGroup @bind-Value="sortBy">
+                    <MenuRadioItem Value="@("date")"
+                                   class="blx-menu-choice-item">
+                        <MenuRadioItemIndicator class="blx-menu-choice-indicator">
+                            <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                <path d="m2.5 8.5 4 4 7-9" />
+                            </svg>
+                        </MenuRadioItemIndicator>
+                        <span class="blx-menu-choice-text">Date</span>
+                    </MenuRadioItem>
+                    <MenuRadioItem Value="@("name")"
+                                   class="blx-menu-choice-item">
+                        <MenuRadioItemIndicator class="blx-menu-choice-indicator">
+                            <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                <path d="m2.5 8.5 4 4 7-9" />
+                            </svg>
+                        </MenuRadioItemIndicator>
+                        <span class="blx-menu-choice-text">Name</span>
+                    </MenuRadioItem>
+                    <MenuRadioItem Value="@("type")"
+                                   class="blx-menu-choice-item">
+                        <MenuRadioItemIndicator class="blx-menu-choice-indicator">
+                            <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                <path d="m2.5 8.5 4 4 7-9" />
+                            </svg>
+                        </MenuRadioItemIndicator>
+                        <span class="blx-menu-choice-text">Type</span>
+                    </MenuRadioItem>
+                </MenuRadioGroup>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>
+
+@code {
+    private object? sortBy = "date";
+}

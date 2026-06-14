@@ -1,0 +1,56 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-input-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  color: #020617;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+}
+
+.dark .blx-input-label {
+  color: #ffffff;
+}
+
+.blx-input {
+  box-sizing: border-box;
+  width: 10rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.5rem;
+  border: 1px solid #020617;
+  border-radius: 0;
+  background-color: #ffffff;
+  color: #020617;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.25rem;
+}
+
+.dark .blx-input {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #ffffff;
+}
+
+.blx-input::placeholder {
+  color: #64748b;
+}
+
+.dark .blx-input::placeholder {
+  color: #94a3b8;
+}
+
+.blx-input:focus {
+  outline: 2px solid #020617;
+  outline-offset: -1px;
+}
+
+.dark .blx-input:focus {
+  outline-color: #ffffff;
+}

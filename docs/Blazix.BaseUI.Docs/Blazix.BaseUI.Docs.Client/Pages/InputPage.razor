@@ -1,0 +1,54 @@
+@page "/components/input"
+
+<PageTitle>Input · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Input"
+               Subtitle="A native input element that automatically works with Field."
+               MarkdownHref="/components/input.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <InputHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Every input needs an accessible name from a native <code class="@LiquidGlassClasses.CodeInline">label</code> element or the Field component.</li>
+    <li>Use Field when you want validation state, dirty/touched tracking, and data attributes coordinated with labels and errors.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and use Input as a single part:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in InputApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Input
+
+        <Input />
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Input.razor", "xml", "Components.Demos.Input.Hero.Css.InputHeroCss.razor"),
+            new DemoFile("input.css", "css", "wwwroot.demos.input.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Input.razor", "xml", "Components.Demos.Input.Hero.Tailwind.InputHeroTailwind.razor"),
+        ]),
+    ];
+}

@@ -1,0 +1,43 @@
+<MenuRoot Context="_">
+    <MenuTrigger class="blx-menu-button">
+        Song
+        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M12 6H4l4 4.5z" />
+        </svg>
+    </MenuTrigger>
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuItem class="blx-menu-item">Add to Library</MenuItem>
+                <MenuSubmenuRoot>
+                    <MenuSubmenuTrigger class="blx-menu-submenu-trigger">
+                        Add to Playlist
+                        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M6 12V4l4.5 4z" />
+                        </svg>
+                    </MenuSubmenuTrigger>
+                    <MenuPortal>
+                        <MenuPositioner SideOffset="-4"
+                                        AlignOffset="-4"
+                                        class="blx-menu-positioner">
+                            <MenuPopup class="blx-menu-popup">
+                                <MenuItem class="blx-menu-item">Get Up!</MenuItem>
+                                <MenuItem class="blx-menu-item">Inside Out</MenuItem>
+                                <MenuItem class="blx-menu-item">Night Beats</MenuItem>
+                                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                                <MenuItem class="blx-menu-item">New playlist...</MenuItem>
+                            </MenuPopup>
+                        </MenuPositioner>
+                    </MenuPortal>
+                </MenuSubmenuRoot>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">Play Next</MenuItem>
+                <MenuItem class="blx-menu-item">Play Last</MenuItem>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">Favorite</MenuItem>
+                <MenuItem class="blx-menu-item">Share</MenuItem>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>

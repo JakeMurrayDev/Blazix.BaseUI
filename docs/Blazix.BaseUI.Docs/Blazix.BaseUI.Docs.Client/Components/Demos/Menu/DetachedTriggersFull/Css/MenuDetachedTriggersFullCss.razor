@@ -1,0 +1,81 @@
+<div class="blx-menu-trigger-row">
+    <MenuTypedTrigger TPayload="string"
+                      Handle="animatedMenu"
+                      Payload="@("library")"
+                      class="blx-menu-button">
+        Library
+    </MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string"
+                      Handle="animatedMenu"
+                      Payload="@("playback")"
+                      class="blx-menu-button">
+        Playback
+    </MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string"
+                      Handle="animatedMenu"
+                      Payload="@("share")"
+                      class="blx-menu-button">
+        Share
+    </MenuTypedTrigger>
+
+    <MenuRoot Handle="animatedMenu"
+              Modal="MenuModalMode.False"
+              Context="menu">
+        <MenuPortal>
+            <MenuPositioner SideOffset="8"
+                            class="blx-menu-positioner blx-menu-animated-positioner">
+                <MenuPopup class="blx-menu-popup blx-menu-animated-popup">
+                    <MenuViewport class="blx-menu-viewport">
+                        @if (TryGetAnimatedMenu(menu.Payload as string, out var content))
+                        {
+                            @for (var groupIndex = 0; groupIndex < content.Groups.Length; groupIndex++)
+                            {
+                                var group = content.Groups[groupIndex];
+                                <MenuGroup>
+                                    @if (groupIndex == 0)
+                                    {
+                                        <MenuGroupLabel class="blx-menu-group-label">@content.Heading</MenuGroupLabel>
+                                    }
+
+                                    @foreach (var item in group)
+                                    {
+                                        <MenuItem class="blx-menu-item">@item</MenuItem>
+                                    }
+                                </MenuGroup>
+
+                                @if (groupIndex < content.Groups.Length - 1)
+                                {
+                                    <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                                }
+                            }
+                        }
+                    </MenuViewport>
+                </MenuPopup>
+            </MenuPositioner>
+        </MenuPortal>
+    </MenuRoot>
+</div>
+
+@code {
+    private readonly MenuHandle<string> animatedMenu = MenuHandleFactory.CreateHandle<string>();
+
+    private static readonly IReadOnlyDictionary<string, AnimatedMenuContent> Menus = new Dictionary<string, AnimatedMenuContent>
+    {
+        ["library"] = new("Library", [["Add to library", "Add to favorites"], ["Create playlist", "Create station"]]),
+        ["playback"] = new("Playback", [["Play now", "Add to queue"], ["Play next", "Play last", "Sleep timer"]]),
+        ["share"] = new("Share", [["Copy link", "Copy embed code"], ["Share to contacts", "Share to social"]]),
+    };
+
+    private static bool TryGetAnimatedMenu(string? key, out AnimatedMenuContent content)
+    {
+        if (key is not null && Menus.TryGetValue(key, out content!))
+        {
+            return true;
+        }
+
+        content = Menus["library"];
+        return true;
+    }
+
+    private sealed record AnimatedMenuContent(string Heading, string[][] Groups);
+}

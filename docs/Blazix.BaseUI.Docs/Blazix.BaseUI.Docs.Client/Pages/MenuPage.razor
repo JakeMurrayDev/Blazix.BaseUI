@@ -1,0 +1,427 @@
+@page "/components/menu"
+
+<PageTitle>Menu · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Menu"
+               Subtitle="A list of actions in a dropdown, enhanced with keyboard navigation."
+               MarkdownHref="/components/menu.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <MenuHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its trigger, portal, positioner, popup, items, and optional groups or submenus:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Open on hover" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Add <code class="@LiquidGlassClasses.CodeInline">OpenOnHover</code> to the trigger when pointer hover should open the menu. Use <code class="@LiquidGlassClasses.CodeInline">Delay</code> and <code class="@LiquidGlassClasses.CodeInline">CloseDelay</code> to tune the timing.
+</p>
+<div class="mb-8">
+    <Demo Variants="@OpenOnHoverVariants">
+        <MenuOpenOnHoverCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Checkbox items" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">MenuCheckboxItem</code> with <code class="@LiquidGlassClasses.CodeInline">MenuCheckboxItemIndicator</code> for toggled settings.
+</p>
+<div class="mb-8">
+    <Demo Variants="@CheckboxItemsVariants">
+        <MenuCheckboxItemsCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Radio items" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">MenuRadioGroup</code>, <code class="@LiquidGlassClasses.CodeInline">MenuRadioItem</code>, and <code class="@LiquidGlassClasses.CodeInline">MenuRadioItemIndicator</code> for one-of-many selections.
+</p>
+<div class="mb-8">
+    <Demo Variants="@RadioItemsVariants">
+        <MenuRadioItemsCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Close on click" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">CloseOnClick</code> when an item should override its default close behavior.
+</p>
+<CodeBlock Code="@CloseOnClickCode" />
+
+<DocsHeading Level="3" Title="Group labels" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">MenuGroupLabel</code> inside a <code class="@LiquidGlassClasses.CodeInline">MenuGroup</code> or <code class="@LiquidGlassClasses.CodeInline">MenuRadioGroup</code> to label a section.
+</p>
+<div class="mb-8">
+    <Demo Variants="@GroupLabelsVariants">
+        <MenuGroupLabelsCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Nested menu" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Place a <code class="@LiquidGlassClasses.CodeInline">MenuSubmenuRoot</code> inside a parent popup and use <code class="@LiquidGlassClasses.CodeInline">MenuSubmenuTrigger</code> as the item that opens the nested popup.
+</p>
+<CodeBlock Code="@SubmenuCode" />
+<div class="mb-8 mt-3">
+    <Demo Variants="@SubmenuVariants">
+        <MenuSubmenuCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Navigate to another page" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">MenuLinkItem</code> when a menu item should render as an anchor.
+</p>
+<CodeBlock Code="@LinkItemCode" />
+
+<DocsHeading Level="3" Title="Open a dialog" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Control the dialog state and open it from the menu item's click handler.
+</p>
+<CodeBlock Code="@DialogCode" />
+
+<DocsHeading Level="3" Title="Detached triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Create a menu handle and pass it to both a detached trigger and the root when the trigger lives outside the root's render tree.
+</p>
+<CodeBlock Code="@DetachedTriggerCode" />
+<div class="mb-8 mt-3">
+    <Demo Variants="@DetachedTriggersSimpleVariants">
+        <MenuDetachedTriggersSimpleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    A single root can be opened by more than one trigger. Use payloads when the menu content should depend on the trigger that opened it.
+</p>
+<CodeBlock Code="@MultipleTriggersCode" />
+
+<DocsHeading Level="3" Title="Controlled mode with multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Control the root's open state and trigger id when several triggers share one menu.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersControlledVariants">
+        <MenuDetachedTriggersControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Arrow" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Place <code class="@LiquidGlassClasses.CodeInline">MenuArrow</code> inside the popup and set <code class="@LiquidGlassClasses.CodeInline">ArrowPadding</code> on the positioner to keep it away from popup edges.
+</p>
+<div class="mb-8">
+    <Demo Variants="@ArrowVariants">
+        <MenuArrowCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Animating the Menu" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    With detached triggers, transition the positioner and popup as the active trigger changes. Wrap changing content in <code class="@LiquidGlassClasses.CodeInline">MenuViewport</code> for direction-aware content transitions.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersFullVariants">
+        <MenuDetachedTriggersFullCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in MenuApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Menu
+
+        <MenuRoot Context="_">
+            <MenuTrigger />
+            <MenuPortal>
+                <MenuBackdrop />
+                <MenuPositioner>
+                    <MenuPopup>
+                        <MenuArrow />
+                        <MenuItem />
+                        <MenuLinkItem />
+
+                        <MenuSubmenuRoot>
+                            <MenuSubmenuTrigger />
+                        </MenuSubmenuRoot>
+
+                        <MenuGroup>
+                            <MenuGroupLabel />
+                        </MenuGroup>
+
+                        <MenuRadioGroup>
+                            <MenuRadioItem>
+                                <MenuRadioItemIndicator />
+                            </MenuRadioItem>
+                        </MenuRadioGroup>
+
+                        <MenuCheckboxItem>
+                            <MenuCheckboxItemIndicator />
+                        </MenuCheckboxItem>
+
+                        <MenuViewport />
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+        """;
+
+    private const string CloseOnClickCode =
+        """
+        // Close the menu when a checkbox item is clicked.
+        <MenuCheckboxItem CloseOnClick="true" />
+
+        // Keep the menu open when a normal item is clicked.
+        <MenuItem CloseOnClick="false" />
+        """;
+
+    private const string SubmenuCode =
+        """
+        <MenuRoot Context="_">
+            <MenuTrigger />
+            <MenuPortal>
+                <MenuPositioner>
+                    <MenuPopup>
+                        <MenuItem />
+
+                        <MenuSubmenuRoot>
+                            <MenuSubmenuTrigger />
+                            <MenuPortal>
+                                <MenuPositioner>
+                                    <MenuPopup>
+                                        <MenuItem />
+                                    </MenuPopup>
+                                </MenuPositioner>
+                            </MenuPortal>
+                        </MenuSubmenuRoot>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+        """;
+
+    private const string LinkItemCode =
+        """
+        <MenuLinkItem href="/components/menu">
+            Go to Menu docs
+        </MenuLinkItem>
+        """;
+
+    private const string DialogCode =
+        """
+        @using Blazix.BaseUI.Dialog
+        @using Blazix.BaseUI.Menu
+
+        <MenuRoot Context="_">
+            <MenuTrigger>Open menu</MenuTrigger>
+            <MenuPortal>
+                <MenuPositioner>
+                    <MenuPopup>
+                        <MenuItem @onclick="() => dialogOpen = true">
+                            Open dialog
+                        </MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+
+        <DialogRoot @bind-Open="dialogOpen">
+            <DialogPortal>
+                <DialogBackdrop />
+                <DialogPopup>
+                    ...
+                </DialogPopup>
+            </DialogPortal>
+        </DialogRoot>
+
+        @code {
+            private bool dialogOpen;
+        }
+        """;
+
+    private const string DetachedTriggerCode =
+        """
+        <MenuTrigger Handle="projectMenu">
+            Actions
+        </MenuTrigger>
+
+        <MenuRoot Handle="projectMenu" Context="_">
+            <MenuPortal>
+                <MenuPositioner>
+                    <MenuPopup>
+                        <MenuItem>Edit</MenuItem>
+                        <MenuItem>Share</MenuItem>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+
+        @code {
+            private readonly MenuHandle projectMenu = MenuHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string MultipleTriggersCode =
+        """
+        <MenuRoot Context="menu">
+            <MenuTrigger Payload="@((object?)"File")">File</MenuTrigger>
+            <MenuTrigger Payload="@((object?)"Edit")">Edit</MenuTrigger>
+
+            <MenuPortal>
+                <MenuPositioner>
+                    <MenuPopup>
+                        <MenuViewport>
+                            <MenuItem>@menu.Payload action</MenuItem>
+                        </MenuViewport>
+                    </MenuPopup>
+                </MenuPositioner>
+            </MenuPortal>
+        </MenuRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Hero.Css.MenuHeroCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Hero.Tailwind.MenuHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> OpenOnHoverVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.OpenOnHover.Css.MenuOpenOnHoverCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.OpenOnHover.Tailwind.MenuOpenOnHoverTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> CheckboxItemsVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.CheckboxItems.Css.MenuCheckboxItemsCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.CheckboxItems.Tailwind.MenuCheckboxItemsTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> RadioItemsVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.RadioItems.Css.MenuRadioItemsCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.RadioItems.Tailwind.MenuRadioItemsTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> GroupLabelsVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.GroupLabels.Css.MenuGroupLabelsCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.GroupLabels.Tailwind.MenuGroupLabelsTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> SubmenuVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Submenu.Css.MenuSubmenuCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Submenu.Tailwind.MenuSubmenuTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersSimpleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersSimple.Css.MenuDetachedTriggersSimpleCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersSimple.Tailwind.MenuDetachedTriggersSimpleTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersControlled.Css.MenuDetachedTriggersControlledCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersControlled.Tailwind.MenuDetachedTriggersControlledTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> ArrowVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Arrow.Css.MenuArrowCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.Arrow.Tailwind.MenuArrowTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersFullVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersFull.Css.MenuDetachedTriggersFullCss.razor"),
+            new DemoFile("menu.css", "css", "wwwroot.demos.menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menu.razor", "xml", "Components.Demos.Menu.DetachedTriggersFull.Tailwind.MenuDetachedTriggersFullTailwind.razor"),
+        ]),
+    ];
+}

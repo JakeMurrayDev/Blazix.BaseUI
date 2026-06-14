@@ -1,0 +1,89 @@
+<MenuBarRoot class="blx-menubar">
+    <MenuRoot Context="_">
+        <MenuTrigger class="blx-menubar-trigger">File</MenuTrigger>
+        <MenuPortal>
+            <MenuPositioner SideOffset="4"
+                            class="blx-menubar-positioner">
+                <MenuPopup class="blx-menubar-popup">
+                    <MenuItem class="blx-menubar-item">New</MenuItem>
+                    <MenuItem class="blx-menubar-item">Open</MenuItem>
+                    <MenuItem class="blx-menubar-item">Save</MenuItem>
+                    <MenuSubmenuRoot>
+                        <MenuSubmenuTrigger class="blx-menubar-submenu-trigger">
+                            Export
+                            <svg class="blx-menubar-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                <path d="M6 12V4l4.5 4z" />
+                            </svg>
+                        </MenuSubmenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="-4"
+                                            AlignOffset="-4"
+                                            class="blx-menubar-positioner">
+                                <MenuPopup class="blx-menubar-popup">
+                                    <MenuItem class="blx-menubar-item">PDF</MenuItem>
+                                    <MenuItem class="blx-menubar-item">PNG</MenuItem>
+                                    <MenuItem class="blx-menubar-item">SVG</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuSubmenuRoot>
+                    <Blazix.BaseUI.Separator.Separator class="blx-menubar-separator" />
+                    <MenuItem class="blx-menubar-item">Print</MenuItem>
+                </MenuPopup>
+            </MenuPositioner>
+        </MenuPortal>
+    </MenuRoot>
+
+    <MenuRoot Context="_">
+        <MenuTrigger class="blx-menubar-trigger">Edit</MenuTrigger>
+        <MenuPortal>
+            <MenuPositioner SideOffset="4"
+                            class="blx-menubar-positioner">
+                <MenuPopup class="blx-menubar-popup">
+                    <MenuItem class="blx-menubar-item">Cut</MenuItem>
+                    <MenuItem class="blx-menubar-item">Copy</MenuItem>
+                    <MenuItem class="blx-menubar-item">Paste</MenuItem>
+                </MenuPopup>
+            </MenuPositioner>
+        </MenuPortal>
+    </MenuRoot>
+
+    <MenuRoot Context="_">
+        <MenuTrigger class="blx-menubar-trigger">View</MenuTrigger>
+        <MenuPortal>
+            <MenuPositioner SideOffset="4"
+                            class="blx-menubar-positioner">
+                <MenuPopup class="blx-menubar-popup">
+                    <MenuItem class="blx-menubar-item">Zoom In</MenuItem>
+                    <MenuItem class="blx-menubar-item">Zoom Out</MenuItem>
+                    <MenuSubmenuRoot>
+                        <MenuSubmenuTrigger class="blx-menubar-submenu-trigger">
+                            Layout
+                            <svg class="blx-menubar-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                <path d="M6 12V4l4.5 4z" />
+                            </svg>
+                        </MenuSubmenuTrigger>
+                        <MenuPortal>
+                            <MenuPositioner SideOffset="-4"
+                                            AlignOffset="-4"
+                                            class="blx-menubar-positioner">
+                                <MenuPopup class="blx-menubar-popup">
+                                    <MenuItem class="blx-menubar-item">Single Page</MenuItem>
+                                    <MenuItem class="blx-menubar-item">Two Pages</MenuItem>
+                                    <MenuItem class="blx-menubar-item">Continuous</MenuItem>
+                                </MenuPopup>
+                            </MenuPositioner>
+                        </MenuPortal>
+                    </MenuSubmenuRoot>
+                    <Blazix.BaseUI.Separator.Separator class="blx-menubar-separator" />
+                    <MenuItem class="blx-menubar-item">Full Screen</MenuItem>
+                </MenuPopup>
+            </MenuPositioner>
+        </MenuPortal>
+    </MenuRoot>
+
+    <MenuRoot Disabled="true"
+              Context="_">
+        <MenuTrigger class="blx-menubar-trigger">Help</MenuTrigger>
+    </MenuRoot>
+</MenuBarRoot>
