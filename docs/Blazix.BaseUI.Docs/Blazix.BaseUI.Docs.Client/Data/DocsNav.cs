@@ -30,7 +30,7 @@ public static class DocsNav
             new("Autocomplete", "autocomplete", "/components/autocomplete", "An input that suggests options as you type.", IsDocumented: true),
             new("Avatar", "avatar", "/components/avatar", "An image with a textual fallback.", IsDocumented: true),
             new("Button", "button", "/components/button", "An accessible button with full styling freedom.", IsDocumented: true),
-            new("Checkbox", "checkbox", "/components/checkbox", "A control for toggling between checked states."),
+            new("Checkbox", "checkbox", "/components/checkbox", "A control for toggling between checked states.", IsDocumented: true),
             new("Checkbox Group", "checkbox-group", "/components/checkbox-group", "Manages shared state for a series of checkboxes."),
             new("Collapsible", "collapsible", "/components/collapsible", "A collapsible panel controlled by a button."),
             new("Context Menu", "context-menu", "/components/context-menu", "A menu opened by right-clicking an area."),
