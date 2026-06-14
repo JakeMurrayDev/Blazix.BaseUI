@@ -1,0 +1,17 @@
+<Button class="blx-button"
+        Disabled="loading"
+        FocusableWhenDisabled="true"
+        @onclick="HandleClickAsync">
+    @(loading ? "Submitting" : "Submit")
+</Button>
+
+@code {
+    private bool loading;
+
+    private async Task HandleClickAsync()
+    {
+        loading = true;
+        await Task.Delay(4000);
+        loading = false;
+    }
+}
