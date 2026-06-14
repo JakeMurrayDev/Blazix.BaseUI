@@ -1,0 +1,38 @@
+<DrawerRoot SwipeDirection="DrawerSwipeDirection.Right">
+    <DrawerTrigger class="inline-flex h-10 items-center justify-center rounded-lg border border-teal-400/45 bg-teal-500/15 px-4 text-sm font-semibold text-teal-950 shadow-[0_12px_30px_rgba(13,148,136,0.16)] transition-colors hover:bg-teal-500/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:border-teal-300/30 dark:bg-teal-300/10 dark:text-teal-50 dark:hover:bg-teal-300/15">Open drawer</DrawerTrigger>
+    <DrawerPortal>
+        <DrawerBackdrop class="fixed inset-0 z-50 bg-slate-950/50 opacity-100 transition-opacity duration-200 ease-out data-[starting-style]:opacity-0 data-[ending-style]:opacity-0" />
+        <DrawerViewport class="pointer-events-none fixed inset-0 z-50 flex justify-end">
+            <DrawerPopup class="pointer-events-auto m-3 box-border h-[calc(100dvh-1.5rem)] w-[min(26rem,calc(100vw-1.5rem))] translate-x-[var(--drawer-swipe-movement-x,0px)] overflow-y-auto rounded-2xl border border-white/70 bg-white text-slate-950 shadow-[0_24px_70px_rgba(15,23,42,0.24)] transition-[opacity,transform,box-shadow] duration-200 ease-out focus-visible:outline-none data-[starting-style]:translate-x-full data-[starting-style]:opacity-0 data-[ending-style]:translate-x-full data-[ending-style]:opacity-0 data-[swiping]:transition-none dark:border-white/10 dark:bg-slate-950 dark:text-slate-100 dark:shadow-[0_24px_70px_rgba(0,0,0,0.55)]">
+                <DrawerContent class="flex min-h-full flex-col gap-5 p-6">
+                    <div>
+                        <DrawerTitle class="m-0 text-lg font-semibold">Project settings</DrawerTitle>
+                        <DrawerDescription class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
+                            Tune notifications, visibility, and deployment defaults without leaving the page.
+                        </DrawerDescription>
+                    </div>
+
+                    <div class="grid gap-2">
+                        <label class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                            <span>Weekly digest</span>
+                            <input type="checkbox" checked />
+                        </label>
+                        <label class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                            <span>Require review before publish</span>
+                            <input type="checkbox" checked />
+                        </label>
+                        <label class="flex min-h-12 items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                            <span>Preview branch deploys</span>
+                            <input type="checkbox" />
+                        </label>
+                    </div>
+
+                    <div class="mt-auto flex flex-wrap justify-end gap-2">
+                        <DrawerClose class="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">Close</DrawerClose>
+                        <DrawerClose class="inline-flex h-10 items-center justify-center rounded-lg border border-transparent bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:bg-teal-300 dark:text-slate-950 dark:hover:bg-teal-200">Apply</DrawerClose>
+                    </div>
+                </DrawerContent>
+            </DrawerPopup>
+        </DrawerViewport>
+    </DrawerPortal>
+</DrawerRoot>

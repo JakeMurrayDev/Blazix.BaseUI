@@ -1,0 +1,39 @@
+<div class="blx-dialog-controlled">
+    <div class="blx-dialog-controlled-row">
+        <button type="button" class="blx-dialog-trigger" @onclick="@(() => open = true)">Open from state</button>
+        <span class="blx-dialog-status" data-open="@open">@(open ? "Open" : "Closed")</span>
+    </div>
+
+    <DialogRoot Open="open" OpenChanged="@(value => open = value)" OnOpenChange="HandleOpenChange">
+        <DialogPortal>
+            <DialogBackdrop class="blx-dialog-backdrop" />
+            <DialogPopup class="blx-dialog-popup">
+                <div class="blx-dialog-header">
+                    <DialogTitle class="blx-dialog-title">Controlled dialog</DialogTitle>
+                    <DialogDescription class="blx-dialog-description">
+                        This dialog is opened and closed by Blazor state.
+                    </DialogDescription>
+                </div>
+
+                <div class="blx-dialog-note">
+                    Last reason: <strong>@lastReason</strong>
+                </div>
+
+                <div class="blx-dialog-actions">
+                    <DialogClose class="blx-dialog-button">Close</DialogClose>
+                    <button type="button" class="blx-dialog-button blx-dialog-button-primary" @onclick="@(() => open = false)">Close externally</button>
+                </div>
+            </DialogPopup>
+        </DialogPortal>
+    </DialogRoot>
+</div>
+
+@code {
+    private bool open;
+    private DialogOpenChangeReason lastReason = DialogOpenChangeReason.None;
+
+    private void HandleOpenChange(DialogOpenChangeEventArgs args)
+    {
+        lastReason = args.Reason;
+    }
+}

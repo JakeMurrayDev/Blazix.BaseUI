@@ -1,0 +1,264 @@
+.blx-dialog-trigger {
+    align-items: center;
+    background: rgba(14, 165, 233, 0.14);
+    border: 1px solid rgba(14, 165, 233, 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(8, 145, 178, 0.16);
+    box-sizing: border-box;
+    color: rgb(8, 51, 68);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 650;
+    height: 2.5rem;
+    justify-content: center;
+    padding: 0 1rem;
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.blx-dialog-trigger:hover {
+    background: rgba(14, 165, 233, 0.23);
+}
+
+.blx-dialog-trigger:focus-visible,
+.blx-dialog-button:focus-visible {
+    outline: 2px solid rgb(6, 182, 212);
+    outline-offset: 2px;
+}
+
+.blx-dialog-backdrop {
+    background: rgba(2, 6, 23, 0.5);
+    inset: 0;
+    opacity: 1;
+    position: fixed;
+    transition: opacity 150ms ease-out;
+    z-index: 50;
+}
+
+.blx-dialog-backdrop[data-starting-style],
+.blx-dialog-backdrop[data-ending-style] {
+    opacity: 0;
+}
+
+.blx-dialog-popup {
+    background: white;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+    box-sizing: border-box;
+    color: rgb(15, 23, 42);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    left: 50%;
+    max-width: calc(100vw - 3rem);
+    padding: 1.5rem;
+    position: fixed;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    transition: opacity 150ms ease-out, transform 150ms ease-out;
+    width: 24rem;
+    z-index: 50;
+}
+
+.blx-dialog-popup:focus-visible {
+    outline: none;
+}
+
+.blx-dialog-popup[data-starting-style],
+.blx-dialog-popup[data-ending-style] {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+}
+
+.blx-dialog-header {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.blx-dialog-title {
+    font-size: 1.125rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.blx-dialog-description {
+    color: rgb(71, 85, 105);
+    font-size: 0.875rem;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.blx-dialog-fields {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.blx-dialog-field {
+    color: rgb(51, 65, 85);
+    display: grid;
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 0.375rem;
+}
+
+.blx-dialog-input {
+    background: white;
+    border: 1px solid rgb(203, 213, 225);
+    border-radius: 8px;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+    box-sizing: border-box;
+    color: rgb(15, 23, 42);
+    font: inherit;
+    height: 2.5rem;
+    outline: none;
+    padding: 0 0.75rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.blx-dialog-input:focus {
+    border-color: rgb(6, 182, 212);
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06), 0 0 0 3px rgba(6, 182, 212, 0.22);
+}
+
+.blx-dialog-actions,
+.blx-dialog-controlled-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
+
+.blx-dialog-controlled {
+    display: grid;
+    gap: 1rem;
+}
+
+.blx-dialog-controlled-row {
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.blx-dialog-button {
+    align-items: center;
+    background: white;
+    border: 1px solid rgb(203, 213, 225);
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: rgb(51, 65, 85);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    height: 2.5rem;
+    justify-content: center;
+    padding: 0 1rem;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.blx-dialog-button:hover {
+    background: rgb(241, 245, 249);
+}
+
+.blx-dialog-button-primary {
+    background: rgb(15, 23, 42);
+    border-color: rgb(15, 23, 42);
+    color: white;
+}
+
+.blx-dialog-button-primary:hover {
+    background: rgb(30, 41, 59);
+}
+
+.blx-dialog-status {
+    align-items: center;
+    background: rgb(241, 245, 249);
+    border: 1px solid rgb(203, 213, 225);
+    border-radius: 999px;
+    color: rgb(71, 85, 105);
+    display: inline-flex;
+    font-size: 0.75rem;
+    font-weight: 700;
+    height: 1.75rem;
+    padding: 0 0.75rem;
+}
+
+.blx-dialog-status[data-open="True"] {
+    background: rgb(220, 252, 231);
+    border-color: rgb(134, 239, 172);
+    color: rgb(22, 101, 52);
+}
+
+.blx-dialog-note {
+    background: rgb(248, 250, 252);
+    border: 1px solid rgb(226, 232, 240);
+    border-radius: 8px;
+    color: rgb(71, 85, 105);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.75rem;
+    padding: 0.625rem 0.75rem;
+}
+
+.dark .blx-dialog-trigger {
+    background: rgba(103, 232, 249, 0.1);
+    border-color: rgba(103, 232, 249, 0.3);
+    color: rgb(236, 254, 255);
+}
+
+.dark .blx-dialog-trigger:hover {
+    background: rgba(103, 232, 249, 0.16);
+}
+
+.dark .blx-dialog-popup {
+    background: rgb(2, 6, 23);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    color: rgb(241, 245, 249);
+}
+
+.dark .blx-dialog-description,
+.dark .blx-dialog-field {
+    color: rgb(148, 163, 184);
+}
+
+.dark .blx-dialog-input,
+.dark .blx-dialog-button {
+    background: rgb(15, 23, 42);
+    border-color: rgb(51, 65, 85);
+    color: rgb(241, 245, 249);
+}
+
+.dark .blx-dialog-button:hover {
+    background: rgb(30, 41, 59);
+}
+
+.dark .blx-dialog-button-primary {
+    background: rgb(103, 232, 249);
+    border-color: rgb(103, 232, 249);
+    color: rgb(15, 23, 42);
+}
+
+.dark .blx-dialog-button-primary:hover {
+    background: rgb(165, 243, 252);
+}
+
+.dark .blx-dialog-status {
+    background: rgb(15, 23, 42);
+    border-color: rgb(51, 65, 85);
+    color: rgb(203, 213, 225);
+}
+
+.dark .blx-dialog-status[data-open="True"] {
+    background: rgba(52, 211, 153, 0.15);
+    border-color: rgba(52, 211, 153, 0.3);
+    color: rgb(167, 243, 208);
+}
+
+.dark .blx-dialog-note {
+    background: rgb(15, 23, 42);
+    border-color: rgb(30, 41, 59);
+    color: rgb(203, 213, 225);
+}

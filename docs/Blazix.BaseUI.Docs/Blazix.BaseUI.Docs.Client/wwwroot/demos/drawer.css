@@ -1,0 +1,295 @@
+.blx-drawer-trigger {
+    align-items: center;
+    background: rgba(20, 184, 166, 0.14);
+    border: 1px solid rgba(20, 184, 166, 0.45);
+    border-radius: 8px;
+    box-shadow: 0 12px 30px rgba(13, 148, 136, 0.16);
+    box-sizing: border-box;
+    color: rgb(19, 78, 74);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 650;
+    height: 2.5rem;
+    justify-content: center;
+    padding: 0 1rem;
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.blx-drawer-trigger:hover {
+    background: rgba(20, 184, 166, 0.23);
+}
+
+.blx-drawer-trigger:focus-visible,
+.blx-drawer-button:focus-visible {
+    outline: 2px solid rgb(20, 184, 166);
+    outline-offset: 2px;
+}
+
+.blx-drawer-backdrop {
+    background: rgba(2, 6, 23, 0.5);
+    inset: 0;
+    opacity: calc(1 - var(--drawer-swipe-progress, 0));
+    position: fixed;
+    transition: opacity 200ms cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 50;
+}
+
+.blx-drawer-backdrop[data-starting-style],
+.blx-drawer-backdrop[data-ending-style] {
+    opacity: 0;
+}
+
+.blx-drawer-backdrop[data-swiping],
+.blx-drawer-popup[data-swiping] {
+    transition-duration: 0ms;
+}
+
+.blx-drawer-viewport {
+    display: flex;
+    inset: 0;
+    pointer-events: none;
+    position: fixed;
+    z-index: 50;
+}
+
+.blx-drawer-viewport-right {
+    justify-content: flex-end;
+}
+
+.blx-drawer-viewport-bottom {
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.blx-drawer-viewport-snap {
+    touch-action: none;
+}
+
+.blx-drawer-popup {
+    background: white;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+    box-sizing: border-box;
+    color: rgb(15, 23, 42);
+    outline: none;
+    pointer-events: auto;
+    transition: opacity 220ms cubic-bezier(0.32, 0.72, 0, 1), transform 220ms cubic-bezier(0.32, 0.72, 0, 1), padding-bottom 220ms cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+}
+
+.blx-drawer-popup-right {
+    border-radius: 16px;
+    height: calc(100dvh - 1.5rem);
+    margin: 0.75rem;
+    max-width: calc(100vw - 1.5rem);
+    overflow-y: auto;
+    transform: translateX(var(--drawer-swipe-movement-x, 0px));
+    width: min(26rem, calc(100vw - 1.5rem));
+}
+
+.blx-drawer-popup-right[data-starting-style],
+.blx-drawer-popup-right[data-ending-style] {
+    opacity: 0;
+    transform: translateX(100%);
+}
+
+.blx-drawer-popup-bottom {
+    border-radius: 16px 16px 0 0;
+    margin: 0 0.75rem;
+    max-height: min(76dvh, 42rem);
+    min-height: 18rem;
+    overflow-y: auto;
+    transform: translateY(var(--drawer-swipe-movement-y, 0px));
+    width: min(42rem, calc(100vw - 1.5rem));
+}
+
+.blx-drawer-popup-bottom[data-starting-style],
+.blx-drawer-popup-bottom[data-ending-style] {
+    opacity: 0;
+    transform: translateY(100%);
+}
+
+.blx-drawer-popup-snap {
+    display: flex;
+    flex-direction: column;
+    height: min(34rem, calc(100dvh - 1rem));
+    max-height: calc(100dvh - 1rem);
+    overflow: hidden;
+    padding-bottom: max(0px, calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)));
+    transform: translateY(calc(var(--drawer-snap-point-offset, 0px) + var(--drawer-swipe-movement-y, 0px)));
+}
+
+.blx-drawer-popup-snap[data-starting-style],
+.blx-drawer-popup-snap[data-ending-style] {
+    opacity: 0;
+    transform: translateY(100%);
+}
+
+.blx-drawer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    min-height: 100%;
+    padding: 1.5rem;
+}
+
+.blx-drawer-snap-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 0;
+}
+
+.blx-drawer-grabber {
+    background: rgb(203, 213, 225);
+    border-radius: 999px;
+    flex: 0 0 auto;
+    height: 0.25rem;
+    margin: 0.75rem auto 1rem;
+    width: 3rem;
+}
+
+.blx-drawer-title {
+    font-size: 1.125rem;
+    font-weight: 650;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.blx-drawer-description {
+    color: rgb(71, 85, 105);
+    font-size: 0.875rem;
+    line-height: 1.55;
+    margin: 0.5rem 0 0;
+}
+
+.blx-drawer-stack,
+.blx-drawer-task-list {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.blx-drawer-option {
+    align-items: center;
+    background: rgb(248, 250, 252);
+    border: 1px solid rgb(226, 232, 240);
+    border-radius: 8px;
+    color: rgb(51, 65, 85);
+    display: flex;
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 1rem;
+    justify-content: space-between;
+    min-height: 3rem;
+    padding: 0 0.75rem;
+}
+
+.blx-drawer-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: auto;
+}
+
+.blx-drawer-button {
+    align-items: center;
+    background: white;
+    border: 1px solid rgb(203, 213, 225);
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: rgb(51, 65, 85);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    height: 2.5rem;
+    justify-content: center;
+    padding: 0 1rem;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.blx-drawer-button:hover {
+    background: rgb(241, 245, 249);
+}
+
+.blx-drawer-button-primary {
+    background: rgb(15, 23, 42);
+    border-color: rgb(15, 23, 42);
+    color: white;
+}
+
+.blx-drawer-button-primary:hover {
+    background: rgb(30, 41, 59);
+}
+
+.blx-drawer-snap-demo,
+.blx-drawer-snap-row {
+    display: grid;
+    gap: 1rem;
+}
+
+.blx-drawer-snap-badge {
+    align-items: center;
+    background: rgb(241, 245, 249);
+    border: 1px solid rgb(203, 213, 225);
+    border-radius: 999px;
+    color: rgb(71, 85, 105);
+    display: inline-flex;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-height: 2rem;
+    padding: 0 0.75rem;
+}
+
+.dark .blx-drawer-trigger {
+    background: rgba(94, 234, 212, 0.1);
+    border-color: rgba(94, 234, 212, 0.3);
+    color: rgb(240, 253, 250);
+}
+
+.dark .blx-drawer-trigger:hover {
+    background: rgba(94, 234, 212, 0.16);
+}
+
+.dark .blx-drawer-popup {
+    background: rgb(2, 6, 23);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    color: rgb(241, 245, 249);
+}
+
+.dark .blx-drawer-description {
+    color: rgb(148, 163, 184);
+}
+
+.dark .blx-drawer-option,
+.dark .blx-drawer-button,
+.dark .blx-drawer-snap-badge {
+    background: rgb(15, 23, 42);
+    border-color: rgb(51, 65, 85);
+    color: rgb(203, 213, 225);
+}
+
+.dark .blx-drawer-button:hover {
+    background: rgb(30, 41, 59);
+}
+
+.dark .blx-drawer-button-primary {
+    background: rgb(94, 234, 212);
+    border-color: rgb(94, 234, 212);
+    color: rgb(15, 23, 42);
+}
+
+.dark .blx-drawer-button-primary:hover {
+    background: rgb(153, 246, 228);
+}
+
+.dark .blx-drawer-grabber {
+    background: rgb(51, 65, 85);
+}

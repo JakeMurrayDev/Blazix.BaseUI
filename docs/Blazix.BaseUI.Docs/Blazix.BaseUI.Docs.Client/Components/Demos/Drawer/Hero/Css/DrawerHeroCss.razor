@@ -1,0 +1,38 @@
+<DrawerRoot SwipeDirection="DrawerSwipeDirection.Right">
+    <DrawerTrigger class="blx-drawer-trigger">Open drawer</DrawerTrigger>
+    <DrawerPortal>
+        <DrawerBackdrop class="blx-drawer-backdrop" />
+        <DrawerViewport class="blx-drawer-viewport blx-drawer-viewport-right">
+            <DrawerPopup class="blx-drawer-popup blx-drawer-popup-right">
+                <DrawerContent class="blx-drawer-content">
+                    <div>
+                        <DrawerTitle class="blx-drawer-title">Project settings</DrawerTitle>
+                        <DrawerDescription class="blx-drawer-description">
+                            Tune notifications, visibility, and deployment defaults without leaving the page.
+                        </DrawerDescription>
+                    </div>
+
+                    <div class="blx-drawer-stack">
+                        <label class="blx-drawer-option">
+                            <span>Weekly digest</span>
+                            <input type="checkbox" checked />
+                        </label>
+                        <label class="blx-drawer-option">
+                            <span>Require review before publish</span>
+                            <input type="checkbox" checked />
+                        </label>
+                        <label class="blx-drawer-option">
+                            <span>Preview branch deploys</span>
+                            <input type="checkbox" />
+                        </label>
+                    </div>
+
+                    <div class="blx-drawer-actions">
+                        <DrawerClose class="blx-drawer-button">Close</DrawerClose>
+                        <DrawerClose class="blx-drawer-button blx-drawer-button-primary">Apply</DrawerClose>
+                    </div>
+                </DrawerContent>
+            </DrawerPopup>
+        </DrawerViewport>
+    </DrawerPortal>
+</DrawerRoot>

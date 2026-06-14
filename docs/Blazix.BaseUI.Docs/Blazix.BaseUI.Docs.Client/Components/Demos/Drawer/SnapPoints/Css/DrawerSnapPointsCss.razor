@@ -1,0 +1,55 @@
+<div class="blx-drawer-snap-demo">
+    <div class="blx-drawer-snap-row">
+        <DrawerRoot SnapPoints="snapPoints"
+                    @bind-SnapPoint="snapPoint"
+                    DefaultSnapPoint="defaultSnapPoint">
+            <DrawerTrigger class="blx-drawer-trigger">Open snap drawer</DrawerTrigger>
+            <DrawerPortal>
+                <DrawerBackdrop class="blx-drawer-backdrop" />
+                <DrawerViewport class="blx-drawer-viewport blx-drawer-viewport-bottom blx-drawer-viewport-snap">
+                    <DrawerPopup class="blx-drawer-popup blx-drawer-popup-bottom blx-drawer-popup-snap">
+                        <div class="blx-drawer-grabber" aria-hidden="true"></div>
+                        <DrawerContent class="blx-drawer-content blx-drawer-snap-content">
+                            <DrawerTitle class="blx-drawer-title">Release checklist</DrawerTitle>
+                            <DrawerDescription class="blx-drawer-description">
+                                Drag the sheet between snap points, or close it when the review is complete.
+                            </DrawerDescription>
+
+                            <div class="blx-drawer-task-list">
+                                <label class="blx-drawer-option">
+                                    <span>Run accessibility smoke tests</span>
+                                    <input type="checkbox" checked />
+                                </label>
+                                <label class="blx-drawer-option">
+                                    <span>Confirm dark-mode contrast</span>
+                                    <input type="checkbox" checked />
+                                </label>
+                                <label class="blx-drawer-option">
+                                    <span>Capture mobile viewport screenshots</span>
+                                    <input type="checkbox" />
+                                </label>
+                                <label class="blx-drawer-option">
+                                    <span>Publish API reference updates</span>
+                                    <input type="checkbox" />
+                                </label>
+                            </div>
+
+                            <div class="blx-drawer-actions">
+                                <span class="blx-drawer-snap-badge">Active snap: @ActiveSnapLabel</span>
+                                <DrawerClose class="blx-drawer-button blx-drawer-button-primary">Done</DrawerClose>
+                            </div>
+                        </DrawerContent>
+                    </DrawerPopup>
+                </DrawerViewport>
+            </DrawerPortal>
+        </DrawerRoot>
+    </div>
+</div>
+
+@code {
+    private readonly IReadOnlyList<DrawerSnapPoint> snapPoints = [(DrawerSnapPoint)"18rem", (DrawerSnapPoint)1];
+    private readonly DrawerSnapPoint defaultSnapPoint = (DrawerSnapPoint)"18rem";
+    private DrawerSnapPoint? snapPoint = (DrawerSnapPoint)"18rem";
+
+    private string ActiveSnapLabel => snapPoint?.ToString() ?? "none";
+}
