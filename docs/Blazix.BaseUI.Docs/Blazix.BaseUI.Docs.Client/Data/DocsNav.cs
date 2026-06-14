@@ -35,7 +35,7 @@ public static class DocsNav
             new("Collapsible", "collapsible", "/components/collapsible", "A collapsible panel controlled by a button.", IsDocumented: true),
             new("Context Menu", "context-menu", "/components/context-menu", "A menu opened by right-clicking an area.", IsDocumented: true),
             new("Dialog", "dialog", "/components/dialog", "A popup that opens on top of the page.", IsDocumented: true),
-            new("Drawer", "drawer", "/components/drawer", "A dialog that slides in from the edge of the screen."),
+            new("Drawer", "drawer", "/components/drawer", "A dialog that slides in from the edge of the screen.", IsDocumented: true),
             new("Field", "field", "/components/field", "Labelling and validation for form controls."),
             new("Fieldset", "fieldset", "/components/fieldset", "A grouped set of fields with a legend."),
             new("Form", "form", "/components/form", "A native form with consolidated error handling."),
