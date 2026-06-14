@@ -37,6 +37,7 @@ Groups all parts of the meter and provides the value for screen readers. Renders
 | `Render` | `RenderFragment<RenderProps<MeterRootState>>?` | `null` | Replaces the rendered element. |
 | `ClassValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS style based on state. |
+| `ChildContent` | `RenderFragment?` | `null` | The meter parts to render. |
 
 ### Label
 
@@ -47,6 +48,7 @@ An accessible label for the meter. Renders a `<span>` element by default.
 | `Render` | `RenderFragment<RenderProps<MeterRootState>>?` | `null` | Replaces the rendered element. |
 | `ClassValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS style based on state. |
+| `ChildContent` | `RenderFragment?` | `null` | The label contents. |
 
 ### Track
 
@@ -57,6 +59,7 @@ Contains the meter indicator and represents the entire range. Renders a `<div>` 
 | `Render` | `RenderFragment<RenderProps<MeterRootState>>?` | `null` | Replaces the rendered element. |
 | `ClassValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS style based on state. |
+| `ChildContent` | `RenderFragment?` | `null` | The track contents. |
 
 ### Indicator
 
@@ -67,6 +70,7 @@ Visualizes the position of the value along the range. Renders a `<div>` element 
 | `Render` | `RenderFragment<RenderProps<MeterRootState>>?` | `null` | Replaces the rendered element. |
 | `ClassValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<MeterRootState, string?>?` | `null` | Returns a CSS style based on state. The component appends its width and inset styles. |
+| `ChildContent` | `RenderFragment?` | `null` | The indicator contents. |
 
 ### Value
 
