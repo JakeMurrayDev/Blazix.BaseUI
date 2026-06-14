@@ -31,7 +31,9 @@ public class DocsCheckboxGroupDemoTests : BunitContext
             .Single(label => label.TextContent.Contains("Create user", StringComparison.Ordinal));
         createUserLabel.QuerySelector("input[type='checkbox']")!.Change(true);
 
-        var outerParent = cut.FindAll("[data-parent]")[0];
+        var outerParentLabel = cut.FindAll("label")
+            .Single(label => label.TextContent.Contains("User permissions", StringComparison.Ordinal));
+        var outerParent = outerParentLabel.QuerySelector("[role='checkbox']")!;
         outerParent.GetAttribute("aria-checked").ShouldBe("mixed");
     }
 }
