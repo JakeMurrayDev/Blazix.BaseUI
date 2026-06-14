@@ -32,7 +32,7 @@ public static class DocsNav
             new("Button", "button", "/components/button", "An accessible button with full styling freedom.", IsDocumented: true),
             new("Checkbox", "checkbox", "/components/checkbox", "A control for toggling between checked states.", IsDocumented: true),
             new("Checkbox Group", "checkbox-group", "/components/checkbox-group", "Manages shared state for a series of checkboxes.", IsDocumented: true),
-            new("Collapsible", "collapsible", "/components/collapsible", "A collapsible panel controlled by a button."),
+            new("Collapsible", "collapsible", "/components/collapsible", "A collapsible panel controlled by a button.", IsDocumented: true),
             new("Context Menu", "context-menu", "/components/context-menu", "A menu opened by right-clicking an area."),
             new("Dialog", "dialog", "/components/dialog", "A popup that opens on top of the page."),
             new("Drawer", "drawer", "/components/drawer", "A dialog that slides in from the edge of the screen."),
