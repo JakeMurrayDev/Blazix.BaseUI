@@ -27,6 +27,7 @@ public class DocsHydrationGuardTests
 
         layout.ShouldContain("blazixDocs.markInteractive");
         layout.ShouldContain("ObjectDisposedException");
+        layout.ShouldContain("JSException");
     }
 
     private static string ReadRepoFile(string relativePath)

@@ -307,6 +307,11 @@
             await UpdateGroupTabIndexesAsync();
         }
 
+        if (isDisposed)
+        {
+            return;
+        }
+
         if (!firstRender && IsInToolbarGroup)
         {
             RegisterWithToolbar();
@@ -480,7 +485,7 @@
 
     private void RegisterWithToolbar()
     {
-        if (!Element.HasValue || ToolbarContext is null)
+        if (isDisposed || !Element.HasValue || ToolbarContext is null)
         {
             return;
         }

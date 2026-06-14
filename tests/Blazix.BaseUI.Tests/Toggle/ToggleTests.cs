@@ -591,6 +591,69 @@ public class ToggleTests : BunitContext, IToggleContract
             JSInterop.Invocations.Count(invocation => invocation.Identifier == "disposeGroupItem").ShouldBe(1);
         });
     }
+
+    [Fact]
+    public void RegisterWithToolbar_DoesNotRegisterDisposedToggle()
+    {
+        var toggle = new Blazix.BaseUI.Toggle.Toggle();
+        var renderElement = new RenderElement<ToggleState>();
+        var registerCount = 0;
+        var toolbarContext = new ToolbarRootContext
+        {
+            Disabled = false,
+            Orientation = Orientation.Horizontal,
+            RegisterItem = _ => registerCount++,
+            UnregisterItem = _ => { }
+        };
+
+        SetRenderElementReference(renderElement, new ElementReference("toggle-one"));
+        SetPrivateField(toggle, "renderElementReference", renderElement);
+        SetPrivateProperty(toggle, "ToolbarContext", toolbarContext);
+        SetPrivateField(toggle, "isDisposed", true);
+
+        InvokePrivateMethod(toggle, "RegisterWithToolbar");
+
+        registerCount.ShouldBe(0);
+    }
+
+    private static void SetRenderElementReference(
+        RenderElement<ToggleState> renderElement,
+        ElementReference element)
+    {
+        var property = typeof(RenderElement<ToggleState>).GetProperty(nameof(RenderElement<ToggleState>.Element));
+        property.ShouldNotBeNull();
+
+        var setMethod = property!.GetSetMethod(nonPublic: true);
+        setMethod.ShouldNotBeNull();
+        setMethod!.Invoke(renderElement, [element]);
+    }
+
+    private static void SetPrivateField<TInstance>(TInstance instance, string fieldName, object? value)
+    {
+        var field = typeof(TInstance).GetField(
+            fieldName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        field.ShouldNotBeNull();
+        field!.SetValue(instance, value);
+    }
+
+    private static void SetPrivateProperty<TInstance>(TInstance instance, string propertyName, object? value)
+    {
+        var property = typeof(TInstance).GetProperty(
+            propertyName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        property.ShouldNotBeNull();
+        property!.SetValue(instance, value);
+    }
+
+    private static void InvokePrivateMethod<TInstance>(TInstance instance, string methodName)
+    {
+        var method = typeof(TInstance).GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        method.ShouldNotBeNull();
+        method!.Invoke(instance, []);
+    }
 }
 
 internal sealed class ToggleToolbarContextClearHost : ComponentBase

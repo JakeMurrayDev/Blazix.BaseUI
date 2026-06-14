@@ -33,7 +33,7 @@ Confirmed with a Playwright probe that delayed `blazor.web.js` and clicked visib
 | Theme toggle (`SwitchRoot`) | No | Toggled |
 | Mobile navigation (`DrawerTrigger`) | No | Opened |
 
-Once the same page was already interactive, all of the representative controls responded normally. Local Playwright timings for the interactive click-to-state-change path were roughly 200-335 ms for the Server-mode controls in this run; those timings include browser automation and SignalR round-trip overhead, so they should be treated as coarse confirmation rather than micro-benchmark numbers.
+Once the same page was already interactive, the representative controls responded normally. Local Playwright timings for the interactive click-to-state-change path were roughly 200-335 ms for the Server-mode controls in this run; those timings include browser automation and SignalR round-trip overhead, so they should be treated as coarse confirmation rather than micro-benchmark numbers.
 
 The broader source scan shows the same class of risk for stateful controls whose first visible action is handled through Blazor event callbacks or post-render JavaScript interop, including Accordion, Alert/Dialog/Drawer/Popover/Menu-family triggers, Autocomplete/Select, Tabs, Toggle/Switch/Checkbox/Radio groups, Slider/NumberField/Form controls, Toast actions, and docs-only controls like `CopyButton`, `RuntimeSwitch`, and `ThemeToggle`. Static display components and already-rendered default state are not meaningfully affected by this specific first-open lag. Plain native links can still navigate before hydration, though any Blazor callback attached to the same click waits for interactivity.
 
