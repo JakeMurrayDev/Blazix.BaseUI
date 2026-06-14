@@ -1,0 +1,63 @@
+@page "/components/menubar"
+
+<PageTitle>Menubar · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Menubar"
+               Subtitle="A menu bar providing commands and options for your application."
+               MarkdownHref="/components/menubar.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <MenuBarHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import Menubar and Menu, then place Menu roots inside the menubar container:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in MenuBarApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Menu
+        @using Blazix.BaseUI.MenuBar
+
+        <MenuBarRoot>
+            <MenuRoot Context="_">
+                <MenuTrigger>File</MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner>
+                        <MenuPopup>
+                            <MenuItem>New</MenuItem>
+                            <MenuSubmenuRoot>
+                                <MenuSubmenuTrigger>Export</MenuSubmenuTrigger>
+                            </MenuSubmenuRoot>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </MenuBarRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Menubar.razor", "xml", "Components.Demos.MenuBar.Hero.Css.MenuBarHeroCss.razor"),
+            new DemoFile("menubar.css", "css", "wwwroot.demos.menubar.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Menubar.razor", "xml", "Components.Demos.MenuBar.Hero.Tailwind.MenuBarHeroTailwind.razor"),
+        ]),
+    ];
+}

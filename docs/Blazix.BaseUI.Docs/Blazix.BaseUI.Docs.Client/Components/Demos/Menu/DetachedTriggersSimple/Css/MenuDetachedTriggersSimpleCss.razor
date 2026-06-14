@@ -1,0 +1,30 @@
+<MenuTrigger Handle="projectMenu"
+             aria-label="Project actions"
+             class="blx-menu-icon-button">
+    <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <circle cx="3" cy="8" r="1" />
+        <circle cx="8" cy="8" r="1" />
+        <circle cx="13" cy="8" r="1" />
+    </svg>
+</MenuTrigger>
+
+<MenuRoot Handle="projectMenu"
+          Context="_">
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuItem class="blx-menu-item">Rename</MenuItem>
+                <MenuItem class="blx-menu-item">Duplicate</MenuItem>
+                <MenuItem class="blx-menu-item">Move to folder</MenuItem>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">Archive</MenuItem>
+                <MenuItem class="blx-menu-item">Delete</MenuItem>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>
+
+@code {
+    private readonly MenuHandle projectMenu = MenuHandleFactory.CreateHandle();
+}

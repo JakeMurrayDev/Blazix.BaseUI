@@ -1,0 +1,96 @@
+<div class="blx-menu-trigger-row">
+    <MenuTypedTrigger TPayload="string"
+                      id="menu-controlled-library"
+                      Handle="controlledMenu"
+                      Payload="@("library")"
+                      class="blx-menu-button">
+        Library
+    </MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string"
+                      id="menu-controlled-playback"
+                      Handle="controlledMenu"
+                      Payload="@("playback")"
+                      class="blx-menu-button">
+        Playback
+    </MenuTypedTrigger>
+    <MenuTypedTrigger TPayload="string"
+                      id="menu-controlled-share"
+                      Handle="controlledMenu"
+                      Payload="@("share")"
+                      class="blx-menu-button">
+        Share
+    </MenuTypedTrigger>
+    <button type="button"
+            class="blx-menu-button"
+            @onclick="OpenPlayback">
+        Open playback (controlled)
+    </button>
+</div>
+
+<MenuRoot Handle="controlledMenu"
+          Open="@isOpen"
+          OpenChanged="SetOpen"
+          TriggerId="@activeTriggerId"
+          OnOpenChange="HandleOpenChange"
+          Context="menu">
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                @foreach (var item in GetControlledItems(menu.Payload as string))
+                {
+                    <MenuItem class="blx-menu-item">@item</MenuItem>
+                }
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>
+
+@code {
+    private static readonly IReadOnlyDictionary<string, string[]> ItemGroups = new Dictionary<string, string[]>
+    {
+        ["library"] = ["Add to library", "Add to favorites"],
+        ["playback"] = ["Play", "Add to queue"],
+        ["share"] = ["Share", "Copy link"],
+    };
+
+    private readonly MenuHandle<string> controlledMenu = MenuHandleFactory.CreateHandle<string>();
+    private bool isOpen;
+    private string? activeTriggerId;
+
+    private void SetOpen(bool open)
+    {
+        isOpen = open;
+    }
+
+    private Task HandleOpenChange(MenuOpenChangeEventArgs args)
+    {
+        isOpen = args.Open;
+
+        if (args.Open && args.Payload is string payload)
+        {
+            activeTriggerId = payload switch
+            {
+                "library" => "menu-controlled-library",
+                "playback" => "menu-controlled-playback",
+                "share" => "menu-controlled-share",
+                _ => activeTriggerId,
+            };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void OpenPlayback()
+    {
+        activeTriggerId = "menu-controlled-playback";
+        isOpen = true;
+    }
+
+    private static IReadOnlyList<string> GetControlledItems(string? key)
+    {
+        return key is not null && ItemGroups.TryGetValue(key, out var items)
+            ? items
+            : ItemGroups["library"];
+    }
+}

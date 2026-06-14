@@ -1,0 +1,54 @@
+@page "/components/meter"
+
+<PageTitle>Meter · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Meter"
+               Subtitle="A graphical display of a numeric value within a range."
+               MarkdownHref="/components/meter.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <MeterHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the label, value, track, and indicator inside the root:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in MeterApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Meter
+
+        <MeterRoot Value="24">
+            <MeterLabel>Storage Used</MeterLabel>
+            <MeterValue />
+            <MeterTrack>
+                <MeterIndicator />
+            </MeterTrack>
+        </MeterRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Meter.razor", "xml", "Components.Demos.Meter.Hero.Css.MeterHeroCss.razor"),
+            new DemoFile("meter.css", "css", "wwwroot.demos.meter.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Meter.razor", "xml", "Components.Demos.Meter.Hero.Tailwind.MeterHeroTailwind.razor"),
+        ]),
+    ];
+}

@@ -1,0 +1,25 @@
+<MenuRoot Context="_">
+    <MenuTrigger class="blx-menu-button">
+        Song
+        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M12 6H4l4 4.5z" />
+        </svg>
+    </MenuTrigger>
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        ArrowPadding="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuArrow class="blx-menu-arrow" />
+                <MenuItem class="blx-menu-item">Add to Library</MenuItem>
+                <MenuItem class="blx-menu-item">Add to Playlist</MenuItem>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">Play Next</MenuItem>
+                <MenuItem class="blx-menu-item">Play Last</MenuItem>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">Favorite</MenuItem>
+                <MenuItem class="blx-menu-item">Share</MenuItem>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>

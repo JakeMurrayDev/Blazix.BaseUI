@@ -1,0 +1,48 @@
+<MenuRoot Context="_">
+    <MenuTrigger class="blx-menu-button">
+        Workspace
+        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M12 6H4l4 4.5z" />
+        </svg>
+    </MenuTrigger>
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuCheckboxItem @bind-Checked="showMinimap"
+                                  class="blx-menu-choice-item">
+                    <MenuCheckboxItemIndicator class="blx-menu-choice-indicator">
+                        <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="m2.5 8.5 4 4 7-9" />
+                        </svg>
+                    </MenuCheckboxItemIndicator>
+                    <span class="blx-menu-choice-text">Minimap</span>
+                </MenuCheckboxItem>
+                <MenuCheckboxItem @bind-Checked="showSearch"
+                                  class="blx-menu-choice-item">
+                    <MenuCheckboxItemIndicator class="blx-menu-choice-indicator">
+                        <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="m2.5 8.5 4 4 7-9" />
+                        </svg>
+                    </MenuCheckboxItemIndicator>
+                    <span class="blx-menu-choice-text">Search</span>
+                </MenuCheckboxItem>
+                <MenuCheckboxItem @bind-Checked="showSidebar"
+                                  class="blx-menu-choice-item">
+                    <MenuCheckboxItemIndicator class="blx-menu-choice-indicator">
+                        <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="m2.5 8.5 4 4 7-9" />
+                        </svg>
+                    </MenuCheckboxItemIndicator>
+                    <span class="blx-menu-choice-text">Sidebar</span>
+                </MenuCheckboxItem>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>
+
+@code {
+    private bool showMinimap = true;
+    private bool showSearch = true;
+    private bool showSidebar;
+}

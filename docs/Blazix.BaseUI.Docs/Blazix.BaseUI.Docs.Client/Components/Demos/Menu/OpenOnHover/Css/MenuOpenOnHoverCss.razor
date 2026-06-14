@@ -1,0 +1,21 @@
+<MenuRoot Context="_">
+    <MenuTrigger OpenOnHover="true"
+                 class="blx-menu-button">
+        Add to playlist
+        <svg class="blx-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M12 6H4l4 4.5z" />
+        </svg>
+    </MenuTrigger>
+    <MenuPortal>
+        <MenuPositioner SideOffset="8"
+                        class="blx-menu-positioner">
+            <MenuPopup class="blx-menu-popup">
+                <MenuItem class="blx-menu-item">Get Up!</MenuItem>
+                <MenuItem class="blx-menu-item">Inside Out</MenuItem>
+                <MenuItem class="blx-menu-item">Night Beats</MenuItem>
+                <Blazix.BaseUI.Separator.Separator class="blx-menu-separator" />
+                <MenuItem class="blx-menu-item">New playlist...</MenuItem>
+            </MenuPopup>
+        </MenuPositioner>
+    </MenuPortal>
+</MenuRoot>
