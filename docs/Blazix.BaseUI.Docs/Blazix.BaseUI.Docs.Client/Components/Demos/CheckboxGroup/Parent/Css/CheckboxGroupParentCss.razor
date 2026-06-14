@@ -1,0 +1,67 @@
+<CheckboxGroup aria-labelledby="permissions-label"
+               Value="@selectedPermissions"
+               ValueChanged="@(value => selectedPermissions = value)"
+               AllValues="@AllPermissions"
+               class="blx-checkbox-group blx-checkbox-group-parent">
+    <label class="blx-checkbox-group-item blx-checkbox-group-parent-item" id="permissions-label">
+        <CheckboxRoot Parent="true" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                @if (IsParentIndeterminate)
+                {
+                    <svg class="blx-checkbox-group-rule-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M3 8H13" />
+                    </svg>
+                }
+                else
+                {
+                    <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                    </svg>
+                }
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        Release readiness
+    </label>
+
+    <label class="blx-checkbox-group-item">
+        <CheckboxRoot Value="api" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                </svg>
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        API reviewed
+    </label>
+
+    <label class="blx-checkbox-group-item">
+        <CheckboxRoot Value="docs" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                </svg>
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        Docs updated
+    </label>
+
+    <label class="blx-checkbox-group-item">
+        <CheckboxRoot Value="tests" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                </svg>
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        Tests passing
+    </label>
+</CheckboxGroup>
+
+@code {
+    private static readonly string[] AllPermissions = ["api", "docs", "tests"];
+
+    private string[] selectedPermissions = ["api"];
+
+    private bool IsParentIndeterminate =>
+        selectedPermissions.Length > 0 && selectedPermissions.Length < AllPermissions.Length;
+}

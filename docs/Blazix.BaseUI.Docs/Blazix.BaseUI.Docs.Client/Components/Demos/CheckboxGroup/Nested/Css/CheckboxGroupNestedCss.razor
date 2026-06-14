@@ -1,0 +1,130 @@
+<CheckboxGroup aria-labelledby="access-label"
+               Value="@mainValue"
+               ValueChanged="HandleMainValueChanged"
+               class="blx-checkbox-group blx-checkbox-group-parent">
+    <label class="blx-checkbox-group-item blx-checkbox-group-parent-item" id="access-label">
+        <CheckboxRoot Checked="@AllPermissionsSelected"
+                      Indeterminate="@AllPermissionsPartiallySelected"
+                      OnCheckedChange="HandleAllPermissionsChanged"
+                      class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                @if (AllPermissionsPartiallySelected)
+                {
+                    <svg class="blx-checkbox-group-rule-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M3 8H13" />
+                    </svg>
+                }
+                else
+                {
+                    <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                    </svg>
+                }
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        User permissions
+    </label>
+
+    <label class="blx-checkbox-group-item">
+        <CheckboxRoot Value="view-dashboard" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                </svg>
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        View dashboard
+    </label>
+
+    <label class="blx-checkbox-group-item">
+        <CheckboxRoot Value="access-reports" class="blx-checkbox-group-checkbox">
+            <CheckboxIndicator class="blx-checkbox-group-indicator">
+                <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                </svg>
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        Access reports
+    </label>
+
+    <CheckboxGroup aria-labelledby="manage-users-label"
+                   Value="@managementValue"
+                   ValueChanged="HandleManagementValueChanged"
+                   AllValues="@UserManagementPermissions"
+                   class="blx-checkbox-group blx-checkbox-group-nested">
+        <label class="blx-checkbox-group-item blx-checkbox-group-parent-item" id="manage-users-label">
+            <CheckboxRoot Parent="true" class="blx-checkbox-group-checkbox">
+                <CheckboxIndicator class="blx-checkbox-group-indicator">
+                    @if (ManagementIsPartiallySelected)
+                    {
+                        <svg class="blx-checkbox-group-rule-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M3 8H13" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                        </svg>
+                    }
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            Manage users
+        </label>
+
+        @foreach (var permission in UserPermissionOptions)
+        {
+            <label class="blx-checkbox-group-item">
+                <CheckboxRoot Value="@permission.Value" class="blx-checkbox-group-checkbox">
+                    <CheckboxIndicator class="blx-checkbox-group-indicator">
+                        <svg class="blx-checkbox-group-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                        </svg>
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                @permission.Label
+            </label>
+        }
+    </CheckboxGroup>
+</CheckboxGroup>
+
+@code {
+    private static readonly string[] MainPermissions = ["view-dashboard", "access-reports"];
+    private static readonly string[] UserManagementPermissions = ["create-user", "edit-user", "delete-user", "assign-roles"];
+
+    private static readonly (string Value, string Label)[] UserPermissionOptions =
+    [
+        ("create-user", "Create user"),
+        ("edit-user", "Edit user"),
+        ("delete-user", "Delete user"),
+        ("assign-roles", "Assign roles"),
+    ];
+
+    private string[] mainValue = [];
+    private string[] managementValue = [];
+
+    private bool AllPermissionsSelected =>
+        mainValue.Length == MainPermissions.Length && managementValue.Length == UserManagementPermissions.Length;
+
+    private bool AllPermissionsPartiallySelected =>
+        !AllPermissionsSelected && (mainValue.Length > 0 || managementValue.Length > 0);
+
+    private bool ManagementIsPartiallySelected =>
+        managementValue.Length > 0 && managementValue.Length < UserManagementPermissions.Length;
+
+    private void HandleAllPermissionsChanged(CheckboxCheckedChangeEventArgs args)
+    {
+        mainValue = args.Checked ? [.. MainPermissions] : [];
+        managementValue = args.Checked ? [.. UserManagementPermissions] : [];
+    }
+
+    private void HandleMainValueChanged(string[] value)
+    {
+        mainValue = value;
+    }
+
+    private void HandleManagementValueChanged(string[] value)
+    {
+        managementValue = value;
+    }
+}

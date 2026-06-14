@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Blazix.BaseUI\Blazix.BaseUI.csproj" />
     <ProjectReference Include="..\..\demo\Blazix.BaseUI.Demo\Blazix.BaseUI.Demo.Client\Blazix.BaseUI.Demo.Client.csproj" />
+    <ProjectReference Include="..\..\docs\Blazix.BaseUI.Docs\Blazix.BaseUI.Docs.Client\Blazix.BaseUI.Docs.Client.csproj" />
     <ProjectReference Include="..\Blazix.BaseUI.Tests.Contracts\Blazix.BaseUI.Tests.Contracts.csproj" />
   </ItemGroup>
 
