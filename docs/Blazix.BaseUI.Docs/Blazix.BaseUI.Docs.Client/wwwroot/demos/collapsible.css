@@ -1,0 +1,124 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-collapsible {
+  display: flex;
+  width: 12rem;
+  min-height: 9rem;
+  flex-direction: column;
+  justify-content: center;
+  color: #020617;
+}
+
+.dark .blx-collapsible {
+  color: #ffffff;
+}
+
+.blx-collapsible-trigger {
+  box-sizing: border-box;
+  display: flex;
+  height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0 0.5rem 0 0.75rem;
+  border: 1px solid #020617;
+  border-radius: 0;
+  background-color: #ffffff;
+  color: #020617;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.dark .blx-collapsible-trigger {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #ffffff;
+}
+
+@media (hover: hover) {
+  .blx-collapsible-trigger:hover:not([data-disabled]) {
+    background-color: #f1f5f9;
+  }
+
+  .dark .blx-collapsible-trigger:hover:not([data-disabled]) {
+    background-color: #1e293b;
+  }
+}
+
+.blx-collapsible-trigger:active:not([data-disabled]) {
+  background-color: #e2e8f0;
+}
+
+.dark .blx-collapsible-trigger:active:not([data-disabled]) {
+  background-color: #334155;
+}
+
+.blx-collapsible-trigger:focus-visible {
+  outline: 2px solid #020617;
+  outline-offset: -1px;
+}
+
+.dark .blx-collapsible-trigger:focus-visible {
+  outline-color: #ffffff;
+}
+
+.blx-collapsible-trigger[data-disabled] {
+  border-color: #64748b;
+  color: #64748b;
+}
+
+.dark .blx-collapsible-trigger[data-disabled] {
+  border-color: #94a3b8;
+  color: #94a3b8;
+}
+
+.blx-collapsible-icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  transition: transform 100ms ease-out;
+}
+
+.blx-collapsible-trigger[data-panel-open] .blx-collapsible-icon {
+  transform: rotate(90deg);
+}
+
+.blx-collapsible-panel {
+  display: flex;
+  height: var(--collapsible-panel-height);
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  transition: height 150ms ease-out;
+}
+
+.blx-collapsible-panel[hidden]:not([hidden='until-found']) {
+  display: none;
+}
+
+.blx-collapsible-panel[data-starting-style],
+.blx-collapsible-panel[data-ending-style] {
+  height: 0;
+}
+
+.blx-collapsible-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blx-collapsible-icon,
+  .blx-collapsible-panel {
+    transition: none;
+  }
+}

@@ -1,0 +1,51 @@
+@page "/components/collapsible"
+
+<PageTitle>Collapsible · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Collapsible"
+               Subtitle="A collapsible panel controlled by a button."
+               MarkdownHref="/components/collapsible.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <CollapsibleHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in CollapsibleApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Collapsible
+
+        <CollapsibleRoot>
+            <CollapsibleTrigger />
+            <CollapsiblePanel />
+        </CollapsibleRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Collapsible.razor", "xml", "Components.Demos.Collapsible.Hero.Css.CollapsibleHeroCss.razor"),
+            new DemoFile("collapsible.css", "css", "wwwroot.demos.collapsible.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Collapsible.razor", "xml", "Components.Demos.Collapsible.Hero.Tailwind.CollapsibleHeroTailwind.razor"),
+        ]),
+    ];
+}

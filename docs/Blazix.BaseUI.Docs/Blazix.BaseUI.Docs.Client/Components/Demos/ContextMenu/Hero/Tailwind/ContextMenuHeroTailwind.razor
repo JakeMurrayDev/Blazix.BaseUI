@@ -1,0 +1,24 @@
+<ContextMenuRoot>
+    <ContextMenuTrigger class="flex h-48 w-60 items-center justify-center rounded-none border border-slate-950 bg-white font-normal text-slate-950 select-none dark:border-white dark:bg-slate-950 dark:text-white">
+        Right click here
+    </ContextMenuTrigger>
+    <ContextMenuPortal>
+        <ContextMenuPositioner class="outline-none">
+            <ContextMenuPopup class="origin-[var(--transform-origin)] border border-slate-950 bg-white py-1 text-slate-950 shadow-[0.25rem_0.25rem_0] shadow-black/10 outline-none transition-[scale,opacity] duration-100 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 dark:border-white dark:bg-slate-950 dark:text-white dark:shadow-none">
+                <ContextMenuItem class="@ItemClass">Add to Library</ContextMenuItem>
+                <ContextMenuItem class="@ItemClass">Add to Playlist</ContextMenuItem>
+                <ContextMenuSeparator class="mx-1 my-1 h-px bg-slate-950 dark:bg-white" />
+                <ContextMenuItem class="@ItemClass">Play Next</ContextMenuItem>
+                <ContextMenuItem class="@ItemClass">Play Last</ContextMenuItem>
+                <ContextMenuSeparator class="mx-1 my-1 h-px bg-slate-950 dark:bg-white" />
+                <ContextMenuItem class="@ItemClass">Favorite</ContextMenuItem>
+                <ContextMenuItem class="@ItemClass">Share</ContextMenuItem>
+            </ContextMenuPopup>
+        </ContextMenuPositioner>
+    </ContextMenuPortal>
+</ContextMenuRoot>
+
+@code {
+    private const string ItemClass =
+        "relative z-0 flex cursor-default py-2 pr-8 pl-4 text-sm leading-4 outline-none select-none data-[highlighted]:text-white data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:bg-slate-950 data-[highlighted]:before:content-[''] data-[disabled]:text-slate-500 dark:data-[highlighted]:text-slate-950 dark:data-[highlighted]:before:bg-white dark:data-[disabled]:text-slate-400";
+}

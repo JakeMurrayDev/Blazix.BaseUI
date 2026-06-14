@@ -1,0 +1,97 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  color: #020617;
+}
+
+.dark .blx-checkbox-group {
+  color: #ffffff;
+}
+
+.blx-checkbox-group-parent {
+  margin-left: 1rem;
+}
+
+.blx-checkbox-group-nested {
+  margin-left: 1rem;
+}
+
+.blx-checkbox-group-caption {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.blx-checkbox-group-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+.blx-checkbox-group-parent-item {
+  margin-left: -1rem;
+}
+
+.blx-checkbox-group-checkbox {
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #020617;
+  border-radius: 0;
+  background-color: #ffffff;
+  color: #ffffff;
+}
+
+.dark .blx-checkbox-group-checkbox {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #020617;
+}
+
+.blx-checkbox-group-checkbox[data-checked],
+.blx-checkbox-group-checkbox[data-indeterminate] {
+  background-color: #020617;
+}
+
+.dark .blx-checkbox-group-checkbox[data-checked],
+.dark .blx-checkbox-group-checkbox[data-indeterminate] {
+  background-color: #ffffff;
+}
+
+.blx-checkbox-group-checkbox:focus-visible {
+  outline: 2px solid #020617;
+  outline-offset: 2px;
+}
+
+.dark .blx-checkbox-group-checkbox:focus-visible {
+  outline-color: #ffffff;
+}
+
+.blx-checkbox-group-indicator {
+  display: flex;
+}
+
+.blx-checkbox-group-indicator[data-unchecked] {
+  display: none;
+}
+
+.blx-checkbox-group-icon,
+.blx-checkbox-group-rule-icon {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}

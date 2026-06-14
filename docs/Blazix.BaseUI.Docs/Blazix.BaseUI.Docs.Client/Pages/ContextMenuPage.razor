@@ -1,0 +1,103 @@
+@page "/components/context-menu"
+
+<PageTitle>Context Menu · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Context Menu"
+               Subtitle="A menu that appears at the pointer on right click or long press."
+               MarkdownHref="/components/context-menu.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ContextMenuHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and place the popup parts inside a portal. The popup positions itself at the pointer that opened the menu.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Nested menu" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Place a <code class="@LiquidGlassClasses.CodeInline">ContextMenuSubmenuRoot</code> inside the parent popup and use <code class="@LiquidGlassClasses.CodeInline">ContextMenuSubmenuTrigger</code> for the item that opens it.
+</p>
+<div class="mb-2">
+    <Demo Variants="@SubmenuVariants">
+        <ContextMenuSubmenuCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ContextMenuApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.ContextMenu
+
+        <ContextMenuRoot>
+            <ContextMenuTrigger />
+            <ContextMenuPortal>
+                <ContextMenuBackdrop />
+                <ContextMenuPositioner>
+                    <ContextMenuPopup>
+                        <ContextMenuArrow />
+                        <ContextMenuItem />
+                        <ContextMenuLinkItem />
+                        <ContextMenuSeparator />
+
+                        <ContextMenuSubmenuRoot>
+                            <ContextMenuSubmenuTrigger />
+                        </ContextMenuSubmenuRoot>
+
+                        <ContextMenuGroup>
+                            <ContextMenuGroupLabel />
+                        </ContextMenuGroup>
+
+                        <ContextMenuRadioGroup>
+                            <ContextMenuRadioItem>
+                                <ContextMenuRadioItemIndicator />
+                            </ContextMenuRadioItem>
+                        </ContextMenuRadioGroup>
+
+                        <ContextMenuCheckboxItem>
+                            <ContextMenuCheckboxItemIndicator />
+                        </ContextMenuCheckboxItem>
+                    </ContextMenuPopup>
+                </ContextMenuPositioner>
+            </ContextMenuPortal>
+        </ContextMenuRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("ContextMenu.razor", "xml", "Components.Demos.ContextMenu.Hero.Css.ContextMenuHeroCss.razor"),
+            new DemoFile("context-menu.css", "css", "wwwroot.demos.context-menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("ContextMenu.razor", "xml", "Components.Demos.ContextMenu.Hero.Tailwind.ContextMenuHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> SubmenuVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("ContextMenu.razor", "xml", "Components.Demos.ContextMenu.Submenu.Css.ContextMenuSubmenuCss.razor"),
+            new DemoFile("context-menu.css", "css", "wwwroot.demos.context-menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("ContextMenu.razor", "xml", "Components.Demos.ContextMenu.Submenu.Tailwind.ContextMenuSubmenuTailwind.razor"),
+        ]),
+    ];
+}

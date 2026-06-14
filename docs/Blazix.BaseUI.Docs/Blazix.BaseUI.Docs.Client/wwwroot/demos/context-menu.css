@@ -1,0 +1,155 @@
+/* Dark mode keys off the `.dark` class on the root element, matching the
+   Tailwind variant's class strategy. */
+
+.blx-context-menu-trigger {
+  box-sizing: border-box;
+  display: flex;
+  width: 15rem;
+  height: 12rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #020617;
+  border-radius: 0;
+  background-color: #ffffff;
+  color: #020617;
+  font-weight: 400;
+  user-select: none;
+}
+
+.dark .blx-context-menu-trigger {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #ffffff;
+}
+
+.blx-context-menu-positioner {
+  outline: none;
+}
+
+.blx-context-menu-popup {
+  box-sizing: border-box;
+  padding-block: 0.25rem;
+  border: 1px solid #020617;
+  border-radius: 0;
+  outline: none;
+  background-color: #ffffff;
+  color: #020617;
+  box-shadow: 0.25rem 0.25rem 0 rgba(0, 0, 0, 0.1);
+  transform-origin: var(--transform-origin);
+  transition:
+    transform 100ms ease-out,
+    opacity 100ms ease-out;
+}
+
+.dark .blx-context-menu-popup {
+  border-color: #ffffff;
+  background-color: #020617;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.blx-context-menu-popup[data-starting-style],
+.blx-context-menu-popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.blx-context-menu-item,
+.blx-context-menu-submenu-trigger {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  cursor: default;
+  padding-block: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 2rem;
+  outline: none;
+  font-size: 0.875rem;
+  line-height: 1rem;
+  user-select: none;
+}
+
+.blx-context-menu-submenu-trigger {
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-right: 0.5rem;
+}
+
+.blx-context-menu-item[data-highlighted],
+.blx-context-menu-submenu-trigger[data-highlighted] {
+  color: #ffffff;
+}
+
+.dark .blx-context-menu-item[data-highlighted],
+.dark .blx-context-menu-submenu-trigger[data-highlighted] {
+  color: #020617;
+}
+
+.blx-context-menu-item[data-highlighted]::before,
+.blx-context-menu-submenu-trigger[data-highlighted]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0.25rem;
+  z-index: -1;
+  background-color: #020617;
+}
+
+.dark .blx-context-menu-item[data-highlighted]::before,
+.dark .blx-context-menu-submenu-trigger[data-highlighted]::before {
+  background-color: #ffffff;
+}
+
+.blx-context-menu-submenu-trigger[data-popup-open]::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0.25rem;
+  z-index: -1;
+  background-color: #f1f5f9;
+}
+
+.dark .blx-context-menu-submenu-trigger[data-popup-open]::before {
+  background-color: #1e293b;
+}
+
+.blx-context-menu-submenu-trigger[data-highlighted][data-popup-open]::before {
+  background-color: #020617;
+}
+
+.dark .blx-context-menu-submenu-trigger[data-highlighted][data-popup-open]::before {
+  background-color: #ffffff;
+}
+
+.blx-context-menu-item[data-disabled],
+.blx-context-menu-submenu-trigger[data-disabled] {
+  color: #64748b;
+}
+
+.dark .blx-context-menu-item[data-disabled],
+.dark .blx-context-menu-submenu-trigger[data-disabled] {
+  color: #94a3b8;
+}
+
+.blx-context-menu-separator {
+  height: 1px;
+  margin: 0.25rem;
+  background-color: #020617;
+}
+
+.dark .blx-context-menu-separator {
+  background-color: #ffffff;
+}
+
+.blx-context-menu-caret {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blx-context-menu-popup {
+    transition: none;
+  }
+}

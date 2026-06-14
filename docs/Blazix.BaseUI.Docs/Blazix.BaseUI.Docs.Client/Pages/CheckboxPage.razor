@@ -1,0 +1,119 @@
+@page "/components/checkbox"
+
+<PageTitle>Checkbox · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Checkbox"
+               Subtitle="An easily stylable checkbox component with form integration and mixed-state support."
+               MarkdownHref="/components/checkbox.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <CheckboxHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>
+        Form controls need an accessible name. Wrap the checkbox in a <code class="@LiquidGlassClasses.CodeInline">&lt;label&gt;</code>, or use Field components for richer form layouts.
+    </li>
+    <li>
+        Use <code class="@LiquidGlassClasses.CodeInline">NativeButton="true"</code> for sibling-label patterns where the visible control should own the id.
+    </li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Labeling a checkbox" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrapping a label around the default non-native checkbox is the simplest accessible labeling pattern.
+</p>
+<CodeBlock Code="@LabelCode" />
+
+<DocsHeading Level="3" Title="Rendering as a native button" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">NativeButton="true"</code> when the checkbox is labeled by a sibling element.
+</p>
+<CodeBlock Code="@NativeButtonCode" />
+
+<DocsHeading Level="3" Title="Form integration" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use Field when you want label, description, validation, and form state to flow through the checkbox.
+</p>
+<CodeBlock Code="@FieldCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in CheckboxApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Checkbox
+
+        <CheckboxRoot>
+            <CheckboxIndicator />
+        </CheckboxRoot>
+        """;
+
+    private const string LabelCode =
+        """
+        @using Blazix.BaseUI.Checkbox
+
+        <label>
+            <CheckboxRoot>
+                <CheckboxIndicator />
+            </CheckboxRoot>
+            Accept terms and conditions
+        </label>
+        """;
+
+    private const string NativeButtonCode =
+        """
+        @using Blazix.BaseUI.Checkbox
+
+        <div>
+            <label for="notifications-checkbox">Enable notifications</label>
+            <CheckboxRoot id="notifications-checkbox" NativeButton="true">
+                <CheckboxIndicator />
+            </CheckboxRoot>
+        </div>
+        """;
+
+    private const string FieldCode =
+        """
+        @using Blazix.BaseUI.Checkbox
+        @using Blazix.BaseUI.Field
+        @using Blazix.BaseUI.Form
+
+        <Form Model="@model">
+            <FieldRoot Name="stayLoggedIn">
+                <FieldLabel>
+                    <CheckboxRoot />
+                    Stay logged in for 7 days
+                </FieldLabel>
+            </FieldRoot>
+        </Form>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Checkbox.razor", "xml", "Components.Demos.Checkbox.Hero.Css.CheckboxHeroCss.razor"),
+            new DemoFile("checkbox.css", "css", "wwwroot.demos.checkbox.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Checkbox.razor", "xml", "Components.Demos.Checkbox.Hero.Tailwind.CheckboxHeroTailwind.razor"),
+        ]),
+    ];
+}

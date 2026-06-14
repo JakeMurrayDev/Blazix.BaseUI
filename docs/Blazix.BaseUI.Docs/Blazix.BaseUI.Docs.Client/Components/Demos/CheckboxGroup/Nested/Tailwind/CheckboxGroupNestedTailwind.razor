@@ -1,0 +1,130 @@
+<CheckboxGroup aria-labelledby="access-tailwind-label"
+               Value="@mainValue"
+               ValueChanged="HandleMainValueChanged"
+               class="ml-4 flex flex-col items-start gap-1 text-slate-950 dark:text-white">
+    <label class="-ml-4 flex items-center gap-2 text-sm font-normal" id="access-tailwind-label">
+        <CheckboxRoot Checked="@AllPermissionsSelected"
+                      Indeterminate="@AllPermissionsPartiallySelected"
+                      OnCheckedChange="HandleAllPermissionsChanged"
+                      class="@CheckboxClass">
+            <CheckboxIndicator class="flex data-[unchecked]:hidden">
+                @if (AllPermissionsPartiallySelected)
+                {
+                    <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M3 8H13" />
+                    </svg>
+                }
+                else
+                {
+                    <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                    </svg>
+                }
+            </CheckboxIndicator>
+        </CheckboxRoot>
+        User permissions
+    </label>
+
+    @foreach (var permission in MainPermissionOptions)
+    {
+        <label class="flex items-center gap-2 text-sm font-normal">
+            <CheckboxRoot Value="@permission.Value" class="@CheckboxClass">
+                <CheckboxIndicator class="flex data-[unchecked]:hidden">
+                    <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                        <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                    </svg>
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            @permission.Label
+        </label>
+    }
+
+    <CheckboxGroup aria-labelledby="manage-users-tailwind-label"
+                   Value="@managementValue"
+                   ValueChanged="HandleManagementValueChanged"
+                   AllValues="@UserManagementPermissions"
+                   class="ml-4 flex flex-col items-start gap-1">
+        <label class="-ml-4 flex items-center gap-2 text-sm font-normal" id="manage-users-tailwind-label">
+            <CheckboxRoot Parent="true" class="@CheckboxClass">
+                <CheckboxIndicator class="flex data-[unchecked]:hidden">
+                    @if (ManagementIsPartiallySelected)
+                    {
+                        <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M3 8H13" />
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                        </svg>
+                    }
+                </CheckboxIndicator>
+            </CheckboxRoot>
+            Manage users
+        </label>
+
+        @foreach (var permission in UserPermissionOptions)
+        {
+            <label class="flex items-center gap-2 text-sm font-normal">
+                <CheckboxRoot Value="@permission.Value" class="@CheckboxClass">
+                    <CheckboxIndicator class="flex data-[unchecked]:hidden">
+                        <svg class="block size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                            <path d="M2.5 8.5 6.5 12.5 13.5 3.5" />
+                        </svg>
+                    </CheckboxIndicator>
+                </CheckboxRoot>
+                @permission.Label
+            </label>
+        }
+    </CheckboxGroup>
+</CheckboxGroup>
+
+@code {
+    private const string CheckboxClass = "flex size-4 shrink-0 items-center justify-center rounded-none border border-slate-950 bg-white p-0 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 data-[checked]:bg-slate-950 data-[indeterminate]:bg-slate-950 dark:border-white dark:bg-slate-950 dark:text-slate-950 dark:focus-visible:outline-white dark:data-[checked]:bg-white dark:data-[indeterminate]:bg-white";
+
+    private static readonly string[] MainPermissions = ["view-dashboard", "access-reports"];
+    private static readonly string[] UserManagementPermissions = ["create-user", "edit-user", "delete-user", "assign-roles"];
+
+    private static readonly (string Value, string Label)[] MainPermissionOptions =
+    [
+        ("view-dashboard", "View dashboard"),
+        ("access-reports", "Access reports"),
+    ];
+
+    private static readonly (string Value, string Label)[] UserPermissionOptions =
+    [
+        ("create-user", "Create user"),
+        ("edit-user", "Edit user"),
+        ("delete-user", "Delete user"),
+        ("assign-roles", "Assign roles"),
+    ];
+
+    private string[] mainValue = [];
+    private string[] managementValue = [];
+
+    private bool AllPermissionsSelected =>
+        mainValue.Length == MainPermissions.Length && managementValue.Length == UserManagementPermissions.Length;
+
+    private bool AllPermissionsPartiallySelected =>
+        !AllPermissionsSelected && (mainValue.Length > 0 || managementValue.Length > 0);
+
+    private bool ManagementIsPartiallySelected =>
+        managementValue.Length > 0 && managementValue.Length < UserManagementPermissions.Length;
+
+    private void HandleAllPermissionsChanged(CheckboxCheckedChangeEventArgs args)
+    {
+        mainValue = args.Checked ? [.. MainPermissions] : [];
+        managementValue = args.Checked ? [.. UserManagementPermissions] : [];
+    }
+
+    private void HandleMainValueChanged(string[] value)
+    {
+        mainValue = value;
+    }
+
+    private void HandleManagementValueChanged(string[] value)
+    {
+        managementValue = value;
+    }
+}

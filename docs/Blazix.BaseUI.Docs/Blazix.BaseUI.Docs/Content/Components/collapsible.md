@@ -1,24 +1,38 @@
 # Collapsible
 
-Collapsible renders one trigger and one panel for showing or hiding supporting content.
+A collapsible panel controlled by a button.
 
-## Import
-
-```razor
-@using Blazix.BaseUI.Collapsible
-```
+Rendered docs: `/components/collapsible`
 
 ## Anatomy
 
 ```razor
-<CollapsibleRoot DefaultOpen="true">
-    <CollapsibleTrigger>Details</CollapsibleTrigger>
-    <CollapsiblePanel>More information</CollapsiblePanel>
+@using Blazix.BaseUI.Collapsible
+
+<CollapsibleRoot>
+    <CollapsibleTrigger />
+    <CollapsiblePanel />
 </CollapsibleRoot>
 ```
 
-## Notes
+## API reference
 
-- `Open` and `OpenChanged` make the component controlled.
-- `DefaultOpen` sets the initial uncontrolled state.
-- `KeepMounted` keeps closed content in the DOM.
+### Root
+
+Groups the trigger and panel while owning the open state. Use `Open`/`OpenChanged` for controlled state and `DefaultOpen` for uncontrolled state.
+
+Data attributes: `data-open`, `data-closed`, `data-disabled`, `data-starting-style`, `data-ending-style`.
+
+### Trigger
+
+A button that opens and closes the panel. Renders a native `<button>` by default.
+
+Data attributes: `data-panel-open`, `data-disabled`, `data-starting-style`, `data-ending-style`.
+
+### Panel
+
+The collapsible content area. Use `KeepMounted` to keep closed content in the DOM or `HiddenUntilFound` for browser find-in-page support.
+
+Data attributes: `data-open`, `data-closed`, `data-disabled`, `data-starting-style`, `data-ending-style`.
+
+CSS variables: `--collapsible-panel-height`, `--collapsible-panel-width`.
