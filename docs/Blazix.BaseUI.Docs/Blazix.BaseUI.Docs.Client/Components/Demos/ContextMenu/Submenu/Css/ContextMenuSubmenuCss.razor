@@ -1,0 +1,39 @@
+<ContextMenuRoot>
+    <ContextMenuTrigger class="blx-context-menu-trigger">
+        Right click here
+    </ContextMenuTrigger>
+    <ContextMenuPortal>
+        <ContextMenuPositioner class="blx-context-menu-positioner">
+            <ContextMenuPopup class="blx-context-menu-popup">
+                <ContextMenuItem class="blx-context-menu-item">Add to Library</ContextMenuItem>
+
+                <ContextMenuSubmenuRoot>
+                    <ContextMenuSubmenuTrigger class="blx-context-menu-submenu-trigger">
+                        Add to Playlist
+                        <svg class="blx-context-menu-caret" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M6 12V4L10.5 8L6 12Z" />
+                        </svg>
+                    </ContextMenuSubmenuTrigger>
+                    <ContextMenuPortal>
+                        <ContextMenuPositioner AlignOffset="-4" SideOffset="-4" class="blx-context-menu-positioner">
+                            <ContextMenuPopup class="blx-context-menu-popup blx-context-menu-submenu-popup">
+                                <ContextMenuItem class="blx-context-menu-item">Get Up!</ContextMenuItem>
+                                <ContextMenuItem class="blx-context-menu-item">Inside Out</ContextMenuItem>
+                                <ContextMenuItem class="blx-context-menu-item">Night Beats</ContextMenuItem>
+                                <ContextMenuSeparator class="blx-context-menu-separator" />
+                                <ContextMenuItem class="blx-context-menu-item">New playlist...</ContextMenuItem>
+                            </ContextMenuPopup>
+                        </ContextMenuPositioner>
+                    </ContextMenuPortal>
+                </ContextMenuSubmenuRoot>
+
+                <ContextMenuSeparator class="blx-context-menu-separator" />
+                <ContextMenuItem class="blx-context-menu-item">Play Next</ContextMenuItem>
+                <ContextMenuItem class="blx-context-menu-item">Play Last</ContextMenuItem>
+                <ContextMenuSeparator class="blx-context-menu-separator" />
+                <ContextMenuItem class="blx-context-menu-item">Favorite</ContextMenuItem>
+                <ContextMenuItem class="blx-context-menu-item">Share</ContextMenuItem>
+            </ContextMenuPopup>
+        </ContextMenuPositioner>
+    </ContextMenuPortal>
+</ContextMenuRoot>
