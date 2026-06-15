@@ -71,6 +71,7 @@ Compress the panel while preventing overflow:
 .Content,
 .Popup {
     max-height: var(--available-height);
+    overflow: hidden;
 }
 ```
 

@@ -97,6 +97,16 @@
   color: #ffffff;
 }
 
+.blx-number-field-stepper:focus-visible {
+  z-index: 1;
+  outline: 2px solid #171717;
+  outline-offset: -1px;
+}
+
+.dark .blx-number-field-stepper:focus-visible {
+  outline-color: #ffffff;
+}
+
 @media (hover: hover) {
   .blx-number-field-stepper:hover:not(:disabled) {
     background-color: #f5f5f5;

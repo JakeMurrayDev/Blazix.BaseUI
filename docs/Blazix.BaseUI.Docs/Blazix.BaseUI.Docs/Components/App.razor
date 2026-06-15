@@ -82,7 +82,10 @@
 
                     const mediaQuery = matchMedia(query);
                     const listener = event => {
-                        dotNetRef.invokeMethodAsync('OnMediaQueryChanged', event.matches).catch(() => {});
+                        dotNetRef.invokeMethodAsync('OnMediaQueryChanged', event.matches).catch(error => {
+                            console.error('[Blazix docs] Media query callback failed.', error);
+                            removeMediaQuerySubscription(id);
+                        });
                     };
 
                     addMediaQueryListener(mediaQuery, listener);

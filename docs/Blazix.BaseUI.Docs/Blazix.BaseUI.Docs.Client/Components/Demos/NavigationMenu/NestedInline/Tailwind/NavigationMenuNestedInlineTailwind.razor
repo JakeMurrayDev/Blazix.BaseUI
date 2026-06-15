@@ -183,8 +183,10 @@
         catch (InvalidOperationException)
         {
         }
-
-        dotNetReference.Dispose();
+        finally
+        {
+            dotNetReference.Dispose();
+        }
     }
 
     [JSInvokable]
