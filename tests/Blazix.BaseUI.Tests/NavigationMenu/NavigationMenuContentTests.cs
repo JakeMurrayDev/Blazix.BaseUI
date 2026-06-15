@@ -48,6 +48,52 @@ public class NavigationMenuContentTests : BunitContext, INavigationMenuContentCo
         };
     }
 
+    private static RenderFragment CreateSwitchingContentRoot()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<NavigationMenuRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<NavigationMenuList>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(listBuilder =>
+                {
+                    listBuilder.OpenComponent<NavigationMenuItem>(0);
+                    listBuilder.AddAttribute(1, "Value", "item1");
+                    listBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                    {
+                        itemBuilder.OpenComponent<NavigationMenuTrigger>(0);
+                        itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Item 1")));
+                        itemBuilder.CloseComponent();
+
+                        itemBuilder.OpenComponent<NavigationMenuContent>(2);
+                        itemBuilder.AddAttribute(3, "data-testid", "content-1");
+                        itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content 1")));
+                        itemBuilder.CloseComponent();
+                    }));
+                    listBuilder.CloseComponent();
+
+                    listBuilder.OpenComponent<NavigationMenuItem>(3);
+                    listBuilder.AddAttribute(4, "Value", "item2");
+                    listBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(itemBuilder =>
+                    {
+                        itemBuilder.OpenComponent<NavigationMenuTrigger>(0);
+                        itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Item 2")));
+                        itemBuilder.CloseComponent();
+
+                        itemBuilder.OpenComponent<NavigationMenuContent>(2);
+                        itemBuilder.AddAttribute(3, "data-testid", "content-2");
+                        itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content 2")));
+                        itemBuilder.CloseComponent();
+                    }));
+                    listBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersDivByDefault()
     {
@@ -117,6 +163,33 @@ public class NavigationMenuContentTests : BunitContext, INavigationMenuContentCo
         content.GetAttribute("class")!.ShouldContain("active-class");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task SwitchingItemsWhileOpenDoesNotApplyRootStartingStyleToContent()
+    {
+        var cut = Render(CreateSwitchingContentRoot());
+        var root = cut.FindComponent<NavigationMenuRoot>();
+
+        cut.Find("button[id='nav-trigger-item1']").Click();
+
+        await cut.InvokeAsync(() => root.Instance.OnStartingStyleApplied());
+
+        cut.WaitForAssertion(() =>
+        {
+            var content1 = cut.Find("[data-testid='content-1']");
+            content1.HasAttribute("data-open").ShouldBeTrue();
+            content1.HasAttribute("data-starting-style").ShouldBeFalse();
+        });
+
+        cut.Find("button[id='nav-trigger-item2']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            var content2 = cut.Find("[data-testid='content-2']");
+            content2.HasAttribute("data-open").ShouldBeTrue();
+            content2.HasAttribute("data-starting-style").ShouldBeFalse();
+        });
     }
 
     [Fact]

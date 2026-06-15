@@ -447,21 +447,35 @@ public static class JsInteropSetup
     }
 
     private const string NavigationMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.js";
+    private const string NavigationMenuMinModule = "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.min.js";
 
     public static BunitJSModuleInterop SetupNavigationMenuModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(NavigationMenuModule);
-        module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
-        module.SetupVoid("setRootValue", _ => true).SetVoidResult();
-        module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("disposeTriggerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
-        module.SetupVoid("setViewportElement", _ => true).SetVoidResult();
-        module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
-        module.SetupVoid("updatePosition", _ => true).SetVoidResult();
-        module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
-        return module;
+        SetupNavigationMenuModulePath(NavigationMenuModule);
+        return SetupNavigationMenuModulePath(NavigationMenuMinModule);
+
+        BunitJSModuleInterop SetupNavigationMenuModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
+            module.SetupVoid("setRootValue", _ => true).SetVoidResult();
+            module.SetupVoid("setRootElement", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("disposeTriggerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setContentElement", _ => true).SetVoidResult();
+            module.SetupVoid("disposeContentElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPopupElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setViewportElement", _ => true).SetVoidResult();
+            module.SetupVoid("setViewportTargetElement", _ => true).SetVoidResult();
+            module.SetupVoid("focusPreviousTabbable", _ => true).SetVoidResult();
+            module.SetupVoid("focusNavigationMenuContent", _ => true).SetVoidResult();
+            module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
+            module.SetupVoid("updatePosition", _ => true).SetVoidResult();
+            module.SetupVoid("disposePositioner", _ => true).SetVoidResult();
+            return module;
+        }
     }
 
     private const string ToggleModule = "./_content/Blazix.BaseUI/blazix-baseui-toggle.js";
