@@ -481,11 +481,14 @@
             activationDirection = ActivationDirection.None;
         }
 
-        if (nextValue is not null)
+        var wasOpen = context.Value is not null;
+        var nextOpen = nextValue is not null;
+
+        if (nextOpen && (!wasOpen || !transition.IsMounted))
         {
             transition.BeginOpen();
         }
-        else if (context.Value is not null || transition.IsMounted)
+        else if (!nextOpen && (wasOpen || transition.IsMounted))
         {
             transition.BeginClose();
         }
