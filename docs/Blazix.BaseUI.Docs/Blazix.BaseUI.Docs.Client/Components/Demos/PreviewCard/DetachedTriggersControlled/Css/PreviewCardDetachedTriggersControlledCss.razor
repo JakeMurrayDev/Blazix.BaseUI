@@ -1,0 +1,122 @@
+<div class="blx-preview-card-container">
+    <p class="blx-preview-card-paragraph">
+        Discover
+        @foreach (var card in Cards)
+        {
+            <PreviewCardTypedTrigger TPayload="PreviewCardContent"
+                                     Handle="@demoPreviewCard"
+                                     href="@card.Href"
+                                     Id="@card.ControlledId"
+                                     Payload="@card"
+                                     class="blx-preview-card-link">
+                @card.Label
+            </PreviewCardTypedTrigger>
+            @if (card == Cards[0])
+            {
+                <text>, </text>
+            }
+            else if (card == Cards[1])
+            {
+                <text>, or </text>
+            }
+        }
+        .
+    </p>
+    <button type="button" class="blx-preview-card-button" @onclick="OpenProgrammatically">
+        Open programmatically
+    </button>
+</div>
+
+<PreviewCardRoot Handle="@demoPreviewCard"
+                 Open="@open"
+                 OpenChanged="HandleOpenChanged"
+                 OnOpenChange="HandleOpenChange"
+                 TriggerId="@triggerId">
+    <ChildContentWithPayload Context="payloadContext">
+        <PreviewCardPortal>
+            <PreviewCardPositioner SideOffset="8" class="blx-preview-card-positioner">
+                <PreviewCardPopup class="blx-preview-card-popup">
+                    <PreviewCardArrow class="blx-preview-card-arrow" />
+                    @RenderCard(ResolveCard(payloadContext.Payload), useControlledDimensions: true)
+                </PreviewCardPopup>
+            </PreviewCardPositioner>
+        </PreviewCardPortal>
+    </ChildContentWithPayload>
+</PreviewCardRoot>
+
+@code {
+    private readonly PreviewCardHandle<PreviewCardContent> demoPreviewCard = PreviewCardHandleFactory.CreateHandle<PreviewCardContent>();
+    private bool open;
+    private string? triggerId;
+
+    private static readonly PreviewCardContent[] Cards =
+    [
+        new("trigger-1", "typography", "typography", "https://en.wikipedia.org/wiki/Typography", "https://images.unsplash.com/photo-1619615391095-dfa29e1672ef?q=80&w=448&h=300", "Station Hofplein signage in Rotterdam, Netherlands", "Typography", "is the art and science of arranging type.", 224, 150, 224, 150),
+        new("trigger-2", "design", "design", "https://en.wikipedia.org/wiki/Industrial_design", "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Braun_ABW30_%28schwarz%29.jpg/250px-Braun_ABW30_%28schwarz%29.jpg", "Braun ABW30", "design", "is the concept or proposal for an object, process, or system.", 241, 240, 250, 249),
+        new("trigger-3", "art", "art", "https://en.wikipedia.org/wiki/Art", "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/MonaLisa_sfumato.jpeg/250px-MonaLisa_sfumato.jpeg", "Mona Lisa", "Art", "is a diverse range of cultural activity centered around works utilizing creative or imaginative talents, which are expected to evoke a worthwhile experience, generally through an expression of emotional power, conceptual ideas, technical proficiency, or beauty.", 206, 240, 250, 290),
+    ];
+
+    private void HandleOpenChanged(bool value)
+    {
+        open = value;
+    }
+
+    private void HandleOpenChange(PreviewCardOpenChangeEventArgs args)
+    {
+        open = args.Open;
+
+        if (!string.IsNullOrEmpty(args.TriggerId))
+        {
+            triggerId = args.TriggerId;
+        }
+    }
+
+    private void OpenProgrammatically()
+    {
+        triggerId = Cards[1].ControlledId;
+        open = true;
+    }
+
+    private static PreviewCardContent ResolveCard(object? payload)
+    {
+        return payload as PreviewCardContent ?? Cards[0];
+    }
+
+    private static RenderFragment RenderCard(PreviewCardContent card, bool useControlledDimensions) => builder =>
+    {
+        var width = useControlledDimensions ? card.ControlledWidth : card.FullWidth;
+        var height = useControlledDimensions ? card.ControlledHeight : card.FullHeight;
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "blx-preview-card-content");
+        builder.OpenElement(2, "img");
+        builder.AddAttribute(3, "width", width);
+        builder.AddAttribute(4, "height", height);
+        builder.AddAttribute(5, "class", "blx-preview-card-image");
+        builder.AddAttribute(6, "src", card.ImageUrl);
+        builder.AddAttribute(7, "alt", card.ImageAlt);
+        builder.CloseElement();
+        builder.OpenElement(8, "p");
+        builder.AddAttribute(9, "class", "blx-preview-card-summary");
+        builder.OpenElement(10, "strong");
+        builder.AddContent(11, card.Title);
+        builder.CloseElement();
+        builder.AddContent(12, $" {card.Summary}");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private sealed record PreviewCardContent(
+        string ControlledId,
+        string Id,
+        string Label,
+        string Href,
+        string ImageUrl,
+        string ImageAlt,
+        string Title,
+        string Summary,
+        int ControlledWidth,
+        int ControlledHeight,
+        int FullWidth,
+        int FullHeight);
+}

@@ -1,0 +1,87 @@
+<div class="blx-popover-button-row">
+    @foreach (var panel in Panels)
+    {
+        <PopoverTypedTrigger TPayload="PopoverPanel"
+                             Handle="@demoPopover"
+                             Id="@panel.Id"
+                             Payload="@panel"
+                             class="blx-popover-button">
+            @panel.Label
+        </PopoverTypedTrigger>
+    }
+
+    <PopoverRoot Handle="@demoPopover">
+        <ChildContent Context="payloadContext">
+            <PopoverPortal>
+                <PopoverPositioner SideOffset="8"
+                                   class="blx-popover-positioner blx-popover-animated-positioner">
+                    <PopoverPopup class="blx-popover-popup blx-popover-animated-popup">
+                        <PopoverArrow class="blx-popover-arrow blx-popover-animated-arrow" />
+                        <PopoverViewport class="blx-popover-viewport">
+                            @{
+                                var selectedPanel = payloadContext.Payload as PopoverPanel ?? Panels[0];
+                            }
+                            @switch (selectedPanel.Kind)
+                            {
+                                case PopoverPanelKind.Profile:
+                                    <div class="blx-popover-profile">
+                                        <PopoverTitle class="blx-popover-title">Jason Eventon</PopoverTitle>
+                                        <AvatarRoot class="blx-popover-avatar">
+                                            <AvatarImage class="blx-popover-avatar-image"
+                                                         src="https://images.unsplash.com/photo-1543610892-0b1f7e6d8ac1?w=128&amp;h=128&amp;dpr=2&amp;q=80"
+                                                         width="48"
+                                                         height="48"
+                                                         alt="Jason Eventon" />
+                                            <AvatarFallback>JE</AvatarFallback>
+                                        </AvatarRoot>
+                                        <span class="blx-popover-plan">Pro plan</span>
+                                        <div class="blx-popover-profile-actions">
+                                            <a href="#">Profile settings</a>
+                                            <a href="#">Log out</a>
+                                        </div>
+                                    </div>
+                                    break;
+                                case PopoverPanelKind.Activity:
+                                    <div class="blx-popover-stack">
+                                        <PopoverTitle class="blx-popover-title">Activity</PopoverTitle>
+                                        <PopoverDescription class="blx-popover-description">
+                                            Nothing interesting happened recently.
+                                        </PopoverDescription>
+                                    </div>
+                                    break;
+                                default:
+                                    <div class="blx-popover-stack">
+                                        <PopoverTitle class="blx-popover-title">Notifications</PopoverTitle>
+                                        <PopoverDescription class="blx-popover-description">
+                                            You are all caught up. Good job!
+                                        </PopoverDescription>
+                                    </div>
+                                    break;
+                            }
+                        </PopoverViewport>
+                    </PopoverPopup>
+                </PopoverPositioner>
+            </PopoverPortal>
+        </ChildContent>
+    </PopoverRoot>
+</div>
+
+@code {
+    private readonly PopoverHandle<PopoverPanel> demoPopover = PopoverHandleFactory.CreateHandle<PopoverPanel>();
+
+    private static readonly PopoverPanel[] Panels =
+    [
+        new("notifications", "Notifications", PopoverPanelKind.Notifications),
+        new("activity", "Activity", PopoverPanelKind.Activity),
+        new("profile", "Profile", PopoverPanelKind.Profile),
+    ];
+
+    private sealed record PopoverPanel(string Id, string Label, PopoverPanelKind Kind);
+
+    private enum PopoverPanelKind
+    {
+        Notifications,
+        Activity,
+        Profile
+    }
+}
