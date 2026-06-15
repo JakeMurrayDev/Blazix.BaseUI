@@ -1,0 +1,39 @@
+<RadioGroup TValue="string"
+            aria-labelledby="@captionId"
+            DefaultValue="@("fuji-apple")"
+            class="blx-radio-group">
+    <div class="blx-radio-caption" id="@captionId">
+        Best apple
+    </div>
+
+    <label class="blx-radio-item">
+        <RadioRoot TValue="string"
+                   Value="@("fuji-apple")"
+                   class="blx-radio">
+            <RadioIndicator class="blx-radio-indicator" />
+        </RadioRoot>
+        Fuji
+    </label>
+
+    <label class="blx-radio-item">
+        <RadioRoot TValue="string"
+                   Value="@("gala-apple")"
+                   class="blx-radio">
+            <RadioIndicator class="blx-radio-indicator" />
+        </RadioRoot>
+        Gala
+    </label>
+
+    <label class="blx-radio-item">
+        <RadioRoot TValue="string"
+                   Value="@("granny-smith-apple")"
+                   class="blx-radio">
+            <RadioIndicator class="blx-radio-indicator" />
+        </RadioRoot>
+        Granny Smith
+    </label>
+</RadioGroup>
+
+@code {
+    private readonly string captionId = $"radio-group-label-{Guid.NewGuid():N}";
+}

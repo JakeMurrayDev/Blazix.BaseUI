@@ -1,0 +1,90 @@
+.blx-radio-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  color: #171717;
+}
+
+.dark .blx-radio-group {
+  color: #ffffff;
+}
+
+.blx-radio-caption {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 700;
+}
+
+.blx-radio-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #171717;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+.dark .blx-radio-item {
+  color: #ffffff;
+}
+
+.blx-radio {
+  box-sizing: border-box;
+  display: flex;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #171717;
+  border-radius: 9999px;
+  background: #ffffff;
+  color: #ffffff;
+  padding: 0;
+  margin: 0;
+}
+
+.dark .blx-radio {
+  border-color: #ffffff;
+  background: #171717;
+  color: #171717;
+}
+
+.blx-radio[data-checked] {
+  background: #171717;
+  color: #ffffff;
+}
+
+.dark .blx-radio[data-checked] {
+  background: #ffffff;
+  color: #171717;
+}
+
+.blx-radio:focus-visible {
+  outline: 2px solid #171717;
+  outline-offset: 2px;
+}
+
+.dark .blx-radio:focus-visible {
+  outline-color: #ffffff;
+}
+
+.blx-radio-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blx-radio-indicator[data-unchecked] {
+  display: none;
+}
+
+.blx-radio-indicator::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: currentcolor;
+}

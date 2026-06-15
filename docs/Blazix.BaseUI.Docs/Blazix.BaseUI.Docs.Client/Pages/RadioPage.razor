@@ -1,0 +1,193 @@
+@page "/components/radio"
+
+<PageTitle>Radio · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Radio"
+               Subtitle="An easily stylable radio button for choosing one option from a group."
+               MarkdownHref="/components/radio.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <RadioHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Radio controls need an accessible name. Use an enclosing <code class="@LiquidGlassClasses.CodeInline">label</code>, explicit ARIA labelling, or the Field and Fieldset components.</li>
+    <li>Radio is always used with <code class="@LiquidGlassClasses.CodeInline">RadioGroup</code> so one value is selected from the set.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the Radio and RadioGroup namespaces, then place each root and indicator inside the group:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Labeling a radio group" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Label the group with <code class="@LiquidGlassClasses.CodeInline">aria-labelledby</code> and give each radio a visible label.
+</p>
+<CodeBlock Code="@GroupLabelCode" />
+<div class="mt-3 mb-8">
+    <CodeBlock Code="@EnclosingLabelCode" />
+</div>
+
+<DocsHeading Level="3" Title="Rendering as a native button" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    The default root is a span so enclosing labels are valid. Set <code class="@LiquidGlassClasses.CodeInline">NativeButton</code> when using sibling labels with <code class="@LiquidGlassClasses.CodeInline">for</code> and <code class="@LiquidGlassClasses.CodeInline">id</code>.
+</p>
+<CodeBlock Code="@NativeButtonCode" />
+<p class="mt-3 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For a native button inside a wrapping label, use <code class="@LiquidGlassClasses.CodeInline">Render</code> so the hidden input stays outside the label.
+</p>
+<CodeBlock Code="@RenderCallbackCode" />
+
+<DocsHeading Level="3" Title="Form integration" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use Field and Fieldset to provide labels, names, validation, and form state to the radio group.
+</p>
+<CodeBlock Code="@FormIntegrationCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in RadioApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Radio
+        @using Blazix.BaseUI.RadioGroup
+
+        <RadioGroup TValue="string">
+            <RadioRoot TValue="string" Value="@("ssd")">
+                <RadioIndicator />
+            </RadioRoot>
+        </RadioGroup>
+        """;
+
+    private const string GroupLabelCode =
+        """
+        <div id="storage-type-label">Storage type</div>
+
+        <RadioGroup TValue="string" aria-labelledby="storage-type-label">
+            ...
+        </RadioGroup>
+        """;
+
+    private const string EnclosingLabelCode =
+        """
+        <label>
+            <RadioRoot TValue="string" Value="@("ssd")" />
+            SSD
+        </label>
+        """;
+
+    private const string NativeButtonCode =
+        """
+        <div id="storage-type">Storage type</div>
+
+        <RadioGroup TValue="string"
+                    DefaultValue="@("ssd")"
+                    aria-labelledby="storage-type">
+            <div>
+                <label for="storage-type-ssd">SSD</label>
+                <RadioRoot TValue="string"
+                           Value="@("ssd")"
+                           id="storage-type-ssd"
+                           NativeButton="true">
+                    <RadioIndicator />
+                </RadioRoot>
+            </div>
+        </RadioGroup>
+        """;
+
+    private const string RenderCallbackCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Radio
+        @using Blazix.BaseUI.RadioGroup
+        @using Microsoft.AspNetCore.Components.Rendering
+
+        <div id="storage-type">Storage type</div>
+
+        <RadioGroup TValue="string"
+                    DefaultValue="@("ssd")"
+                    aria-labelledby="storage-type">
+            <RadioRoot TValue="string"
+                       Value="@("ssd")"
+                       NativeButton="true"
+                       Render="@RenderWrappedButton" />
+        </RadioGroup>
+
+        @code {
+            private RenderFragment<RenderProps<RadioRootState>> RenderWrappedButton => props => builder =>
+            {
+                builder.OpenElement(0, "label");
+                builder.OpenElement(1, "button");
+                builder.AddMultipleAttributes(2, props.Attributes);
+                if (props.ElementReferenceCallback is not null)
+                {
+                    builder.AddElementReferenceCapture(3, props.ElementReferenceCallback);
+                }
+                builder.CloseElement();
+                builder.AddContent(4, "SSD");
+                builder.CloseElement();
+            };
+        }
+        """;
+
+    private const string FormIntegrationCode =
+        """
+        @using Blazix.BaseUI.Field
+        @using Blazix.BaseUI.Fieldset
+        @using Blazix.BaseUI.Form
+        @using Blazix.BaseUI.Radio
+        @using Blazix.BaseUI.RadioGroup
+
+        <Form Model="@model">
+            <FieldRoot Name="storageType">
+                <FieldsetRoot Render="@RenderFieldsetAsRadioGroup">
+                    <FieldsetLegend>Storage type</FieldsetLegend>
+                    <FieldItem>
+                        <FieldLabel>
+                            <RadioRoot TValue="string" Value="@("ssd")" />
+                            SSD
+                        </FieldLabel>
+                    </FieldItem>
+                    <FieldItem>
+                        <FieldLabel>
+                            <RadioRoot TValue="string" Value="@("hdd")" />
+                            HDD
+                        </FieldLabel>
+                    </FieldItem>
+                </FieldsetRoot>
+            </FieldRoot>
+        </Form>
+
+        @code {
+            private readonly object model = new();
+
+            private RenderFragment<RenderProps<FieldsetRootState>> RenderFieldsetAsRadioGroup => props =>
+                RenderUtilities.CreateComponent(typeof(RadioGroup<string>), props);
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Radio.razor", "xml", "Components.Demos.Radio.Hero.Css.RadioHeroCss.razor"),
+            new DemoFile("radio.css", "css", "wwwroot.demos.radio.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Radio.razor", "xml", "Components.Demos.Radio.Hero.Tailwind.RadioHeroTailwind.razor"),
+        ]),
+    ];
+}
