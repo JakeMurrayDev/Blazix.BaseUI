@@ -48,7 +48,7 @@ public static class DocsNav
             new("Popover", "popover", "/components/popover", "An accessible popup anchored to a trigger.", IsDocumented: true),
             new("Preview Card", "preview-card", "/components/preview-card", "A popup that appears when hovering a link.", IsDocumented: true),
             new("Progress", "progress", "/components/progress", "Displays the status of a task over time.", IsDocumented: true),
-            new("Radio", "radio", "/components/radio", "A control for selecting one option from a set."),
+            new("Radio", "radio", "/components/radio", "A control for selecting one option from a set.", IsDocumented: true),
             new("Scroll Area", "scroll-area", "/components/scroll-area", "A scrollable container with custom scrollbars."),
             new("Select", "select", "/components/select", "A form component for choosing a value from a list of options."),
             new("Separator", "separator", "/components/separator", "A visual divider between sections."),
