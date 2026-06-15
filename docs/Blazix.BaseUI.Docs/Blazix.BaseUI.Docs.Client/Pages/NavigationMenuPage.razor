@@ -1,0 +1,170 @@
+@page "/components/navigation-menu"
+
+<PageTitle>Navigation Menu · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Navigation Menu"
+               Subtitle="A collection of links and menus for website navigation."
+               MarkdownHref="/components/navigation-menu.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <NavigationMenuHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its list, items, triggers, content, links, and shared popup viewport:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Nested submenus" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Nest a second <code class="@LiquidGlassClasses.CodeInline">NavigationMenuRoot</code> inside a content panel when a top-level item should open another flyout.
+</p>
+<div class="mb-8">
+    <Demo Variants="@NestedVariants">
+        <NavigationMenuNestedCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Nested inline submenus" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For second-level navigation that stays in the same panel, omit the nested portal and render the nested list with its own viewport and default active value.
+</p>
+<div class="mb-8">
+    <Demo Variants="@NestedInlineVariants">
+        <NavigationMenuNestedInlineCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Custom links" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">Render</code> when a router-specific link needs to receive the attributes from <code class="@LiquidGlassClasses.CodeInline">NavigationMenuLink</code>.
+</p>
+<CodeBlock Code="@CustomLinksCode" />
+
+<DocsHeading Level="3" Title="Large menus" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Large panels can either compress within the available viewport height or make their content scrollable.
+</p>
+<CodeBlock Code="@CompactLargeMenuCode" />
+<div class="mt-3">
+    <CodeBlock Code="@ScrollableLargeMenuCode" />
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in NavigationMenuApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.NavigationMenu
+
+        <NavigationMenuRoot>
+            <NavigationMenuList>
+                <NavigationMenuItem>
+                    <NavigationMenuTrigger>
+                        Products
+                        <NavigationMenuIcon />
+                    </NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                        <NavigationMenuLink Href="/components/menu" />
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+            </NavigationMenuList>
+
+            <NavigationMenuPortal>
+                <NavigationMenuBackdrop />
+                <NavigationMenuPositioner>
+                    <NavigationMenuPopup>
+                        <NavigationMenuArrow />
+                        <NavigationMenuViewport />
+                    </NavigationMenuPopup>
+                </NavigationMenuPositioner>
+            </NavigationMenuPortal>
+        </NavigationMenuRoot>
+        """;
+
+    private const string CustomLinksCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.NavigationMenu
+
+        <NavigationMenuLink Href="/components/navigation-menu"
+                            Render="@RenderLink">
+            Navigation Menu
+        </NavigationMenuLink>
+
+        @code {
+            private RenderFragment<RenderProps<NavigationMenuLinkState>> RenderLink => props =>
+                RenderUtilities.CreateElement("a", props);
+        }
+        """;
+
+    private const string CompactLargeMenuCode =
+        """
+        /* Compress the panel while preventing overflow. */
+        .Content,
+        .Popup {
+            max-height: var(--available-height);
+        }
+        """;
+
+    private const string ScrollableLargeMenuCode =
+        """
+        /* Or make the panel scrollable. */
+        .Content,
+        .Popup {
+            max-height: var(--available-height);
+        }
+
+        .Content {
+            overflow-y: auto;
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.Hero.Css.NavigationMenuHeroCss.razor"),
+            new DemoFile("navigation-menu.css", "css", "wwwroot.demos.navigation-menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.Hero.Tailwind.NavigationMenuHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> NestedVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.Nested.Css.NavigationMenuNestedCss.razor"),
+            new DemoFile("navigation-menu.css", "css", "wwwroot.demos.navigation-menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.Nested.Tailwind.NavigationMenuNestedTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> NestedInlineVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.NestedInline.Css.NavigationMenuNestedInlineCss.razor"),
+            new DemoFile("navigation-menu.css", "css", "wwwroot.demos.navigation-menu.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("NavigationMenu.razor", "xml", "Components.Demos.NavigationMenu.NestedInline.Tailwind.NavigationMenuNestedInlineTailwind.razor"),
+        ]),
+    ];
+}

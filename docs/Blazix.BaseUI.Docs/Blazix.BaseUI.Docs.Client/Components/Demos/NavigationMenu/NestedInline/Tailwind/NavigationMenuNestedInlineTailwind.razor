@@ -1,0 +1,280 @@
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<NavigationMenuRoot class="min-w-max text-neutral-950 dark:text-white">
+    <NavigationMenuList class="relative flex gap-px">
+        <NavigationMenuItem>
+            <NavigationMenuTrigger class="@TriggerClassName">
+                Product
+                <NavigationMenuIcon class="flex items-center justify-center transition-transform duration-200 ease-[ease] data-popup-open:rotate-180">
+                    @CaretDownIcon
+                </NavigationMenuIcon>
+            </NavigationMenuTrigger>
+            <NavigationMenuContent class="@ProductContentClassName">
+                <NavigationMenuRoot class="overflow-hidden text-neutral-950 dark:text-white"
+                                    Orientation="@NestedOrientation"
+                                    DefaultValue="developers">
+                    <div class="grid grid-cols-1 overflow-hidden min-[700px]:grid-cols-[13rem_minmax(0,1fr)]">
+                        <NavigationMenuList class="m-0 flex list-none flex-row gap-1 overflow-x-auto p-2 min-[700px]:h-[var(--popup-height)] min-[700px]:flex-col min-[700px]:gap-px min-[700px]:overflow-x-visible min-[700px]:overflow-y-clip min-[700px]:border-r min-[700px]:border-r-neutral-950 min-[700px]:transition-[height] min-[700px]:duration-[var(--duration)] min-[700px]:ease-[var(--easing)] dark:min-[700px]:border-r-white">
+                            @foreach (var menu in AudienceMenus)
+                            {
+                                <NavigationMenuItem Value="@menu.Value" @key="menu.Value">
+                                    <NavigationMenuTrigger class="@SubmenuTriggerClassName">
+                                        <span class="text-sm font-normal leading-4 text-neutral-950 dark:text-white">@menu.Label</span>
+                                        <span class="text-sm leading-5 text-neutral-500 dark:text-neutral-400">@menu.Hint</span>
+                                    </NavigationMenuTrigger>
+                                    <NavigationMenuContent class="@SubmenuContentClassName">
+                                        <div>
+                                            <h4 class="m-0 text-base font-normal leading-5">@menu.Title</h4>
+                                            <p class="m-0 mt-1 text-sm leading-5 text-neutral-500 dark:text-neutral-400">@menu.Description</p>
+                                        </div>
+                                        <ul class="-mx-2 m-0 flex list-none flex-col gap-0 p-0">
+                                            @foreach (var link in menu.Links)
+                                            {
+                                                <li @key="link.Href">
+                                                    <NavigationMenuLink class="@LinkCardClassName" Href="@link.Href">
+                                                        <h5 class="m-0 text-sm font-normal leading-4">@link.Title</h5>
+                                                        <p class="m-0 text-sm leading-5 text-neutral-500 dark:text-neutral-400">@link.Description</p>
+                                                    </NavigationMenuLink>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+                            }
+                        </NavigationMenuList>
+
+                        <NavigationMenuViewport class="relative min-h-[16.5rem] overflow-hidden border-t border-neutral-950 min-[700px]:border-t-0 dark:border-white" />
+                    </div>
+                </NavigationMenuRoot>
+            </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+            <NavigationMenuTrigger class="@TriggerClassName">
+                Learn
+                <NavigationMenuIcon class="flex items-center justify-center transition-transform duration-200 ease-[ease] data-popup-open:rotate-180">
+                    @CaretDownIcon
+                </NavigationMenuIcon>
+            </NavigationMenuTrigger>
+            <NavigationMenuContent class="@GuidesContentClassName">
+                <div class="flex flex-col gap-4 p-4 text-neutral-950 dark:text-white">
+                    <div>
+                        <h4 class="m-0 text-base font-normal leading-5">@GuidesPanel.Title</h4>
+                        <p class="m-0 mt-1 text-sm leading-5 text-neutral-500 dark:text-neutral-400">@GuidesPanel.Description</p>
+                    </div>
+                    <ul class="-mx-2 m-0 flex list-none flex-col gap-0 p-0">
+                        @foreach (var link in GuideLinks)
+                        {
+                            <li @key="link.Href">
+                                <NavigationMenuLink class="@LinkCardClassName" Href="@link.Href">
+                                    <h5 class="m-0 text-sm font-normal leading-4">@link.Title</h5>
+                                    <p class="m-0 text-sm leading-5 text-neutral-500 dark:text-neutral-400">@link.Description</p>
+                                </NavigationMenuLink>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+            <NavigationMenuLink class="@TriggerClassName" Href="/overview/releases">
+                Releases
+            </NavigationMenuLink>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+            <NavigationMenuLink class="@TriggerClassName" Href="https://github.com/JakeMurrayDev/Blazix.BaseUI">
+                GitHub
+            </NavigationMenuLink>
+        </NavigationMenuItem>
+    </NavigationMenuList>
+
+    <NavigationMenuPortal>
+        <NavigationMenuPositioner SideOffset="10"
+                                  CollisionPadding="20"
+                                  CollisionAvoidance="@NoSideCollision"
+                                  class="@PositionerClassName"
+                                  style="--duration: 0.35s; --easing: cubic-bezier(0.22, 1, 0.36, 1)">
+            <NavigationMenuPopup class="@PopupClassName">
+                <NavigationMenuArrow class="@NestedInlineArrowClassName" />
+                <NavigationMenuViewport class="relative h-full w-full overflow-hidden" />
+            </NavigationMenuPopup>
+        </NavigationMenuPositioner>
+    </NavigationMenuPortal>
+</NavigationMenuRoot>
+
+@code {
+    private const string TriggerClassName =
+        "flex h-8 items-center justify-center gap-1.5 bg-transparent px-2 text-sm font-normal text-neutral-950 no-underline select-none min-[501px]:px-3 hover:bg-neutral-100 data-popup-open:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:text-white dark:hover:bg-neutral-800 dark:data-popup-open:bg-neutral-800 dark:focus-visible:outline-white";
+
+    private const string SharedContentClassName =
+        "h-full w-[calc(100vw_-_40px)] transition-[opacity,translate] duration-[calc(var(--duration)*0.5),var(--duration)] ease-[ease,cubic-bezier(0.4,0,0.2,1)] data-starting-style:data-[activation-direction=left]:opacity-0 data-starting-style:data-[activation-direction=right]:opacity-0 data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--duration)*0.5)] data-ending-style:ease-[ease] data-starting-style:data-[activation-direction=left]:translate-x-[-2rem] data-starting-style:data-[activation-direction=right]:translate-x-[2rem] data-ending-style:data-[activation-direction=left]:translate-x-[2rem] data-ending-style:data-[activation-direction=right]:translate-x-[-2rem]";
+
+    private const string ProductContentClassName =
+        SharedContentClassName + " p-0 min-[700px]:[width:min(675px,calc(100vw-40px))]";
+
+    private const string GuidesContentClassName =
+        SharedContentClassName + " p-0 min-[700px]:[width:min(500px,calc(100vw-40px))]";
+
+    private const string SubmenuTriggerClassName =
+        "m-0 flex w-full min-w-[10rem] flex-col items-start gap-1 border-0 bg-transparent p-2 text-left text-inherit hover:bg-neutral-100 data-popup-open:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:hover:bg-neutral-800 dark:data-popup-open:bg-neutral-800 dark:focus-visible:outline-white";
+
+    private const string SubmenuContentClassName =
+        "flex h-full translate-x-0 flex-col gap-4 p-4 transition-[opacity,translate,filter] duration-[var(--duration)] ease-[var(--easing)] data-starting-style:data-[activation-direction=left]:opacity-0 data-starting-style:data-[activation-direction=right]:opacity-0 data-starting-style:data-[activation-direction=left]:translate-x-[-50%] data-starting-style:data-[activation-direction=right]:translate-x-[50%] data-ending-style:opacity-0 data-ending-style:data-[activation-direction=left]:translate-x-[50%] data-ending-style:data-[activation-direction=right]:translate-x-[-50%] min-[700px]:duration-[calc(var(--duration)*1.35)] min-[700px]:ease-[cubic-bezier(0.16,1,0.3,1)] min-[700px]:data-starting-style:data-[activation-direction=up]:opacity-0 min-[700px]:data-starting-style:data-[activation-direction=down]:opacity-0 min-[700px]:data-starting-style:data-[activation-direction=up]:translate-y-[-72px] min-[700px]:data-starting-style:data-[activation-direction=down]:translate-y-[72px] min-[700px]:data-starting-style:blur-[2px] min-[700px]:data-ending-style:data-[activation-direction=up]:translate-y-[72px] min-[700px]:data-ending-style:data-[activation-direction=down]:translate-y-[-72px] min-[700px]:data-ending-style:blur-[2px]";
+
+    private const string LinkCardClassName =
+        "relative block h-full w-full border-0 bg-transparent p-2 text-left text-inherit no-underline hover:bg-neutral-100 data-popup-open:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:hover:bg-neutral-800 dark:data-popup-open:bg-neutral-800 dark:focus-visible:outline-white";
+
+    private const string PositionerClassName =
+        "h-[var(--positioner-height)] w-[var(--positioner-width)] max-w-[var(--available-width)] transition-[top,left,right,bottom] duration-[var(--duration)] ease-[var(--easing)] before:absolute before:content-[''] data-instant:transition-none data-[side=bottom]:before:left-0 data-[side=bottom]:before:right-0 data-[side=bottom]:before:top-[-10px] data-[side=bottom]:before:h-2.5 data-[side=top]:before:left-0 data-[side=top]:before:right-0 data-[side=top]:before:bottom-[-10px] data-[side=top]:before:h-2.5 data-[side=left]:before:bottom-0 data-[side=left]:before:right-[-10px] data-[side=left]:before:top-0 data-[side=left]:before:w-2.5 data-[side=right]:before:bottom-0 data-[side=right]:before:left-[-10px] data-[side=right]:before:top-0 data-[side=right]:before:w-2.5";
+
+    private const string PopupClassName =
+        "relative h-[var(--popup-height)] w-[var(--popup-width)] origin-[var(--transform-origin)] border border-neutral-950 bg-white text-neutral-950 shadow-[0.25rem_0.25rem_0] shadow-black/10 outline-none transition-[opacity,transform,width,height,scale] duration-[var(--duration)] ease-[var(--easing)] data-starting-style:scale-90 data-starting-style:opacity-0 data-ending-style:scale-90 data-ending-style:opacity-0 data-ending-style:duration-150 data-ending-style:ease-[ease] data-ending-style:transition-[opacity,scale] dark:border-white dark:bg-neutral-950 dark:text-white dark:shadow-none";
+
+    private const string NestedInlineArrowClassName =
+        "relative block h-1.5 w-3 overflow-clip transition-[left,right] duration-[var(--duration)] ease-[var(--easing)] before:absolute before:bottom-0 before:left-1/2 before:block before:h-[8.485px] before:w-[8.485px] before:-translate-x-1/2 before:translate-y-1/2 before:rotate-45 before:border before:border-neutral-950 before:bg-white before:content-[''] max-[699px]:hidden data-[side=bottom]:top-[-6px] data-[side=top]:bottom-[-6px] data-[side=top]:rotate-180 data-[side=left]:right-[-9px] data-[side=left]:rotate-90 data-[side=right]:left-[-9px] data-[side=right]:-rotate-90 dark:before:border-white dark:before:bg-neutral-950";
+
+    private bool isDesktop = true;
+    private readonly string mediaQuerySubscriptionId = Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<NavigationMenuNestedInlineTailwind>? dotNetReference;
+
+    private NavigationMenuOrientation NestedOrientation => isDesktop
+        ? NavigationMenuOrientation.Vertical
+        : NavigationMenuOrientation.Horizontal;
+
+    private static readonly CollisionAvoidance NoSideCollision = new()
+    {
+        Side = CollisionAvoidanceSideMode.None
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        dotNetReference = DotNetObjectReference.Create(this);
+        var matches = await JSRuntime.InvokeAsync<bool>(
+            "blazixDocs.watchMediaQuery",
+            mediaQuerySubscriptionId,
+            "(min-width: 700px)",
+            dotNetReference);
+
+        ApplyMediaQueryMatch(matches);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dotNetReference is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("blazixDocs.unwatchMediaQuery", mediaQuerySubscriptionId);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        dotNetReference.Dispose();
+    }
+
+    [JSInvokable]
+    public Task OnMediaQueryChanged(bool matches)
+    {
+        ApplyMediaQueryMatch(matches);
+        return Task.CompletedTask;
+    }
+
+    private void ApplyMediaQueryMatch(bool matches)
+    {
+        if (matches == isDesktop)
+        {
+            return;
+        }
+
+        isDesktop = matches;
+        StateHasChanged();
+    }
+
+    private static readonly IReadOnlyList<AudienceMenu> AudienceMenus =
+    [
+        new("developers", "Developers", "Go from idea to UI faster.", "Build product UI without giving up control",
+        "Start with accessible parts and shape them to your app instead of working around a preset design system.",
+        [
+            new("/overview/quick-start", "Quick start", "Install Base UI and get your first interactive primitive on screen fast."),
+            new("/handbook/composition", "Composition", "Wrap and combine parts to match your product structure without hacks."),
+        ]),
+        new("systems", "Design Systems", "Keep patterns aligned across teams.", "Turn shared standards into working components",
+        "Connect tokens, states, and accessibility rules once, then give every product team the same solid starting point.",
+        [
+            new("/handbook/styling", "Styling", "Map tokens and component states to your own CSS or utility setup."),
+            new("/overview/accessibility", "Accessibility", "Review keyboard support and semantic defaults before anything ships."),
+            new("/components/tooltip", "Tooltip", "Set one clear pattern for lightweight help, hints, and field guidance."),
+            new("/components/popover", "Popover", "Handle richer anchored panels like menus, inspectors, and onboarding."),
+        ]),
+        new("managers", "Engineering Leads", "Roll out shared UI without drag.", "Give squads clear defaults and room to move",
+        "Use the docs to align on quality bars, upgrades, and extension points while still leaving teams space to customize.",
+        [
+            new("/overview/releases", "Releases", "Track version changes and migration notes before upgrades surprise teams."),
+            new("/handbook/typescript", "TypeScript", "See how the primitives type custom wrappers and shared abstractions."),
+            new("/handbook/forms", "Forms", "Standardize validation and field patterns teams reach for constantly."),
+        ]),
+        new("startups", "Startups", "Ship polished basics while things change.", "Get sturdy UI foundations in place early",
+        "Cover the hard interaction details now so your team can spend more time on the product ideas that actually differentiate you.",
+        [
+            new("/overview/quick-start", "Quick start", "Get the package installed and your first component working in minutes."),
+            new("/components/menu", "Menu", "Add action menus with keyboard support and focus handling already done."),
+            new("/components/dialog", "Dialog", "Launch settings or upgrade flows without rebuilding focus management."),
+        ]),
+    ];
+
+    private static readonly PanelCopy GuidesPanel = new(
+        "Where teams usually start",
+        "These are the docs people reach for first when they are turning a prototype into shared UI.");
+
+    private static readonly IReadOnlyList<NavigationLink> GuideLinks =
+    [
+        new("/overview/accessibility", "Accessibility handbook", "Take a practical pass over focus order, semantics, and keyboard support."),
+        new("/handbook/composition", "Composition handbook", "Learn when to wrap parts, share behavior, and expose flexible APIs."),
+        new("/handbook/styling", "Styling handbook", "Apply tokens and state styles without fighting the underlying markup."),
+    ];
+
+    private readonly record struct AudienceMenu(
+        string Value,
+        string Label,
+        string Hint,
+        string Title,
+        string Description,
+        IReadOnlyList<NavigationLink> Links);
+
+    private readonly record struct NavigationLink(string Href, string Title, string Description);
+
+    private readonly record struct PanelCopy(string Title, string Description);
+}
+
+@code {
+    private static RenderFragment CaretDownIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "currentColor");
+        builder.AddAttribute(5, "style", "display:block");
+        builder.AddAttribute(6, "aria-hidden", "true");
+        builder.AddAttribute(7, "focusable", "false");
+        builder.OpenElement(8, "path");
+        builder.AddAttribute(9, "d", "M12 6H4l4 4.5z");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

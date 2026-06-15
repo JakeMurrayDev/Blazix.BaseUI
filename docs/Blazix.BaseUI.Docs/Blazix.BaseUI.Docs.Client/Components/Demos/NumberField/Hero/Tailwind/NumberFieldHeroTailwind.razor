@@ -1,0 +1,83 @@
+<NumberFieldRoot Id="blx-number-field-amount-tailwind"
+                 DefaultValue="100"
+                 class="flex flex-col items-start gap-1">
+    <NumberFieldScrubArea class="cursor-ew-resize font-bold select-none">
+        <label for="blx-number-field-amount-tailwind"
+               class="cursor-ew-resize text-sm font-bold leading-5 text-neutral-950 dark:text-white">
+            Amount
+        </label>
+        <NumberFieldScrubAreaCursor class="drop-shadow-[0_1px_1px_#0008] filter">
+            @CursorGrowIcon
+        </NumberFieldScrubAreaCursor>
+    </NumberFieldScrubArea>
+
+    <NumberFieldGroup class="flex h-8">
+        <NumberFieldDecrement class="@($"{StepperClasses} border-r-0")">
+            @MinusIcon
+        </NumberFieldDecrement>
+        <NumberFieldInput class="h-full w-[7ch] rounded-none border border-neutral-950 bg-white px-2 text-left text-sm font-normal tabular-nums text-neutral-950 focus:z-10 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:focus:outline-white" />
+        <NumberFieldIncrement class="@($"{StepperClasses} border-l-0")">
+            @PlusIcon
+        </NumberFieldIncrement>
+    </NumberFieldGroup>
+</NumberFieldRoot>
+
+@code {
+    private const string StepperClasses =
+        "flex h-full w-8 items-center justify-center rounded-none border border-neutral-950 bg-white bg-clip-padding p-0 text-neutral-950 outline-0 select-none hover:bg-neutral-100 active:bg-neutral-200 disabled:border-neutral-500 disabled:text-neutral-500 dark:border-white dark:bg-neutral-950 dark:text-white dark:hover:bg-neutral-800 dark:active:bg-neutral-700 dark:disabled:border-neutral-400 dark:disabled:text-neutral-400";
+
+    private static RenderFragment CursorGrowIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "26");
+        builder.AddAttribute(2, "height", "14");
+        builder.AddAttribute(3, "viewBox", "0 0 24 14");
+        builder.AddAttribute(4, "fill", "black");
+        builder.AddAttribute(5, "stroke", "white");
+        builder.AddAttribute(6, "style", "display:block");
+        builder.AddAttribute(7, "aria-hidden", "true");
+        builder.AddAttribute(8, "focusable", "false");
+        builder.OpenElement(9, "path");
+        builder.AddAttribute(10, "d", "M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static RenderFragment PlusIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "none");
+        builder.AddAttribute(5, "stroke", "currentColor");
+        builder.AddAttribute(6, "stroke-linecap", "square");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "style", "display:block");
+        builder.AddAttribute(9, "aria-hidden", "true");
+        builder.AddAttribute(10, "focusable", "false");
+        builder.OpenElement(11, "path");
+        builder.AddAttribute(12, "d", "M1.5 8h13M8 14.5v-13");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static RenderFragment MinusIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "none");
+        builder.AddAttribute(5, "stroke", "currentColor");
+        builder.AddAttribute(6, "stroke-linecap", "square");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "style", "display:block");
+        builder.AddAttribute(9, "aria-hidden", "true");
+        builder.AddAttribute(10, "focusable", "false");
+        builder.OpenElement(11, "path");
+        builder.AddAttribute(12, "d", "M1.5 8h13");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}
