@@ -113,6 +113,7 @@ public abstract class RadioGroupTestsBase : TestBase
         await WaitForRadioStateAsync("b", true);
         await Assertions.Expect(indicatorB).ToBeAttachedAsync();
         await Assertions.Expect(indicatorB).ToHaveAttributeAsync("data-checked", "");
+        await Assertions.Expect(indicatorA).Not.ToBeAttachedAsync();
     }
 
     /// <summary>
