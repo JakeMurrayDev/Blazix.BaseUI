@@ -23,6 +23,8 @@ public abstract class RadioGroupTestsBase : TestBase
 
     protected ILocator GetRadio(string value) => GetByTestId($"radio-{value}");
 
+    protected ILocator GetRadioIndicator(string value) => GetByTestId($"indicator-{value}");
+
     protected async Task<bool> IsRadioCheckedAsync(string value)
     {
         var radio = GetRadio(value);
@@ -87,6 +89,30 @@ public abstract class RadioGroupTestsBase : TestBase
 
         await WaitForRadioStateAsync("a", false);
         await WaitForRadioStateAsync("b", true);
+    }
+
+    /// <summary>
+    /// Tests that the rendered indicator follows the newly selected radio.
+    /// </summary>
+    [Fact]
+    public virtual async Task Click_MovesIndicatorToSelectedRadio()
+    {
+        await NavigateAsync(CreateUrl("/tests/radiogroup")
+            .WithRadioDefaultValue("a"));
+
+        var indicatorA = GetRadioIndicator("a");
+        var indicatorB = GetRadioIndicator("b");
+
+        await Assertions.Expect(indicatorA).ToBeAttachedAsync();
+        await Assertions.Expect(indicatorA).ToHaveAttributeAsync("data-checked", "");
+        await Assertions.Expect(indicatorB).Not.ToBeAttachedAsync();
+
+        var radioB = GetRadio("b");
+        await radioB.ClickAsync();
+
+        await WaitForRadioStateAsync("b", true);
+        await Assertions.Expect(indicatorB).ToBeAttachedAsync();
+        await Assertions.Expect(indicatorB).ToHaveAttributeAsync("data-checked", "");
     }
 
     /// <summary>
