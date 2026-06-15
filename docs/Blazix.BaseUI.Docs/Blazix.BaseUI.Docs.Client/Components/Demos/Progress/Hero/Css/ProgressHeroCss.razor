@@ -9,7 +9,7 @@
 </ProgressRoot>
 
 @code {
-    private readonly Timer timer;
+    private Timer? timer;
     private double? value = 20;
 
     public ProgressHeroCss()
@@ -19,15 +19,36 @@
 
     public void Dispose()
     {
-        timer.Dispose();
+        timer?.Dispose();
+        timer = null;
     }
 
     private void UpdateValue(object? state)
     {
         _ = InvokeAsync(() =>
         {
-            value = Math.Min(100, Math.Round((value ?? 0) + Random.Shared.NextDouble() * 25));
+            var nextValue = Math.Min(100, Math.Round((value ?? 0) + Random.Shared.NextDouble() * 25));
+
+            if (value == nextValue)
+            {
+                StopTimerIfComplete(nextValue);
+                return;
+            }
+
+            value = nextValue;
+            StopTimerIfComplete(nextValue);
             StateHasChanged();
         });
+    }
+
+    private void StopTimerIfComplete(double nextValue)
+    {
+        if (nextValue < 100)
+        {
+            return;
+        }
+
+        timer?.Dispose();
+        timer = null;
     }
 }
