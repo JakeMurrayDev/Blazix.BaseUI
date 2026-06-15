@@ -1,0 +1,107 @@
+<NavigationMenuRoot class="blx-nav-menu-root">
+    <NavigationMenuList class="blx-nav-menu-list">
+        <NavigationMenuItem>
+            <NavigationMenuTrigger class="blx-nav-menu-trigger">
+                Overview
+                <NavigationMenuIcon class="blx-nav-menu-icon">
+                    @CaretDownIcon
+                </NavigationMenuIcon>
+            </NavigationMenuTrigger>
+            <NavigationMenuContent class="blx-nav-menu-content">
+                <ul class="blx-nav-menu-grid-link-list">
+                    @foreach (var item in OverviewLinks)
+                    {
+                        <li @key="item.Href">
+                            <NavigationMenuLink Href="@item.Href" class="blx-nav-menu-link-card">
+                                <h3 class="blx-nav-menu-link-title">@item.Title</h3>
+                                <p class="blx-nav-menu-link-description">@item.Description</p>
+                            </NavigationMenuLink>
+                        </li>
+                    }
+                </ul>
+            </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem Value="handbook">
+            <NavigationMenuTrigger class="blx-nav-menu-trigger">
+                Handbook
+                <NavigationMenuIcon class="blx-nav-menu-icon">
+                    @CaretDownIcon
+                </NavigationMenuIcon>
+            </NavigationMenuTrigger>
+            <NavigationMenuContent class="blx-nav-menu-content">
+                <ul class="blx-nav-menu-flex-link-list">
+                    @foreach (var item in HandbookLinks)
+                    {
+                        <li @key="item.Href">
+                            <NavigationMenuLink Href="@item.Href" class="blx-nav-menu-link-card">
+                                <h3 class="blx-nav-menu-link-title">@item.Title</h3>
+                                <p class="blx-nav-menu-link-description">@item.Description</p>
+                            </NavigationMenuLink>
+                        </li>
+                    }
+                </ul>
+            </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+            <NavigationMenuLink class="blx-nav-menu-trigger" Href="https://github.com/JakeMurrayDev/Blazix.BaseUI">
+                GitHub
+            </NavigationMenuLink>
+        </NavigationMenuItem>
+    </NavigationMenuList>
+
+    <NavigationMenuPortal>
+        <NavigationMenuPositioner class="blx-nav-menu-positioner"
+                                  SideOffset="10"
+                                  CollisionPadding="20"
+                                  CollisionAvoidance="@NoSideCollision">
+            <NavigationMenuPopup class="blx-nav-menu-popup">
+                <NavigationMenuArrow class="blx-nav-menu-arrow" />
+                <NavigationMenuViewport class="blx-nav-menu-viewport" />
+            </NavigationMenuPopup>
+        </NavigationMenuPositioner>
+    </NavigationMenuPortal>
+</NavigationMenuRoot>
+
+@code {
+    private static readonly CollisionAvoidance NoSideCollision = new()
+    {
+        Side = CollisionAvoidanceSideMode.None
+    };
+
+    private static readonly IReadOnlyList<NavigationLink> OverviewLinks =
+    [
+        new("/overview/quick-start", "Quick Start", "Install and assemble your first component."),
+        new("/overview/accessibility", "Accessibility", "Learn how Blazix.BaseUI builds accessible components."),
+        new("/overview/releases", "Releases", "See what is new in the latest Base UI versions."),
+        new("/overview/about", "About", "Learn more about Base UI and its mission."),
+    ];
+
+    private static readonly IReadOnlyList<NavigationLink> HandbookLinks =
+    [
+        new("/handbook/styling", "Styling", "Base UI components can be styled with plain CSS, Tailwind CSS, CSS-in-JS, or CSS Modules."),
+        new("/handbook/animation", "Animation", "Base UI components can be animated with CSS transitions, CSS animations, or JavaScript libraries."),
+        new("/handbook/composition", "Composition", "Base UI components can be replaced and composed with your own existing components."),
+    ];
+
+    private readonly record struct NavigationLink(string Href, string Title, string Description);
+}
+
+@code {
+    private static RenderFragment CaretDownIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "currentColor");
+        builder.AddAttribute(5, "style", "display:block");
+        builder.AddAttribute(6, "aria-hidden", "true");
+        builder.AddAttribute(7, "focusable", "false");
+        builder.OpenElement(8, "path");
+        builder.AddAttribute(9, "d", "M12 6H4l4 4.5z");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

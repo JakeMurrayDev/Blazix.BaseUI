@@ -1,0 +1,64 @@
+@page "/components/number-field"
+
+<PageTitle>Number Field · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Number Field"
+               Subtitle="A numeric input element with increment and decrement buttons, and a scrub area."
+               MarkdownHref="/components/number-field.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <NumberFieldHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Form controls must have an accessible name from a native <code class="@LiquidGlassClasses.CodeInline">label</code> element or the Field component.</li>
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">DefaultValue</code> for uncontrolled fields and <code class="@LiquidGlassClasses.CodeInline">Value</code> with <code class="@LiquidGlassClasses.CodeInline">ValueChanged</code> for controlled fields.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">AllowOutOfRange</code> only affects direct text input; buttons, keyboard steps, wheel, and scrub interactions still clamp to the configured range.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the optional scrub area plus the grouped stepper controls:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in NumberFieldApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.NumberField
+
+        <NumberFieldRoot>
+            <NumberFieldScrubArea>
+                <NumberFieldScrubAreaCursor />
+            </NumberFieldScrubArea>
+            <NumberFieldGroup>
+                <NumberFieldDecrement />
+                <NumberFieldInput />
+                <NumberFieldIncrement />
+            </NumberFieldGroup>
+        </NumberFieldRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("NumberField.razor", "xml", "Components.Demos.NumberField.Hero.Css.NumberFieldHeroCss.razor"),
+            new DemoFile("number-field.css", "css", "wwwroot.demos.number-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("NumberField.razor", "xml", "Components.Demos.NumberField.Hero.Tailwind.NumberFieldHeroTailwind.razor"),
+        ]),
+    ];
+}

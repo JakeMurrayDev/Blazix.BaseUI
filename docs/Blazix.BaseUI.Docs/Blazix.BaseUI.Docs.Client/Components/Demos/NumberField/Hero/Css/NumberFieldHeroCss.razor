@@ -1,0 +1,79 @@
+<NumberFieldRoot Id="blx-number-field-amount-css"
+                 DefaultValue="100"
+                 class="blx-number-field">
+    <NumberFieldScrubArea class="blx-number-field-scrub-area">
+        <label for="blx-number-field-amount-css" class="blx-number-field-label">
+            Amount
+        </label>
+        <NumberFieldScrubAreaCursor class="blx-number-field-scrub-area-cursor">
+            @CursorGrowIcon
+        </NumberFieldScrubAreaCursor>
+    </NumberFieldScrubArea>
+
+    <NumberFieldGroup class="blx-number-field-group">
+        <NumberFieldDecrement class="blx-number-field-stepper blx-number-field-decrement">
+            @MinusIcon
+        </NumberFieldDecrement>
+        <NumberFieldInput class="blx-number-field-input" />
+        <NumberFieldIncrement class="blx-number-field-stepper blx-number-field-increment">
+            @PlusIcon
+        </NumberFieldIncrement>
+    </NumberFieldGroup>
+</NumberFieldRoot>
+
+@code {
+    private static RenderFragment CursorGrowIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "26");
+        builder.AddAttribute(2, "height", "14");
+        builder.AddAttribute(3, "viewBox", "0 0 24 14");
+        builder.AddAttribute(4, "fill", "black");
+        builder.AddAttribute(5, "stroke", "white");
+        builder.AddAttribute(6, "style", "display:block");
+        builder.AddAttribute(7, "aria-hidden", "true");
+        builder.AddAttribute(8, "focusable", "false");
+        builder.OpenElement(9, "path");
+        builder.AddAttribute(10, "d", "M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static RenderFragment PlusIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "none");
+        builder.AddAttribute(5, "stroke", "currentColor");
+        builder.AddAttribute(6, "stroke-linecap", "square");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "style", "display:block");
+        builder.AddAttribute(9, "aria-hidden", "true");
+        builder.AddAttribute(10, "focusable", "false");
+        builder.OpenElement(11, "path");
+        builder.AddAttribute(12, "d", "M1.5 8h13M8 14.5v-13");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static RenderFragment MinusIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "width", "16");
+        builder.AddAttribute(2, "height", "16");
+        builder.AddAttribute(3, "viewBox", "0 0 16 16");
+        builder.AddAttribute(4, "fill", "none");
+        builder.AddAttribute(5, "stroke", "currentColor");
+        builder.AddAttribute(6, "stroke-linecap", "square");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "style", "display:block");
+        builder.AddAttribute(9, "aria-hidden", "true");
+        builder.AddAttribute(10, "focusable", "false");
+        builder.OpenElement(11, "path");
+        builder.AddAttribute(12, "d", "M1.5 8h13");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

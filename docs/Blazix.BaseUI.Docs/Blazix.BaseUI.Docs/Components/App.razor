@@ -44,10 +44,58 @@
                 event.preventDefault();
                 event.stopImmediatePropagation();
             };
+            const mediaQuerySubscriptions = new Map();
+            const addMediaQueryListener = (mediaQuery, listener) => {
+                if (typeof mediaQuery.addEventListener === 'function') {
+                    mediaQuery.addEventListener('change', listener);
+                    return;
+                }
+
+                mediaQuery.addListener(listener);
+            };
+            const removeMediaQueryListener = (mediaQuery, listener) => {
+                if (typeof mediaQuery.removeEventListener === 'function') {
+                    mediaQuery.removeEventListener('change', listener);
+                    return;
+                }
+
+                mediaQuery.removeListener(listener);
+            };
+            const removeMediaQuerySubscription = id => {
+                const subscription = mediaQuerySubscriptions.get(id);
+                if (!subscription) {
+                    return;
+                }
+
+                removeMediaQueryListener(subscription.mediaQuery, subscription.listener);
+                mediaQuerySubscriptions.delete(id);
+            };
 
             gatedEvents.forEach(eventName => document.addEventListener(eventName, gateEvent, true));
             window.blazixDocs = {
                 ...(window.blazixDocs || {}),
+                matchesMedia(query) {
+                    return matchMedia(query).matches;
+                },
+                watchMediaQuery(id, query, dotNetRef) {
+                    removeMediaQuerySubscription(id);
+
+                    const mediaQuery = matchMedia(query);
+                    const listener = event => {
+                        dotNetRef.invokeMethodAsync('OnMediaQueryChanged', event.matches).catch(error => {
+                            console.error('[Blazix docs] Media query callback failed.', error);
+                            removeMediaQuerySubscription(id);
+                        });
+                    };
+
+                    addMediaQueryListener(mediaQuery, listener);
+                    mediaQuerySubscriptions.set(id, { mediaQuery, listener });
+
+                    return mediaQuery.matches;
+                },
+                unwatchMediaQuery(id) {
+                    removeMediaQuerySubscription(id);
+                },
                 markInteractive() {
                     document.body?.classList.remove('blazix-docs-preinteractive');
                     document.documentElement.dataset.blazixInteractive = 'true';
@@ -523,6 +571,8 @@
     <link rel="stylesheet" href="@Assets["demos/menu.min.css"]" />
     <link rel="stylesheet" href="@Assets["demos/menubar.min.css"]" />
     <link rel="stylesheet" href="@Assets["demos/meter.min.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/navigation-menu.min.css"]" />
+    <link rel="stylesheet" href="@Assets["demos/number-field.min.css"]" />
     <HeadOutlet @rendermode="ActiveRenderMode" />
 </head>
 
