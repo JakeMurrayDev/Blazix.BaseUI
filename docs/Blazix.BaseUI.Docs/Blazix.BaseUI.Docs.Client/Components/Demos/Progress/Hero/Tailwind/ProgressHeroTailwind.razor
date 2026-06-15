@@ -1,0 +1,35 @@
+@implements IDisposable
+
+<ProgressRoot class="grid w-60 max-w-full grid-cols-2 gap-y-2" Value="@value">
+    <ProgressLabel class="text-sm font-normal text-neutral-950 dark:text-white">
+        Export data
+    </ProgressLabel>
+    <ProgressValue class="text-right text-sm text-neutral-950 dark:text-white" />
+    <ProgressTrack class="col-span-2 h-1 overflow-hidden bg-neutral-200 dark:bg-neutral-800">
+        <ProgressIndicator class="bg-neutral-950 transition-[width] duration-500 dark:bg-white" />
+    </ProgressTrack>
+</ProgressRoot>
+
+@code {
+    private readonly Timer timer;
+    private double? value = 20;
+
+    public ProgressHeroTailwind()
+    {
+        timer = new Timer(UpdateValue, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public void Dispose()
+    {
+        timer.Dispose();
+    }
+
+    private void UpdateValue(object? state)
+    {
+        _ = InvokeAsync(() =>
+        {
+            value = Math.Min(100, Math.Round((value ?? 0) + Random.Shared.NextDouble() * 25));
+            StateHasChanged();
+        });
+    }
+}

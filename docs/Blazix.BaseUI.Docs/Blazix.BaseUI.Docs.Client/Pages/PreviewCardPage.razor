@@ -1,0 +1,212 @@
+@page "/components/preview-card"
+
+<PageTitle>Preview Card · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Preview Card"
+               Subtitle="A popup that appears when a link is hovered, showing a preview for sighted users."
+               MarkdownHref="/components/preview-card.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <PreviewCardHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Popup content should reflect the link destination. Do not put essential information only inside the preview card.</li>
+    <li>Preview cards are a visual enhancement for sighted pointer and keyboard users.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the link trigger, portal, positioned popup, optional backdrop, arrow, and viewport:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Detached triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use a handle when the preview card content is defined away from its link trigger.
+</p>
+<CodeBlock Code="@DetachedTriggersCode" />
+<div class="mt-3 mb-8">
+    <Demo Variants="@DetachedTriggersSimpleVariants">
+        <PreviewCardDetachedTriggersSimpleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Multiple links can share one preview card. Typed payloads let each link provide different preview content.
+</p>
+<CodeBlock Code="@MultipleTriggersCode" />
+<div class="mt-3">
+    <CodeBlock Code="@PayloadCode" />
+</div>
+
+<DocsHeading Level="3" Title="Controlled mode with multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Control <code class="@LiquidGlassClasses.CodeInline">Open</code> and <code class="@LiquidGlassClasses.CodeInline">TriggerId</code> together when application state selects the active link.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersControlledVariants">
+        <PreviewCardDetachedTriggersControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Animating the Preview Card" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Animate position on the Positioner, size on the Popup, and content swaps through <code class="@LiquidGlassClasses.CodeInline">PreviewCardViewport</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersFullVariants">
+        <PreviewCardDetachedTriggersFullCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in PreviewCardApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.PreviewCard
+
+        <PreviewCardRoot>
+            <PreviewCardTrigger />
+            <PreviewCardPortal>
+                <PreviewCardBackdrop />
+                <PreviewCardPositioner>
+                    <PreviewCardPopup>
+                        <PreviewCardArrow />
+                        <PreviewCardViewport />
+                    </PreviewCardPopup>
+                </PreviewCardPositioner>
+            </PreviewCardPortal>
+        </PreviewCardRoot>
+        """;
+
+    private const string DetachedTriggersCode =
+        """
+        @using Blazix.BaseUI.PreviewCard
+
+        <PreviewCardTrigger Handle="@demoPreviewCard" href="#">
+            Link
+        </PreviewCardTrigger>
+
+        <PreviewCardRoot Handle="@demoPreviewCard">
+            ...
+        </PreviewCardRoot>
+
+        @code {
+            private readonly PreviewCardHandle demoPreviewCard =
+                PreviewCardHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string MultipleTriggersCode =
+        """
+        <PreviewCardRoot>
+            <PreviewCardTrigger href="#">Trigger 1</PreviewCardTrigger>
+            <PreviewCardTrigger href="#">Trigger 2</PreviewCardTrigger>
+            ...
+        </PreviewCardRoot>
+
+        <PreviewCardTrigger Handle="@demoPreviewCard" href="#">Trigger 1</PreviewCardTrigger>
+        <PreviewCardTrigger Handle="@demoPreviewCard" href="#">Trigger 2</PreviewCardTrigger>
+
+        <PreviewCardRoot Handle="@demoPreviewCard">
+            ...
+        </PreviewCardRoot>
+
+        @code {
+            private readonly PreviewCardHandle demoPreviewCard =
+                PreviewCardHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string PayloadCode =
+        """
+        <PreviewCardTypedTrigger TPayload="PreviewPayload"
+                                 Handle="@demoPreviewCard"
+                                 Payload='@new PreviewPayload("Trigger 1")'
+                                 href="#">
+            Trigger 1
+        </PreviewCardTypedTrigger>
+
+        <PreviewCardRoot Handle="@demoPreviewCard">
+            <ChildContentWithPayload Context="payloadContext">
+                <PreviewCardPortal>
+                    <PreviewCardPositioner SideOffset="8">
+                        <PreviewCardPopup>
+                            Opened by @((payloadContext.Payload as PreviewPayload)?.Title)
+                        </PreviewCardPopup>
+                    </PreviewCardPositioner>
+                </PreviewCardPortal>
+            </ChildContentWithPayload>
+        </PreviewCardRoot>
+
+        @code {
+            private readonly PreviewCardHandle<PreviewPayload> demoPreviewCard =
+                PreviewCardHandleFactory.CreateHandle<PreviewPayload>();
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.Hero.Css.PreviewCardHeroCss.razor"),
+            new DemoFile("preview-card.css", "css", "wwwroot.demos.preview-card.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.Hero.Tailwind.PreviewCardHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersSimpleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersSimple.Css.PreviewCardDetachedTriggersSimpleCss.razor"),
+            new DemoFile("preview-card.css", "css", "wwwroot.demos.preview-card.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersSimple.Tailwind.PreviewCardDetachedTriggersSimpleTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersControlled.Css.PreviewCardDetachedTriggersControlledCss.razor"),
+            new DemoFile("preview-card.css", "css", "wwwroot.demos.preview-card.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersControlled.Tailwind.PreviewCardDetachedTriggersControlledTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersFullVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersFull.Css.PreviewCardDetachedTriggersFullCss.razor"),
+            new DemoFile("preview-card.css", "css", "wwwroot.demos.preview-card.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("PreviewCard.razor", "xml", "Components.Demos.PreviewCard.DetachedTriggersFull.Tailwind.PreviewCardDetachedTriggersFullTailwind.razor"),
+        ]),
+    ];
+}

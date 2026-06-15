@@ -1,0 +1,54 @@
+@page "/components/progress"
+
+<PageTitle>Progress · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Progress"
+               Subtitle="Displays the status of a task that takes a long time."
+               MarkdownHref="/components/progress.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ProgressHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the label, track, indicator, and value:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ProgressApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Progress
+
+        <ProgressRoot Value="20">
+            <ProgressLabel />
+            <ProgressTrack>
+                <ProgressIndicator />
+            </ProgressTrack>
+            <ProgressValue />
+        </ProgressRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Progress.razor", "xml", "Components.Demos.Progress.Hero.Css.ProgressHeroCss.razor"),
+            new DemoFile("progress.css", "css", "wwwroot.demos.progress.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Progress.razor", "xml", "Components.Demos.Progress.Hero.Tailwind.ProgressHeroTailwind.razor"),
+        ]),
+    ];
+}

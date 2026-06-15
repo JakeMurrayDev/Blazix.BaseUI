@@ -1,0 +1,33 @@
+<p class="blx-preview-card-paragraph">
+    The principles of good
+    <PreviewCardTrigger Handle="@demoPreviewCard"
+                        class="blx-preview-card-link"
+                        href="https://en.wikipedia.org/wiki/Typography">
+        typography
+    </PreviewCardTrigger>
+    remain in the digital age.
+</p>
+
+<PreviewCardRoot Handle="@demoPreviewCard">
+    <PreviewCardPortal>
+        <PreviewCardPositioner SideOffset="8">
+            <PreviewCardPopup class="blx-preview-card-popup">
+                <PreviewCardArrow class="blx-preview-card-arrow" />
+                <div class="blx-preview-card-content">
+                    <img width="224"
+                         height="150"
+                         class="blx-preview-card-image"
+                         src="https://images.unsplash.com/photo-1619615391095-dfa29e1672ef?q=80&amp;w=448&amp;h=300"
+                         alt="Station Hofplein signage in Rotterdam, Netherlands" />
+                    <p class="blx-preview-card-summary">
+                        <strong>Typography</strong> is the art and science of arranging type to make written language clear, visually appealing, and effective in communication.
+                    </p>
+                </div>
+            </PreviewCardPopup>
+        </PreviewCardPositioner>
+    </PreviewCardPortal>
+</PreviewCardRoot>
+
+@code {
+    private readonly PreviewCardHandle demoPreviewCard = PreviewCardHandleFactory.CreateHandle();
+}

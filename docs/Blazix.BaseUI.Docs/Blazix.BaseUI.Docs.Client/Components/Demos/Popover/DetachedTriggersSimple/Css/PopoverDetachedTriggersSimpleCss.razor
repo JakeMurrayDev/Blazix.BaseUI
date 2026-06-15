@@ -1,0 +1,23 @@
+<PopoverTrigger Handle="@demoPopover" class="blx-popover-button">
+    Notifications
+</PopoverTrigger>
+
+<PopoverRoot Handle="@demoPopover">
+    <ChildContent Context="payloadContext">
+        <PopoverPortal>
+            <PopoverPositioner SideOffset="8">
+                <PopoverPopup class="blx-popover-popup">
+                    <PopoverArrow class="blx-popover-arrow" />
+                    <PopoverTitle class="blx-popover-title">Notifications</PopoverTitle>
+                    <PopoverDescription class="blx-popover-description">
+                        You are all caught up. Good job!
+                    </PopoverDescription>
+                </PopoverPopup>
+            </PopoverPositioner>
+        </PopoverPortal>
+    </ChildContent>
+</PopoverRoot>
+
+@code {
+    private readonly PopoverHandle demoPopover = PopoverHandleFactory.CreateHandle();
+}

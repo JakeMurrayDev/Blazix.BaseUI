@@ -1,0 +1,239 @@
+@page "/components/popover"
+
+<PageTitle>Popover · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Popover"
+               Subtitle="An accessible popup anchored to a button."
+               MarkdownHref="/components/popover.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <PopoverHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the trigger, portal, positioned popup, optional arrow, viewport, title, description, and close button:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Opening on hover" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">OpenOnHover</code> on the trigger and adjust <code class="@LiquidGlassClasses.CodeInline">Delay</code> or <code class="@LiquidGlassClasses.CodeInline">CloseDelay</code> when hover timing matters.
+</p>
+<div class="mb-8">
+    <Demo Variants="@OpenOnHoverVariants">
+        <PopoverOpenOnHoverCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Detached triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use a handle when the trigger and popup content cannot be colocated.
+</p>
+<CodeBlock Code="@DetachedTriggersCode" />
+<div class="mt-3 mb-8">
+    <Demo Variants="@DetachedTriggersSimpleVariants">
+        <PopoverDetachedTriggersSimpleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    A single root can serve several triggers. Use trigger ids and typed payloads when each trigger needs different content.
+</p>
+<CodeBlock Code="@MultipleTriggersCode" />
+<div class="mt-3">
+    <CodeBlock Code="@PayloadCode" />
+</div>
+
+<DocsHeading Level="3" Title="Controlled mode with multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Control <code class="@LiquidGlassClasses.CodeInline">Open</code> and <code class="@LiquidGlassClasses.CodeInline">TriggerId</code> together when external state determines which trigger owns the popup.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersControlledVariants">
+        <PopoverDetachedTriggersControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Animating the Popover" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Animate position on the Positioner, size on the Popup, and content swaps through <code class="@LiquidGlassClasses.CodeInline">PopoverViewport</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersFullVariants">
+        <PopoverDetachedTriggersFullCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in PopoverApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Popover
+
+        <PopoverRoot>
+            <PopoverTrigger />
+            <PopoverPortal>
+                <PopoverBackdrop />
+                <PopoverPositioner>
+                    <PopoverPopup>
+                        <PopoverArrow />
+                        <PopoverViewport>
+                            <PopoverTitle />
+                            <PopoverDescription />
+                            <PopoverClose />
+                        </PopoverViewport>
+                    </PopoverPopup>
+                </PopoverPositioner>
+            </PopoverPortal>
+        </PopoverRoot>
+        """;
+
+    private const string DetachedTriggersCode =
+        """
+        @using Blazix.BaseUI.Popover
+
+        <PopoverTrigger Handle="@demoPopover">
+            Trigger
+        </PopoverTrigger>
+
+        <PopoverRoot Handle="@demoPopover">
+            <ChildContent Context="payloadContext">
+                ...
+            </ChildContent>
+        </PopoverRoot>
+
+        @code {
+            private readonly PopoverHandle demoPopover = PopoverHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string MultipleTriggersCode =
+        """
+        <PopoverRoot>
+            <ChildContent Context="payloadContext">
+                <PopoverTrigger Id="trigger-1">Trigger 1</PopoverTrigger>
+                <PopoverTrigger Id="trigger-2">Trigger 2</PopoverTrigger>
+                ...
+            </ChildContent>
+        </PopoverRoot>
+
+        <PopoverTrigger Handle="@demoPopover" Id="trigger-1">Trigger 1</PopoverTrigger>
+        <PopoverTrigger Handle="@demoPopover" Id="trigger-2">Trigger 2</PopoverTrigger>
+
+        <PopoverRoot Handle="@demoPopover">
+            <ChildContent Context="payloadContext">
+                ...
+            </ChildContent>
+        </PopoverRoot>
+
+        @code {
+            private readonly PopoverHandle demoPopover = PopoverHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string PayloadCode =
+        """
+        <PopoverTypedTrigger TPayload="PopoverPayload"
+                             Handle="@demoPopover"
+                             Payload='@new PopoverPayload("Trigger 1")'>
+            Trigger 1
+        </PopoverTypedTrigger>
+
+        <PopoverRoot Handle="@demoPopover">
+            <ChildContent Context="payloadContext">
+                <PopoverPortal>
+                    <PopoverPositioner SideOffset="8">
+                        <PopoverPopup>
+                            <PopoverTitle>Popover</PopoverTitle>
+                            <PopoverDescription>
+                                Opened by @((payloadContext.Payload as PopoverPayload)?.Text)
+                            </PopoverDescription>
+                        </PopoverPopup>
+                    </PopoverPositioner>
+                </PopoverPortal>
+            </ChildContent>
+        </PopoverRoot>
+
+        @code {
+            private readonly PopoverHandle<PopoverPayload> demoPopover =
+                PopoverHandleFactory.CreateHandle<PopoverPayload>();
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.Hero.Css.PopoverHeroCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.Hero.Tailwind.PopoverHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> OpenOnHoverVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.OpenOnHover.Css.PopoverOpenOnHoverCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.OpenOnHover.Tailwind.PopoverOpenOnHoverTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersSimpleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersSimple.Css.PopoverDetachedTriggersSimpleCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersSimple.Tailwind.PopoverDetachedTriggersSimpleTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersControlled.Css.PopoverDetachedTriggersControlledCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersControlled.Tailwind.PopoverDetachedTriggersControlledTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersFullVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersFull.Css.PopoverDetachedTriggersFullCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.DetachedTriggersFull.Tailwind.PopoverDetachedTriggersFullTailwind.razor"),
+        ]),
+    ];
+}

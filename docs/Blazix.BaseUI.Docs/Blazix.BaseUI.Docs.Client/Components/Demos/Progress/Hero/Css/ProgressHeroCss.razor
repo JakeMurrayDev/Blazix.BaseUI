@@ -1,0 +1,33 @@
+@implements IDisposable
+
+<ProgressRoot class="blx-progress" Value="@value">
+    <ProgressLabel class="blx-progress-label">Export data</ProgressLabel>
+    <ProgressValue class="blx-progress-value" />
+    <ProgressTrack class="blx-progress-track">
+        <ProgressIndicator class="blx-progress-indicator" />
+    </ProgressTrack>
+</ProgressRoot>
+
+@code {
+    private readonly Timer timer;
+    private double? value = 20;
+
+    public ProgressHeroCss()
+    {
+        timer = new Timer(UpdateValue, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    public void Dispose()
+    {
+        timer.Dispose();
+    }
+
+    private void UpdateValue(object? state)
+    {
+        _ = InvokeAsync(() =>
+        {
+            value = Math.Min(100, Math.Round((value ?? 0) + Random.Shared.NextDouble() * 25));
+            StateHasChanged();
+        });
+    }
+}
