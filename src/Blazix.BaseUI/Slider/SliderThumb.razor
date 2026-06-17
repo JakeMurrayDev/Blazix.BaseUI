@@ -242,6 +242,7 @@
         {
             var metadata = new ThumbMetadata(inputId, thumbElement, inputElement);
             Context.RegisterThumb(ResolvedIndex, metadata);
+            Context.RequestInsetSync();
         }
 
         if (firstRender && dotNetRef is not null)

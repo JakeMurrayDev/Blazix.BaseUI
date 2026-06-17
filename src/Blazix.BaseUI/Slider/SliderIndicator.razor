@@ -1,4 +1,5 @@
 @using System.Globalization
+@implements IDisposable
 
 <RenderElement TState="SliderRootState"
                Tag="div"
@@ -13,6 +14,7 @@
                @ref="renderElementReference" />
 
 @code {
+    private bool isValueSubscriberRegistered;
     private SliderRootState state = null!;
     private RenderElement<SliderRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -21,6 +23,10 @@
 
     [CascadingParameter]
     private SliderRootContext? Context { get; set; }
+
+    private bool IsVertical => Context?.Orientation == Orientation.Vertical;
+
+    private bool IsRange => Context?.Values.Length > 1;
 
     /// <summary>
     /// Gets or sets a custom render fragment that replaces the default element.
@@ -57,26 +63,20 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
-    private bool IsVertical => Context?.Orientation == Orientation.Vertical;
-
-    private bool IsRange => Context?.Values.Length > 1;
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (Context is not null && !isValueSubscriberRegistered)
+        {
+            Context.RegisterValueSubscriber(NotifyValueChanged);
+            isValueSubscriberRegistered = true;
+        }
+    }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (Context is not null)
-        {
-            state = Context.State;
-        }
-
-        computedStyleValue = s =>
-        {
-            var indicatorStyle = GetIndicatorStyle();
-            var userStyle = StyleValue?.Invoke(s);
-            return string.IsNullOrEmpty(userStyle) ? indicatorStyle : $"{indicatorStyle} {userStyle}";
-        };
-
-        BuildComponentAttributes();
+        UpdateStateAndAttributes();
     }
 
     /// <inheritdoc />
@@ -87,6 +87,17 @@
         {
             previousElement = currentElement;
             Context?.SetIndicatorElement(currentElement.Value);
+            Context?.RequestInsetSync();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (Context is not null && isValueSubscriberRegistered)
+        {
+            Context.UnregisterValueSubscriber(NotifyValueChanged);
+            isValueSubscriberRegistered = false;
         }
     }
 
@@ -111,6 +122,29 @@
         attrs["data-focused"] = state.Focused;
 
         componentAttributes = attrs;
+    }
+
+    private void UpdateStateAndAttributes()
+    {
+        if (Context is not null)
+        {
+            state = Context.State;
+        }
+
+        computedStyleValue = s =>
+        {
+            var indicatorStyle = GetIndicatorStyle();
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? indicatorStyle : $"{indicatorStyle} {userStyle}";
+        };
+
+        BuildComponentAttributes();
+    }
+
+    private void NotifyValueChanged()
+    {
+        UpdateStateAndAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private string GetIndicatorStyle()

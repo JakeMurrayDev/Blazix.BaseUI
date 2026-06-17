@@ -22,6 +22,8 @@ public abstract class SliderTestsBase : TestBase
 
     protected ILocator GetSliderThumb(int index = 0) => GetByTestId($"slider-thumb-{index}");
 
+    protected ILocator GetSliderIndicator() => GetByTestId("slider-indicator");
+
     protected ILocator GetSliderInput(int index = 0) =>
         GetSliderThumb(index).Locator("input[type='range']");
 
@@ -69,6 +71,42 @@ public abstract class SliderTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await WaitForValueAsync(51);
+    }
+
+    /// <summary>
+    /// Tests that ArrowRight updates the visual indicator with the slider value.
+    /// </summary>
+    [Fact]
+    public virtual async Task ArrowRight_UpdatesIndicator()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithStep(1));
+
+        await FocusSliderAsync();
+        await Page.Keyboard.PressAsync("ArrowRight");
+
+        await WaitForValueAsync(26);
+        await Assertions.Expect(GetSliderIndicator()).ToHaveAttributeAsync(
+            "style",
+            new Regex(@"width:\s*26\.0000%;"),
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    /// <summary>
+    /// Tests that edge-aligned sliders reveal the thumb after inset positioning is synchronized.
+    /// </summary>
+    [Fact]
+    public virtual async Task EdgeThumbAlignment_RevealsThumb()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithThumbAlignment("edge"));
+
+        await Assertions.Expect(GetSliderThumb()).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(GetSliderIndicator()).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     /// <summary>
