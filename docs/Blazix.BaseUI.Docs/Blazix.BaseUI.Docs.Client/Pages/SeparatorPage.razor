@@ -1,0 +1,48 @@
+@page "/components/separator"
+
+<PageTitle>Separator · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Separator"
+               Subtitle="A separator element accessible to screen readers."
+               MarkdownHref="/components/separator.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <SeparatorHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and use the single Separator part.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in SeparatorApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Separator
+
+        <Separator />
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Separator.razor", "xml", "Components.Demos.Separator.Hero.Css.SeparatorHeroCss.razor"),
+            new DemoFile("separator.css", "css", "wwwroot.demos.separator.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Separator.razor", "xml", "Components.Demos.Separator.Hero.Tailwind.SeparatorHeroTailwind.razor"),
+        ]),
+    ];
+}
