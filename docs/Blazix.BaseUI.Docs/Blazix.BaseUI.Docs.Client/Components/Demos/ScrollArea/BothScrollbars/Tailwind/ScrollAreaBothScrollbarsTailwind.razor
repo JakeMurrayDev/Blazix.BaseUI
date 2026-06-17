@@ -1,0 +1,21 @@
+<ScrollAreaRoot class="h-80 w-80 max-w-[calc(100vw-8rem)]">
+    <ScrollAreaViewport class="h-full border border-neutral-950 dark:border-white focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:focus-visible:outline-white">
+        <ScrollAreaContent class="pt-3 pr-6 pb-6 pl-3">
+            <ul class="m-0 grid list-none grid-cols-[repeat(10,6.25rem)] grid-rows-[repeat(10,6.25rem)] gap-3 p-0">
+                @for (var i = 1; i <= 100; i++)
+                {
+                    <li class="flex items-center justify-center bg-neutral-200 text-sm font-bold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                        @i
+                    </li>
+                }
+            </ul>
+        </ScrollAreaContent>
+    </ScrollAreaViewport>
+    <ScrollAreaScrollbar class="relative m-px flex bg-black/10 opacity-0 transition-opacity pointer-events-none data-[orientation=vertical]:w-4 data-[orientation=horizontal]:h-4 data-hovering:pointer-events-auto data-hovering:opacity-100 data-scrolling:pointer-events-auto data-scrolling:opacity-100 data-scrolling:duration-0 dark:bg-white/15">
+        <ScrollAreaThumb class="bg-neutral-950 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full dark:bg-white" />
+    </ScrollAreaScrollbar>
+    <ScrollAreaScrollbar Orientation="Orientation.Horizontal" class="relative m-px flex bg-black/10 opacity-0 transition-opacity pointer-events-none data-[orientation=vertical]:w-4 data-[orientation=horizontal]:h-4 data-hovering:pointer-events-auto data-hovering:opacity-100 data-scrolling:pointer-events-auto data-scrolling:opacity-100 data-scrolling:duration-0 dark:bg-white/15">
+        <ScrollAreaThumb class="bg-neutral-950 data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full dark:bg-white" />
+    </ScrollAreaScrollbar>
+    <ScrollAreaCorner />
+</ScrollAreaRoot>

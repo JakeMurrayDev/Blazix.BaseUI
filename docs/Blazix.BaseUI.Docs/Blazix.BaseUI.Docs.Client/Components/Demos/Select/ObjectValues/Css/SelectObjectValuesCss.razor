@@ -1,0 +1,70 @@
+<div class="blx-select-field">
+    <SelectRoot TValue="ShippingMethod"
+                DefaultValue="@ShippingMethods[0]"
+                ItemToStringValue="@(method => method?.Id)"
+                IsItemEqualToValue="@((left, right) => left.Id == right.Id)">
+        <SelectLabel class="blx-select-label">Shipping method</SelectLabel>
+        <SelectTrigger class="blx-select-trigger blx-select-trigger--object">
+            <SelectValue TValue="ShippingMethod"
+                         ValueContent="@ShippingValueContent" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
+                </svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="blx-select-positioner" SideOffset="4">
+                <SelectPopup class="blx-select-popup">
+                    <SelectScrollUpArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 10H4l4-4.5z" /></svg>
+                    </SelectScrollUpArrow>
+                    <SelectList class="blx-select-list">
+                        @foreach (var method in ShippingMethods)
+                        {
+                            <SelectItem TValue="ShippingMethod" Value="@method" Label="@method.Name" class="blx-select-item">
+                                <SelectItemIndicator class="blx-select-item-indicator">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                                </SelectItemIndicator>
+                                <SelectItemText class="blx-select-item-text">
+                                    <span class="blx-select-item-rich">
+                                        <span>@method.Name</span>
+                                        <span class="blx-select-secondary">@method.Duration (@method.Price)</span>
+                                    </span>
+                                </SelectItemText>
+                            </SelectItem>
+                        }
+                    </SelectList>
+                    <SelectScrollDownArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+                    </SelectScrollDownArrow>
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private sealed record ShippingMethod(string Id, string Name, string Duration, string Price);
+
+    private static readonly IReadOnlyList<ShippingMethod> ShippingMethods =
+    [
+        new("standard", "Standard", "Delivers in 4-6 business days", "$4.99"),
+        new("express", "Express", "Delivers in 2-3 business days", "$9.99"),
+        new("overnight", "Overnight", "Delivers next business day", "$19.99"),
+    ];
+
+    private RenderFragment<ShippingMethod?> ShippingValueContent => method => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "blx-select-value-text");
+        builder.OpenElement(2, "span");
+        builder.AddContent(3, method?.Name);
+        builder.CloseElement();
+        builder.OpenElement(4, "span");
+        builder.AddAttribute(5, "class", "blx-select-secondary");
+        builder.AddContent(6, $"{method?.Duration} ({method?.Price})");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

@@ -1,0 +1,19 @@
+<ScrollAreaRoot class="blx-scroll-area-root blx-scroll-area-root--both">
+    <ScrollAreaViewport class="blx-scroll-area-viewport">
+        <ScrollAreaContent class="blx-scroll-area-content blx-scroll-area-content--grid">
+            <ul class="blx-scroll-area-grid">
+                @for (var i = 1; i <= 100; i++)
+                {
+                    <li class="blx-scroll-area-cell">@i</li>
+                }
+            </ul>
+        </ScrollAreaContent>
+    </ScrollAreaViewport>
+    <ScrollAreaScrollbar class="blx-scroll-area-scrollbar">
+        <ScrollAreaThumb class="blx-scroll-area-thumb" />
+    </ScrollAreaScrollbar>
+    <ScrollAreaScrollbar Orientation="Orientation.Horizontal" class="blx-scroll-area-scrollbar">
+        <ScrollAreaThumb class="blx-scroll-area-thumb" />
+    </ScrollAreaScrollbar>
+    <ScrollAreaCorner class="blx-scroll-area-corner" />
+</ScrollAreaRoot>

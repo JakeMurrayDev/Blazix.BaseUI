@@ -1,0 +1,169 @@
+@page "/components/scroll-area"
+
+<PageTitle>Scroll Area · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Scroll Area"
+               Subtitle="A native scroll container with custom scrollbars."
+               MarkdownHref="/components/scroll-area.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ScrollAreaHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble the root, viewport, content, scrollbar, thumb, and optional corner.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Both scrollbars" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Add a horizontal scrollbar and <code class="@LiquidGlassClasses.CodeInline">ScrollAreaCorner</code> so the two scrollbars do not intersect.
+</p>
+<div class="mb-8">
+    <Demo Variants="@BothScrollbarsVariants">
+        <ScrollAreaBothScrollbarsCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Gradient scroll fade" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use the viewport overflow CSS variables to drive a mask that grows as the user scrolls away from an edge.
+</p>
+<CodeBlock Code="@ScrollFadeCssCode" Language="css" />
+<p class="mt-3 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    When the fade is applied to <code class="@LiquidGlassClasses.CodeInline">ScrollAreaViewport</code>, use an SSR fallback in the end-side variable and explicitly inherit the variables on child elements that need them.
+</p>
+<CodeBlock Code="@ScrollFadeFallbackCode" Language="css" />
+<div class="mt-3 mb-8">
+    <Demo Variants="@ScrollFadeVariants">
+        <ScrollAreaScrollFadeCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Combining with Tabs" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Render the tab list as <code class="@LiquidGlassClasses.CodeInline">ScrollAreaViewport</code> when the list itself needs overflow values for a horizontal fade.
+</p>
+<CodeBlock Code="@TabsCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ScrollAreaApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.ScrollArea
+
+        <ScrollAreaRoot>
+            <ScrollAreaViewport>
+                <ScrollAreaContent />
+            </ScrollAreaViewport>
+            <ScrollAreaScrollbar>
+                <ScrollAreaThumb />
+            </ScrollAreaScrollbar>
+            <ScrollAreaCorner />
+        </ScrollAreaRoot>
+        """;
+
+    private const string ScrollFadeCssCode =
+        """
+        .Viewport {
+            mask-image: linear-gradient(
+                to bottom,
+                transparent 0,
+                black min(40px, var(--scroll-area-overflow-y-start)),
+                black calc(100% - min(40px, var(--scroll-area-overflow-y-end, 40px))),
+                transparent 100%
+            );
+            mask-repeat: no-repeat;
+        }
+        """;
+
+    private const string ScrollFadeFallbackCode =
+        """
+        .Viewport {
+            mask-image: linear-gradient(
+                to bottom,
+                transparent 0,
+                black min(40px, var(--scroll-area-overflow-y-start)),
+                black calc(100% - min(40px, var(--scroll-area-overflow-y-end, 40px))),
+                transparent 100%
+            );
+        }
+
+        .Child {
+            --scroll-area-overflow-y-start: inherit;
+            --scroll-area-overflow-y-end: inherit;
+        }
+        """;
+
+    private const string TabsCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.ScrollArea
+        @using Blazix.BaseUI.Tabs
+
+        <TabsRoot TValue="string" DefaultValue="@("overview")">
+            <ScrollAreaRoot>
+                <TabsList TValue="string" Render="@RenderListAsViewport">
+                    <TabsTab TValue="string" Value="@("overview")">Overview</TabsTab>
+                    <TabsIndicator />
+                </TabsList>
+            </ScrollAreaRoot>
+            <TabsPanel TValue="string" Value="@("overview")">...</TabsPanel>
+        </TabsRoot>
+
+        @code {
+            private RenderFragment<RenderProps<TabsRootState>> RenderListAsViewport => props =>
+                RenderUtilities.CreateComponent(typeof(ScrollAreaViewport), props);
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.Hero.Css.ScrollAreaHeroCss.razor"),
+            new DemoFile("scroll-area.css", "css", "wwwroot.demos.scroll-area.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.Hero.Tailwind.ScrollAreaHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> BothScrollbarsVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.BothScrollbars.Css.ScrollAreaBothScrollbarsCss.razor"),
+            new DemoFile("scroll-area.css", "css", "wwwroot.demos.scroll-area.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.BothScrollbars.Tailwind.ScrollAreaBothScrollbarsTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> ScrollFadeVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.ScrollFade.Css.ScrollAreaScrollFadeCss.razor"),
+            new DemoFile("scroll-area.css", "css", "wwwroot.demos.scroll-area.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("ScrollArea.razor", "xml", "Components.Demos.ScrollArea.ScrollFade.Tailwind.ScrollAreaScrollFadeTailwind.razor"),
+        ]),
+    ];
+}

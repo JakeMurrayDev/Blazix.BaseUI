@@ -351,6 +351,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithThumbAlignment(string alignment)
+    {
+        queryParams["thumbAlignment"] = alignment;
+        return this;
+    }
+
     public TestPageUrlBuilder WithShowRangeSlider(bool value)
     {
         queryParams["showRangeSlider"] = value.ToString().ToLowerInvariant();

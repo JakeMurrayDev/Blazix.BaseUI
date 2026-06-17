@@ -1,0 +1,59 @@
+<div class="flex flex-col items-start gap-1">
+    <SelectRoot TValue="string" Multiple="true" DefaultValues="@DefaultLanguages" Items="@LanguageOptions">
+        <SelectLabel class="cursor-default text-sm font-bold leading-5 text-neutral-950 dark:text-white">Languages</SelectLabel>
+        <SelectTrigger class="flex min-h-8 min-w-56 items-center justify-between gap-3 border border-neutral-950 bg-white py-1.5 pl-2 pr-1 text-sm leading-none text-neutral-950 outline-none select-none hover:bg-neutral-100 data-popup-open:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:hover:bg-neutral-800 dark:data-popup-open:bg-neutral-800 dark:focus-visible:outline-white">
+            <SelectValue TValue="string" ValuesContent="@LanguageValuesContent" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" /></svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="z-10 outline-none" SideOffset="4" AlignItemWithTrigger="false">
+                <SelectPopup class="min-w-[var(--anchor-width)] max-h-[var(--available-height)] overflow-y-auto border border-neutral-950 bg-white py-1 text-neutral-950 outline-none shadow-[0.25rem_0.25rem_0] shadow-black/10 transition-[scale,opacity] duration-100 ease-out data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0 dark:border-white dark:bg-neutral-950 dark:text-white dark:shadow-none">
+                    @foreach (var language in LanguageOptions)
+                    {
+                        <SelectItem TValue="string" Value="@language.Value" Label="@language.Label" class="grid cursor-default grid-cols-[1rem_1fr] items-center gap-2 py-1.5 pr-2.5 pl-2.5 text-sm outline-none select-none data-highlighted:bg-neutral-950 data-highlighted:text-white dark:data-highlighted:bg-white dark:data-highlighted:text-neutral-950">
+                            <SelectItemIndicator class="col-start-1">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </SelectItemIndicator>
+                            <SelectItemText class="col-start-2">@language.Label</SelectItemText>
+                        </SelectItem>
+                    }
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<string> DefaultLanguages = ["javascript", "typescript"];
+    private static readonly IReadOnlyList<SelectOption<string>> LanguageOptions =
+    [
+        new("javascript", "JavaScript"),
+        new("typescript", "TypeScript"),
+        new("python", "Python"),
+        new("java", "Java"),
+        new("csharp", "C#"),
+        new("php", "PHP"),
+        new("cpp", "C++"),
+        new("rust", "Rust"),
+        new("go", "Go"),
+        new("swift", "Swift"),
+    ];
+
+    private RenderFragment<IReadOnlyList<string>> LanguageValuesContent => values => builder =>
+    {
+        builder.AddContent(0, FormatLanguages(values));
+    };
+
+    private static string FormatLanguages(IReadOnlyList<string> values)
+    {
+        if (values.Count == 0)
+        {
+            return "Select languages";
+        }
+
+        var first = LanguageOptions.First(option => option.Value == values[0]).Label;
+        return values.Count == 1 ? first : $"{first} (+{values.Count - 1} more)";
+    }
+}

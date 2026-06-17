@@ -22,6 +22,8 @@ public abstract class SliderTestsBase : TestBase
 
     protected ILocator GetSliderThumb(int index = 0) => GetByTestId($"slider-thumb-{index}");
 
+    protected ILocator GetSliderIndicator() => GetByTestId("slider-indicator");
+
     protected ILocator GetSliderInput(int index = 0) =>
         GetSliderThumb(index).Locator("input[type='range']");
 
@@ -69,6 +71,42 @@ public abstract class SliderTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await WaitForValueAsync(51);
+    }
+
+    /// <summary>
+    /// Tests that ArrowRight updates the visual indicator with the slider value.
+    /// </summary>
+    [Fact]
+    public virtual async Task ArrowRight_UpdatesIndicator()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithStep(1));
+
+        await FocusSliderAsync();
+        await Page.Keyboard.PressAsync("ArrowRight");
+
+        await WaitForValueAsync(26);
+        await Assertions.Expect(GetSliderIndicator()).ToHaveAttributeAsync(
+            "style",
+            new Regex(@"width:\s*26\.0000%;"),
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    /// <summary>
+    /// Tests that edge-aligned sliders reveal the thumb after inset positioning is synchronized.
+    /// </summary>
+    [Fact]
+    public virtual async Task EdgeThumbAlignment_RevealsThumb()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithThumbAlignment("edge"));
+
+        await Assertions.Expect(GetSliderThumb()).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(GetSliderIndicator()).ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
     /// <summary>
@@ -925,6 +963,42 @@ public abstract class SliderTestsBase : TestBase
         await Assertions.Expect(input).ToHaveAttributeAsync(
             "aria-valuenow",
             new Regex(@"^(6[0-9]|7[0-9]|8[0-9]|90)$"),
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    /// <summary>
+    /// Tests that pressing the track itself updates the hidden input state, not only the visual thumb.
+    /// </summary>
+    [Fact]
+    public virtual async Task TrackPress_UpdatesInputValue()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithMin(0)
+            .WithMax(100));
+
+        var control = GetByTestId("slider-control");
+        var controlBox = await control.BoundingBoxAsync();
+
+        if (controlBox is null)
+        {
+            Assert.Fail("Could not get bounding box for slider control");
+            return;
+        }
+
+        await Page.Mouse.ClickAsync(
+            (float)(controlBox.X + (controlBox.Width * 0.8)),
+            (float)(controlBox.Y + (controlBox.Height / 2)));
+
+        var expectedTrackPressValue = new Regex(@"^(7[5-9]|8[0-5])$");
+        await Assertions.Expect(GetByTestId("current-value")).ToHaveTextAsync(expectedTrackPressValue);
+        await Assertions.Expect(GetByTestId("last-change-reason")).ToHaveTextAsync("TrackPress");
+
+        var input = GetSliderInput();
+        await Assertions.Expect(input).ToHaveValueAsync(expectedTrackPressValue);
+        await Assertions.Expect(input).ToHaveAttributeAsync(
+            "aria-valuenow",
+            expectedTrackPressValue,
             new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 

@@ -1,0 +1,66 @@
+<div class="flex flex-col items-start gap-1">
+    <SelectRoot TValue="ShippingMethod"
+                DefaultValue="@ShippingMethods[0]"
+                ItemToStringValue="@(method => method?.Id)"
+                IsItemEqualToValue="@((left, right) => left.Id == right.Id)">
+        <SelectLabel class="cursor-default text-sm font-bold leading-5 text-neutral-950 dark:text-white">Shipping method</SelectLabel>
+        <SelectTrigger class="flex min-h-8 min-w-64 items-center justify-between gap-3 border border-neutral-950 bg-white py-1.5 pl-2 pr-1 text-sm leading-none text-neutral-950 outline-none select-none hover:bg-neutral-100 data-popup-open:bg-neutral-100 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:hover:bg-neutral-800 dark:data-popup-open:bg-neutral-800 dark:focus-visible:outline-white">
+            <SelectValue TValue="ShippingMethod"
+                         ValueContent="@ShippingValueContent" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" /></svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="z-10 select-none outline-none" SideOffset="4">
+                <SelectPopup class="min-w-[var(--anchor-width)] origin-[var(--transform-origin)] border border-neutral-950 bg-white text-neutral-950 outline-none shadow-[0.25rem_0.25rem_0] shadow-black/10 transition-[scale,opacity] duration-100 ease-out data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0 data-[side=none]:min-w-[calc(var(--anchor-width)+1.75rem)] data-[side=none]:translate-y-px data-[side=none]:transition-none dark:border-white dark:bg-neutral-950 dark:text-white dark:shadow-none">
+                    <SelectScrollUpArrow class="top-0 z-[2] flex h-4 w-full cursor-default items-center justify-center bg-white text-xs dark:bg-neutral-950">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 10H4l4-4.5z" /></svg>
+                    </SelectScrollUpArrow>
+                    <SelectList class="relative max-h-[var(--available-height)] overflow-y-auto py-1 scroll-py-6">
+                        @foreach (var method in ShippingMethods)
+                        {
+                            <SelectItem TValue="ShippingMethod" Value="@method" Label="@method.Name" class="group grid cursor-default grid-cols-[1rem_1fr] items-start gap-2 py-1.5 pr-4 pl-2.5 text-sm outline-none select-none data-highlighted:bg-neutral-950 data-highlighted:text-white dark:data-highlighted:bg-white dark:data-highlighted:text-neutral-950">
+                                <SelectItemIndicator class="col-start-1 relative top-1.5">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                                </SelectItemIndicator>
+                                <SelectItemText class="col-start-2 flex flex-col gap-0.5">
+                                    <span>@method.Name</span>
+                                    <span class="text-xs leading-4 text-neutral-600 group-data-[highlighted]:text-neutral-300 dark:text-neutral-400 dark:group-data-[highlighted]:text-neutral-700">@method.Duration (@method.Price)</span>
+                                </SelectItemText>
+                            </SelectItem>
+                        }
+                    </SelectList>
+                    <SelectScrollDownArrow class="bottom-0 z-[2] flex h-4 w-full cursor-default items-center justify-center bg-white text-xs dark:bg-neutral-950">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+                    </SelectScrollDownArrow>
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private sealed record ShippingMethod(string Id, string Name, string Duration, string Price);
+
+    private static readonly IReadOnlyList<ShippingMethod> ShippingMethods =
+    [
+        new("standard", "Standard", "Delivers in 4-6 business days", "$4.99"),
+        new("express", "Express", "Delivers in 2-3 business days", "$9.99"),
+        new("overnight", "Overnight", "Delivers next business day", "$19.99"),
+    ];
+
+    private RenderFragment<ShippingMethod?> ShippingValueContent => method => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", "flex flex-col items-start gap-0.5");
+        builder.OpenElement(2, "span");
+        builder.AddContent(3, method?.Name);
+        builder.CloseElement();
+        builder.OpenElement(4, "span");
+        builder.AddAttribute(5, "class", "text-xs leading-4 text-neutral-600 dark:text-neutral-400");
+        builder.AddContent(6, $"{method?.Duration} ({method?.Price})");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+}

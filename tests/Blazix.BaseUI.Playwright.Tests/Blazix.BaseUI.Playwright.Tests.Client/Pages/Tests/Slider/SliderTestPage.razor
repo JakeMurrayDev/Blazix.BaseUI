@@ -22,6 +22,7 @@
         ReadOnly="@ReadOnly"
         Required="@Required"
         ThumbCollisionBehavior="@ParsedThumbCollisionBehavior"
+        ThumbAlignment="@ParsedThumbAlignment"
         OnValueChange="HandleValueChange"
         OnValuesChange="HandleValuesChange"
         OnValueCommitted="HandleValueCommitted"
@@ -97,6 +98,9 @@
     [SupplyParameterFromQuery(Name = "thumbCollisionBehavior")]
     public string ThumbCollisionBehavior { get; set; } = "push";
 
+    [SupplyParameterFromQuery(Name = "thumbAlignment")]
+    public string ThumbAlignment { get; set; } = "center";
+
     [SupplyParameterFromQuery(Name = "showRangeSlider")]
     public bool ShowRangeSlider { get; set; }
 
@@ -127,6 +131,14 @@
             "swap" => Blazix.BaseUI.Slider.ThumbCollisionBehavior.Swap,
             "block" => Blazix.BaseUI.Slider.ThumbCollisionBehavior.None,
             _ => Blazix.BaseUI.Slider.ThumbCollisionBehavior.Push
+        };
+
+    private Blazix.BaseUI.Slider.ThumbAlignment ParsedThumbAlignment =>
+        ThumbAlignment?.ToLowerInvariant() switch
+        {
+            "edge" => Blazix.BaseUI.Slider.ThumbAlignment.Edge,
+            "edge-client-only" => Blazix.BaseUI.Slider.ThumbAlignment.EdgeClientOnly,
+            _ => Blazix.BaseUI.Slider.ThumbAlignment.Center
         };
 
     private Blazix.BaseUI.Direction ParsedDirection =>

@@ -1,0 +1,290 @@
+@page "/components/select"
+
+<PageTitle>Select · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Select"
+               Subtitle="A common form component for choosing a predefined value in a dropdown menu."
+               MarkdownHref="/components/select.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <SelectHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Prefer Autocomplete for large lists that need filtering. Select supports typeahead but is not filterable.</li>
+    <li>The popup aligns the selected item with the trigger by default. Disable this with <code class="@LiquidGlassClasses.CodeInline">AlignItemWithTrigger="false"</code> on the positioner.</li>
+    <li>Select needs an accessible name. Prefer <code class="@LiquidGlassClasses.CodeInline">SelectLabel</code> or provide an ARIA label on the trigger.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Positioning" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">SelectPositioner</code> defaults to align-item-with-trigger placement, where the popup overlaps the trigger so selected text lines up with trigger text. In that mode, the popup and positioner can expose <code class="@LiquidGlassClasses.CodeInline">data-side="none"</code>.
+</p>
+<CodeBlock Code="@PositioningCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Typed wrapper component" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap the generic root with a typed component when you want a reusable select with strong value inference.
+</p>
+<CodeBlock Code="@TypedWrapperCode" />
+
+<DocsHeading Level="3" Title="Formatting the value" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Pass <code class="@LiquidGlassClasses.CodeInline">Items</code> for label lookup, or use <code class="@LiquidGlassClasses.CodeInline">ValueContent</code> for custom display.
+</p>
+<CodeBlock Code="@ItemsCode" />
+<div class="mt-3 mb-8">
+    <CodeBlock Code="@ValueContentCode" />
+</div>
+
+<DocsHeading Level="3" Title="Labeling a select" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">SelectLabel</code> to provide a visible label. It renders as a div and focuses the trigger without opening the popup.
+</p>
+<CodeBlock Code="@LabelingCode" />
+
+<DocsHeading Level="3" Title="Placeholder values" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">Placeholder</code> on <code class="@LiquidGlassClasses.CodeInline">SelectValue</code>, or include a null option when the popup itself should clear the selection.
+</p>
+<CodeBlock Code="@PlaceholderCode" />
+<div class="mt-3 mb-8">
+    <CodeBlock Code="@ClearableCode" />
+</div>
+
+<DocsHeading Level="3" Title="Multiple selection" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Enable <code class="@LiquidGlassClasses.CodeInline">Multiple</code> and render the selected values with <code class="@LiquidGlassClasses.CodeInline">ValuesContent</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@MultipleVariants">
+        <SelectMultipleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Object values" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Object values can carry richer item data. Supply form serialization and equality functions when values are not primitives.
+</p>
+<div class="mb-8">
+    <Demo Variants="@ObjectValuesVariants">
+        <SelectObjectValuesCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Grouped" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Organize related options with <code class="@LiquidGlassClasses.CodeInline">SelectGroup</code> and <code class="@LiquidGlassClasses.CodeInline">SelectGroupLabel</code>. Use <code class="@LiquidGlassClasses.CodeInline">ItemGroups</code> for pre-mount label resolution.
+</p>
+<CodeBlock Code="@GroupedDataCode" />
+<div class="mt-3 mb-8">
+    <Demo Variants="@GroupedVariants">
+        <SelectGroupedCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in SelectApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Select
+
+        <SelectRoot TValue="string">
+            <SelectLabel />
+            <SelectTrigger>
+                <SelectValue TValue="string" />
+                <SelectIcon />
+            </SelectTrigger>
+
+            <SelectPortal>
+                <SelectBackdrop />
+                <SelectPositioner>
+                    <SelectPopup>
+                        <SelectScrollUpArrow />
+                        <SelectArrow />
+                        <SelectList>
+                            <SelectItem TValue="string">
+                                <SelectItemText />
+                                <SelectItemIndicator />
+                            </SelectItem>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectGroupLabel />
+                            </SelectGroup>
+                        </SelectList>
+                        <SelectScrollDownArrow />
+                    </SelectPopup>
+                </SelectPositioner>
+            </SelectPortal>
+        </SelectRoot>
+        """;
+
+    private const string PositioningCode =
+        """
+        <SelectPositioner AlignItemWithTrigger="false"
+                          Side="Side.Bottom"
+                          Align="Align.Center"
+                          SideOffset="4">
+            <SelectPopup>...</SelectPopup>
+        </SelectPositioner>
+        """;
+
+    private const string TypedWrapperCode =
+        """
+        @typeparam TValue
+
+        <SelectRoot TValue="TValue" @attributes="AdditionalAttributes">
+            @ChildContent
+        </SelectRoot>
+
+        @code {
+            [Parameter(CaptureUnmatchedValues = true)]
+            public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+            [Parameter]
+            public RenderFragment? ChildContent { get; set; }
+        }
+        """;
+
+    private const string ItemsCode =
+        """
+        private static readonly IReadOnlyList<SelectOption<string>> ThemeItems =
+        [
+            new("system", "System default"),
+            new("light", "Light"),
+            new("dark", "Dark"),
+        ];
+
+        <SelectRoot TValue="string" Items="@ThemeItems">
+            <SelectValue TValue="string" Placeholder="Select theme" />
+        </SelectRoot>
+        """;
+
+    private const string ValueContentCode =
+        """
+        private static readonly IReadOnlyDictionary<string, string> Fonts = new Dictionary<string, string>
+        {
+            ["monospace"] = "Monospace",
+            ["serif"] = "Serif",
+            ["sans-serif"] = "Sans-serif",
+        };
+
+        <SelectValue TValue="string"
+                     ValueContent="@(value => @<span style="@($"font-family: {value}")">@Fonts[value!]</span>)" />
+        """;
+
+    private const string LabelingCode =
+        """
+        <SelectRoot TValue="string">
+            <SelectLabel>Theme</SelectLabel>
+            ...
+        </SelectRoot>
+        """;
+
+    private const string PlaceholderCode =
+        """
+        <SelectRoot TValue="string" Items="@ThemeItems">
+            <SelectValue TValue="string" Placeholder="Select theme" />
+        </SelectRoot>
+        """;
+
+    private const string ClearableCode =
+        """
+        private static readonly IReadOnlyList<SelectOption<string?>> ThemeItems =
+        [
+            new(null, "Select theme"),
+            new("system", "System default"),
+            new("light", "Light"),
+            new("dark", "Dark"),
+        ];
+
+        <SelectRoot TValue="string?" Items="@ThemeItems">
+            <SelectValue TValue="string?" />
+        </SelectRoot>
+        """;
+
+    private const string GroupedDataCode =
+        """
+        private static readonly IReadOnlyList<SelectOptionGroup<string>> GroupedProduce =
+        [
+            new("Fruits",
+            [
+                new("apple", "Apple"),
+                new("banana", "Banana"),
+                new("orange", "Orange"),
+            ]),
+            new("Vegetables",
+            [
+                new("carrot", "Carrot"),
+                new("lettuce", "Lettuce"),
+                new("spinach", "Spinach"),
+            ]),
+        ];
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Hero.Css.SelectHeroCss.razor"),
+            new DemoFile("select.css", "css", "wwwroot.demos.select.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Hero.Tailwind.SelectHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> MultipleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Multiple.Css.SelectMultipleCss.razor"),
+            new DemoFile("select.css", "css", "wwwroot.demos.select.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Multiple.Tailwind.SelectMultipleTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> ObjectValuesVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.ObjectValues.Css.SelectObjectValuesCss.razor"),
+            new DemoFile("select.css", "css", "wwwroot.demos.select.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.ObjectValues.Tailwind.SelectObjectValuesTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> GroupedVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Grouped.Css.SelectGroupedCss.razor"),
+            new DemoFile("select.css", "css", "wwwroot.demos.select.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Select.razor", "xml", "Components.Demos.Select.Grouped.Tailwind.SelectGroupedTailwind.razor"),
+        ]),
+    ];
+}

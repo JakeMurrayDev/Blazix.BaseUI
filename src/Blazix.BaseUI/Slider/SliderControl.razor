@@ -85,6 +85,7 @@
         if (Context is not null)
         {
             state = Context.State;
+            Context.RequestInsetSync = RequestInsetSync;
         }
 
         computedStyleValue = s =>
@@ -354,6 +355,14 @@
 
         await SyncInsetPositionsAsync();
         await ObserveInsetResizeAsync();
+    }
+
+    private void RequestInsetSync()
+    {
+        if (Context?.Inset == true)
+        {
+            _ = SetupInsetIndicatorAsync();
+        }
     }
 
     private async Task SyncInsetPositionsAsync()

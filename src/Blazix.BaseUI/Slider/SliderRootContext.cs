@@ -51,6 +51,7 @@ internal sealed class SliderRootContext
     public Action<ElementReference> SetControlElement { get; set; } = null!;
     public Action<ElementReference> SetIndicatorElement { get; set; } = null!;
     public Func<ElementReference?> GetIndicatorElement { get; set; } = null!;
+    public Action RequestInsetSync { get; set; } = () => { };
     public Action RegisterRealtimeSubscriber { get; set; } = null!;
     public Action UnregisterRealtimeSubscriber { get; set; } = null!;
     public Action<Action> RegisterValueSubscriber { get; set; } = _ => { };

@@ -28,6 +28,7 @@
 
     private bool hasRendered;
     private bool hasImplicitThumbIndex;
+    private bool isValueSubscriberRegistered;
     private int implicitIndex;
     private string inputId = null!;
     private ElementReference thumbElement;
@@ -190,6 +191,12 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        if (Context is not null && !isValueSubscriberRegistered)
+        {
+            Context.RegisterValueSubscriber(NotifyValueChanged);
+            isValueSubscriberRegistered = true;
+        }
+
         ResolveImplicitIndex();
 
         inputId = IsRange
@@ -206,28 +213,13 @@
     protected override void OnParametersSet()
     {
         ResolveImplicitIndex();
-
-        state = SliderThumbState.FromRootState(
-            Context?.State ?? SliderRootState.Default,
-            ResolvedIndex,
-            IsActive);
-
-        computedStyleValue = s =>
-        {
-            var positionStyle = GetPositionStyle();
-            var userStyle = StyleValue?.Invoke(s);
-            return string.IsNullOrEmpty(userStyle) ? positionStyle : $"{positionStyle} {userStyle}";
-        };
-
-        ComputeInputAttributes();
+        UpdateStateAndAttributes();
 
         if (Context is not null && hasRendered)
         {
             var metadata = new ThumbMetadata(inputId, thumbElement, inputElement);
             Context.RegisterThumb(ResolvedIndex, metadata);
         }
-
-        BuildComponentAttributes();
     }
 
     /// <inheritdoc />
@@ -250,6 +242,7 @@
         {
             var metadata = new ThumbMetadata(inputId, thumbElement, inputElement);
             Context.RegisterThumb(ResolvedIndex, metadata);
+            Context.RequestInsetSync();
         }
 
         if (firstRender && dotNetRef is not null)
@@ -269,6 +262,12 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (Context is not null && isValueSubscriberRegistered)
+        {
+            Context.UnregisterValueSubscriber(NotifyValueChanged);
+            isValueSubscriberRegistered = false;
+        }
+
         Context?.UnregisterThumb(ResolvedIndex);
 
         if (hasImplicitThumbIndex)
@@ -317,6 +316,30 @@
         attrs["data-focused"] = state.Focused;
 
         componentAttributes = attrs;
+    }
+
+    private void UpdateStateAndAttributes()
+    {
+        state = SliderThumbState.FromRootState(
+            Context?.State ?? SliderRootState.Default,
+            ResolvedIndex,
+            IsActive);
+
+        computedStyleValue = s =>
+        {
+            var positionStyle = GetPositionStyle();
+            var userStyle = StyleValue?.Invoke(s);
+            return string.IsNullOrEmpty(userStyle) ? positionStyle : $"{positionStyle} {userStyle}";
+        };
+
+        ComputeInputAttributes();
+        BuildComponentAttributes();
+    }
+
+    private void NotifyValueChanged()
+    {
+        UpdateStateAndAttributes();
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private void ComputeInputAttributes()
