@@ -929,6 +929,42 @@ public abstract class SliderTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that pressing the track itself updates the hidden input state, not only the visual thumb.
+    /// </summary>
+    [Fact]
+    public virtual async Task TrackPress_UpdatesInputValue()
+    {
+        await NavigateAsync(CreateUrl("/tests/slider")
+            .WithDefaultSliderValue(25)
+            .WithMin(0)
+            .WithMax(100));
+
+        var control = GetByTestId("slider-control");
+        var controlBox = await control.BoundingBoxAsync();
+
+        if (controlBox is null)
+        {
+            Assert.Fail("Could not get bounding box for slider control");
+            return;
+        }
+
+        await Page.Mouse.ClickAsync(
+            (float)(controlBox.X + (controlBox.Width * 0.8)),
+            (float)(controlBox.Y + (controlBox.Height / 2)));
+
+        var expectedTrackPressValue = new Regex(@"^(7[5-9]|8[0-5])$");
+        await Assertions.Expect(GetByTestId("current-value")).ToHaveTextAsync(expectedTrackPressValue);
+        await Assertions.Expect(GetByTestId("last-change-reason")).ToHaveTextAsync("TrackPress");
+
+        var input = GetSliderInput();
+        await Assertions.Expect(input).ToHaveValueAsync(expectedTrackPressValue);
+        await Assertions.Expect(input).ToHaveAttributeAsync(
+            "aria-valuenow",
+            expectedTrackPressValue,
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    /// <summary>
     /// Tests that dragging the thumb changes the value.
     /// Requires real browser pointer events.
     /// </summary>
