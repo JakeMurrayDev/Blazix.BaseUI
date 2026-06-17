@@ -1,0 +1,240 @@
+@page "/components/slider"
+
+<PageTitle>Slider · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Slider"
+               Subtitle="An easily stylable range input."
+               MarkdownHref="/components/slider.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <SliderHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Slider controls need an accessible name. Prefer <code class="@LiquidGlassClasses.CodeInline">SliderLabel</code>, or set <code class="@LiquidGlassClasses.CodeInline">AriaLabel</code> on each thumb when no visible label is rendered.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Range slider" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Pass an array of values and render one thumb for each value. Use explicit indexes for deterministic server-side rendering.
+</p>
+<div class="mb-8">
+    <Demo Variants="@RangeSliderVariants">
+        <SliderRangeSliderCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Thumb alignment" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">ThumbAlignment.Edge</code> to inset the thumb so its edge aligns with the control edge at the minimum and maximum values.
+</p>
+<div class="mb-8">
+    <Demo Variants="@EdgeAlignmentVariants">
+        <SliderEdgeAlignmentCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Labeling a slider" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    A single-thumb slider without a visible label can set <code class="@LiquidGlassClasses.CodeInline">AriaLabel</code> on the thumb.
+</p>
+<CodeBlock Code="@InvisibleLabelCode" />
+<p class="mt-3 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    A visible label can be created with <code class="@LiquidGlassClasses.CodeInline">SliderLabel</code>.
+</p>
+<CodeBlock Code="@VisibleLabelCode" />
+<p class="mt-3 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For multi-thumb range sliders, give each thumb its own label.
+</p>
+<CodeBlock Code="@RangeLabelCode" />
+
+<DocsHeading Level="3" Title="Vertical" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">Orientation.Vertical</code> to build a vertical slider.
+</p>
+<div class="mb-8">
+    <Demo Variants="@VerticalVariants">
+        <SliderVerticalCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Form integration" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Pass <code class="@LiquidGlassClasses.CodeInline">Name</code> to submit the hidden range input with a form, or compose with Field and Fieldset for grouped range controls.
+</p>
+<CodeBlock Code="@FormCode" />
+<div class="mt-3">
+    <CodeBlock Code="@FieldsetCode" />
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in SliderApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Slider
+
+        <SliderRoot>
+            <SliderLabel />
+            <SliderValue />
+            <SliderControl>
+                <SliderTrack>
+                    <SliderIndicator />
+                    <SliderThumb />
+                </SliderTrack>
+            </SliderControl>
+        </SliderRoot>
+        """;
+
+    private const string InvisibleLabelCode =
+        """
+        <SliderRoot>
+            <SliderControl>
+                <SliderTrack>
+                    <SliderIndicator />
+                    <SliderThumb AriaLabel="Volume" />
+                </SliderTrack>
+            </SliderControl>
+        </SliderRoot>
+        """;
+
+    private const string VisibleLabelCode =
+        """
+        <SliderRoot>
+            <SliderLabel>Volume</SliderLabel>
+            <SliderControl>
+                <SliderTrack>
+                    <SliderIndicator />
+                    <SliderThumb />
+                </SliderTrack>
+            </SliderControl>
+        </SliderRoot>
+        """;
+
+    private const string RangeLabelCode =
+        """
+        <SliderRoot DefaultValues="@(new double[] { 25, 75 })">
+            <SliderLabel>Price range</SliderLabel>
+            <SliderControl>
+                <SliderTrack>
+                    <SliderIndicator />
+                    <SliderThumb Index="0" AriaLabel="Minimum price" />
+                    <SliderThumb Index="1" AriaLabel="Maximum price" />
+                </SliderTrack>
+            </SliderControl>
+        </SliderRoot>
+        """;
+
+    private const string FormCode =
+        """
+        @using Blazix.BaseUI.Form
+        @using Blazix.BaseUI.Slider
+
+        <Form Model="@model">
+            <SliderRoot Name="volume">
+                <SliderLabel>Volume</SliderLabel>
+                <SliderControl>
+                    <SliderTrack>
+                        <SliderIndicator />
+                        <SliderThumb />
+                    </SliderTrack>
+                </SliderControl>
+            </SliderRoot>
+        </Form>
+
+        @code {
+            private readonly object model = new();
+        }
+        """;
+
+    private const string FieldsetCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Field
+        @using Blazix.BaseUI.Fieldset
+        @using Blazix.BaseUI.Slider
+
+        <FieldRoot Name="priceRange">
+            <FieldsetRoot Render="@RenderFieldsetAsSlider">
+                <FieldsetLegend>Price range</FieldsetLegend>
+                <SliderControl>
+                    <SliderTrack>
+                        <SliderIndicator />
+                        <SliderThumb Index="0" AriaLabel="Minimum price" />
+                        <SliderThumb Index="1" AriaLabel="Maximum price" />
+                    </SliderTrack>
+                </SliderControl>
+            </FieldsetRoot>
+        </FieldRoot>
+
+        @code {
+            private RenderFragment<RenderProps<FieldsetRootState>> RenderFieldsetAsSlider => props =>
+                RenderUtilities.CreateComponent(typeof(SliderRoot), props);
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.Hero.Css.SliderHeroCss.razor"),
+            new DemoFile("slider.css", "css", "wwwroot.demos.slider.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.Hero.Tailwind.SliderHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> RangeSliderVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.RangeSlider.Css.SliderRangeSliderCss.razor"),
+            new DemoFile("slider.css", "css", "wwwroot.demos.slider.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.RangeSlider.Tailwind.SliderRangeSliderTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> EdgeAlignmentVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.EdgeAlignment.Css.SliderEdgeAlignmentCss.razor"),
+            new DemoFile("slider.css", "css", "wwwroot.demos.slider.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.EdgeAlignment.Tailwind.SliderEdgeAlignmentTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> VerticalVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.Vertical.Css.SliderVerticalCss.razor"),
+            new DemoFile("slider.css", "css", "wwwroot.demos.slider.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Slider.razor", "xml", "Components.Demos.Slider.Vertical.Tailwind.SliderVerticalTailwind.razor"),
+        ]),
+    ];
+}
