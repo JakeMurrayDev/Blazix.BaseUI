@@ -53,7 +53,7 @@ public static class DocsNav
             new("Select", "select", "/components/select", "A form component for choosing a value from a list of options.", IsDocumented: true),
             new("Separator", "separator", "/components/separator", "A visual divider between sections.", IsDocumented: true),
             new("Slider", "slider", "/components/slider", "A control for selecting a value from a range.", IsDocumented: true),
-            new("Switch", "switch", "/components/switch", "A control for toggling between on and off."),
+            new("Switch", "switch", "/components/switch", "A control for toggling between on and off.", IsDocumented: true),
             new("Tabs", "tabs", "/components/tabs", "Organizes content into panels with tabbed navigation."),
             new("Toast", "toast", "/components/toast", "Briefly displays notifications."),
             new("Toggle", "toggle", "/components/toggle", "A two-state button that can be on or off."),
