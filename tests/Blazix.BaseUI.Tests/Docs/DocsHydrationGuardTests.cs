@@ -30,6 +30,14 @@ public class DocsHydrationGuardTests
         layout.ShouldContain("JSException");
     }
 
+    [Fact]
+    public void MobileNavPopup_PreservesFixedPositionWhenUsingLiquidGlass()
+    {
+        var classes = ReadRepoFile("docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Data/LiquidGlassClasses.cs");
+
+        classes.ShouldContain("liquid-glass !fixed");
+    }
+
     private static string ReadRepoFile(string relativePath)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
