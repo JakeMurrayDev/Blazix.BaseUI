@@ -1,0 +1,75 @@
+<div class="blx-select-field">
+    <SelectRoot TValue="string" ItemGroups="@GroupedProduce">
+        <SelectLabel class="blx-select-label">Produce</SelectLabel>
+        <SelectTrigger class="blx-select-trigger blx-select-trigger--wide">
+            <SelectValue TValue="string" class="blx-select-value" Placeholder="Select produce" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
+                </svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="blx-select-positioner" SideOffset="4">
+                <SelectPopup class="blx-select-popup">
+                    <SelectScrollUpArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 10H4l4-4.5z" /></svg>
+                    </SelectScrollUpArrow>
+                    <SelectList class="blx-select-list">
+                        @for (var i = 0; i < GroupedProduce.Count; i++)
+                        {
+                            var group = GroupedProduce[i];
+                            <SelectGroup>
+                                <SelectGroupLabel class="blx-select-group-label">@group.Label</SelectGroupLabel>
+                                @foreach (var item in group.Items)
+                                {
+                                    <SelectItem TValue="string" Value="@item.Value" Label="@item.Label" class="blx-select-item">
+                                        <SelectItemIndicator class="blx-select-item-indicator">
+                                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                                        </SelectItemIndicator>
+                                        <SelectItemText class="blx-select-item-text">@item.Label</SelectItemText>
+                                    </SelectItem>
+                                }
+                            </SelectGroup>
+                            @if (i < GroupedProduce.Count - 1)
+                            {
+                                <SelectSeparator class="blx-select-separator" />
+                            }
+                        }
+                    </SelectList>
+                    <SelectScrollDownArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+                    </SelectScrollDownArrow>
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<SelectOptionGroup<string>> GroupedProduce =
+    [
+        new("Fruits",
+        [
+            new("apple", "Apple"),
+            new("banana", "Banana"),
+            new("mango", "Mango"),
+            new("kiwi", "Kiwi"),
+            new("grape", "Grape"),
+            new("orange", "Orange"),
+            new("strawberry", "Strawberry"),
+            new("watermelon", "Watermelon"),
+        ]),
+        new("Vegetables",
+        [
+            new("broccoli", "Broccoli"),
+            new("carrot", "Carrot"),
+            new("cauliflower", "Cauliflower"),
+            new("cucumber", "Cucumber"),
+            new("kale", "Kale"),
+            new("pepper", "Bell pepper"),
+            new("spinach", "Spinach"),
+            new("zucchini", "Zucchini"),
+        ]),
+    ];
+}

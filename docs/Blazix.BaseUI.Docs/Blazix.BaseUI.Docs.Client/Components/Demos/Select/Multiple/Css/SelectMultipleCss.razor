@@ -1,0 +1,69 @@
+<div class="blx-select-field">
+    <SelectRoot TValue="string"
+                Multiple="true"
+                DefaultValues="@DefaultLanguages"
+                Items="@LanguageOptions">
+        <SelectLabel class="blx-select-label">Languages</SelectLabel>
+        <SelectTrigger class="blx-select-trigger blx-select-trigger--wide">
+            <SelectValue TValue="string"
+                         class="blx-select-value"
+                         ValuesContent="@LanguageValuesContent" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
+                </svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="blx-select-positioner" SideOffset="4" AlignItemWithTrigger="false">
+                <SelectPopup class="blx-select-popup">
+                    @foreach (var language in LanguageOptions)
+                    {
+                        <SelectItem TValue="string" Value="@language.Value" Label="@language.Label" class="blx-select-item">
+                            <SelectItemIndicator class="blx-select-item-indicator">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                    <path d="m2.5 8.5 4 4 7-9" />
+                                </svg>
+                            </SelectItemIndicator>
+                            <SelectItemText class="blx-select-item-text">@language.Label</SelectItemText>
+                        </SelectItem>
+                    }
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<string> DefaultLanguages = ["javascript", "typescript"];
+
+    private static readonly IReadOnlyList<SelectOption<string>> LanguageOptions =
+    [
+        new("javascript", "JavaScript"),
+        new("typescript", "TypeScript"),
+        new("python", "Python"),
+        new("java", "Java"),
+        new("csharp", "C#"),
+        new("php", "PHP"),
+        new("cpp", "C++"),
+        new("rust", "Rust"),
+        new("go", "Go"),
+        new("swift", "Swift"),
+    ];
+
+    private RenderFragment<IReadOnlyList<string>> LanguageValuesContent => values => builder =>
+    {
+        builder.AddContent(0, FormatLanguages(values));
+    };
+
+    private static string FormatLanguages(IReadOnlyList<string> values)
+    {
+        if (values.Count == 0)
+        {
+            return "Select languages";
+        }
+
+        var first = LanguageOptions.First(option => option.Value == values[0]).Label;
+        return values.Count == 1 ? first : $"{first} (+{values.Count - 1} more)";
+    }
+}

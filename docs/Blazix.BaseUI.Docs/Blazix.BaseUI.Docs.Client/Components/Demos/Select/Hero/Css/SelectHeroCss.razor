@@ -1,0 +1,53 @@
+<div class="blx-select-field">
+    <SelectRoot TValue="string" Items="@Apples">
+        <SelectLabel class="blx-select-label">Apple</SelectLabel>
+        <SelectTrigger class="blx-select-trigger">
+            <SelectValue TValue="string" class="blx-select-value" Placeholder="Select apple" />
+            <SelectIcon>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" />
+                </svg>
+            </SelectIcon>
+        </SelectTrigger>
+        <SelectPortal>
+            <SelectPositioner class="blx-select-positioner" SideOffset="4">
+                <SelectPopup class="blx-select-popup">
+                    <SelectScrollUpArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M12 10H4l4-4.5z" />
+                        </svg>
+                    </SelectScrollUpArrow>
+                    <SelectList class="blx-select-list">
+                        @foreach (var apple in Apples)
+                        {
+                            <SelectItem TValue="string" Value="@apple.Value" Label="@apple.Label" class="blx-select-item">
+                                <SelectItemIndicator class="blx-select-item-indicator">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                        <path d="m2.5 8.5 4 4 7-9" />
+                                    </svg>
+                                </SelectItemIndicator>
+                                <SelectItemText class="blx-select-item-text">@apple.Label</SelectItemText>
+                            </SelectItem>
+                        }
+                    </SelectList>
+                    <SelectScrollDownArrow class="blx-select-scroll-arrow">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                            <path d="M12 6H4l4 4.5z" />
+                        </svg>
+                    </SelectScrollDownArrow>
+                </SelectPopup>
+            </SelectPositioner>
+        </SelectPortal>
+    </SelectRoot>
+</div>
+
+@code {
+    private static readonly IReadOnlyList<SelectOption<string>> Apples =
+    [
+        new("gala", "Gala"),
+        new("fuji", "Fuji"),
+        new("honeycrisp", "Honeycrisp"),
+        new("granny-smith", "Granny Smith"),
+        new("pink-lady", "Pink Lady"),
+    ];
+}

@@ -50,7 +50,7 @@ public static class DocsNav
             new("Progress", "progress", "/components/progress", "Displays the status of a task over time.", IsDocumented: true),
             new("Radio", "radio", "/components/radio", "A control for selecting one option from a set.", IsDocumented: true),
             new("Scroll Area", "scroll-area", "/components/scroll-area", "A scrollable container with custom scrollbars.", IsDocumented: true),
-            new("Select", "select", "/components/select", "A form component for choosing a value from a list of options."),
+            new("Select", "select", "/components/select", "A form component for choosing a value from a list of options.", IsDocumented: true),
             new("Separator", "separator", "/components/separator", "A visual divider between sections."),
             new("Slider", "slider", "/components/slider", "A control for selecting a value from a range."),
             new("Switch", "switch", "/components/switch", "A control for toggling between on and off."),
