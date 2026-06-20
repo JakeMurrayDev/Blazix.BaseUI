@@ -1,0 +1,19 @@
+<TabsRoot TValue="string" DefaultValue="@("overview")" class="box-border w-full max-w-80">
+    <TabsList TValue="string" class="relative z-[1] mb-[-1px] flex gap-1">
+        <TabsTab TValue="string" Value="@("overview")" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap border-0 bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Overview</TabsTab>
+        <TabsTab TValue="string" Value="@("projects")" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap border-0 bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Projects</TabsTab>
+        <TabsTab TValue="string" Value="@("account")" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap border-0 bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Account</TabsTab>
+        <TabsIndicator TValue="string" class="absolute left-0 top-0 z-[-1] box-border h-full translate-x-[var(--active-tab-left)] border-x border-t border-neutral-950 bg-white transition-[translate,width] duration-150 ease-in-out [width:var(--active-tab-width)] dark:border-white dark:bg-neutral-950" />
+    </TabsList>
+    <div class="grid min-h-32 w-full grid-cols-[minmax(0,1fr)] border border-neutral-950 dark:border-white">
+        <TabsPanel TValue="string" Value="@("overview")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white dark:focus-visible:outline-white">
+            <p class="m-0">Workspace stats and activity.</p>
+        </TabsPanel>
+        <TabsPanel TValue="string" Value="@("projects")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white dark:focus-visible:outline-white">
+            <p class="m-0">Milestones and deadlines.</p>
+        </TabsPanel>
+        <TabsPanel TValue="string" Value="@("account")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 focus-visible:z-[1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white dark:focus-visible:outline-white">
+            <p class="m-0">Profile and preferences.</p>
+        </TabsPanel>
+    </div>
+</TabsRoot>

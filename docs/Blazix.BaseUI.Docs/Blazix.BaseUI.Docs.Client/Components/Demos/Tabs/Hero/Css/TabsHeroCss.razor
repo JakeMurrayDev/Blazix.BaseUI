@@ -1,0 +1,19 @@
+<TabsRoot TValue="string" DefaultValue="@("overview")" class="blx-tabs-root">
+    <TabsList TValue="string" class="blx-tabs-list">
+        <TabsTab TValue="string" Value="@("overview")" class="blx-tabs-tab">Overview</TabsTab>
+        <TabsTab TValue="string" Value="@("projects")" class="blx-tabs-tab">Projects</TabsTab>
+        <TabsTab TValue="string" Value="@("account")" class="blx-tabs-tab">Account</TabsTab>
+        <TabsIndicator TValue="string" class="blx-tabs-indicator" />
+    </TabsList>
+    <div class="blx-tabs-panel-viewport">
+        <TabsPanel TValue="string" Value="@("overview")" class="blx-tabs-panel">
+            <p class="blx-tabs-paragraph">Workspace stats and activity.</p>
+        </TabsPanel>
+        <TabsPanel TValue="string" Value="@("projects")" class="blx-tabs-panel">
+            <p class="blx-tabs-paragraph">Milestones and deadlines.</p>
+        </TabsPanel>
+        <TabsPanel TValue="string" Value="@("account")" class="blx-tabs-panel">
+            <p class="blx-tabs-paragraph">Profile and preferences.</p>
+        </TabsPanel>
+    </div>
+</TabsRoot>

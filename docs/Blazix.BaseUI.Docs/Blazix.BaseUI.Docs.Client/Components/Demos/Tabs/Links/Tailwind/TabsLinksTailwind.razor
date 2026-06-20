@@ -1,0 +1,18 @@
+<TabsRoot TValue="string" DefaultValue="@("overview")" class="box-border w-full max-w-80">
+    <TabsList TValue="string" class="relative z-[1] mb-[-1px] flex gap-1">
+        <TabsTab TValue="string" Value="@("overview")" NativeButton="false" href="#overview" Render="@RenderAnchor" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 no-underline outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Overview</TabsTab>
+        <TabsTab TValue="string" Value="@("docs")" NativeButton="false" href="#docs" Render="@RenderAnchor" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 no-underline outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Docs</TabsTab>
+        <TabsTab TValue="string" Value="@("settings")" NativeButton="false" href="#settings" Render="@RenderAnchor" class="box-border flex h-[calc(2rem+1px)] items-center justify-center whitespace-nowrap bg-transparent px-2 py-0 text-sm leading-5 text-neutral-600 no-underline outline-0 hover:text-neutral-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-neutral-950 data-[active]:text-neutral-950 dark:text-neutral-200 dark:hover:text-white dark:focus-visible:outline-white dark:data-[active]:text-white">Settings</TabsTab>
+        <TabsIndicator TValue="string" class="absolute left-0 top-0 z-[-1] box-border h-full translate-x-[var(--active-tab-left)] border-x border-t border-neutral-950 bg-white transition-[translate,width] duration-150 ease-in-out [width:var(--active-tab-width)] dark:border-white dark:bg-neutral-950" />
+    </TabsList>
+    <div class="grid min-h-32 w-full grid-cols-[minmax(0,1fr)] border border-neutral-950 dark:border-white">
+        <TabsPanel TValue="string" Value="@("overview")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white">Anchor tabs can still activate panels.</TabsPanel>
+        <TabsPanel TValue="string" Value="@("docs")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white">Use this pattern when tabs should also be links.</TabsPanel>
+        <TabsPanel TValue="string" Value="@("settings")" class="col-start-1 row-start-1 flex w-full items-center justify-center bg-white p-4 text-center text-sm leading-5 text-neutral-950 outline-0 [&[hidden]]:hidden dark:bg-neutral-950 dark:text-white">Keep the tab value and link destination in sync.</TabsPanel>
+    </div>
+</TabsRoot>
+
+@code {
+    private static RenderFragment<RenderProps<TabsTabState>> RenderAnchor => props =>
+        RenderUtilities.CreateElement("a", props);
+}
