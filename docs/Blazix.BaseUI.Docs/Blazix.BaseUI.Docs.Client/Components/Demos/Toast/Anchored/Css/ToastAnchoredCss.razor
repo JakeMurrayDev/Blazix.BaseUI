@@ -1,0 +1,116 @@
+<TooltipProvider>
+    <ToastProvider Context="anchoredToastManager">
+        <ToastProvider Context="stackedToastManager">
+            <div class="blx-toast-button-group">
+                <TooltipRoot Disabled="copied">
+                    <TooltipTrigger @ref="copyTrigger"
+                                    CloseOnClick="false"
+                                    Disabled="copied"
+                                    class="blx-toast-copy-button"
+                                    aria-label="Copy to clipboard"
+                                    @onclick="@(() => HandleCopy(anchoredToastManager))">
+                        @if (copied)
+                        {
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+                                <path d="m2.5 8.5 4 4 7-9" />
+                            </svg>
+                        }
+                        else
+                        {
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                            </svg>
+                        }
+                    </TooltipTrigger>
+                    <TooltipPortal>
+                        <TooltipPositioner SideOffset="10">
+                            <TooltipPopup class="blx-toast-tooltip">
+                                <TooltipArrow class="blx-toast-arrow" />
+                                Copy
+                            </TooltipPopup>
+                        </TooltipPositioner>
+                    </TooltipPortal>
+                </TooltipRoot>
+
+                <button type="button" class="blx-toast-demo-button" @onclick="@(() => CreateStackedToast(stackedToastManager))">
+                    Stacked toast
+                </button>
+            </div>
+
+            <ToastPortal>
+                <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => StackedViewportStyle)">
+                    @foreach (var item in stackedToastManager.Toasts)
+                    {
+                        <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root">
+                            <ToastContent class="blx-toast-content">
+                                <div class="blx-toast-copy">
+                                    <ToastTitle class="blx-toast-title" />
+                                    <ToastDescription class="blx-toast-description" />
+                                </div>
+                                <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                            </ToastContent>
+                        </ToastRoot>
+                    }
+                </ToastViewport>
+            </ToastPortal>
+        </ToastProvider>
+
+        <ToastPortal>
+            <ToastViewport class="blx-toast-anchored-viewport">
+                @foreach (var item in anchoredToastManager.Toasts)
+                {
+                    <ToastPositioner @key="item.Id" Toast="item" class="blx-toast-positioner">
+                        <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root blx-toast-root--anchored">
+                            <ToastArrow class="blx-toast-arrow" />
+                            <ToastContent class="blx-toast-anchored-content">
+                                <ToastDescription class="blx-toast-anchored-description" />
+                            </ToastContent>
+                        </ToastRoot>
+                    </ToastPositioner>
+                }
+            </ToastViewport>
+        </ToastPortal>
+    </ToastProvider>
+</TooltipProvider>
+
+@code {
+    private TooltipTrigger? copyTrigger;
+    private int stackedViewportLayer = ToastDemoViewportLayer.Next();
+    private bool copied;
+
+    private string StackedViewportStyle => ToastDemoViewportLayer.Style(stackedViewportLayer);
+
+    private void CreateStackedToast(ToastManagerContext toastManager)
+    {
+        BringStackedViewportToFront();
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Description = "Copied"
+        });
+    }
+
+    private void BringStackedViewportToFront() => stackedViewportLayer = ToastDemoViewportLayer.Next();
+
+    private void HandleCopy(ToastManagerContext toastManager)
+    {
+        var anchor = copyTrigger?.Element;
+        if (anchor is null)
+        {
+            return;
+        }
+
+        copied = true;
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Description = "Copied",
+            Timeout = 1500,
+            PositionerProps = new ToastPositionerOptions
+            {
+                Anchor = anchor,
+                SideOffset = 10
+            },
+            OnCloseCallback = EventCallback.Factory.Create(this, () => copied = false)
+        });
+    }
+}
