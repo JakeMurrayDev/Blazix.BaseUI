@@ -2,6 +2,12 @@
 
 Tooltip labels or describes an element on hover or focus.
 
+## Usage guidelines
+
+- Use tooltips for supplementary visual labels, not for information users must read to complete a task.
+- Give icon-only or ambiguous triggers an accessible name, such as `aria-label`, that matches the tooltip text.
+- Do not rely on tooltips for touch or screen-reader access; use inline text, Popover, or anchored Toast when the content needs to be reachable by everyone.
+
 ## Anatomy
 
 ```razor

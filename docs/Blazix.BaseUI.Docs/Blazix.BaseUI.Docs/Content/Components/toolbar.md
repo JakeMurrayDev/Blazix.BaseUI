@@ -2,6 +2,12 @@
 
 Toolbar groups related controls into one roving-focus command surface.
 
+## Usage guidelines
+
+- Give each toolbar an accessible label that describes the command group.
+- Use inputs sparingly in horizontal toolbars because arrow keys also move focus between toolbar items.
+- When a horizontal toolbar needs an input, prefer one input and place it last in the toolbar.
+
 ## Anatomy
 
 ```razor

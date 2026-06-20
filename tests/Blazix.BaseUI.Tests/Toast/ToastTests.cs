@@ -284,6 +284,45 @@ public class ToastTests : BunitContext
     }
 
     [Fact]
+    public Task DeferredMouseLeaveCollapsesViewportAfterDismissalSettles()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        manager.Add(new ToastManagerAddOptions { Id = "back", Description = "Back", Timeout = 0 });
+        manager.Add(new ToastManagerAddOptions { Id = "front", Description = "Front", Timeout = 0 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-toast-id='front']").ShouldNotBeNull();
+            cut.Find("[data-toast-id='back']").ShouldNotBeNull();
+        });
+
+        cut.Find("[data-testid='toast-viewport']").MouseEnter();
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue());
+
+        manager.Close("front");
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-toast-id='front']").HasAttribute("data-ending-style").ShouldBeTrue());
+
+        cut.Find("[data-testid='toast-viewport']").MouseLeave();
+        cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue();
+
+        var frontRoot = cut.FindComponents<ToastRoot>()
+            .Single(component => component.Instance.Toast.Id == "front");
+        frontRoot.Instance.OnTransitionComplete();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("[data-toast-id='front']").ShouldBeEmpty();
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task MouseLeaveWhileIdleCollapsesViewport()
     {
         var manager = new ToastManager();

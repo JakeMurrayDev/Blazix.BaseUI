@@ -2,6 +2,13 @@
 
 Toast displays brief notifications with stacking, actions, promises, custom content, and optional anchored positioning.
 
+## Usage guidelines
+
+- Place a shared `ToastProvider` near the app root when notifications should use one viewport.
+- Keep the viewport keyboard reachable; `F6` moves focus into the toast region when toasts are present.
+- Add `data-blazix-base-ui-swipe-ignore` to custom interactive areas that should not start swipe dismissal.
+- For high-priority toasts, put the announced screen-reader text in the toast title and description values.
+
 ## Anatomy
 
 ```razor

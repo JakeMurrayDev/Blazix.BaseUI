@@ -13,6 +13,14 @@
     </Demo>
 </div>
 
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Place a shared <code class="@LiquidGlassClasses.CodeInline">ToastProvider</code> near the app root when notifications should use one viewport.</li>
+    <li>Keep the viewport keyboard reachable; <kbd class="@LiquidGlassClasses.CodeInline">F6</kbd> moves focus into the toast region when toasts are present.</li>
+    <li>Add <code class="@LiquidGlassClasses.CodeInline">data-blazix-base-ui-swipe-ignore</code> to custom interactive areas that should not start swipe dismissal.</li>
+    <li>For high-priority toasts, put the announced screen-reader text in the toast title and description values.</li>
+</ul>
+
 <DocsHeading Title="Anatomy" />
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
     Put <code class="@LiquidGlassClasses.CodeInline">ToastProvider</code> around a portal and viewport, then render each visible manager item as a root.

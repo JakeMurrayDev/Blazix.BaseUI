@@ -13,6 +13,13 @@
     </Demo>
 </div>
 
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Use tooltips for supplementary visual labels, not for information users must read to complete a task.</li>
+    <li>Give icon-only or ambiguous triggers an accessible name, such as <code class="@LiquidGlassClasses.CodeInline">aria-label</code>, that matches the tooltip text.</li>
+    <li>Do not rely on tooltips for touch or screen-reader access; use inline text, Popover, or anchored Toast when the content needs to be reachable by everyone.</li>
+</ul>
+
 <DocsHeading Title="Anatomy" />
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
     Import the tooltip namespace and assemble provider, root, trigger, portal, positioner, popup, and optional arrow.
