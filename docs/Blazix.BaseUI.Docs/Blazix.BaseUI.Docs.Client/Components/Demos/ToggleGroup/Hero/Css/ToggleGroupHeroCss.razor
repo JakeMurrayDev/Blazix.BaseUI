@@ -1,0 +1,13 @@
+<ToggleGroup DefaultValue="@DefaultAlignment" class="blx-toggle-group-panel" aria-label="Alignment">
+    <Toggle Value="left" aria-label="Align left" class="blx-toggle-group-button">@AlignLeftIcon</Toggle>
+    <Toggle Value="center" aria-label="Align center" class="blx-toggle-group-button">@AlignCenterIcon</Toggle>
+    <Toggle Value="right" aria-label="Align right" class="blx-toggle-group-button">@AlignRightIcon</Toggle>
+</ToggleGroup>
+
+@code {
+    private static readonly IReadOnlyList<string> DefaultAlignment = ["left"];
+
+    private static readonly RenderFragment AlignLeftIcon = @<svg width="16" height="16" fill="none" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-11 7h9M2.5 8h5" /></svg>;
+    private static readonly RenderFragment AlignCenterIcon = @<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-10 7h9M5.5 8h5" /></svg>;
+    private static readonly RenderFragment AlignRightIcon = @<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-9 7h9M8.5 8h5" /></svg>;
+}
