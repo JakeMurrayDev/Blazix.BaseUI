@@ -1,0 +1,53 @@
+@page "/components/toggle"
+
+<PageTitle>Toggle · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Toggle"
+               Subtitle="A two-state button that can be pressed or unpressed."
+               MarkdownHref="/components/toggle.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ToggleHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Give icon-only toggles an accessible name with <code class="@LiquidGlassClasses.CodeInline">aria-label</code>.</li>
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">ToggleGroup</code> when a set of toggles shares selection state.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ToggleApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Toggle
+
+        <Toggle aria-label="Favorite">
+            Favorite
+        </Toggle>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toggle.razor", "xml", "Components.Demos.Toggle.Hero.Css.ToggleHeroCss.razor"),
+            new DemoFile("toggle.css", "css", "wwwroot.demos.toggle.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toggle.razor", "xml", "Components.Demos.Toggle.Hero.Tailwind.ToggleHeroTailwind.razor"),
+        ]),
+    ];
+}
