@@ -1,0 +1,47 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="CreateToast">
+            Create toast
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--top-center" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" SwipeDirection="UpSwipeDirections" class="blx-toast-root">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy">
+                            <ToastTitle class="blx-toast-title" />
+                            <ToastDescription class="blx-toast-description" />
+                        </div>
+                        <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private static readonly IReadOnlyList<ToastSwipeDirection> UpSwipeDirections = [ToastSwipeDirection.Up];
+
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+    private int count;
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private void CreateToast()
+    {
+        BringViewportToFront();
+        count++;
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Title = $"Toast {count} created",
+            Description = "This is a toast notification."
+        });
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+}

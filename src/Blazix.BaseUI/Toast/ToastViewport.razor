@@ -45,6 +45,8 @@
     private Dictionary<string, object> componentAttributes = new();
     private bool hasRendered;
     private bool hasPreviousFocusElement;
+    private bool markedReadyForMouseLeave;
+    private bool hadTransitioningToasts;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -87,6 +89,9 @@
     /// Gets or sets the associated <see cref="ElementReference"/>.
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
+
+    private bool HasTransitioningToasts =>
+        Store?.Toasts.Any(toast => toast.TransitionStatus == TransitionStatus.Ending) ?? false;
 
     /// <inheritdoc />
     protected override void OnInitialized()
@@ -136,6 +141,15 @@
             {
                 _ = ex;
             }
+        }
+
+        // Mirrors base-ui's effect on `hasTransitioningToasts`: once a dismissal
+        // animation settles, flush any mouseleave that was deferred while it ran.
+        var transitioning = HasTransitioningToasts;
+        if (transitioning != hadTransitioningToasts)
+        {
+            hadTransitioningToasts = transitioning;
+            FlushMouseLeave();
         }
     }
 
@@ -269,13 +283,26 @@
     {
         Store?.PauseTimers();
         Store?.SetHovering(true);
+        markedReadyForMouseLeave = false;
         return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
     }
 
     private Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        Store?.ResumeTimers();
-        Store?.SetHovering(false);
+        // While a toast is animating out, the dismissed toast sliding from under the
+        // pointer fires a transient mouseleave. Collapsing immediately would compact
+        // the stack and then re-expand it once the pointer settles over a sibling.
+        // Defer the collapse and flush it after the transition settles instead.
+        if (HasTransitioningToasts)
+        {
+            markedReadyForMouseLeave = true;
+        }
+        else
+        {
+            Store?.ResumeTimers();
+            Store?.SetHovering(false);
+        }
+
         return EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 
@@ -353,12 +380,12 @@
 
     private void FlushMouseLeave()
     {
-        var hasEndingToasts = Store?.Toasts.Any(toast => toast.TransitionStatus == TransitionStatus.Ending) ?? false;
-        if (hasEndingToasts || Store?.IsWindowFocused == false)
+        if (Store?.IsWindowFocused == false || HasTransitioningToasts || !markedReadyForMouseLeave)
         {
             return;
         }
 
+        markedReadyForMouseLeave = false;
         Store?.ResumeTimers();
         Store?.SetHovering(false);
     }

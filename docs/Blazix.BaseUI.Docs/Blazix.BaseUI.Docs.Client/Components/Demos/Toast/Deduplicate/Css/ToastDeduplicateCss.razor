@@ -1,0 +1,53 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="CreateToast">
+            Save draft
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" class="@GetToastClass(item)">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy">
+                            <ToastTitle class="blx-toast-title" />
+                            <ToastDescription class="blx-toast-description" />
+                        </div>
+                        <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private const string DeduplicatedToastId = "save-status";
+
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private void CreateToast()
+    {
+        BringViewportToFront();
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Id = DeduplicatedToastId,
+            Title = "Draft saved",
+            Description = "Click again while it is visible to replay the pulse."
+        });
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+
+    private static string GetToastClass(ToastObject item) => item.UpdateKey switch
+    {
+        0 => "blx-toast-root",
+        var updateKey when updateKey % 2 == 0 => "blx-toast-root blx-toast-root--pulse-even",
+        _ => "blx-toast-root blx-toast-root--pulse-odd"
+    };
+}

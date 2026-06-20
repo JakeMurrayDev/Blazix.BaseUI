@@ -1,0 +1,28 @@
+<TooltipProvider>
+    <div class="blx-tooltip-button-group">
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Listen to audio preview")" aria-label="Listen to audio preview" class="blx-tooltip-button">@HeadphonesIcon</TooltipTrigger>
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Set a timer")" aria-label="Set a timer" class="blx-tooltip-button">@StopwatchIcon</TooltipTrigger>
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Delete: This action cannot be undone")" aria-label="Delete: This action cannot be undone" class="blx-tooltip-button">@TrashIcon</TooltipTrigger>
+    </div>
+
+    <TooltipRoot Handle="@demoTooltip">
+        <ChildContentWithPayload Context="payloadContext">
+            <TooltipPortal>
+                <TooltipPositioner SideOffset="11">
+                    <TooltipPopup class="blx-tooltip-popup">
+                        <TooltipArrow class="blx-tooltip-arrow" />
+                        <TooltipViewport class="blx-tooltip-viewport">@payloadContext.Payload</TooltipViewport>
+                    </TooltipPopup>
+                </TooltipPositioner>
+            </TooltipPortal>
+        </ChildContentWithPayload>
+    </TooltipRoot>
+</TooltipProvider>
+
+@code {
+    private readonly TooltipHandle demoTooltip = TooltipHandleFactory.CreateHandle();
+
+    private static readonly RenderFragment HeadphonesIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" d="M1.5 11V7.5c0-2.5 2.5-6 6.5-6s6.5 3.5 6.5 6V11" /><path d="M12 7.5c1.381 0 2.5 1.119 2.5 2.5v2c0 1.381-1.119 2.5-2.5 2.5h-1.5v-7zm-8 0h1.5v7H4A2.5 2.5 0 0 1 1.5 12v-2A2.5 2.5 0 0 1 4 7.5Z" /></svg>;
+    private static readonly RenderFragment StopwatchIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="8" cy="8.5" r="6" /><path stroke-linecap="square" stroke-linejoin="round" d="M8 9.5v-5m0-2v-2m-2 0h4M12 4l1.5-1.5" /></svg>;
+    private static readonly RenderFragment TrashIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linejoin="round" aria-hidden="true"><path stroke-linecap="square" d="M2.5 4h11" /><path stroke-linecap="round" d="M6.5 4V3c0-.828.672-1.5 1.5-1.5S9.5 2.172 9.5 3v1" /><path stroke-linecap="square" d="m3.5 4 .871 9.142A1.5 1.5 0 0 0 5.864 14.5h4.272a1.5 1.5 0 0 0 1.493-1.358L12.5 4" /></svg>;
+}

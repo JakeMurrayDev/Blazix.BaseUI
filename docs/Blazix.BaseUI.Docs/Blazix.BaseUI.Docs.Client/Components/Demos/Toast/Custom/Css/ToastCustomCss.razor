@@ -1,0 +1,52 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="CreateCustomToast">
+            Create custom toast
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy">
+                            <ToastTitle class="blx-toast-title" />
+                            @if (item.Data is CustomToastData data)
+                            {
+                                <ToastDescription class="blx-toast-description">data.userId is @data.UserId</ToastDescription>
+                            }
+                            else
+                            {
+                                <ToastDescription class="blx-toast-description" />
+                            }
+                        </div>
+                        <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private void CreateCustomToast()
+    {
+        BringViewportToFront();
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Title = "Toast with custom data",
+            Data = new CustomToastData("123")
+        });
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+
+    private sealed record CustomToastData(string UserId);
+}

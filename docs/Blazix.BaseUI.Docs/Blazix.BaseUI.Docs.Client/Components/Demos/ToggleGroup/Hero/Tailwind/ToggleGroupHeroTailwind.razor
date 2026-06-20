@@ -1,0 +1,13 @@
+<ToggleGroup DefaultValue="@DefaultAlignment" class="flex gap-px border border-neutral-950 p-px dark:border-white" aria-label="Alignment">
+    <Toggle Value="left" aria-label="Align left" class="box-border flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-neutral-950 outline-0 hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-neutral-950 data-[pressed]:bg-neutral-950 data-[pressed]:text-white dark:text-white dark:hover:bg-neutral-800 dark:active:bg-neutral-700 dark:focus-visible:outline-white dark:data-[pressed]:bg-white dark:data-[pressed]:text-neutral-950">@AlignLeftIcon</Toggle>
+    <Toggle Value="center" aria-label="Align center" class="box-border flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-neutral-950 outline-0 hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-neutral-950 data-[pressed]:bg-neutral-950 data-[pressed]:text-white dark:text-white dark:hover:bg-neutral-800 dark:active:bg-neutral-700 dark:focus-visible:outline-white dark:data-[pressed]:bg-white dark:data-[pressed]:text-neutral-950">@AlignCenterIcon</Toggle>
+    <Toggle Value="right" aria-label="Align right" class="box-border flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 text-neutral-950 outline-0 hover:bg-neutral-100 active:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-neutral-950 data-[pressed]:bg-neutral-950 data-[pressed]:text-white dark:text-white dark:hover:bg-neutral-800 dark:active:bg-neutral-700 dark:focus-visible:outline-white dark:data-[pressed]:bg-white dark:data-[pressed]:text-neutral-950">@AlignRightIcon</Toggle>
+</ToggleGroup>
+
+@code {
+    private static readonly IReadOnlyList<string> DefaultAlignment = ["left"];
+
+    private static readonly RenderFragment AlignLeftIcon = @<svg width="16" height="16" fill="none" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-11 7h9M2.5 8h5" /></svg>;
+    private static readonly RenderFragment AlignCenterIcon = @<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-10 7h9M5.5 8h5" /></svg>;
+    private static readonly RenderFragment AlignRightIcon = @<svg width="16" height="16" viewBox="0 0 16 16" stroke="currentColor" aria-hidden="true"><path stroke-linecap="square" stroke-linejoin="round" d="M2.5 4.5h11m-9 7h9M8.5 8h5" /></svg>;
+}

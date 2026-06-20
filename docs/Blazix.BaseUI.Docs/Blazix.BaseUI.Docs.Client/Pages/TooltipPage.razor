@@ -1,0 +1,201 @@
+@page "/components/tooltip"
+
+<PageTitle>Tooltip · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Tooltip"
+               Subtitle="A popup that labels or describes an element on hover or focus."
+               MarkdownHref="/components/tooltip.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <TooltipHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Use tooltips for supplementary visual labels, not for information users must read to complete a task.</li>
+    <li>Give icon-only or ambiguous triggers an accessible name, such as <code class="@LiquidGlassClasses.CodeInline">aria-label</code>, that matches the tooltip text.</li>
+    <li>Do not rely on tooltips for touch or screen-reader access; use inline text, Popover, or anchored Toast when the content needs to be reachable by everyone.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the tooltip namespace and assemble provider, root, trigger, portal, positioner, popup, and optional arrow.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Detached triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use a handle when the trigger and tooltip root cannot be colocated in the same component.
+</p>
+<CodeBlock Code="@DetachedTriggersCode" />
+<div class="mt-3 mb-8">
+    <Demo Variants="@DetachedTriggersSimpleVariants">
+        <TooltipDetachedTriggersSimpleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Multiple triggers" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    A single root can serve several triggers. Trigger ids and typed payloads let each trigger display different content.
+</p>
+<CodeBlock Code="@MultipleTriggersCode" />
+
+<DocsHeading Level="3" Title="Controlled mode with multiple triggers" />
+<p class="mt-6 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Control <code class="@LiquidGlassClasses.CodeInline">Open</code> and <code class="@LiquidGlassClasses.CodeInline">TriggerId</code> together when external state chooses the active trigger.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersControlledVariants">
+        <TooltipDetachedTriggersControlledCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Animating the Tooltip" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Animate placement on the positioner, the popup transition, and payload changes through <code class="@LiquidGlassClasses.CodeInline">TooltipViewport</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DetachedTriggersFullVariants">
+        <TooltipDetachedTriggersFullCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in TooltipApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Tooltip
+
+        <TooltipProvider>
+            <TooltipRoot>
+                <TooltipTrigger>Save</TooltipTrigger>
+                <TooltipPortal>
+                    <TooltipPositioner SideOffset="8">
+                        <TooltipPopup>
+                            <TooltipArrow />
+                            Save changes
+                        </TooltipPopup>
+                    </TooltipPositioner>
+                </TooltipPortal>
+            </TooltipRoot>
+        </TooltipProvider>
+        """;
+
+    private const string DetachedTriggersCode =
+        """
+        @using Blazix.BaseUI.Tooltip
+
+        <TooltipTrigger Handle="@demoTooltip">
+            Trigger
+        </TooltipTrigger>
+
+        <TooltipRoot Handle="@demoTooltip">
+            <TooltipPortal>
+                <TooltipPositioner SideOffset="8">
+                    <TooltipPopup>Detached tooltip</TooltipPopup>
+                </TooltipPositioner>
+            </TooltipPortal>
+        </TooltipRoot>
+
+        @code {
+            private readonly TooltipHandle demoTooltip = TooltipHandleFactory.CreateHandle();
+        }
+        """;
+
+    private const string MultipleTriggersCode =
+        """
+        @using Blazix.BaseUI.Tooltip
+
+        <TooltipTypedTrigger TPayload="string"
+                             Handle="@demoTooltip"
+                             Id="bold"
+                             Payload="@("Bold")">
+            B
+        </TooltipTypedTrigger>
+        <TooltipTypedTrigger TPayload="string"
+                             Handle="@demoTooltip"
+                             Id="italic"
+                             Payload="@("Italic")">
+            I
+        </TooltipTypedTrigger>
+
+        <TooltipRoot Handle="@demoTooltip">
+            <ChildContentWithPayload Context="payloadContext">
+                <TooltipPortal>
+                    <TooltipPositioner SideOffset="8">
+                        <TooltipPopup>
+                            @payloadContext.Payload
+                        </TooltipPopup>
+                    </TooltipPositioner>
+                </TooltipPortal>
+            </ChildContentWithPayload>
+        </TooltipRoot>
+
+        @code {
+            private readonly TooltipHandle<string> demoTooltip =
+                TooltipHandleFactory.CreateHandle<string>();
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.Hero.Css.TooltipHeroCss.razor"),
+            new DemoFile("tooltip.css", "css", "wwwroot.demos.tooltip.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.Hero.Tailwind.TooltipHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersSimpleVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersSimple.Css.TooltipDetachedTriggersSimpleCss.razor"),
+            new DemoFile("tooltip.css", "css", "wwwroot.demos.tooltip.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersSimple.Tailwind.TooltipDetachedTriggersSimpleTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersControlledVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersControlled.Css.TooltipDetachedTriggersControlledCss.razor"),
+            new DemoFile("tooltip.css", "css", "wwwroot.demos.tooltip.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersControlled.Tailwind.TooltipDetachedTriggersControlledTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DetachedTriggersFullVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersFull.Css.TooltipDetachedTriggersFullCss.razor"),
+            new DemoFile("tooltip.css", "css", "wwwroot.demos.tooltip.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Tooltip.razor", "xml", "Components.Demos.Tooltip.DetachedTriggersFull.Tailwind.TooltipDetachedTriggersFullTailwind.razor"),
+        ]),
+    ];
+}

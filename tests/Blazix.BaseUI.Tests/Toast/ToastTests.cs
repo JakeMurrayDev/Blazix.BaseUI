@@ -247,6 +247,109 @@ public class ToastTests : BunitContext
     }
 
     [Fact]
+    public Task MouseLeaveWhileDismissingKeepsViewportExpanded()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        // Two toasts: dismissing the front one must leave the stack expanded while
+        // the back one remains (a single toast collapses by design when closed).
+        manager.Add(new ToastManagerAddOptions { Id = "back", Description = "Back", Timeout = 0 });
+        manager.Add(new ToastManagerAddOptions { Id = "front", Description = "Front", Timeout = 0 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-toast-id='front']").ShouldNotBeNull();
+            cut.Find("[data-toast-id='back']").ShouldNotBeNull();
+        });
+
+        // Hovering the viewport expands the stack.
+        cut.Find("[data-testid='toast-viewport']").MouseEnter();
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue());
+
+        // The front toast is now animating out.
+        manager.Close("front");
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-toast-id='front']").HasAttribute("data-ending-style").ShouldBeTrue());
+
+        // The dismissed toast sliding from under the pointer fires a transient
+        // mouseleave; it must be deferred so the stack does not collapse and then
+        // re-expand mid-dismissal.
+        cut.Find("[data-testid='toast-viewport']").MouseLeave();
+
+        cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DeferredMouseLeaveCollapsesViewportAfterDismissalSettles()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        manager.Add(new ToastManagerAddOptions { Id = "back", Description = "Back", Timeout = 0 });
+        manager.Add(new ToastManagerAddOptions { Id = "front", Description = "Front", Timeout = 0 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-toast-id='front']").ShouldNotBeNull();
+            cut.Find("[data-toast-id='back']").ShouldNotBeNull();
+        });
+
+        cut.Find("[data-testid='toast-viewport']").MouseEnter();
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue());
+
+        manager.Close("front");
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-toast-id='front']").HasAttribute("data-ending-style").ShouldBeTrue());
+
+        cut.Find("[data-testid='toast-viewport']").MouseLeave();
+        cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue();
+
+        var frontRoot = cut.FindComponents<ToastRoot>()
+            .Single(component => component.Instance.Toast.Id == "front");
+        frontRoot.Instance.OnTransitionComplete();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("[data-toast-id='front']").ShouldBeEmpty();
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task MouseLeaveWhileIdleCollapsesViewport()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "idle",
+            Description = "Idle",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() => cut.Find("[data-toast-id='idle']").ShouldNotBeNull());
+
+        cut.Find("[data-testid='toast-viewport']").MouseEnter();
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeTrue());
+
+        // With no toast transitioning, mouseleave collapses immediately as before.
+        cut.Find("[data-testid='toast-viewport']").MouseLeave();
+
+        cut.Find("[data-testid='toast-viewport']").HasAttribute("data-expanded").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task ManagerSubscribeAndEmitCanRunConcurrently()
     {
         var manager = new ToastManager();

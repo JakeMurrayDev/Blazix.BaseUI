@@ -1,0 +1,236 @@
+@page "/components/toast"
+
+<PageTitle>Toast · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Toast"
+               Subtitle="Brief status messages with stacking, actions, promises, and anchored positioning."
+               MarkdownHref="/components/toast.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ToastHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Place a shared <code class="@LiquidGlassClasses.CodeInline">ToastProvider</code> near the app root when notifications should use one viewport.</li>
+    <li>Keep the viewport keyboard reachable; <kbd class="@LiquidGlassClasses.CodeInline">F6</kbd> moves focus into the toast region when toasts are present.</li>
+    <li>Add <code class="@LiquidGlassClasses.CodeInline">data-blazix-base-ui-swipe-ignore</code> to custom interactive areas that should not start swipe dismissal.</li>
+    <li>For high-priority toasts, put the announced screen-reader text in the toast title and description values.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Put <code class="@LiquidGlassClasses.CodeInline">ToastProvider</code> around a portal and viewport, then render each visible manager item as a root.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Anchored toasts" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">ToastPositioner</code> when a toast should be placed relative to a specific element.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AnchoredVariants">
+        <ToastAnchoredCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Custom position" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Change the viewport and root styles to place the stack somewhere else; this source sample shows a top-center position.
+</p>
+<div class="mb-8">
+    <Demo Variants="@PositionVariants">
+        <ToastPositionCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Undo action" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Add an action button through the toast options when the notification can reverse an operation.
+</p>
+<div class="mb-8">
+    <Demo Variants="@UndoVariants">
+        <ToastUndoCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Promise" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Let the manager update loading, success, and error states around an asynchronous operation.
+</p>
+<div class="mb-8">
+    <Demo Variants="@PromiseVariants">
+        <ToastPromiseCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Custom" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Pass custom data to the manager and read it from each toast while rendering.
+</p>
+<div class="mb-8">
+    <Demo Variants="@CustomVariants">
+        <ToastCustomCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Deduplicated toast" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Upsert the same toast id so repeated events update one toast and replay attention styles through <code class="@LiquidGlassClasses.CodeInline">UpdateKey</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@DeduplicateVariants">
+        <ToastDeduplicateCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Varying heights" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Toasts measure their own height so stacked transitions keep working as content size changes.
+</p>
+<div class="mb-8">
+    <Demo Variants="@VaryingHeightsVariants">
+        <ToastVaryingHeightsCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ToastApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Toast
+
+        <ToastProvider ToastManager="@toastManager" Context="toasts">
+            <ToastPortal>
+                <ToastViewport>
+                    @foreach (var toast in toasts.Toasts)
+                    {
+                        <ToastRoot Toast="toast">
+                            <ToastTitle>@toast.Title</ToastTitle>
+                            <ToastDescription>@toast.Description</ToastDescription>
+                            <ToastClose />
+                        </ToastRoot>
+                    }
+                </ToastViewport>
+            </ToastPortal>
+        </ToastProvider>
+
+        @code {
+            private readonly ToastManager toastManager = new();
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Hero.Css.ToastHeroCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Hero.Tailwind.ToastHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> AnchoredVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Anchored.Css.ToastAnchoredCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Anchored.Tailwind.ToastAnchoredTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> PositionVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Position.Css.ToastPositionCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Position.Tailwind.ToastPositionTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> UndoVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Undo.Css.ToastUndoCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Undo.Tailwind.ToastUndoTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> PromiseVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Promise.Css.ToastPromiseCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Promise.Tailwind.ToastPromiseTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> CustomVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Custom.Css.ToastCustomCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Custom.Tailwind.ToastCustomTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> DeduplicateVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Deduplicate.Css.ToastDeduplicateCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.Deduplicate.Tailwind.ToastDeduplicateTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> VaryingHeightsVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.VaryingHeights.Css.ToastVaryingHeightsCss.razor"),
+            new DemoFile("toast.css", "css", "wwwroot.demos.toast.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toast.razor", "xml", "Components.Demos.Toast.VaryingHeights.Tailwind.ToastVaryingHeightsTailwind.razor"),
+        ]),
+    ];
+}

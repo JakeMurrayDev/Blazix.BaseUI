@@ -1,0 +1,164 @@
+@page "/components/toolbar"
+
+<PageTitle>Toolbar · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Toolbar"
+               Subtitle="A roving-focus container for related buttons, links, inputs, and composite controls."
+               MarkdownHref="/components/toolbar.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ToolbarHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Give each toolbar an accessible label that describes the command group.</li>
+    <li>Use inputs sparingly in horizontal toolbars because arrow keys also move focus between toolbar items.</li>
+    <li>When a horizontal toolbar needs an input, prefer one input and place it last in the toolbar.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the toolbar namespace and compose root, groups, buttons, links, inputs, and separators.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Using with Menu" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Render a menu trigger as a toolbar button so it participates in toolbar roving focus.
+</p>
+<CodeBlock Code="@MenuCode" />
+
+<DocsHeading Level="3" Title="Using with Tooltip" />
+<p class="mt-6 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap toolbar controls in tooltips when icon-only commands need visible hover and focus labels.
+</p>
+<CodeBlock Code="@TooltipCode" />
+
+<DocsHeading Level="3" Title="Using with Number Field" />
+<p class="mt-6 mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Compose form controls inside a toolbar when they are part of the same command surface.
+</p>
+<CodeBlock Code="@NumberFieldCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ToolbarApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Toolbar
+
+        <ToolbarRoot aria-label="Formatting">
+            <ToolbarGroup>
+                <ToolbarButton>Bold</ToolbarButton>
+                <ToolbarButton>Italic</ToolbarButton>
+            </ToolbarGroup>
+            <ToolbarSeparator />
+            <ToolbarLink href="/docs">Docs</ToolbarLink>
+            <ToolbarInput aria-label="Search" />
+        </ToolbarRoot>
+        """;
+
+    private const string MenuCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Menu
+        @using Blazix.BaseUI.Toolbar
+
+        <ToolbarRoot aria-label="Text tools">
+            <MenuRoot>
+                <MenuTrigger Render="@RenderMenuTriggerAsToolbarButton">
+                    Font
+                </MenuTrigger>
+                <MenuPortal>
+                    <MenuPositioner>
+                        <MenuPopup>
+                            <MenuItem>Serif</MenuItem>
+                            <MenuItem>Sans serif</MenuItem>
+                        </MenuPopup>
+                    </MenuPositioner>
+                </MenuPortal>
+            </MenuRoot>
+        </ToolbarRoot>
+
+        @code {
+            private RenderFragment<RenderProps<MenuTriggerState>> RenderMenuTriggerAsToolbarButton => props =>
+                RenderUtilities.CreateComponent(typeof(ToolbarButton), props);
+        }
+        """;
+
+    private const string TooltipCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Toolbar
+        @using Blazix.BaseUI.Tooltip
+
+        <TooltipProvider>
+            <ToolbarRoot aria-label="Formatting">
+                <TooltipRoot>
+                    <TooltipTrigger Render="@RenderTooltipTriggerAsToolbarButton" aria-label="Bold">
+                        B
+                    </TooltipTrigger>
+                    <TooltipPortal>
+                        <TooltipPositioner SideOffset="8">
+                            <TooltipPopup>Bold</TooltipPopup>
+                        </TooltipPositioner>
+                    </TooltipPortal>
+                </TooltipRoot>
+            </ToolbarRoot>
+        </TooltipProvider>
+
+        @code {
+            private RenderFragment<RenderProps<TooltipTriggerState>> RenderTooltipTriggerAsToolbarButton => props =>
+                RenderUtilities.CreateComponent(typeof(ToolbarButton), props);
+        }
+        """;
+
+    private const string NumberFieldCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.NumberField
+        @using Blazix.BaseUI.Toolbar
+
+        <ToolbarRoot aria-label="Image controls">
+            <NumberFieldRoot>
+                <NumberFieldDecrement Render="@RenderDecrementAsToolbarButton">-</NumberFieldDecrement>
+                <NumberFieldInput Render="@RenderInputAsToolbarInput" aria-label="Zoom percentage" />
+                <NumberFieldIncrement Render="@RenderIncrementAsToolbarButton">+</NumberFieldIncrement>
+            </NumberFieldRoot>
+        </ToolbarRoot>
+
+        @code {
+            private RenderFragment<RenderProps<NumberFieldRootState>> RenderDecrementAsToolbarButton => props =>
+                RenderUtilities.CreateComponent(typeof(ToolbarButton), props);
+
+            private RenderFragment<RenderProps<NumberFieldRootState>> RenderInputAsToolbarInput => props =>
+                RenderUtilities.CreateComponent(typeof(ToolbarInput), props);
+
+            private RenderFragment<RenderProps<NumberFieldRootState>> RenderIncrementAsToolbarButton => props =>
+                RenderUtilities.CreateComponent(typeof(ToolbarButton), props);
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Toolbar.razor", "xml", "Components.Demos.Toolbar.Hero.Css.ToolbarHeroCss.razor"),
+            new DemoFile("toolbar.css", "css", "wwwroot.demos.toolbar.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Toolbar.razor", "xml", "Components.Demos.Toolbar.Hero.Tailwind.ToolbarHeroTailwind.razor"),
+        ]),
+    ];
+}

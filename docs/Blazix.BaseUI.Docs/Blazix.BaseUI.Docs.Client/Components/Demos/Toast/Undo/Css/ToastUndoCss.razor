@@ -1,0 +1,66 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="PerformAction">
+            Perform action
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy blx-toast-copy--undo">
+                            <div class="blx-toast-message">
+                                <ToastTitle class="blx-toast-title" />
+                                <ToastDescription class="blx-toast-description" />
+                            </div>
+                            <ToastAction class="blx-toast-action" />
+                        </div>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private void PerformAction()
+    {
+        BringViewportToFront();
+        string? toastId = null;
+        toastId = toastManager.Add(new ToastManagerAddOptions
+        {
+            Title = "Action performed",
+            Description = "You can undo this action.",
+            Type = "success",
+            ActionProps = new ToastActionOptions
+            {
+                ChildContent = @<span>Undo</span>,
+                OnClick = EventCallback.Factory.Create<MouseEventArgs>(this, () => UndoAction(toastId))
+            }
+        });
+    }
+
+    private void UndoAction(string? toastId)
+    {
+        BringViewportToFront();
+        if (toastId is not null)
+        {
+            toastManager.Close(toastId);
+        }
+
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Title = "Action undone"
+        });
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+}

@@ -1,0 +1,39 @@
+<TabsRoot TValue="string" DefaultValue="@("overview")" class="blx-tabs-root">
+    <TabsList TValue="string" class="blx-tabs-list">
+        <TabsTab TValue="string"
+                 Value="@("overview")"
+                 NativeButton="false"
+                 href="#overview"
+                 class="blx-tabs-tab"
+                 Render="@RenderAnchor">
+            Overview
+        </TabsTab>
+        <TabsTab TValue="string"
+                 Value="@("docs")"
+                 NativeButton="false"
+                 href="#docs"
+                 class="blx-tabs-tab"
+                 Render="@RenderAnchor">
+            Docs
+        </TabsTab>
+        <TabsTab TValue="string"
+                 Value="@("settings")"
+                 NativeButton="false"
+                 href="#settings"
+                 class="blx-tabs-tab"
+                 Render="@RenderAnchor">
+            Settings
+        </TabsTab>
+        <TabsIndicator TValue="string" class="blx-tabs-indicator" />
+    </TabsList>
+    <div class="blx-tabs-panel-viewport">
+        <TabsPanel TValue="string" Value="@("overview")" class="blx-tabs-panel">Anchor tabs can still activate panels.</TabsPanel>
+        <TabsPanel TValue="string" Value="@("docs")" class="blx-tabs-panel">Use this pattern when tabs should also be links.</TabsPanel>
+        <TabsPanel TValue="string" Value="@("settings")" class="blx-tabs-panel">Keep the tab value and link destination in sync.</TabsPanel>
+    </div>
+</TabsRoot>
+
+@code {
+    private static RenderFragment<RenderProps<TabsTabState>> RenderAnchor => props =>
+        RenderUtilities.CreateElement("a", props);
+}

@@ -1,0 +1,31 @@
+<TooltipProvider>
+    <div class="blx-tooltip-panel">
+        @foreach (var tool in Tools)
+        {
+            <TooltipRoot @key="tool.Label">
+                <TooltipTrigger aria-label="@tool.Label" class="blx-tooltip-button">
+                    @tool.Icon
+                </TooltipTrigger>
+                <TooltipPortal>
+                    <TooltipPositioner SideOffset="11">
+                        <TooltipPopup class="blx-tooltip-popup">
+                            <TooltipArrow class="blx-tooltip-arrow" />
+                            @tool.Label
+                        </TooltipPopup>
+                    </TooltipPositioner>
+                </TooltipPortal>
+            </TooltipRoot>
+        }
+    </div>
+</TooltipProvider>
+
+@code {
+    private static readonly IReadOnlyList<TooltipTool> Tools =
+    [
+        new("Bold", @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" aria-hidden="true"><path d="M5 3.25h3.2a2.1 2.1 0 0 1 0 4.2H5z" /><path d="M5 7.45h3.85a2.4 2.4 0 0 1 0 4.8H5z" /><path d="M5 3.25v9" /></svg>),
+        new("Italic", @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" aria-hidden="true"><path d="M10.5 3.25H7.25" /><path d="M8.75 12.75H5.5" /><path d="M9.5 3.25 6.5 12.75" /></svg>),
+        new("Underline", @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" aria-hidden="true"><path d="M5 3.25v4.5a3 3 0 0 0 6 0v-4.5" /><path d="M4.25 12.75h7.5" /></svg>),
+    ];
+
+    private sealed record TooltipTool(string Label, RenderFragment Icon);
+}

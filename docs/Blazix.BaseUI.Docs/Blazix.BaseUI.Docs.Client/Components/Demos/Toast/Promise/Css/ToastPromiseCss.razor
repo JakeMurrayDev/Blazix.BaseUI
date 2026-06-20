@@ -1,0 +1,62 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="RunPromise">
+            Run promise
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy">
+                            <ToastTitle class="blx-toast-title" />
+                            <ToastDescription class="blx-toast-description" />
+                        </div>
+                        <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private async Task RunPromise()
+    {
+        BringViewportToFront();
+        try
+        {
+            await toastManager.Promise(SimulateRequestAsync(), new ToastManagerPromiseOptions<string>
+            {
+                Loading = "Loading data...",
+                Success = ToastPromiseOption<string>.From(data => $"Success: {data}"),
+                Error = ToastPromiseOption<Exception>.From(error => $"Error: {error.Message}")
+            });
+        }
+        catch
+        {
+            // The toast already displays the error state.
+        }
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+
+    private static async Task<string> SimulateRequestAsync()
+    {
+        await Task.Delay(2000);
+        if (Random.Shared.NextDouble() <= 0.3)
+        {
+            throw new InvalidOperationException("operation failed");
+        }
+
+        return "operation completed";
+    }
+}

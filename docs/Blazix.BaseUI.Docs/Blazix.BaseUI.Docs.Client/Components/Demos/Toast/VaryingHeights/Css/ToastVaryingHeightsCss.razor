@@ -1,0 +1,54 @@
+<ToastProvider ToastManager="toastManager" Context="toasts">
+    <div class="blx-toast-demo-panel">
+        <button type="button" class="blx-toast-demo-button" @onclick="CreateToast">
+            Create varying height toast
+        </button>
+    </div>
+
+    <ToastPortal>
+        <ToastViewport class="blx-toast-viewport blx-toast-viewport--bottom-end" StyleValue="@(_ => ViewportStyle)">
+            @foreach (var item in toasts.Toasts)
+            {
+                <ToastRoot @key="item.Id" Toast="item" class="blx-toast-root">
+                    <ToastContent class="blx-toast-content">
+                        <div class="blx-toast-copy">
+                            <ToastTitle class="blx-toast-title" />
+                            <ToastDescription class="blx-toast-description" />
+                        </div>
+                        <ToastClose class="blx-toast-close">Dismiss</ToastClose>
+                    </ToastContent>
+                </ToastRoot>
+            }
+        </ToastViewport>
+    </ToastPortal>
+</ToastProvider>
+
+@code {
+    private static readonly string[] Texts =
+    [
+        "Short message.",
+        "A bit longer message that spans two lines.",
+        "This is a longer description that intentionally takes more vertical space to demonstrate stacking with varying heights.",
+        "An even longer description that should span multiple lines so we can verify the clamped collapsed height and smooth expansion animation when hovering or focusing the viewport.",
+    ];
+
+    private readonly ToastManager toastManager = new();
+    private int viewportLayer = ToastDemoViewportLayer.Next();
+    private int count;
+
+    private string ViewportStyle => ToastDemoViewportLayer.Style(viewportLayer);
+
+    private void CreateToast()
+    {
+        BringViewportToFront();
+        count++;
+        var description = Texts[Random.Shared.Next(Texts.Length)];
+        toastManager.Add(new ToastManagerAddOptions
+        {
+            Title = $"Toast {count} created",
+            Description = description
+        });
+    }
+
+    private void BringViewportToFront() => viewportLayer = ToastDemoViewportLayer.Next();
+}

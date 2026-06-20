@@ -1,0 +1,13 @@
+<ToggleGroup Multiple="true" DefaultValue="@DefaultFormatting" class="blx-toggle-group-panel" aria-label="Text formatting options">
+    <Toggle Value="bold" aria-label="Bold" class="blx-toggle-group-button">@BoldIcon</Toggle>
+    <Toggle Value="italic" aria-label="Italic" class="blx-toggle-group-button">@ItalicIcon</Toggle>
+    <Toggle Value="underline" aria-label="Underline" class="blx-toggle-group-button">@UnderlineIcon</Toggle>
+</ToggleGroup>
+
+@code {
+    private static readonly IReadOnlyList<string> DefaultFormatting = ["bold", "italic"];
+
+    private static readonly RenderFragment BoldIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3.733 2.133A.534.534 0 0 0 3.733 3.2h.534v9.6h-.534a.533.533 0 1 0 0 1.067h6.134a3.47 3.47 0 0 0 3.466-3.467 3.47 3.47 0 0 0-2.04-3.156 2.93 2.93 0 0 0 .974-2.177 2.937 2.937 0 0 0-2.934-2.934h-5.6Zm3.2 1.067h1.334a1.867 1.867 0 0 1 0 3.733H6.933V3.2Zm0 4.8h1.334a2.4 2.4 0 0 1 0 4.8H6.933V8Z" /></svg>;
+    private static readonly RenderFragment ItalicIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8.526 2.122a.55.55 0 0 0-.12.011H6.933a.533.533 0 0 0 0 1.067h.768L6.69 12.8h-.824a.533.533 0 0 0 0 1.067h3.2a.533.533 0 0 0 0-1.067h-.768L9.309 3.2h.824a.533.533 0 0 0 0-1.067H8.663a.57.57 0 0 0-.137-.011Z" /></svg>;
+    private static readonly RenderFragment UnderlineIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3.733 2.133a.533.533 0 1 0 0 1.067V8c0 2.224 1.818 4.267 4.267 4.267S12.267 10.224 12.267 8V3.2a.533.533 0 0 0 0-1.067h-2.134a.533.533 0 0 0 0 1.067v5.772a1.94 1.94 0 0 1-1.92 2.218 2.02 2.02 0 0 1-2.346-2.123V3.2a.533.533 0 0 0 0-1.067H3.733Zm0 11.2a.533.533 0 1 0 0 1.067h8.534a.533.533 0 0 0 0-1.067H3.733Z" /></svg>;
+}
