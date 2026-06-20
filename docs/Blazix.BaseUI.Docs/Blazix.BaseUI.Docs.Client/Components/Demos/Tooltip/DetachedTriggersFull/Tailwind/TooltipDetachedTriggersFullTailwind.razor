@@ -1,0 +1,32 @@
+<TooltipProvider>
+    <div class="flex gap-1">
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Listen to audio preview")" aria-label="Listen to audio preview" class="@ButtonClasses">@HeadphonesIcon</TooltipTrigger>
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Set a timer")" aria-label="Set a timer" class="@ButtonClasses">@StopwatchIcon</TooltipTrigger>
+        <TooltipTrigger Handle="@demoTooltip" Payload="@("Delete: This action cannot be undone")" aria-label="Delete: This action cannot be undone" class="@ButtonClasses">@TrashIcon</TooltipTrigger>
+    </div>
+
+    <TooltipRoot Handle="@demoTooltip">
+        <ChildContentWithPayload Context="payloadContext">
+            <TooltipPortal>
+                <TooltipPositioner SideOffset="11">
+                    <TooltipPopup class="@PopupClasses">
+                        <TooltipArrow class="@ArrowClasses" />
+                        <TooltipViewport class="block max-w-52 overflow-hidden whitespace-nowrap">@payloadContext.Payload</TooltipViewport>
+                    </TooltipPopup>
+                </TooltipPositioner>
+            </TooltipPortal>
+        </ChildContentWithPayload>
+    </TooltipRoot>
+</TooltipProvider>
+
+@code {
+    private const string ButtonClasses = "box-border flex h-8 w-8 items-center justify-center border border-neutral-950 bg-white p-0 text-neutral-950 outline-0 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neutral-950 data-[popup-open]:bg-neutral-100 dark:border-white dark:bg-neutral-950 dark:text-white dark:hover:bg-neutral-800 dark:focus-visible:outline-white";
+    private const string PopupClasses = "relative flex flex-col border border-neutral-950 bg-white px-2 py-1 text-sm leading-5 text-neutral-950 shadow-[0.25rem_0.25rem_0_rgb(0_0_0_/_12%)] transition data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 dark:border-white dark:bg-neutral-950 dark:text-white dark:shadow-none";
+    private const string ArrowClasses = "block h-1.5 w-3 overflow-hidden";
+
+    private readonly TooltipHandle demoTooltip = TooltipHandleFactory.CreateHandle();
+
+    private static readonly RenderFragment HeadphonesIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" d="M1.5 11V7.5c0-2.5 2.5-6 6.5-6s6.5 3.5 6.5 6V11" /><path d="M12 7.5c1.381 0 2.5 1.119 2.5 2.5v2c0 1.381-1.119 2.5-2.5 2.5h-1.5v-7zm-8 0h1.5v7H4A2.5 2.5 0 0 1 1.5 12v-2A2.5 2.5 0 0 1 4 7.5Z" /></svg>;
+    private static readonly RenderFragment StopwatchIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="8" cy="8.5" r="6" /><path stroke-linecap="square" stroke-linejoin="round" d="M8 9.5v-5m0-2v-2m-2 0h4M12 4l1.5-1.5" /></svg>;
+    private static readonly RenderFragment TrashIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linejoin="round" aria-hidden="true"><path stroke-linecap="square" d="M2.5 4h11" /><path stroke-linecap="round" d="M6.5 4V3c0-.828.672-1.5 1.5-1.5S9.5 2.172 9.5 3v1" /><path stroke-linecap="square" d="m3.5 4 .871 9.142A1.5 1.5 0 0 0 5.864 14.5h4.272a1.5 1.5 0 0 0 1.493-1.358L12.5 4" /></svg>;
+}

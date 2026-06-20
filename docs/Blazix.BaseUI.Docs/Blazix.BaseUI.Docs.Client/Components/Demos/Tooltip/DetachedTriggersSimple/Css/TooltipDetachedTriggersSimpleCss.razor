@@ -1,0 +1,22 @@
+<TooltipProvider>
+    <TooltipTrigger Handle="@demoTooltip" aria-label="Delete" class="blx-tooltip-button">
+        @TrashIcon
+    </TooltipTrigger>
+
+    <TooltipRoot Handle="@demoTooltip">
+        <TooltipPortal>
+            <TooltipPositioner SideOffset="11">
+                <TooltipPopup class="blx-tooltip-popup">
+                    <TooltipArrow class="blx-tooltip-arrow" />
+                    Delete
+                </TooltipPopup>
+            </TooltipPositioner>
+        </TooltipPortal>
+    </TooltipRoot>
+</TooltipProvider>
+
+@code {
+    private readonly TooltipHandle demoTooltip = TooltipHandleFactory.CreateHandle();
+
+    private static readonly RenderFragment TrashIcon = @<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linejoin="round" aria-hidden="true"><path stroke-linecap="square" d="M2.5 4h11" /><path stroke-linecap="round" d="M6.5 4V3c0-.828.672-1.5 1.5-1.5S9.5 2.172 9.5 3v1" /><path stroke-linecap="square" d="m3.5 4 .871 9.142A1.5 1.5 0 0 0 5.864 14.5h4.272a1.5 1.5 0 0 0 1.493-1.358L12.5 4" /></svg>;
+}
