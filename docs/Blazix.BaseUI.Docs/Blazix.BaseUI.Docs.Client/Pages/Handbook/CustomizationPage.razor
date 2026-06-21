@@ -57,6 +57,8 @@
 @code {
     private const string CancelCode =
         """
+        @using Blazix.BaseUI.Tooltip
+
         <TooltipRoot OnOpenChange="HandleOpenChange">
             ...
         </TooltipRoot>
@@ -75,6 +77,8 @@
 
     private const string AllowPropagationCode =
         """
+        @using Blazix.BaseUI.Popover
+
         <PopoverRoot OnOpenChange="HandleOpenChange">
             ...
         </PopoverRoot>
