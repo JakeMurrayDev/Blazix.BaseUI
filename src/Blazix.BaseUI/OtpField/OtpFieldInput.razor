@@ -1,0 +1,202 @@
+@using Microsoft.AspNetCore.Components.Web
+
+@implements IDisposable
+
+<RenderElement TState="OtpFieldInputState"
+               Tag="@DefaultTag"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               UpdatesAttributeName="value"
+               UpdatesAttributeEventName="oninput"
+               @attributes="filteredAdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string DefaultTag = "input";
+
+    private int index = -1;
+    private bool hasRendered;
+    private OtpFieldInputState state;
+    private RenderElement<OtpFieldInputState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Dictionary<string, object>? filteredAdditionalAttributes;
+
+    private string SlotValue => OtpFieldUtilities.GetCharacterAt(RootContext?.Value ?? string.Empty, index);
+
+    private string? ExternalAriaLabel => AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-label");
+
+    private string? ExternalAriaLabelledBy => AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-labelledby");
+
+    private string? InheritedLabel => ExternalAriaLabelledBy ?? RootContext?.InputAriaLabelledBy;
+
+    [CascadingParameter]
+    private OtpFieldRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing the rendered input element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<OtpFieldInputState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on state.
+    /// </summary>
+    [Parameter]
+    public Func<OtpFieldInputState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on state.
+    /// </summary>
+    [Parameter]
+    public Func<OtpFieldInputState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines child content for custom render scenarios.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional attributes applied to the input element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the input element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+            throw new InvalidOperationException("Base UI: OtpFieldRootContext is missing. OtpField parts must be placed within <OtpFieldRoot>.");
+
+        index = RootContext.RegisterInput(this);
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        state = OtpFieldInputState.FromRoot(RootContext?.State ?? OtpFieldRootState.Default, index, SlotValue);
+        BuildFilteredAdditionalAttributes();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            hasRendered = true;
+
+        RootContext?.SetInputElement(index, Element);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (hasRendered)
+            RootContext?.SetInputElement(index, null);
+
+        RootContext?.UnregisterInput(this);
+    }
+
+    private void BuildFilteredAdditionalAttributes()
+    {
+        if (AdditionalAttributes is null)
+        {
+            filteredAdditionalAttributes = null;
+            return;
+        }
+
+        var attrs = new Dictionary<string, object>(AdditionalAttributes, StringComparer.OrdinalIgnoreCase);
+        if (index == 0)
+            attrs.Remove("aria-label");
+
+        filteredAdditionalAttributes = attrs;
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+        var context = RootContext;
+
+        attrs["data-blazix-otp-input"] = true;
+        if (index == 0 && ExternalAriaLabel is not null)
+            attrs["data-blazix-otp-first-aria-label-warning"] = true;
+
+        if (!string.IsNullOrEmpty(context?.GetInputId(index)))
+            attrs["id"] = context!.GetInputId(index)!;
+
+        attrs["value"] = SlotValue;
+        attrs["type"] = AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "type") ?? (context?.Mask == true ? "password" : "text");
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "inputmode") && !string.IsNullOrEmpty(context?.InputMode))
+            attrs["inputmode"] = context.InputMode!;
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "autocomplete"))
+        {
+            if (index == 0 && !string.IsNullOrEmpty(context?.AutoComplete))
+                attrs["autocomplete"] = context.AutoComplete!;
+            else if (index != 0)
+                attrs["autocomplete"] = "off";
+        }
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "autocorrect"))
+            attrs["autocorrect"] = "off";
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "spellcheck"))
+            attrs["spellcheck"] = "false";
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "enterkeyhint"))
+            attrs["enterkeyhint"] = index == (context?.Length ?? 0) - 1 ? "done" : "next";
+
+        if (index == 0 && !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "maxlength"))
+            attrs["maxlength"] = context?.Length ?? 0;
+
+        attrs["tabindex"] = context?.ActiveIndex == index ? 0 : -1;
+
+        if (context?.Disabled == true)
+            attrs["disabled"] = true;
+
+        if (!string.IsNullOrEmpty(context?.Form))
+            attrs["form"] = context.Form!;
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "pattern") && !string.IsNullOrEmpty(context?.Pattern))
+            attrs["pattern"] = context.Pattern!;
+
+        if (context?.ReadOnly == true)
+            attrs["readonly"] = true;
+
+        if (context?.Required == true)
+            attrs["required"] = true;
+
+        var ariaLabel = index == 0 ? null : ExternalAriaLabel;
+        if (string.IsNullOrEmpty(ariaLabel) && !string.IsNullOrEmpty(InheritedLabel))
+            attrs["aria-labelledby"] = InheritedLabel!;
+        else if (!string.IsNullOrEmpty(ariaLabel))
+            attrs["aria-label"] = ariaLabel!;
+
+        if (context?.Disabled != true && context?.Invalid == true)
+            attrs["aria-invalid"] = "true";
+
+        attrs["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInputAsync);
+
+        OtpFieldAttributeUtilities.AddInputStateAttributes(attrs, state);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleInputAsync(ChangeEventArgs e)
+    {
+        if (RootContext is null)
+            return;
+
+        await RootContext.CommitInputAsync(index, e.Value?.ToString());
+    }
+}

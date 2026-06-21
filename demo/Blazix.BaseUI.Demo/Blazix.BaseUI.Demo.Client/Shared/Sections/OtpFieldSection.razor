@@ -1,0 +1,192 @@
+@using Blazix.BaseUI.OtpField
+@using Blazix.BaseUI.Separator
+
+<ComponentShowcase ComponentName="OtpField"
+                   Description="A one-time password field with separate accessible character inputs and a hidden native form value."
+                   BaseRoute="/otp-field"
+                   IsWasmMode="IsWasmMode">
+
+    <DemoSection Title="Basic OTP Field"
+                 Description="Six numeric slots with native one-time-code autocomplete on the first input.">
+        <div class="demo-otp-field-stack">
+            <label for="demo-otp-basic" class="demo-otp-field-label">Verification code</label>
+            <OtpFieldRoot Id="demo-otp-basic"
+                          Length="6"
+                          Name="verification-code"
+                          OnValueChange="args => basicValue = args.Value"
+                          ClassValue="_ => OtpRootClass">
+                @RenderInputs("basic", 6)
+            </OtpFieldRoot>
+            <span class="demo-otp-field-value">Value: @basicValue</span>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Masked OTP Field"
+                 Description="Slots render as password inputs while preserving the same value normalization.">
+        <div class="demo-otp-field-stack">
+            <label for="demo-otp-masked" class="demo-otp-field-label">Secure code</label>
+            <OtpFieldRoot Id="demo-otp-masked"
+                          Length="6"
+                          Mask="true"
+                          DefaultValue="123"
+                          ClassValue="_ => OtpRootClass">
+                @RenderInputs("masked", 6)
+            </OtpFieldRoot>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Controlled Alphanumeric Code"
+                 Description="The value is controlled by the page and accepts letters or digits.">
+        <div class="demo-otp-field-stack">
+            <label for="demo-otp-controlled" class="demo-otp-field-label">Recovery code</label>
+            <OtpFieldRoot Id="demo-otp-controlled"
+                          Length="8"
+                          Value="@controlledValue"
+                          ValueChanged="value => controlledValue = value"
+                          ValidationType="OtpFieldValidationType.Alphanumeric"
+                          ClassValue="_ => OtpRootClass">
+                @RenderInputs("controlled", 8, splitAt: 3)
+            </OtpFieldRoot>
+            <div class="demo-otp-field-actions">
+                <span class="demo-otp-field-value">Value: @controlledValue</span>
+                <button type="button" class="demo-otp-field-button" @onclick="FillControlledValue">Fill</button>
+                <button type="button" class="demo-otp-field-button" @onclick="ClearControlledValue">Clear</button>
+            </div>
+        </div>
+    </DemoSection>
+
+    <DemoSection Title="Disabled and Read-only"
+                 Description="Disabled slots ignore interaction; read-only slots stay focusable but do not change.">
+        <div class="demo-otp-field-grid">
+            <div class="demo-otp-field-stack">
+                <span class="demo-otp-field-label">Disabled</span>
+                <OtpFieldRoot Length="4"
+                              DefaultValue="2468"
+                              Disabled="true"
+                              ClassValue="_ => OtpRootClass">
+                    @RenderInputs("disabled", 4)
+                </OtpFieldRoot>
+            </div>
+            <div class="demo-otp-field-stack">
+                <span class="demo-otp-field-label">Read-only</span>
+                <OtpFieldRoot Length="4"
+                              DefaultValue="1357"
+                              ReadOnly="true"
+                              ClassValue="_ => OtpRootClass">
+                    @RenderInputs("readonly", 4)
+                </OtpFieldRoot>
+            </div>
+        </div>
+    </DemoSection>
+</ComponentShowcase>
+
+<style>
+    .demo-otp-field-stack {
+        display: grid;
+        gap: 0.625rem;
+        justify-items: start;
+    }
+
+    .demo-otp-field-grid {
+        display: grid;
+        gap: 1.5rem;
+    }
+
+    @@media (min-width: 720px) {
+        .demo-otp-field-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .demo-otp-field-root {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .demo-otp-field-input {
+        width: 2.5rem;
+        height: 2.75rem;
+        border: 1px solid #9ca3af;
+        border-radius: 0.375rem;
+        background: #ffffff;
+        color: #111827;
+        text-align: center;
+        font-size: 1.125rem;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        outline: 0;
+    }
+
+    .demo-otp-field-input:focus {
+        border-color: #111827;
+        box-shadow: 0 0 0 3px rgb(17 24 39 / 14%);
+    }
+
+    .demo-otp-field-input[data-disabled] {
+        opacity: 0.45;
+    }
+
+    .demo-otp-field-label,
+    .demo-otp-field-value {
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    .demo-otp-field-separator {
+        width: 1px;
+        height: 1.5rem;
+        background: #d1d5db;
+    }
+
+    .demo-otp-field-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .demo-otp-field-button {
+        border: 1px solid #9ca3af;
+        border-radius: 0.375rem;
+        background: #ffffff;
+        padding: 0.375rem 0.625rem;
+        color: #111827;
+        font-size: 0.875rem;
+    }
+</style>
+
+@code {
+    private const string OtpRootClass = "demo-otp-field-root";
+
+    private string basicValue = string.Empty;
+    private string controlledValue = "AB12";
+
+    [Parameter]
+    public bool IsWasmMode { get; set; }
+
+    private static RenderFragment RenderInputs(string idPrefix, int length, int? splitAt = null) => __builder =>
+    {
+        for (var index = 0; index < length; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="demo-otp-field-input"
+                           aria-label="@(slot == 0 ? string.Empty : $"Character {slot + 1} of {length}")"
+                           data-demo-slot="@($"{idPrefix}-{slot}")" />
+            if (splitAt.HasValue && slot == splitAt.Value)
+            {
+                <Separator Orientation="Orientation.Vertical" class="demo-otp-field-separator" />
+            }
+        }
+    };
+
+    private void FillControlledValue()
+    {
+        controlledValue = "AB12CD34";
+    }
+
+    private void ClearControlledValue()
+    {
+        controlledValue = string.Empty;
+    }
+}

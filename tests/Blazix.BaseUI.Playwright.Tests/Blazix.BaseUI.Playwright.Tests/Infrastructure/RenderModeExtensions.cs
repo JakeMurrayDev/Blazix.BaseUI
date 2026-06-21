@@ -1210,6 +1210,72 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithOtpDefaultValue(string value)
+    {
+        queryParams["defaultValue"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpValue(string value)
+    {
+        queryParams["value"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpLength(int value)
+    {
+        queryParams["length"] = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpValidationType(string value)
+    {
+        queryParams["validationType"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpName(string value)
+    {
+        queryParams["name"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpShowForm(bool value)
+    {
+        queryParams["showForm"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpAutoSubmit(bool value)
+    {
+        queryParams["autoSubmit"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpDisabled(bool value)
+    {
+        queryParams["disabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpReadOnly(bool value)
+    {
+        queryParams["readOnly"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpRequired(bool value)
+    {
+        queryParams["required"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithOtpMask(bool value)
+    {
+        queryParams["mask"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public string Build()
     {
         var sb = new StringBuilder();

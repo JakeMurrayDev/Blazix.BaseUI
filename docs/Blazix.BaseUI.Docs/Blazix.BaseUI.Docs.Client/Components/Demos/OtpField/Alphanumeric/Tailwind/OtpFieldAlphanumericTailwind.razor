@@ -1,0 +1,20 @@
+<div class="flex w-full max-w-80 flex-col items-start gap-1">
+    <label for="otp-alphanumeric" class="text-sm font-bold text-neutral-950 dark:text-white">
+        Recovery code
+    </label>
+    <OtpFieldRoot Id="otp-alphanumeric"
+                  Length="6"
+                  ValidationType="OtpFieldValidationType.Alphanumeric"
+                  aria-describedby="otp-alphanumeric-description"
+                  class="flex w-full gap-2">
+        @for (var index = 0; index < 6; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="m-0 h-10 w-10 rounded-none border border-neutral-950 bg-white text-center text-base font-normal text-neutral-950 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:focus:outline-white"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-alphanumeric-description" class="m-0 text-sm text-neutral-600 dark:text-neutral-400">
+        Accept letters and numbers for backup codes such as <code class="font-mono">A7C9XZ</code>.
+    </p>
+</div>

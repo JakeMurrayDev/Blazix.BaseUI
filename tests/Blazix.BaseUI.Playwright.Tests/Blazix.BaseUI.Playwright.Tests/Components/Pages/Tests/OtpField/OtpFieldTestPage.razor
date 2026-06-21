@@ -1,0 +1,235 @@
+@page "/tests/otpfield/server"
+@using Blazix.BaseUI.OtpField
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>OtpField Test Page (Server)</PageTitle>
+
+<style>
+    .otp-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .otp-slot {
+        width: 40px;
+        height: 44px;
+        text-align: center;
+        border: 1px solid #777;
+        border-radius: 4px;
+        font-size: 20px;
+    }
+
+    .otp-slot[data-focused] {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+    }
+
+    .otp-slot[data-disabled] {
+        opacity: 0.45;
+    }
+</style>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="before-button" type="button">Before</button>
+
+    @if (ShowForm)
+    {
+        <form data-testid="test-form" @onsubmit="HandleFormSubmit" @onsubmit:preventDefault>
+            @RenderOtpField()
+            <button data-testid="submit-button" type="submit">Submit</button>
+        </form>
+    }
+    else
+    {
+        @RenderOtpField()
+    }
+
+    <button data-testid="after-button" type="button">After</button>
+
+    <div data-testid="state-display">
+        <div>Current Value: <span data-testid="current-value">@currentValue</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Change Reason: <span data-testid="last-reason">@lastChangeReason</span></div>
+        <div>Invalid Count: <span data-testid="invalid-count">@invalidCount</span></div>
+        <div>Last Invalid Value: <span data-testid="last-invalid-value">@lastInvalidValue</span></div>
+        <div>Complete Count: <span data-testid="complete-count">@completeCount</span></div>
+        <div>Last Complete Reason: <span data-testid="last-complete-reason">@lastCompleteReason</span></div>
+        <div>Submitted: <span data-testid="form-submitted">@formSubmitted.ToString().ToLowerInvariant()</span></div>
+        <div>Form Data: <span data-testid="form-data">@formDataDisplay</span></div>
+    </div>
+
+    <div>
+        <button data-testid="set-value-2468" type="button" @onclick='() => SetValue("2468")'>Set Value 2468</button>
+        <button data-testid="toggle-disabled" type="button" @onclick="ToggleDisabled">Toggle Disabled</button>
+        <button data-testid="toggle-readonly" type="button" @onclick="ToggleReadOnly">Toggle ReadOnly</button>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "value")]
+    public string? ControlledValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "length")]
+    public int? QueryLength { get; set; }
+
+    [SupplyParameterFromQuery(Name = "validationType")]
+    public string? ValidationType { get; set; }
+
+    [SupplyParameterFromQuery(Name = "name")]
+    public string? FieldName { get; set; }
+
+    [SupplyParameterFromQuery(Name = "showForm")]
+    public bool? QueryShowForm { get; set; }
+
+    [SupplyParameterFromQuery(Name = "autoSubmit")]
+    public bool? QueryAutoSubmit { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool? QueryDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnly")]
+    public bool? QueryReadOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "required")]
+    public bool? QueryRequired { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mask")]
+    public bool? QueryMask { get; set; }
+
+    private int Length => QueryLength ?? 6;
+    private bool ShowForm => QueryShowForm ?? false;
+    private bool AutoSubmit => QueryAutoSubmit ?? false;
+    private bool IsControlled => ControlledValue is not null;
+    private bool IsDisabled { get; set; }
+    private bool IsReadOnly { get; set; }
+    private OtpFieldValidationType ResolvedValidationType => ValidationType?.ToLowerInvariant() switch
+    {
+        "alpha" => OtpFieldValidationType.Alpha,
+        "alphanumeric" => OtpFieldValidationType.Alphanumeric,
+        "none" => OtpFieldValidationType.None,
+        _ => OtpFieldValidationType.Numeric
+    };
+
+    private string currentValue = string.Empty;
+    private int changeCount;
+    private string lastChangeReason = string.Empty;
+    private int invalidCount;
+    private string lastInvalidValue = string.Empty;
+    private int completeCount;
+    private string lastCompleteReason = string.Empty;
+    private bool formSubmitted;
+    private string formDataDisplay = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        IsDisabled = QueryDisabled ?? false;
+        IsReadOnly = QueryReadOnly ?? false;
+        currentValue = ControlledValue ?? DefaultValue ?? string.Empty;
+    }
+
+    private RenderFragment RenderOtpField() => __builder =>
+    {
+        if (IsControlled)
+        {
+            <OtpFieldRoot
+                Id="otp-code"
+                Length="@Length"
+                Value="@currentValue"
+                ValueChanged="HandleBoundValueChanged"
+                ValidationType="@ResolvedValidationType"
+                Name="@FieldName"
+                AutoSubmit="@AutoSubmit"
+                Disabled="@IsDisabled"
+                ReadOnly="@IsReadOnly"
+                Required="@(QueryRequired ?? false)"
+                Mask="@(QueryMask ?? false)"
+                OnValueChange="HandleValueChange"
+                OnValueInvalid="HandleValueInvalid"
+                OnValueComplete="HandleValueComplete"
+                data-testid="otp-root">
+                @RenderInputs()
+            </OtpFieldRoot>
+        }
+        else
+        {
+            <OtpFieldRoot
+                Id="otp-code"
+                Length="@Length"
+                DefaultValue="@DefaultValue"
+                ValidationType="@ResolvedValidationType"
+                Name="@FieldName"
+                AutoSubmit="@AutoSubmit"
+                Disabled="@IsDisabled"
+                ReadOnly="@IsReadOnly"
+                Required="@(QueryRequired ?? false)"
+                Mask="@(QueryMask ?? false)"
+                OnValueChange="HandleValueChange"
+                OnValueInvalid="HandleValueInvalid"
+                OnValueComplete="HandleValueComplete"
+                data-testid="otp-root">
+                @RenderInputs()
+            </OtpFieldRoot>
+        }
+    };
+
+    private RenderFragment RenderInputs() => __builder =>
+    {
+        for (var index = 0; index < Length; index++)
+        {
+            var slotIndex = index;
+            <OtpFieldInput
+                class="otp-slot"
+                data-testid="@($"otp-input-{slotIndex}")"
+                aria-label="@(slotIndex == 0 ? string.Empty : $"Character {slotIndex + 1} of {Length}")" />
+        }
+    };
+
+    private void HandleBoundValueChanged(string value)
+    {
+        currentValue = value;
+    }
+
+    private void HandleValueChange(OtpFieldValueChangeEventArgs args)
+    {
+        currentValue = args.Value;
+        changeCount++;
+        lastChangeReason = args.Reason.ToString();
+    }
+
+    private void HandleValueInvalid(OtpFieldValueInvalidEventArgs args)
+    {
+        invalidCount++;
+        lastInvalidValue = args.Value;
+    }
+
+    private void HandleValueComplete(OtpFieldValueCompleteEventArgs args)
+    {
+        completeCount++;
+        lastCompleteReason = args.Reason.ToString();
+    }
+
+    private void HandleFormSubmit()
+    {
+        formSubmitted = true;
+        formDataDisplay = $"{FieldName ?? "otp"}={currentValue}";
+    }
+
+    private void SetValue(string value)
+    {
+        currentValue = value;
+    }
+
+    private void ToggleDisabled()
+    {
+        IsDisabled = !IsDisabled;
+    }
+
+    private void ToggleReadOnly()
+    {
+        IsReadOnly = !IsReadOnly;
+    }
+}

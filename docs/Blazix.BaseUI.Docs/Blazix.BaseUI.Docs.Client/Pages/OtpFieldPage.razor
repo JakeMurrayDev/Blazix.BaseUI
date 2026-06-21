@@ -1,0 +1,176 @@
+@page "/components/otp-field"
+
+<PageTitle>OTP Field · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="OTP Field"
+               Subtitle="A one-time password field that renders a group of accessible character slots backed by a hidden native form input."
+               MarkdownHref="/components/otp-field.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <OtpFieldHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage Guidelines" />
+<ul class="mb-3 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Provide exactly one <code class="@LiquidGlassClasses.CodeInline">OtpFieldInput</code> for each slot in <code class="@LiquidGlassClasses.CodeInline">Length</code>.</li>
+    <li>Use a native <code class="@LiquidGlassClasses.CodeInline">label</code> or <code class="@LiquidGlassClasses.CodeInline">FieldLabel</code>; the first slot intentionally ignores its own <code class="@LiquidGlassClasses.CodeInline">aria-label</code>.</li>
+    <li>Use <code class="@LiquidGlassClasses.CodeInline">DefaultValue</code> for uncontrolled fields and <code class="@LiquidGlassClasses.CodeInline">Value</code> with <code class="@LiquidGlassClasses.CodeInline">ValueChanged</code> for controlled fields.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the OTP field namespace and render the root with one input per slot:
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Alphanumeric verification codes" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">ValidationType="OtpFieldValidationType.Alphanumeric"</code> for recovery, backup, or invite codes that mix letters and numbers.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AlphanumericVariants">
+        <OtpFieldAlphanumericCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Grouped layouts" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap subsets of inputs in your own layout elements and place a <code class="@LiquidGlassClasses.CodeInline">Separator</code> between them when the code should read as smaller chunks such as <code class="@LiquidGlassClasses.CodeInline">123-456</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@GroupedVariants">
+        <OtpFieldGroupedCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Placeholder hints" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">OtpFieldInput</code> is a real input, so native <code class="@LiquidGlassClasses.CodeInline">placeholder</code> attributes and CSS work as usual. This example keeps placeholder hints visible until the active slot receives focus.
+</p>
+<div class="mb-8">
+    <Demo Variants="@FocusedPlaceholderVariants">
+        <OtpFieldFocusedPlaceholderCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Custom normalization" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use <code class="@LiquidGlassClasses.CodeInline">NormalizeValue</code> to normalize accepted values before state updates, such as converting alphanumeric codes to uppercase. It runs after <code class="@LiquidGlassClasses.CodeInline">ValidationType</code> filtering, and the result is filtered against <code class="@LiquidGlassClasses.CodeInline">ValidationType</code> again. Pair custom rules with <code class="@LiquidGlassClasses.CodeInline">OnValueInvalid</code> to react to rejected characters.
+</p>
+<div class="mb-8">
+    <Demo Variants="@CustomNormalizeVariants">
+        <OtpFieldCustomNormalizeCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Masked entry" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">Mask</code> when the code should be obscured while it is being typed.
+</p>
+<div class="mb-8">
+    <Demo Variants="@PasswordVariants">
+        <OtpFieldPasswordCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="API Reference" />
+@foreach (var part in OtpFieldApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.OtpField
+
+        <label for="verification-code">Verification code</label>
+        <OtpFieldRoot Id="verification-code" Length="6" Name="code">
+            <OtpFieldInput aria-label="" />
+            <OtpFieldInput aria-label="Character 2 of 6" />
+            <OtpFieldInput aria-label="Character 3 of 6" />
+            <OtpFieldInput aria-label="Character 4 of 6" />
+            <OtpFieldInput aria-label="Character 5 of 6" />
+            <OtpFieldInput aria-label="Character 6 of 6" />
+        </OtpFieldRoot>
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Hero.Css.OtpFieldHeroCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Hero.Tailwind.OtpFieldHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> AlphanumericVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Alphanumeric.Css.OtpFieldAlphanumericCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Alphanumeric.Tailwind.OtpFieldAlphanumericTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> GroupedVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Grouped.Css.OtpFieldGroupedCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Grouped.Tailwind.OtpFieldGroupedTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> FocusedPlaceholderVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.FocusedPlaceholder.Css.OtpFieldFocusedPlaceholderCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.FocusedPlaceholder.Tailwind.OtpFieldFocusedPlaceholderTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> CustomNormalizeVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.CustomNormalize.Css.OtpFieldCustomNormalizeCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> PasswordVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Password.Css.OtpFieldPasswordCss.razor"),
+            new DemoFile("otp-field.css", "css", "wwwroot.demos.otp-field.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("OtpField.razor", "xml", "Components.Demos.OtpField.Password.Tailwind.OtpFieldPasswordTailwind.razor"),
+        ]),
+    ];
+}

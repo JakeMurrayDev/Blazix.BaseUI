@@ -1,0 +1,940 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.DirectionProvider
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using FormValidationMode = Blazix.BaseUI.Form.ValidationMode
+
+@implements IAsyncDisposable
+@implements IFieldStateSubscriber
+
+@inject IJSRuntime JSRuntime
+@inject ILogger<OtpFieldRoot> Logger
+
+<CascadingValue Value="context" IsFixed="true">
+    <RenderElement TState="OtpFieldRootState"
+                   Tag="@DefaultTag"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+    @HiddenInputContent
+</CascadingValue>
+
+@code {
+    private const string DefaultTag = "div";
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-otp-field.min.js";
+    private const string HiddenInputStyleWithName = "position:absolute;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);";
+    private const string HiddenInputStyleWithoutName = "position:fixed;top:0;left:0;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+    private readonly List<OtpFieldInput> inputs = [];
+    private readonly Dictionary<int, ElementReference> inputElements = new();
+    private readonly string fieldControlSource = Guid.NewGuid().ToIdString();
+
+    private string? defaultId;
+    private string currentValue = string.Empty;
+    private string previousNormalizedValue = string.Empty;
+    private int focusedIndex;
+    private int? warnedInvalidLength;
+    private bool focused;
+    private bool hasRendered;
+    private bool isValueParameterSupplied;
+    private bool fieldControlRegistered;
+    private string? registeredControlId;
+    private string? registeredName;
+    private PendingFocus? pendingFocus;
+    private PendingComplete? pendingComplete;
+    private ElementReference hiddenInputElement;
+    private InputCountWarning? warnedInputCount;
+    private DotNetObjectReference<OtpFieldRoot>? dotNetRef;
+    private RenderElement<OtpFieldRootState>? renderElementReference;
+    private OtpFieldRootContext context = null!;
+    private OtpFieldRootState state = OtpFieldRootState.Default;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private bool IsControlled => isValueParameterSupplied;
+
+    private bool HasValidLength => Length > 0;
+
+    private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
+
+    private bool ResolvedInvalid => FieldContext?.Invalid == true || FieldContext?.State.Valid == false;
+
+    private string? ResolvedName => FieldContext?.Name ?? Name;
+
+    private string ResolvedFirstInputId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    private string? ExternalAriaLabelledBy => AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-labelledby");
+
+    private string? InputAriaLabelledBy => ExternalAriaLabelledBy is null ? ResolvedAriaLabelledBy : null;
+
+    private string? ResolvedAriaLabelledBy => ExternalAriaLabelledBy ?? LabelableContext?.LabelId;
+
+    private string? ResolvedAriaDescribedBy => AttributeUtilities.CombineIdRefs(
+        AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+        LabelableContext?.GetAriaDescribedBy());
+
+    private string? Pattern => OtpFieldUtilities.GetSlotPattern(ValidationType);
+
+    private string? HiddenInputPattern => OtpFieldUtilities.GetRootPattern(ValidationType, Length);
+
+    private string? ResolvedInputMode => InputMode ?? OtpFieldUtilities.GetDefaultInputMode(ValidationType);
+
+    private int ActiveIndex => focused
+        ? Math.Min(focusedIndex, Math.Max(Length - 1, 0))
+        : Math.Min(OtpFieldUtilities.GetCharacterLength(CurrentValue), Math.Max(Length - 1, 0));
+
+    private string CurrentValue => IsControlled
+        ? OtpFieldUtilities.Normalize(Value, Length, ValidationType, NormalizeValue)
+        : currentValue;
+
+    private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
+
+    private Direction EffectiveDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
+    private RenderFragment HiddenInputContent => builder =>
+    {
+        if (!HasValidLength)
+            return;
+
+        builder.OpenElement(0, "input");
+        builder.AddAttribute(1, "type", "text");
+        builder.AddAttribute(2, "id", ResolvedName is null ? $"{ResolvedFirstInputId}-hidden-input" : null);
+        builder.AddAttribute(3, "form", Form);
+        builder.AddAttribute(4, "name", ResolvedName);
+        builder.AddAttribute(5, "value", CurrentValue);
+        builder.AddAttribute(6, "autocomplete", AutoComplete);
+        builder.AddAttribute(7, "inputmode", ResolvedInputMode);
+        builder.AddAttribute(8, "minlength", Length);
+        builder.AddAttribute(9, "maxlength", Length);
+        builder.AddAttribute(10, "pattern", HiddenInputPattern);
+        builder.AddAttribute(11, "disabled", ResolvedDisabled);
+        builder.AddAttribute(12, "readonly", ReadOnly);
+        builder.AddAttribute(13, "required", Required);
+        builder.AddAttribute(14, "aria-hidden", "true");
+        builder.AddAttribute(15, "tabindex", -1);
+        builder.AddAttribute(16, "style", ResolvedName is not null ? HiddenInputStyleWithName : HiddenInputStyleWithoutName);
+        builder.AddAttribute(17, "data-blazix-otp-hidden-input", true);
+        builder.AddAttribute(18, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleHiddenInputFocusAsync));
+        builder.AddAttribute(19, "oninput", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleHiddenInputAsync));
+        builder.AddAttribute(20, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleHiddenInputAsync));
+        builder.AddElementReferenceCapture(21, element => hiddenInputElement = element);
+        builder.CloseElement();
+    };
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private FormContext? FormContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the id of the first input element.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Gets or sets the input autocomplete attribute applied to the first slot and hidden validation input.
+    /// </summary>
+    [Parameter]
+    public string? AutoComplete { get; set; } = "one-time-code";
+
+    /// <summary>
+    /// Gets or sets the external form id associated with the hidden validation input.
+    /// </summary>
+    [Parameter]
+    public string? Form { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of OTP input slots.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public int Length { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the owning form should be submitted when the OTP becomes complete.
+    /// </summary>
+    [Parameter]
+    public bool AutoSubmit { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether slot inputs mask entered characters.
+    /// </summary>
+    [Parameter]
+    public bool Mask { get; set; }
+
+    /// <summary>
+    /// Gets or sets the virtual keyboard hint applied to slot inputs and the hidden input.
+    /// </summary>
+    [Parameter]
+    public string? InputMode { get; set; }
+
+    /// <summary>
+    /// Gets or sets the validation type applied to the OTP value.
+    /// </summary>
+    [Parameter]
+    public OtpFieldValidationType ValidationType { get; set; } = OtpFieldValidationType.Numeric;
+
+    /// <summary>
+    /// Gets or sets a custom value normalizer that runs after whitespace stripping and built-in validation.
+    /// </summary>
+    [Parameter]
+    public Func<string, string>? NormalizeValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether a value is required before form submission.
+    /// </summary>
+    [Parameter]
+    public bool Required { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the component should ignore user interaction.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the user should be unable to change the field value.
+    /// </summary>
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    /// <summary>
+    /// Gets or sets the field name used when the hidden validation input is submitted with a form.
+    /// </summary>
+    [Parameter]
+    public string? Name { get; set; }
+
+    /// <summary>
+    /// Gets or sets the controlled OTP value.
+    /// </summary>
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback invoked when the value changes via two-way binding.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>
+    /// Gets or sets the uncontrolled OTP value when the component is initially rendered.
+    /// </summary>
+    [Parameter]
+    public string? DefaultValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback fired when the OTP value changes.
+    /// </summary>
+    [Parameter]
+    public EventCallback<OtpFieldValueChangeEventArgs> OnValueChange { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback fired when entered text is rejected by validation or normalization.
+    /// </summary>
+    [Parameter]
+    public EventCallback<OtpFieldValueInvalidEventArgs> OnValueInvalid { get; set; }
+
+    /// <summary>
+    /// Gets or sets the callback fired when the OTP value becomes complete.
+    /// </summary>
+    [Parameter]
+    public EventCallback<OtpFieldValueCompleteEventArgs> OnValueComplete { get; set; }
+
+    /// <summary>
+    /// Allows replacing the rendered root element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<OtpFieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns a CSS class based on state.
+    /// </summary>
+    [Parameter]
+    public Func<OtpFieldRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that returns an inline style based on state.
+    /// </summary>
+    [Parameter]
+    public Func<OtpFieldRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child components.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional attributes applied to the root element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the root element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="OtpFieldRoot"/> class.
+    /// </summary>
+    public OtpFieldRoot()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        isValueParameterSupplied = parameters.TryGetValue<string?>(nameof(Value), out _);
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        currentValue = OtpFieldUtilities.Normalize(DefaultValue, Length, ValidationType, NormalizeValue);
+        previousNormalizedValue = CurrentValue;
+        focusedIndex = Math.Min(OtpFieldUtilities.GetCharacterLength(CurrentValue), Math.Max(Length - 1, 0));
+        context = new OtpFieldRootContext(RegisterInput, UnregisterInput, SetInputElement, CommitInputFromComponentAsync);
+
+        FieldContext?.Validation.SetInitialValue(CurrentValue);
+        FieldContext?.SetFilled(OtpFieldUtilities.GetCharacterLength(CurrentValue) > 0);
+        FieldContext?.RegisterFocusHandlerFunc(FocusFirstInputAsync);
+        FieldContext?.SubscribeFunc(this);
+
+        UpdateLabelableControlId();
+        RegisterFieldControl();
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (IsControlled)
+            currentValue = OtpFieldUtilities.Normalize(Value, Length, ValidationType, NormalizeValue);
+
+        UpdateLabelableControlId();
+        RegisterFieldControl();
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        previousNormalizedValue = CurrentValue;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasRendered = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+        }
+
+        if (Element.HasValue && dotNetRef is not null)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                if (firstRender)
+                {
+                    await module.InvokeVoidAsync("initialize", Element.Value, hiddenInputElement, dotNetRef, CreateBrowserConfig());
+                }
+                else
+                {
+                    await module.InvokeVoidAsync("update", Element.Value, hiddenInputElement, CreateBrowserConfig());
+                }
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        WarnAboutInputConfiguration();
+        ResolvePendingEffects();
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        LabelableContext?.SetControlId(null);
+        if (fieldControlRegistered)
+            FieldContext?.RegisterFieldControl(fieldControlSource, null);
+
+        FieldContext?.UnsubscribeFunc(this);
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                if (Element.HasValue)
+                    await module.InvokeVoidAsync("dispose", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <inheritdoc />
+    public void NotifyStateChanged()
+    {
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Handles a slot input event from Blazor or JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public Task<OtpFieldCommitResult> HandleSlotInputAsync(int index, string? rawValue) =>
+        CommitSlotInputAsync(index, rawValue ?? string.Empty, OtpFieldChangeReason.InputChange);
+
+    /// <summary>
+    /// Handles a slot paste event from JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public Task<OtpFieldCommitResult> HandleSlotPasteAsync(int index, string? rawValue) =>
+        CommitSlotPasteAsync(index, rawValue ?? string.Empty);
+
+    /// <summary>
+    /// Handles a slot keydown event from JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public Task<OtpFieldCommitResult> HandleSlotKeyDownAsync(int index, OtpFieldKeyDownDetails details) =>
+        CommitSlotKeyDownAsync(index, details);
+
+    /// <summary>
+    /// Handles a hidden validation input event from Blazor or JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public Task<OtpFieldCommitResult> HandleHiddenInputChangeAsync(string? rawValue) =>
+        CommitHiddenInputAsync(rawValue ?? string.Empty);
+
+    /// <summary>
+    /// Handles a slot focus event from JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public Task<int?> HandleSlotFocusAsync(int index)
+    {
+        var characterLength = OtpFieldUtilities.GetCharacterLength(CurrentValue);
+        if (index > characterLength)
+        {
+            return Task.FromResult<int?>(Math.Min(characterLength, Math.Max(Length - 1, 0)));
+        }
+
+        focusedIndex = index;
+        focused = true;
+        FieldContext?.SetFocused(true);
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+        return Task.FromResult<int?>(index);
+    }
+
+    /// <summary>
+    /// Handles focus leaving the OTP field from JavaScript.
+    /// </summary>
+    [JSInvokable]
+    public async Task HandleRootBlurAsync()
+    {
+        focused = false;
+        FieldContext?.SetTouched(true);
+        FieldContext?.SetFocused(false);
+
+        if (FieldContext?.ValidationMode == FormValidationMode.OnBlur)
+            await CommitFieldValidationAsync(CurrentValue);
+
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    internal string GetSlotValue(int index) =>
+        OtpFieldUtilities.GetCharacterAt(CurrentValue, index);
+
+    internal Task<OtpFieldCommitResult> CommitInputFromComponentAsync(int index, string? rawValue) =>
+        CommitSlotInputAsync(index, rawValue ?? string.Empty, OtpFieldChangeReason.InputChange);
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (!AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "role"))
+            attrs["role"] = "group";
+
+        if (!string.IsNullOrEmpty(ResolvedAriaDescribedBy))
+            attrs["aria-describedby"] = ResolvedAriaDescribedBy;
+
+        if (!string.IsNullOrEmpty(ResolvedAriaLabelledBy))
+            attrs["aria-labelledby"] = ResolvedAriaLabelledBy;
+
+        OtpFieldAttributeUtilities.AddRootStateAttributes(attrs, state);
+
+        componentAttributes = attrs;
+    }
+
+    private void UpdateState()
+    {
+        var value = CurrentValue;
+        var characterLength = OtpFieldUtilities.GetCharacterLength(value);
+        state = new OtpFieldRootState(
+            Complete: characterLength == Length && Length > 0,
+            Disabled: ResolvedDisabled,
+            Valid: FieldState.Valid,
+            Touched: FieldState.Touched,
+            Dirty: FieldState.Dirty,
+            Filled: characterLength > 0,
+            Focused: focused || FieldState.Focused,
+            Length: Length,
+            ReadOnly: ReadOnly,
+            Required: Required,
+            Value: value);
+    }
+
+    private void UpdateContext()
+    {
+        context.Update(
+            activeIndex: ActiveIndex,
+            autoComplete: AutoComplete,
+            disabled: ResolvedDisabled,
+            form: Form,
+            inputMode: ResolvedInputMode,
+            inputAriaLabelledBy: InputAriaLabelledBy,
+            invalid: ResolvedInvalid,
+            length: Length,
+            mask: Mask,
+            pattern: Pattern,
+            readOnly: ReadOnly,
+            required: Required,
+            state: state,
+            value: CurrentValue,
+            getInputId: GetInputId);
+    }
+
+    private void ResolvePendingEffects()
+    {
+        var value = CurrentValue;
+
+        if (pendingComplete is { } complete && complete.Value == value)
+        {
+            pendingComplete = null;
+            _ = InvokeAsync(async () => await CompleteValueAsync(value, complete.Reason));
+        }
+        else if (OtpFieldUtilities.GetCharacterLength(value) != Length)
+        {
+            pendingComplete = null;
+        }
+
+        if (pendingFocus is { } focus && focus.Value == value)
+        {
+            pendingFocus = null;
+            _ = FocusInputAsync(focus.Index);
+        }
+        else if (pendingFocus is not null && pendingFocus.Value != value)
+        {
+            pendingFocus = null;
+        }
+    }
+
+    private async Task<OtpFieldCommitResult> CommitSlotInputAsync(
+        int index,
+        string rawValue,
+        OtpFieldChangeReason reason)
+    {
+        if (ResolvedDisabled || ReadOnly)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        var details = OtpFieldUtilities.NormalizeWithDetails(rawValue, Length, ValidationType, NormalizeValue);
+        if (details.DidRejectCharacters)
+            await ReportValueInvalidAsync(rawValue, OtpFieldInvalidReason.InputChange);
+
+        var normalizedInputLength = OtpFieldUtilities.GetCharacterLength(details.Value);
+        if (normalizedInputLength == 0)
+        {
+            if (rawValue.Length == 0)
+                return await SetValueAsync(OtpFieldUtilities.RemoveCharacter(CurrentValue, index), OtpFieldChangeReason.InputClear, index);
+
+            return new OtpFieldCommitResult(false, CurrentValue, index);
+        }
+
+        var nextValue = OtpFieldUtilities.ReplaceValue(CurrentValue, index, details.Value, Length, ValidationType, NormalizeValue);
+        var result = await SetValueAsync(nextValue, reason, Math.Min(index + normalizedInputLength, Math.Max(Length - 1, 0)));
+        return result;
+    }
+
+    private async Task<OtpFieldCommitResult> CommitSlotPasteAsync(int index, string rawValue)
+    {
+        if (ResolvedDisabled || ReadOnly)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        var details = OtpFieldUtilities.NormalizeWithDetails(rawValue, Length, ValidationType, NormalizeValue);
+        if (details.DidRejectCharacters)
+            await ReportValueInvalidAsync(rawValue, OtpFieldInvalidReason.InputPaste);
+
+        var normalizedInputLength = OtpFieldUtilities.GetCharacterLength(details.Value);
+        if (normalizedInputLength == 0)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        var nextValue = OtpFieldUtilities.ReplaceValue(CurrentValue, index, details.Value, Length, ValidationType, NormalizeValue);
+        return await SetValueAsync(nextValue, OtpFieldChangeReason.InputPaste, Math.Min(index + normalizedInputLength, Math.Max(Length - 1, 0)));
+    }
+
+    private async Task<OtpFieldCommitResult> CommitSlotKeyDownAsync(int index, OtpFieldKeyDownDetails details)
+    {
+        if (ResolvedDisabled)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        var firstIndex = 0;
+        var lastIndex = Math.Max(Length - 1, firstIndex);
+        var endTargetIndex = Math.Min(OtpFieldUtilities.GetCharacterLength(CurrentValue), lastIndex);
+        var hasBoundaryModifier = (details.CtrlKey || details.MetaKey) && !details.AltKey;
+        var isRtl = EffectiveDirection == Direction.Rtl;
+        var previousKey = isRtl ? "ArrowRight" : "ArrowLeft";
+        var nextKey = isRtl ? "ArrowLeft" : "ArrowRight";
+
+        if (details.Key == previousKey)
+            return await FocusAndReturnAsync(hasBoundaryModifier ? firstIndex : Math.Max(firstIndex, index - 1));
+
+        if (details.Key == nextKey)
+            return await FocusAndReturnAsync(hasBoundaryModifier ? endTargetIndex : Math.Min(lastIndex, index + 1));
+
+        if (details.Key is "Home" or "ArrowUp")
+            return await FocusAndReturnAsync(firstIndex);
+
+        if (details.Key is "End" or "ArrowDown")
+            return await FocusAndReturnAsync(endTargetIndex);
+
+        if (ReadOnly)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        if (details.Key == "Backspace" && hasBoundaryModifier)
+            return await SetValueAsync(string.Empty, OtpFieldChangeReason.Keyboard, firstIndex);
+
+        if (details.Key == "Delete")
+            return await SetValueAsync(OtpFieldUtilities.RemoveCharacter(CurrentValue, index), OtpFieldChangeReason.Keyboard, index);
+
+        if (details.Key == "Backspace")
+        {
+            var targetIndex = Math.Max(firstIndex, index - 1);
+            var deleteIndex = GetSlotValue(index).Length == 0 ? targetIndex : index;
+            return await SetValueAsync(OtpFieldUtilities.RemoveCharacter(CurrentValue, deleteIndex), OtpFieldChangeReason.Keyboard, targetIndex);
+        }
+
+        return new OtpFieldCommitResult(false, CurrentValue, null);
+    }
+
+    private async Task<OtpFieldCommitResult> CommitHiddenInputAsync(string rawValue)
+    {
+        if (ResolvedDisabled || ReadOnly)
+            return new OtpFieldCommitResult(false, CurrentValue, null);
+
+        var details = OtpFieldUtilities.NormalizeWithDetails(rawValue, Length, ValidationType, NormalizeValue);
+        if (details.DidRejectCharacters)
+            await ReportValueInvalidAsync(rawValue, OtpFieldInvalidReason.InputChange);
+
+        var characterLength = OtpFieldUtilities.GetCharacterLength(details.Value);
+        var focusIndex = characterLength > 0 ? characterLength - 1 : (int?)null;
+        return await SetValueAsync(details.Value, OtpFieldChangeReason.InputChange, focusIndex);
+    }
+
+    private async Task<OtpFieldCommitResult> SetValueAsync(string nextValue, OtpFieldChangeReason reason, int? focusIndex)
+    {
+        var normalizedValue = OtpFieldUtilities.Normalize(nextValue, Length, ValidationType, NormalizeValue);
+        var completeReason = GetCompleteReason(reason);
+        var current = CurrentValue;
+        var normalizedLength = OtpFieldUtilities.GetCharacterLength(normalizedValue);
+        var currentLength = OtpFieldUtilities.GetCharacterLength(current);
+        var shouldComplete = completeReason.HasValue &&
+                             normalizedLength == Length &&
+                             (currentLength != Length || reason == OtpFieldChangeReason.InputPaste);
+
+        if (normalizedValue == current)
+        {
+            if (shouldComplete)
+                await CompleteValueAsync(normalizedValue, completeReason!.Value);
+
+            return new OtpFieldCommitResult(false, current, null);
+        }
+
+        var changeArgs = new OtpFieldValueChangeEventArgs(normalizedValue, reason);
+        await OnValueChange.InvokeAsync(changeArgs);
+        if (changeArgs.IsCanceled)
+            return new OtpFieldCommitResult(false, current, null);
+
+        await ValueChanged.InvokeAsync(normalizedValue);
+
+        if (IsControlled)
+        {
+            if (shouldComplete)
+                pendingComplete = new PendingComplete(normalizedValue, completeReason!.Value);
+            if (focusIndex.HasValue)
+                pendingFocus = new PendingFocus(focusIndex.Value, normalizedValue);
+        }
+        else
+        {
+            currentValue = normalizedValue;
+            if (shouldComplete)
+                pendingComplete = new PendingComplete(normalizedValue, completeReason!.Value);
+            else if (normalizedLength != Length)
+                pendingComplete = null;
+
+            if (focusIndex.HasValue)
+                pendingFocus = new PendingFocus(focusIndex.Value, normalizedValue);
+        }
+
+        FormContext?.ClearErrors(ResolvedName);
+        FieldContext?.SetDirty(!Equals(normalizedValue, FieldContext?.ValidityData.InitialValue));
+        FieldContext?.SetFilled(normalizedLength > 0);
+        await CommitFieldValidationAsync(normalizedValue, revalidateOnly: FieldContext?.ShouldValidateOnChange() != true);
+
+        UpdateState();
+        UpdateContext();
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
+
+        return new OtpFieldCommitResult(true, CurrentValue, focusIndex);
+    }
+
+    private Task<OtpFieldCommitResult> FocusAndReturnAsync(int index)
+    {
+        _ = FocusInputAsync(index);
+        return Task.FromResult(new OtpFieldCommitResult(false, CurrentValue, index));
+    }
+
+    private async Task CompleteValueAsync(string value, OtpFieldCompleteReason reason)
+    {
+        await OnValueComplete.InvokeAsync(new OtpFieldValueCompleteEventArgs(value, reason));
+
+        if (AutoSubmit && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeAsync<bool>("requestSubmit", Element.Value, hiddenInputElement, Form, value);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private Task ReportValueInvalidAsync(string invalidValue, OtpFieldInvalidReason reason) =>
+        OnValueInvalid.InvokeAsync(new OtpFieldValueInvalidEventArgs(invalidValue, reason));
+
+    private async Task HandleHiddenInputAsync(ChangeEventArgs e)
+    {
+        await CommitHiddenInputAsync(e.Value?.ToString() ?? string.Empty);
+    }
+
+    private async Task HandleHiddenInputFocusAsync(FocusEventArgs e)
+    {
+        _ = e;
+        if (!ResolvedDisabled)
+            await FocusFirstInputAsync();
+    }
+
+    private async Task CommitFieldValidationAsync(string value, bool revalidateOnly = false)
+    {
+        if (FieldContext is null)
+            return;
+
+        var nativeValidity = await GetNativeValidityAsync();
+
+        await FieldContext.Validation.CommitAsync(
+            value,
+            revalidateOnly,
+            nativeValidity,
+            SetCustomValidityAsync,
+            GetNativeValidityAsync);
+    }
+
+    private async Task<FieldNativeValiditySnapshot?> GetNativeValidityAsync()
+    {
+        if (!hasRendered || !HasValidLength)
+            return null;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            return await module.InvokeAsync<FieldNativeValiditySnapshot?>("getNativeValidity", hiddenInputElement);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+            return null;
+        }
+    }
+
+    private async Task SetCustomValidityAsync(string message)
+    {
+        if (!hasRendered || !HasValidLength)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("setCustomValidity", hiddenInputElement, message);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private async ValueTask FocusFirstInputAsync()
+    {
+        await FocusInputAsync(0);
+    }
+
+    private async ValueTask FocusInputAsync(int index)
+    {
+        if (!hasRendered || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("focusInput", Element.Value, index);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private int RegisterInput(OtpFieldInput input)
+    {
+        if (!inputs.Contains(input))
+            inputs.Add(input);
+
+        return inputs.IndexOf(input);
+    }
+
+    private void UnregisterInput(OtpFieldInput input)
+    {
+        inputs.Remove(input);
+    }
+
+    private void SetInputElement(int index, ElementReference? element)
+    {
+        if (element.HasValue)
+            inputElements[index] = element.Value;
+        else
+            inputElements.Remove(index);
+    }
+
+    private void WarnAboutInputConfiguration()
+    {
+        if (!HasValidLength)
+        {
+            if (warnedInvalidLength == Length)
+                return;
+
+            warnedInvalidLength = Length;
+            Logger.LogWarning(
+                "Base UI: <OtpFieldRoot> Length must be a positive integer. Received Length={Length}.",
+                Length);
+            return;
+        }
+
+        if (inputs.Count == 0 || inputs.Count == Length)
+            return;
+
+        var currentWarning = new InputCountWarning(Length, inputs.Count);
+        if (warnedInputCount == currentWarning)
+            return;
+
+        warnedInputCount = currentWarning;
+        Logger.LogWarning(
+            "Base UI: <OtpFieldRoot> Length must match the number of rendered <OtpFieldInput> parts. Received Length={Length} but rendered {InputCount} inputs.",
+            Length,
+            inputs.Count);
+    }
+
+    private void RegisterFieldControl()
+    {
+        if (FieldContext is null)
+            return;
+
+        var controlId = GetInputId(0);
+        var registrationName = string.IsNullOrEmpty(ResolvedName) ? null : ResolvedName;
+        if (fieldControlRegistered && registeredControlId == controlId && registeredName == registrationName)
+            return;
+
+        FieldContext.RegisterFieldControl(
+            fieldControlSource,
+            new FieldControlRegistration(
+                Id: controlId,
+                Name: registrationName,
+                GetValue: () => CurrentValue,
+                ValidateAsync: () => CommitFieldValidationAsync(CurrentValue),
+                FocusAsync: FocusFirstInputAsync));
+
+        fieldControlRegistered = true;
+        registeredControlId = controlId;
+        registeredName = registrationName;
+    }
+
+    private void UpdateLabelableControlId()
+    {
+        LabelableContext?.SetControlId(GetInputId(0));
+    }
+
+    private string? GetInputId(int index)
+    {
+        if (string.IsNullOrEmpty(ResolvedFirstInputId))
+            return null;
+
+        return index == 0 ? ResolvedFirstInputId : $"{ResolvedFirstInputId}-{index + 1}";
+    }
+
+    private OtpFieldBrowserConfig CreateBrowserConfig() => new(
+        Length: Length,
+        Disabled: ResolvedDisabled,
+        ReadOnly: ReadOnly);
+
+    private static OtpFieldCompleteReason? GetCompleteReason(OtpFieldChangeReason reason) =>
+        reason switch
+        {
+            OtpFieldChangeReason.InputChange => OtpFieldCompleteReason.InputChange,
+            OtpFieldChangeReason.InputPaste => OtpFieldCompleteReason.InputPaste,
+            _ => null
+        };
+
+    private sealed record PendingFocus(int Index, string Value);
+
+    private sealed record PendingComplete(string Value, OtpFieldCompleteReason Reason);
+
+    private sealed record InputCountWarning(int Length, int Count);
+}

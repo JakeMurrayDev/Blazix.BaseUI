@@ -45,6 +45,7 @@ public static class DocsNav
             new("Meter", "meter", "/components/meter", "A graphical display of a numeric value.", IsDocumented: true),
             new("Navigation Menu", "navigation-menu", "/components/navigation-menu", "A collection of links and menus for site navigation.", IsDocumented: true),
             new("Number Field", "number-field", "/components/number-field", "A numeric input with increment and decrement buttons.", IsDocumented: true),
+            new("OTP Field", "otp-field", "/components/otp-field", "A one-time password field with separate character slots.", IsDocumented: true),
             new("Popover", "popover", "/components/popover", "An accessible popup anchored to a trigger.", IsDocumented: true),
             new("Preview Card", "preview-card", "/components/preview-card", "A popup that appears when hovering a link.", IsDocumented: true),
             new("Progress", "progress", "/components/progress", "Displays the status of a task over time.", IsDocumented: true),
