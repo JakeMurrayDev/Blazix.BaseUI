@@ -1,0 +1,215 @@
+@page "/handbook/forms"
+
+<PageTitle>Forms · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Handbook"
+               Title="Forms"
+               Subtitle="A guide to using Blazix.BaseUI components in forms."
+               MarkdownHref="/handbook/forms.md" />
+
+<div class="mt-6">
+    <Demo Variants="@HeroVariants">
+        <FormHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Building form fields" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Compose a field from <code class="@LiquidGlassClasses.CodeInline">FieldRoot</code> and its parts. The root wires
+    the label to the control, joins helper text into <code class="@LiquidGlassClasses.CodeInline">aria-describedby</code>,
+    and exposes state attributes (<code class="@LiquidGlassClasses.CodeInline">data-valid</code>,
+    <code class="@LiquidGlassClasses.CodeInline">data-invalid</code>,
+    <code class="@LiquidGlassClasses.CodeInline">data-touched</code>,
+    <code class="@LiquidGlassClasses.CodeInline">data-dirty</code>,
+    <code class="@LiquidGlassClasses.CodeInline">data-filled</code>,
+    <code class="@LiquidGlassClasses.CodeInline">data-focused</code>) for styling.
+</p>
+<CodeBlock Code="@BuildFieldCode" />
+
+<DocsHeading Title="Naming form controls" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Give each field a <code class="@LiquidGlassClasses.CodeInline">Name</code> so its value and any external errors are
+    keyed consistently. <code class="@LiquidGlassClasses.CodeInline">FieldRoot.Name</code> takes precedence over
+    <code class="@LiquidGlassClasses.CodeInline">FieldControl.Name</code>.
+</p>
+
+<DocsHeading Title="Labeling control groups" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Group related controls with <code class="@LiquidGlassClasses.CodeInline">FieldsetRoot</code> and a single
+    <code class="@LiquidGlassClasses.CodeInline">FieldsetLegend</code>; set
+    <code class="@LiquidGlassClasses.CodeInline">Disabled</code> on the root to disable the whole group.
+</p>
+<CodeBlock Code="@FieldsetCode" />
+
+<DocsHeading Title="Submitting data" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Read values straight off your bound <code class="@LiquidGlassClasses.CodeInline">Model</code>, or use
+    <code class="@LiquidGlassClasses.CodeInline">OnFormSubmit</code> to receive a
+    <code class="@LiquidGlassClasses.CodeInline">FormSubmitEventArgs</code> whose
+    <code class="@LiquidGlassClasses.CodeInline">Values</code> are keyed by field name.
+</p>
+<CodeBlock Code="@SubmitCode" />
+
+<DocsHeading Title="Validation" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">Form</code> validates on submit by default; choose when with
+    <code class="@LiquidGlassClasses.CodeInline">ValidationMode</code>
+    (<code class="@LiquidGlassClasses.CodeInline">OnSubmit</code>,
+    <code class="@LiquidGlassClasses.CodeInline">OnBlur</code>,
+    <code class="@LiquidGlassClasses.CodeInline">OnChange</code>).
+    <code class="@LiquidGlassClasses.CodeInline">FieldError</code> renders the active messages.
+</p>
+
+<DocsHeading Level="3" Title="Native constraint validation" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Put native HTML validation attributes on the control; Blazix surfaces the browser's messages through
+    <code class="@LiquidGlassClasses.CodeInline">FieldError</code>.
+</p>
+<CodeBlock Code="@NativeValidationCode" />
+
+<DocsHeading Level="3" Title="Server-side errors" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Pass <code class="@LiquidGlassClasses.CodeInline">Errors</code> — a dictionary keyed by field name — to display
+    messages returned by your server.
+</p>
+<CodeBlock Code="@ServerErrorsCode" />
+
+<DocsHeading Title="Blazor integration" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">Form</code> builds an
+    <code class="@LiquidGlassClasses.CodeInline">EditContext</code> from
+    <code class="@LiquidGlassClasses.CodeInline">Model</code> and cascades it, so the standard Blazor validation
+    components work inside it. Add a <code class="@LiquidGlassClasses.CodeInline">DataAnnotationsValidator</code> and
+    annotate your model to validate with data annotations; branch on
+    <code class="@LiquidGlassClasses.CodeInline">OnValidSubmit</code> /
+    <code class="@LiquidGlassClasses.CodeInline">OnInvalidSubmit</code>.
+</p>
+<CodeBlock Code="@DataAnnotationsCode" />
+
+@code {
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Form.razor", "xml", "Components.Demos.Form.Hero.Css.FormHeroCss.razor"),
+            new DemoFile("form.css", "css", "wwwroot.demos.form.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Form.razor", "xml", "Components.Demos.Form.Hero.Tailwind.FormHeroTailwind.razor"),
+        ]),
+    ];
+
+    private const string BuildFieldCode =
+        """
+        @using Blazix.BaseUI.Field
+
+        <FieldRoot Name="email">
+            <FieldLabel>Email</FieldLabel>
+            <FieldControl TValue="string" @bind-Value="model.Email" type="email" />
+            <FieldDescription>We will never share it.</FieldDescription>
+            <FieldError />
+        </FieldRoot>
+        """;
+
+    private const string FieldsetCode =
+        """
+        @using Blazix.BaseUI.Fieldset
+
+        <FieldsetRoot>
+            <FieldsetLegend>Billing details</FieldsetLegend>
+            <FieldRoot Name="card">
+                <FieldLabel>Card number</FieldLabel>
+                <FieldControl TValue="string" @bind-Value="model.Card" />
+            </FieldRoot>
+        </FieldsetRoot>
+        """;
+
+    private const string SubmitCode =
+        """
+        <Form Model="@model" OnFormSubmit="HandleSubmitAsync">
+            <FieldRoot Name="name">
+                <FieldLabel>Name</FieldLabel>
+                <FieldControl TValue="string" @bind-Value="model.Name" />
+            </FieldRoot>
+            <button type="submit">Submit</button>
+        </Form>
+
+        @code {
+            private readonly NameModel model = new();
+
+            private Task HandleSubmitAsync(FormSubmitEventArgs args)
+            {
+                // args.Values["name"] holds the submitted value.
+                return Task.CompletedTask;
+            }
+
+            private sealed class NameModel
+            {
+                public string Name { get; set; } = "";
+            }
+        }
+        """;
+
+    private const string NativeValidationCode =
+        """
+        <FieldRoot Name="url">
+            <FieldLabel>Homepage</FieldLabel>
+            <FieldControl TValue="string"
+                          @bind-Value="model.Url"
+                          type="url"
+                          required="true"
+                          pattern="https?://.*" />
+            <FieldError />
+        </FieldRoot>
+        """;
+
+    private const string ServerErrorsCode =
+        """
+        <Form Model="@model" Errors="@errors">
+            <FieldRoot Name="email">
+                <FieldLabel>Email</FieldLabel>
+                <FieldControl TValue="string" @bind-Value="model.Email" />
+                <FieldError />
+            </FieldRoot>
+        </Form>
+
+        @code {
+            private Dictionary<string, string[]> errors = new()
+            {
+                ["email"] = ["That email is already registered."]
+            };
+        }
+        """;
+
+    private const string DataAnnotationsCode =
+        """
+        @using System.ComponentModel.DataAnnotations
+        @using Microsoft.AspNetCore.Components.Forms
+
+        <Form Model="@model" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <FieldRoot Name="email">
+                <FieldLabel>Email</FieldLabel>
+                <FieldControl TValue="string" @bind-Value="model.Email" />
+                <FieldError />
+            </FieldRoot>
+            <button type="submit">Sign up</button>
+        </Form>
+
+        @code {
+            private readonly AccountModel model = new();
+
+            private void HandleValidSubmit(EditContext context)
+            {
+                // The model passed data-annotation validation.
+            }
+
+            private sealed class AccountModel
+            {
+                [Required, EmailAddress]
+                public string Email { get; set; } = "";
+            }
+        }
+        """;
+}
