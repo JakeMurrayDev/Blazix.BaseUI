@@ -46,6 +46,23 @@ app.MapGet("/components/{slug}.md", async (string slug, IWebHostEnvironment envi
     return Results.Text(markdown, "text/markdown; charset=utf-8");
 });
 
+app.MapGet("/handbook/{slug}.md", async (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
+{
+    if (slug.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
+    {
+        return Results.BadRequest("Invalid handbook slug.");
+    }
+
+    var markdownPath = Path.Combine(environment.ContentRootPath, "Content", "Handbook", $"{slug}.md");
+    if (!File.Exists(markdownPath))
+    {
+        return Results.NotFound();
+    }
+
+    var markdown = await File.ReadAllTextAsync(markdownPath, cancellationToken);
+    return Results.Text(markdown, "text/markdown; charset=utf-8");
+});
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
