@@ -1,0 +1,18 @@
+<div class="blx-otp-field">
+    <label for="otp-alphanumeric" class="blx-otp-field-label">Recovery code</label>
+    <OtpFieldRoot Id="otp-alphanumeric"
+                  Length="6"
+                  ValidationType="OtpFieldValidationType.Alphanumeric"
+                  aria-describedby="otp-alphanumeric-description"
+                  class="blx-otp-field-root">
+        @for (var index = 0; index < 6; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="blx-otp-field-input"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-alphanumeric-description" class="blx-otp-field-description">
+        Accept letters and numbers for backup codes such as <span class="blx-otp-field-code">A7C9XZ</span>.
+    </p>
+</div>

@@ -1,0 +1,24 @@
+<div class="flex w-full max-w-80 flex-col items-start gap-1">
+    <label for="otp-grouped" class="text-sm font-bold text-neutral-950 dark:text-white">
+        Verification code
+    </label>
+    <OtpFieldRoot Id="otp-grouped" Length="6" class="flex w-full items-center gap-2">
+        <div class="flex gap-2">
+            @for (var index = 0; index < 3; index++)
+            {
+                var slot = index;
+                <OtpFieldInput class="m-0 h-10 w-10 rounded-none border border-neutral-950 bg-white text-center text-base font-normal text-neutral-950 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:focus:outline-white"
+                               aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")" />
+            }
+        </div>
+        <Separator class="h-px w-4 bg-current text-neutral-950 dark:text-white" />
+        <div class="flex gap-2">
+            @for (var index = 0; index < 3; index++)
+            {
+                var slot = index;
+                <OtpFieldInput class="m-0 h-10 w-10 rounded-none border border-neutral-950 bg-white text-center text-base font-normal text-neutral-950 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:border-white dark:bg-neutral-950 dark:text-white dark:focus:outline-white"
+                               aria-label="@($"Character {slot + 4} of 6")" />
+            }
+        </div>
+    </OtpFieldRoot>
+</div>

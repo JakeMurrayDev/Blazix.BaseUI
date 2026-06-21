@@ -1,0 +1,17 @@
+<div class="blx-otp-field">
+    <label for="otp-hero" class="blx-otp-field-label">Verification code</label>
+    <OtpFieldRoot Id="otp-hero"
+                  Length="6"
+                  aria-describedby="otp-hero-description"
+                  class="blx-otp-field-root">
+        @for (var index = 0; index < 6; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="blx-otp-field-input"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-hero-description" class="blx-otp-field-description">
+        Enter the 6-character code we sent to your device.
+    </p>
+</div>

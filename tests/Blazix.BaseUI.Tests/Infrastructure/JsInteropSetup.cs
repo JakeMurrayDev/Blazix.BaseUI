@@ -4,6 +4,28 @@ namespace Blazix.BaseUI.Tests.Infrastructure;
 
 public static class JsInteropSetup
 {
+    private const string OtpFieldModule = "./_content/Blazix.BaseUI/blazix-baseui-otp-field.js";
+    private const string OtpFieldMinModule = "./_content/Blazix.BaseUI/blazix-baseui-otp-field.min.js";
+
+    public static BunitJSModuleInterop SetupOtpFieldModule(BunitJSInterop jsInterop)
+    {
+        SetupOtpFieldModulePath(OtpFieldModule);
+        return SetupOtpFieldModulePath(OtpFieldMinModule);
+
+        BunitJSModuleInterop SetupOtpFieldModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initialize", _ => true).SetVoidResult();
+            module.SetupVoid("update", _ => true).SetVoidResult();
+            module.SetupVoid("focusInput", _ => true).SetVoidResult();
+            module.SetupVoid("dispose", _ => true).SetVoidResult();
+            module.Setup<bool>("requestSubmit", _ => true).SetResult(true);
+            module.Setup<Blazix.BaseUI.Field.FieldNativeValiditySnapshot?>("getNativeValidity", _ => true).SetResult(null);
+            module.SetupVoid("setCustomValidity", _ => true).SetVoidResult();
+            return module;
+        }
+    }
+
     private const string AvatarImageModule = "./_content/Blazix.BaseUI/blazix-baseui-avatar-image.js";
 
     public static void SetupLoadedImage(BunitJSInterop jsInterop)

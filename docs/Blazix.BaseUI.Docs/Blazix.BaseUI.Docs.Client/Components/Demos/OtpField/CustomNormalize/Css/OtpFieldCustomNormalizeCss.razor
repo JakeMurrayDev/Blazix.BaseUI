@@ -1,0 +1,87 @@
+@implements IDisposable
+
+<div class="blx-otp-field">
+    <label for="otp-custom-normalize" class="blx-otp-field-label">Recovery code</label>
+    <OtpFieldRoot Id="otp-custom-normalize"
+                  Length="6"
+                  ValidationType="OtpFieldValidationType.Alphanumeric"
+                  NormalizeValue="NormalizeRecoveryCode"
+                  OnValueChange="HandleValueChange"
+                  OnValueInvalid="HandleValueInvalid"
+                  aria-describedby="otp-custom-normalize-description"
+                  class="blx-otp-field-root">
+        @for (var index = 0; index < 6; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="@InputClass(slot)"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")"
+                           @onfocus="() => focusedIndex = slot" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-custom-normalize-description" class="blx-otp-field-description">
+        Letters and digits only. Letters are converted to uppercase.
+    </p>
+    <span aria-live="polite" class="blx-otp-field-status">@statusMessage</span>
+</div>
+
+@code {
+    private int focusedIndex;
+    private int invalidPulse;
+    private string statusMessage = string.Empty;
+    private Timer? resetTimer;
+    private bool skipClearOnNextValueChange;
+
+    private int ActiveInvalidIndex => invalidPulse > 0 ? focusedIndex : -1;
+
+    private static string NormalizeRecoveryCode(string value) => value.ToUpperInvariant();
+
+    private string InputClass(int index)
+    {
+        if (invalidPulse == 0 || ActiveInvalidIndex != index)
+        {
+            return "blx-otp-field-input";
+        }
+
+        var variant = invalidPulse % 2 == 0 ? "blx-otp-field-input--invalid-b" : "blx-otp-field-input--invalid-a";
+        return $"blx-otp-field-input {variant}";
+    }
+
+    private void HandleValueChange(OtpFieldValueChangeEventArgs e)
+    {
+        if (skipClearOnNextValueChange)
+        {
+            skipClearOnNextValueChange = false;
+            return;
+        }
+
+        ClearInvalidFeedback();
+    }
+
+    private void HandleValueInvalid(OtpFieldValueInvalidEventArgs e)
+    {
+        skipClearOnNextValueChange = true;
+        invalidPulse++;
+        statusMessage = $"Unsupported characters were ignored from {e.Value}.";
+
+        resetTimer?.Dispose();
+        resetTimer = new Timer(_ => _ = InvokeAsync(() =>
+        {
+            invalidPulse = 0;
+            StateHasChanged();
+        }), null, TimeSpan.FromMilliseconds(400), Timeout.InfiniteTimeSpan);
+    }
+
+    private void ClearInvalidFeedback()
+    {
+        resetTimer?.Dispose();
+        resetTimer = null;
+        invalidPulse = 0;
+        statusMessage = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        resetTimer?.Dispose();
+        resetTimer = null;
+    }
+}

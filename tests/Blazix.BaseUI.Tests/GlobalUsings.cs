@@ -69,4 +69,5 @@ global using Blazix.BaseUI.Autocomplete;
 global using Blazix.BaseUI.Tests.Contracts.Autocomplete;
 global using Blazix.BaseUI.ScrollArea;
 global using Blazix.BaseUI.Tests.Contracts.ScrollArea;
+global using Blazix.BaseUI.OtpField;
 global using Blazix.BaseUI.Tests.Infrastructure;

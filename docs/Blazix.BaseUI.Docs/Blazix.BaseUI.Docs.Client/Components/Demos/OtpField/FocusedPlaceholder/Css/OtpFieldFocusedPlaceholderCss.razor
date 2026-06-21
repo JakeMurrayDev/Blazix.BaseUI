@@ -1,0 +1,18 @@
+<div class="blx-otp-field">
+    <label for="otp-focused-placeholder" class="blx-otp-field-label">Verification code</label>
+    <OtpFieldRoot Id="otp-focused-placeholder"
+                  Length="6"
+                  aria-describedby="otp-focused-placeholder-description"
+                  class="blx-otp-field-root">
+        @for (var index = 0; index < 6; index++)
+        {
+            var slot = index;
+            <OtpFieldInput class="blx-otp-field-input"
+                           placeholder="•"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of 6")" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-focused-placeholder-description" class="blx-otp-field-description">
+        Placeholder hints can stay visible until the active slot is focused.
+    </p>
+</div>
