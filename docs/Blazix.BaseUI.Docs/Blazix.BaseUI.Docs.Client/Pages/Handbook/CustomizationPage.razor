@@ -1,0 +1,124 @@
+@page "/handbook/customization"
+
+<PageTitle>Customization · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Handbook"
+               Title="Customization"
+               Subtitle="A guide to customizing the behavior of Blazix.BaseUI components."
+               MarkdownHref="/handbook/customization.md" />
+
+<DocsHeading Title="Change events" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Change events such as <code class="@LiquidGlassClasses.CodeInline">OnOpenChange</code>,
+    <code class="@LiquidGlassClasses.CodeInline">OnValueChange</code>, and
+    <code class="@LiquidGlassClasses.CodeInline">OnCheckedChange</code> pass a strongly-typed event-args object.
+    They can be raised by a variety of DOM events, effects, or rendering.
+</p>
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    The args object lets you customize the change and conditionally run side effects based on what caused it:
+</p>
+<ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li><code class="@LiquidGlassClasses.CodeInline">Reason</code> — a type-safe enum describing why the change occurred.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">Cancel()</code> — stops the component from changing its internal state (<code class="@LiquidGlassClasses.CodeInline">IsCanceled</code> reflects this).</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">AllowPropagation()</code> — lets the DOM event propagate in cases where Blazix stops it (<code class="@LiquidGlassClasses.CodeInline">IsPropagationAllowed</code> reflects this).</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">PreventUnmountOnClose()</code> — keeps the popup mounted after its close transition completes.</li>
+</ul>
+
+<DocsHeading Level="3" Title="Canceling a change" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Call <code class="@LiquidGlassClasses.CodeInline">Cancel()</code> to block a specific transition while leaving
+    the component uncontrolled. The <code class="@LiquidGlassClasses.CodeInline">Reason</code> enum (its values appear
+    in IntelliSense after <code class="@LiquidGlassClasses.CodeInline">args.Reason ==</code>) lets you target one cause.
+</p>
+<CodeBlock Code="@CancelCode" Language="csharp" />
+
+<DocsHeading Level="3" Title="Allowing propagation" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    In most components, pressing <kbd>Esc</kbd> stops event propagation so parent popups don't close at the same
+    time. Call <code class="@LiquidGlassClasses.CodeInline">AllowPropagation()</code> to opt out.
+</p>
+<CodeBlock Code="@AllowPropagationCode" Language="csharp" />
+
+<DocsHeading Title="Controlling components with state" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Components are uncontrolled by default — they manage their own state. Set
+    <code class="@LiquidGlassClasses.CodeInline">DefaultOpen</code> (or
+    <code class="@LiquidGlassClasses.CodeInline">DefaultValue</code>) for an uncontrolled initial state.
+</p>
+<CodeBlock Code="@UncontrolledCode" />
+<p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Make a component controlled by binding your own state with
+    <code class="@LiquidGlassClasses.CodeInline">@@bind-Open</code> (or
+    <code class="@LiquidGlassClasses.CodeInline">@@bind-Value</code>). This also lets you read and drive the state
+    from outside the root — for example, opening a dialog from a timer with no trigger.
+</p>
+<CodeBlock Code="@ControlledCode" />
+
+@code {
+    private const string CancelCode =
+        """
+        <TooltipRoot OnOpenChange="HandleOpenChange">
+            ...
+        </TooltipRoot>
+
+        @code {
+            private void HandleOpenChange(TooltipOpenChangeEventArgs args)
+            {
+                // Keep the tooltip open when the trigger is pressed.
+                if (args.Reason == TooltipOpenChangeReason.TriggerPress)
+                {
+                    args.Cancel();
+                }
+            }
+        }
+        """;
+
+    private const string AllowPropagationCode =
+        """
+        <PopoverRoot OnOpenChange="HandleOpenChange">
+            ...
+        </PopoverRoot>
+
+        @code {
+            private void HandleOpenChange(PopoverOpenChangeEventArgs args)
+            {
+                // Let the Escape key bubble so a parent popup can also close.
+                if (args.Reason == PopoverOpenChangeReason.EscapeKey)
+                {
+                    args.AllowPropagation();
+                }
+            }
+        }
+        """;
+
+    private const string UncontrolledCode =
+        """
+        <DialogRoot DefaultOpen="false">
+            <DialogTrigger>Open</DialogTrigger>
+            ...
+        </DialogRoot>
+        """;
+
+    private const string ControlledCode =
+        """
+        <DialogRoot @bind-Open="open">
+            No trigger is needed in this case.
+        </DialogRoot>
+
+        @code {
+            private bool open;
+
+            protected override void OnInitialized()
+            {
+                _ = OpenAfterDelayAsync();
+            }
+
+            private async Task OpenAfterDelayAsync()
+            {
+                await Task.Delay(1000);
+                open = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        """;
+}
