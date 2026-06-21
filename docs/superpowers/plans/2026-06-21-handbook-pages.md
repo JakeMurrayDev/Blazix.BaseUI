@@ -337,7 +337,7 @@ git commit -m "docs: add handbook Styling page"
 - Create: `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Pages/Handbook/CompositionPage.razor`
 - Create: `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Content/Handbook/composition.md`
 
-Background (verified): the composition primitive is the `Render` parameter (`RenderFragment<RenderProps<TState>>`) present on every part. `RenderProps<TState>` exposes `Attributes` (splat with `@attributes="context.Attributes"`), `State`, `ChildContent`, and `ElementReferenceCallback`. It is the Blazor equivalent of base-ui's `render={(props, state) => ...}` prop.
+Background (verified): the composition primitive is the `Render` parameter (`RenderFragment<RenderProps<TState>>`) present on every part. `RenderProps<TState>` exposes `Attributes`, `State`, `ChildContent`, and `ElementReferenceCallback`. The repo's established idiom (see `Pages/SwitchPage.razor`, `Pages/ButtonPage.razor`) is `props => RenderUtilities.CreateElement("tag", props)` for a simple element swap, and `props => builder => { builder.AddMultipleAttributes(...); builder.AddElementReferenceCapture(..., props.ElementReferenceCallback); builder.AddContent(..., props.ChildContent); }` for full control. State types verified: `ButtonState`, `MenuItemState`, `SwitchRootState` (the `TState` of `SwitchThumb`).
 
 - [ ] **Step 1: Create the page**
 
@@ -356,38 +356,38 @@ Background (verified): the composition primitive is the `Render` parameter (`Ren
 <p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
     Every part accepts a <code class="@LiquidGlassClasses.CodeInline">Render</code> parameter — a
     <code class="@LiquidGlassClasses.CodeInline">RenderFragment&lt;RenderProps&lt;TState&gt;&gt;</code> that lets you
-    replace the element the part renders, or compose it with your own component. It is the Blazor equivalent of
-    a render prop.
+    change the element a part renders, or take full control of how it renders, while keeping its behavior. It is the
+    Blazor equivalent of a render prop.
 </p>
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
-    The function receives a <code class="@LiquidGlassClasses.CodeInline">context</code> of type
+    The function receives a <code class="@LiquidGlassClasses.CodeInline">props</code> argument of type
     <code class="@LiquidGlassClasses.CodeInline">RenderProps&lt;TState&gt;</code>, which carries everything the part
     would otherwise render:
 </p>
 <ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
-    <li><code class="@LiquidGlassClasses.CodeInline">context.Attributes</code> — every computed attribute (aria-*, data-*, role, class, style). Splat it with <code class="@LiquidGlassClasses.CodeInline">@@attributes="context.Attributes"</code>.</li>
-    <li><code class="@LiquidGlassClasses.CodeInline">context.State</code> — the part's current public state.</li>
-    <li><code class="@LiquidGlassClasses.CodeInline">context.ChildContent</code> — the original child content, so you decide where it goes.</li>
-    <li><code class="@LiquidGlassClasses.CodeInline">context.ElementReferenceCallback</code> — capture for the part's internal interop; forward it with <code class="@LiquidGlassClasses.CodeInline">@@ref</code>-style capture when rendering a raw element via a builder.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.Attributes</code> — every computed attribute (aria-*, data-*, role, class, style). Apply them with <code class="@LiquidGlassClasses.CodeInline">builder.AddMultipleAttributes</code>.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.State</code> — the part's current public state.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.ChildContent</code> — the original child content, so you decide where it goes.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.ElementReferenceCallback</code> — forward it with <code class="@LiquidGlassClasses.CodeInline">builder.AddElementReferenceCapture</code> so the part can reach its element for interop.</li>
 </ul>
-
-<DocsHeading Title="Composing your own component" />
-<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
-    Most triggers render a <code class="@LiquidGlassClasses.CodeInline">button</code> by default. Use
-    <code class="@LiquidGlassClasses.CodeInline">Render</code> to render your own component instead. Your component
-    must splat <code class="@LiquidGlassClasses.CodeInline">context.Attributes</code> onto its underlying element so
-    the part's behavior keeps working.
-</p>
-<CodeBlock Code="@ComposeCustomCode" />
 
 <DocsHeading Title="Changing the rendered element" />
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
-    <code class="@LiquidGlassClasses.CodeInline">MenuItem</code> renders a
-    <code class="@LiquidGlassClasses.CodeInline">div</code> by default. Render it as an
-    <code class="@LiquidGlassClasses.CodeInline">a</code> so it works like a link. Place
-    <code class="@LiquidGlassClasses.CodeInline">context.ChildContent</code> wherever the content should appear.
+    For the common case of swapping the element, return
+    <code class="@LiquidGlassClasses.CodeInline">RenderUtilities.CreateElement</code> with the tag you want. It applies
+    the attributes, forwards the element reference, and places the child content for you.
 </p>
-<CodeBlock Code="@ChangeElementCode" />
+<CodeBlock Code="@CreateElementCode" />
+
+<DocsHeading Title="Taking full control" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For complete control — wrapping the part in extra markup, adding your own attributes, or rendering your own
+    component — return a render fragment that builds the tree. Apply
+    <code class="@LiquidGlassClasses.CodeInline">props.Attributes</code>, forward
+    <code class="@LiquidGlassClasses.CodeInline">props.ElementReferenceCallback</code>, and place
+    <code class="@LiquidGlassClasses.CodeInline">props.ChildContent</code> so the part keeps working.
+</p>
+<CodeBlock Code="@FullControlCode" />
 <p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
     Each part renders the most appropriate element by default; rendering a different element is recommended only on
     a case-by-case basis.
@@ -395,48 +395,77 @@ Background (verified): the composition primitive is the `Render` parameter (`Ren
 
 <DocsHeading Title="Rendering from state" />
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
-    Because <code class="@LiquidGlassClasses.CodeInline">context.State</code> is available, the
-    <code class="@LiquidGlassClasses.CodeInline">Render</code> function can vary its content based on the part's state.
+    Because <code class="@LiquidGlassClasses.CodeInline">props.State</code> is available, the render function can vary
+    its content based on the part's current state.
 </p>
 <CodeBlock Code="@RenderFromStateCode" />
 
 @code {
-    private const string ComposeCustomCode =
+    private const string CreateElementCode =
         """
-        <MenuTrigger Render="@(context =>
-            @<MyButton Size="md" Attributes="context.Attributes">
-                Open menu
-            </MyButton>)" />
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Button
+
+        <Button NativeButton="false" Render="@RenderAsDiv">
+            A button that can contain complex children
+        </Button>
+
+        @code {
+            private RenderFragment<RenderProps<ButtonState>> RenderAsDiv => props =>
+                RenderUtilities.CreateElement("div", props);
+        }
         """;
 
-    private const string ChangeElementCode =
+    private const string FullControlCode =
         """
-        <MenuItem Render="@(context =>
-            @<a @attributes="context.Attributes" href="https://blazix.dev">
-                @context.ChildContent
-            </a>)">
-            Add to Library
-        </MenuItem>
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Menu
+        @using Microsoft.AspNetCore.Components.Rendering
+
+        <MenuItem Render="@RenderAsLink">Add to Library</MenuItem>
+
+        @code {
+            private RenderFragment<RenderProps<MenuItemState>> RenderAsLink => props => builder =>
+            {
+                builder.OpenElement(0, "a");
+                builder.AddMultipleAttributes(1, props.Attributes);
+                builder.AddAttribute(2, "href", "https://blazix.dev");
+                if (props.ElementReferenceCallback is not null)
+                {
+                    builder.AddElementReferenceCapture(3, props.ElementReferenceCallback);
+                }
+                builder.AddContent(4, props.ChildContent);
+                builder.CloseElement();
+            };
+        }
         """;
 
     private const string RenderFromStateCode =
         """
-        <SwitchThumb Render="@(context =>
-            @<span @attributes="context.Attributes">
-                @if (context.State.Checked)
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Switch
+        @using Microsoft.AspNetCore.Components.Rendering
+
+        <SwitchThumb Render="@RenderThumb" />
+
+        @code {
+            private RenderFragment<RenderProps<SwitchRootState>> RenderThumb => props => builder =>
+            {
+                builder.OpenElement(0, "span");
+                builder.AddMultipleAttributes(1, props.Attributes);
+                if (props.ElementReferenceCallback is not null)
                 {
-                    <CheckedIcon />
+                    builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
                 }
-                else
-                {
-                    <UncheckedIcon />
-                }
-            </span>)" />
+                builder.AddContent(3, props.State.Checked ? "On" : "Off");
+                builder.CloseElement();
+            };
+        }
         """;
 }
 ```
 
-> Note for the implementer: `context.State.Checked` in `RenderFromStateCode` is illustrative content inside a `CodeBlock` string (not compiled), so it needs no type to exist. `MyButton`, `CheckedIcon`, `UncheckedIcon` are likewise illustrative names in code samples only.
+> Note for the implementer: the code-sample constants are not compiled — they are display text. Keep `@` single inside the `@code` raw string literals (these samples contain `@using`/`@code`/`@RenderAsDiv` as literal text). The markup of this page contains no literal `@` needing `@@` escaping.
 
 - [ ] **Step 2: Create the markdown source**
 
@@ -449,24 +478,24 @@ A guide to composing Blazix.BaseUI components with your own Blazor components.
 
 Rendered docs: `/handbook/composition`
 
-Every part accepts a `Render` parameter (`RenderFragment<RenderProps<TState>>`) — the Blazor equivalent of a render prop. The `context` carries:
+Every part accepts a `Render` parameter (`RenderFragment<RenderProps<TState>>`) — the Blazor equivalent of a render prop. The `props` argument carries:
 
-- `context.Attributes` — every computed attribute; splat with `@attributes="context.Attributes"`.
-- `context.State` — the part's current public state.
-- `context.ChildContent` — the original child content.
-- `context.ElementReferenceCallback` — element capture for the part's internal interop.
-
-## Composing your own component
-
-Use `Render` to render your own component; it must splat `context.Attributes` onto its underlying element.
+- `props.Attributes` — every computed attribute; apply with `builder.AddMultipleAttributes`.
+- `props.State` — the part's current public state.
+- `props.ChildContent` — the original child content.
+- `props.ElementReferenceCallback` — forward with `builder.AddElementReferenceCapture` for the part's interop.
 
 ## Changing the rendered element
 
-Render a part as a different element (for example, `MenuItem` as an `<a>`), placing `context.ChildContent` where the content belongs.
+Return `RenderUtilities.CreateElement("tag", props)` to swap the element; it applies the attributes, forwards the element reference, and places the child content for you.
+
+## Taking full control
+
+Return a builder render fragment to wrap the part, add attributes, or render your own component — apply `props.Attributes`, forward `props.ElementReferenceCallback`, and place `props.ChildContent`.
 
 ## Rendering from state
 
-`context.State` lets the `Render` function vary its content based on the part's state.
+`props.State` lets the render function vary its content based on the part's state.
 ```
 
 - [ ] **Step 3: Build**
@@ -476,7 +505,7 @@ Expected: Build succeeded, 0 errors.
 
 - [ ] **Step 4: Preview check**
 
-Navigate to `/handbook/composition`. Verify the page renders, the four `RenderProps` members list correctly (the `@@attributes`/`@@ref` show as literal `@attributes`/`@ref`), code blocks highlight, and `/handbook/composition.md` returns the markdown.
+Navigate to `/handbook/composition`. Verify the page renders, the four `RenderProps` members list correctly, the three code samples (CreateElement one-liner, builder full-control, render-from-state) highlight, and `/handbook/composition.md` returns the markdown.
 
 - [ ] **Step 5: Commit**
 
