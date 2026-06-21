@@ -19,6 +19,22 @@ public class OtpFieldUtilitiesTests
     }
 
     [Fact]
+    public void Normalize_FiltersUnicodeDecimalDigitsForBrowserPatternParity()
+    {
+        var result = OtpFieldUtilities.NormalizeWithDetails("\u06612", 6, OtpFieldValidationType.Numeric);
+
+        result.Value.ShouldBe("2");
+        result.DidRejectCharacters.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Normalize_ThrowsForUnsupportedValidationType()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            OtpFieldUtilities.Normalize("1234", 6, (OtpFieldValidationType)999));
+    }
+
+    [Fact]
     public void Normalize_ComposesCustomNormalizationWithBuiltInValidation()
     {
         var result = OtpFieldUtilities.Normalize(

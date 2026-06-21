@@ -9,7 +9,7 @@ Use one `OtpFieldInput` per slot in `Length`. The first slot receives the field 
 
 <label for="verification-code">Verification code</label>
 <OtpFieldRoot Id="verification-code" Length="6" Name="code">
-    <OtpFieldInput aria-label="" />
+    <OtpFieldInput />
     <OtpFieldInput aria-label="Character 2 of 6" />
     <OtpFieldInput aria-label="Character 3 of 6" />
     <OtpFieldInput aria-label="Character 4 of 6" />

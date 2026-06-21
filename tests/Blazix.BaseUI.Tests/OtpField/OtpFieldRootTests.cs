@@ -6,10 +6,12 @@ public class OtpFieldRootTests : BunitContext
 {
     private const int DefaultLength = 6;
 
+    private readonly BunitJSModuleInterop otpFieldModule;
+
     public OtpFieldRootTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupOtpFieldModule(JSInterop);
+        otpFieldModule = JsInteropSetup.SetupOtpFieldModule(JSInterop);
         JsInteropSetup.SetupFieldModule(JSInterop);
     }
 
@@ -29,7 +31,8 @@ public class OtpFieldRootTests : BunitContext
         hidden.GetAttribute("inputmode").ShouldBe("numeric");
         hidden.GetAttribute("minlength").ShouldBe(DefaultLength.ToString());
         hidden.GetAttribute("maxlength").ShouldBe(DefaultLength.ToString());
-        hidden.GetAttribute("pattern").ShouldBe(@"\d{6}");
+        hidden.GetAttribute("pattern").ShouldBe("[0-9]{6}");
+        inputs[0].GetAttribute("pattern").ShouldBe("[0-9]{1}");
         hidden.HasAttribute("required").ShouldBeTrue();
         hidden.GetAttribute("aria-hidden").ShouldBe("true");
         hidden.GetAttribute("tabindex").ShouldBe("-1");
@@ -216,15 +219,46 @@ public class OtpFieldRootTests : BunitContext
         var cut = Render(CreateOtpField(
             onValueChange: EventCallback.Factory.Create<OtpFieldValueChangeEventArgs>(this, args => args.Cancel())));
 
+        cut.Find("input[data-blazix-otp-input]").Input(new ChangeEventArgs { Value = "123456" });
+
         GetSlotValues(cut).ShouldBe(["", "", "", "", "", ""]);
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task Root_PassesNullHiddenInputToInteropWhenLengthBecomesInvalid()
+    {
+        var cut = Render<OtpFieldInvalidLengthHost>();
+
+        cut.WaitForAssertion(() =>
+            otpFieldModule.Invocations.Any(invocation => invocation.Identifier == "initialize").ShouldBeTrue());
+
+        await cut.InvokeAsync(() => cut.Instance.SetLength(0));
+
+        cut.WaitForAssertion(() =>
+            otpFieldModule.Invocations
+                .Any(invocation => invocation.Identifier == "update" && invocation.Arguments[1] is null)
+                .ShouldBeTrue());
     }
 
     private static string[] GetSlotValues(IRenderedComponent<ContainerFragment> cut) =>
         cut.FindAll("input[data-blazix-otp-input]")
             .Select(input => input.GetAttribute("value") ?? string.Empty)
             .ToArray();
+
+    internal static RenderFragment BuildInputs(int length) => builder =>
+    {
+        for (var index = 0; index < length; index++)
+        {
+            builder.OpenComponent<OtpFieldInput>(0);
+            builder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
+            {
+                ["aria-label"] = index == 0 ? string.Empty : $"Character {index + 1} of {length}"
+            });
+            builder.CloseComponent();
+        }
+    };
 
     private static RenderFragment CreateOtpField(
         string? id = null,
@@ -282,19 +316,28 @@ public class OtpFieldRootTests : BunitContext
                 builder.AddAttribute(attr++, "OnValueInvalid", onValueInvalid.Value);
             if (onValueComplete.HasValue)
                 builder.AddAttribute(attr++, "OnValueComplete", onValueComplete.Value);
-            builder.AddAttribute(attr++, "ChildContent", (RenderFragment)(inputBuilder =>
-            {
-                for (var index = 0; index < length; index++)
-                {
-                    inputBuilder.OpenComponent<OtpFieldInput>(index);
-                    inputBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
-                    {
-                        ["aria-label"] = index == 0 ? string.Empty : $"Character {index + 1} of {length}"
-                    });
-                    inputBuilder.CloseComponent();
-                }
-            }));
+            builder.AddAttribute(attr++, "ChildContent", BuildInputs(length));
             builder.CloseComponent();
         };
+    }
+}
+
+internal sealed class OtpFieldInvalidLengthHost : ComponentBase
+{
+    private int length = 6;
+
+    public void SetLength(int value)
+    {
+        length = value;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<OtpFieldRoot>(0);
+        builder.AddAttribute(1, "Length", length);
+        builder.AddAttribute(2, "Name", "otp");
+        builder.AddAttribute(3, "ChildContent", OtpFieldRootTests.BuildInputs(6));
+        builder.CloseComponent();
     }
 }

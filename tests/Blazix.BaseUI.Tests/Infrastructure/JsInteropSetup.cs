@@ -7,12 +7,12 @@ public static class JsInteropSetup
     private const string OtpFieldModule = "./_content/Blazix.BaseUI/blazix-baseui-otp-field.js";
     private const string OtpFieldMinModule = "./_content/Blazix.BaseUI/blazix-baseui-otp-field.min.js";
 
-    public static void SetupOtpFieldModule(BunitJSInterop jsInterop)
+    public static BunitJSModuleInterop SetupOtpFieldModule(BunitJSInterop jsInterop)
     {
         SetupOtpFieldModulePath(OtpFieldModule);
-        SetupOtpFieldModulePath(OtpFieldMinModule);
+        return SetupOtpFieldModulePath(OtpFieldMinModule);
 
-        void SetupOtpFieldModulePath(string path)
+        BunitJSModuleInterop SetupOtpFieldModulePath(string path)
         {
             var module = jsInterop.SetupModule(path);
             module.SetupVoid("initialize", _ => true).SetVoidResult();
@@ -22,6 +22,7 @@ public static class JsInteropSetup
             module.Setup<bool>("requestSubmit", _ => true).SetResult(true);
             module.Setup<Blazix.BaseUI.Field.FieldNativeValiditySnapshot?>("getNativeValidity", _ => true).SetResult(null);
             module.SetupVoid("setCustomValidity", _ => true).SetVoidResult();
+            return module;
         }
     }
 

@@ -355,13 +355,14 @@
             try
             {
                 var module = await moduleTask.Value;
+                var hiddenInputReference = HasValidLength ? (object?)hiddenInputElement : null;
                 if (firstRender)
                 {
-                    await module.InvokeVoidAsync("initialize", Element.Value, hiddenInputElement, dotNetRef, CreateBrowserConfig());
+                    await module.InvokeVoidAsync("initialize", Element.Value, hiddenInputReference, dotNetRef, CreateBrowserConfig());
                 }
                 else
                 {
-                    await module.InvokeVoidAsync("update", Element.Value, hiddenInputElement, CreateBrowserConfig());
+                    await module.InvokeVoidAsync("update", Element.Value, hiddenInputReference, CreateBrowserConfig());
                 }
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

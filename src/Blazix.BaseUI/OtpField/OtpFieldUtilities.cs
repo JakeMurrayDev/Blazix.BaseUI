@@ -15,8 +15,8 @@ public static partial class OtpFieldUtilities
         string InputMode);
 
     private static readonly ValidationConfig NumericConfig = new(
-        SlotPattern: @"\d{1}",
-        GetRootPattern: length => @$"\d{{{length}}}",
+        SlotPattern: "[0-9]{1}",
+        GetRootPattern: length => $"[0-9]{{{length}}}",
         RejectedCharacters: NumericRejectedRegex(),
         InputMode: "numeric");
 
@@ -166,7 +166,7 @@ public static partial class OtpFieldUtilities
             OtpFieldValidationType.Alpha => AlphaConfig,
             OtpFieldValidationType.Alphanumeric => AlphanumericConfig,
             OtpFieldValidationType.None => null,
-            _ => NumericConfig
+            _ => throw new ArgumentOutOfRangeException(nameof(validationType), validationType, "Unsupported validation type.")
         };
 
     private static string JoinRunes(IEnumerable<Rune> runes)
@@ -178,7 +178,7 @@ public static partial class OtpFieldUtilities
         return builder.ToString();
     }
 
-    [GeneratedRegex(@"[^\d]", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("[^0-9]", RegexOptions.CultureInvariant)]
     private static partial Regex NumericRejectedRegex();
 
     [GeneratedRegex(@"[^a-zA-Z]", RegexOptions.CultureInvariant)]

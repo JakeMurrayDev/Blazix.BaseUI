@@ -171,7 +171,7 @@
         {
             var slot = index;
             <OtpFieldInput class="demo-otp-field-input"
-                           aria-label="@(slot == 0 ? string.Empty : $"Character {slot + 1} of {length}")"
+                           aria-label="@(slot == 0 ? null : $"Character {slot + 1} of {length}")"
                            data-demo-slot="@($"{idPrefix}-{slot}")" />
             if (splitAt.HasValue && slot == splitAt.Value)
             {

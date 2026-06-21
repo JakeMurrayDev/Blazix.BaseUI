@@ -47,7 +47,7 @@ public abstract class OtpFieldTestsBase : TestBase
         await Assertions.Expect(GetInput(2)).ToHaveAttributeAsync("tabindex", "0");
         await Assertions.Expect(GetHiddenInput()).ToHaveAttributeAsync("name", "otp");
         await Assertions.Expect(GetHiddenInput()).ToHaveAttributeAsync("autocomplete", "one-time-code");
-        await Assertions.Expect(GetHiddenInput()).ToHaveAttributeAsync("pattern", "\\d{6}");
+        await Assertions.Expect(GetHiddenInput()).ToHaveAttributeAsync("pattern", "[0-9]{6}");
 
         var hiddenInsideRoot = await GetRoot().Locator("input[data-blazix-otp-hidden-input]").CountAsync();
         Assert.Equal(0, hiddenInsideRoot);
