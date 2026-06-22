@@ -1,0 +1,64 @@
+@page "/utils/csp-provider"
+
+<PageTitle>CSP Provider · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Utils"
+               Title="CSP Provider"
+               Subtitle="Configures Content Security Policy behavior for the inline style elements Blazix.BaseUI components inject at runtime."
+               MarkdownHref="/utils/csp-provider.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Some components inject an inline <code class="@LiquidGlassClasses.CodeInline">&lt;style&gt;</code> element for
+    functionality such as hiding native scrollbars — in Blazix.BaseUI this affects the
+    <code class="@LiquidGlassClasses.CodeInline">Select</code> popup and list. Under a strict
+    <a class="text-sky-700 underline-offset-2 hover:underline dark:text-sky-300" href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP" target="_blank" rel="noreferrer">Content Security Policy</a>,
+    these elements are blocked unless they carry a matching
+    <code class="@LiquidGlassClasses.CodeInline">nonce</code>.
+</p>
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">CspProvider</code> configures this behavior for every Blazix.BaseUI
+    component in its subtree.
+</p>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap it around your app or a group of components and pass the request's nonce.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Supplying a nonce" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Generate a random nonce per request, include it in your CSP header (via the
+    <code class="@LiquidGlassClasses.CodeInline">style-src-elem</code> directive), and pass the same value to
+    <code class="@LiquidGlassClasses.CodeInline">CspProvider</code>. Every injected
+    <code class="@LiquidGlassClasses.CodeInline">&lt;style&gt;</code> element then carries the nonce and is allowed
+    to run.
+</p>
+
+<DocsHeading Title="Disabling style elements" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    If you would rather not supply a nonce, set
+    <code class="@LiquidGlassClasses.CodeInline">DisableStyleElements</code> to skip injecting the style elements
+    entirely and rely on your own stylesheet instead.
+</p>
+<CodeBlock Code="@DisableCode" />
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Csp
+
+        <CspProvider Nonce="@nonce">
+            @* Your app or a group of components *@
+        </CspProvider>
+        """;
+
+    private const string DisableCode =
+        """
+        @using Blazix.BaseUI.Csp
+
+        <CspProvider DisableStyleElements="true">
+            @* ... *@
+        </CspProvider>
+        """;
+}
