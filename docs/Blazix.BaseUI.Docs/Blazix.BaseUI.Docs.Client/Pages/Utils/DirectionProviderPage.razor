@@ -1,0 +1,62 @@
+@page "/utils/direction-provider"
+
+<PageTitle>Direction Provider · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Utils"
+               Title="Direction Provider"
+               Subtitle="Enables right-to-left behavior for Blazix.BaseUI components."
+               MarkdownHref="/utils/direction-provider.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">DirectionProvider</code> lets descendant components adjust their
+    behavior — arrow-key navigation, alignment, and positioning — for right-to-left text. It does not set the
+    <code class="@LiquidGlassClasses.CodeInline">dir</code> HTML attribute or
+    <code class="@LiquidGlassClasses.CodeInline">direction</code> CSS; your own markup or styles must still do that.
+</p>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap it around your app or a group of components.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Resolving the direction" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">Direction</code> accepts
+    <code class="@LiquidGlassClasses.CodeInline">Direction.Ltr</code>,
+    <code class="@LiquidGlassClasses.CodeInline">Direction.Rtl</code>, or
+    <code class="@LiquidGlassClasses.CodeInline">Direction.Undefined</code> (the default). When left undefined, the
+    direction resolves from <code class="@LiquidGlassClasses.CodeInline">CultureInfo.CurrentCulture</code> —
+    right-to-left cultures resolve to <code class="@LiquidGlassClasses.CodeInline">Rtl</code>, everything else to
+    <code class="@LiquidGlassClasses.CodeInline">Ltr</code>.
+</p>
+
+<DocsHeading Title="Setting the visual direction" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">DirectionProvider</code> only feeds behavior. Set the matching
+    <code class="@LiquidGlassClasses.CodeInline">dir</code> attribute (or
+    <code class="@LiquidGlassClasses.CodeInline">direction</code> CSS) yourself so the layout flips visually.
+</p>
+<CodeBlock Code="@VisualCode" />
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.DirectionProvider
+
+        <DirectionProvider Direction="Direction.Rtl">
+            @* Your app or a group of components *@
+        </DirectionProvider>
+        """;
+
+    private const string VisualCode =
+        """
+        @using Blazix.BaseUI.DirectionProvider
+
+        <div dir="rtl">
+            <DirectionProvider Direction="Direction.Rtl">
+                @* ... *@
+            </DirectionProvider>
+        </div>
+        """;
+}
