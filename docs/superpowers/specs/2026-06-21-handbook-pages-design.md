@@ -36,6 +36,7 @@
 Each page is a routable Razor page under `Pages/Handbook/` with a literal `@page` route (shadows the `/handbook/{Slug}` stub), a `DocsPageIntro` (with `MarkdownHref`), `DocsHeading` sections, and `CodeBlock`s. Animation and Forms additionally embed a live `Demo` with CSS + Tailwind variants.
 
 ### 1. Styling — `/handbook/styling` (prose + code)
+
 Sections:
 - **Style hooks**
   - CSS classes — `class` and `ClassValue` (function form receives state).
@@ -46,6 +47,7 @@ Sections:
 - **Plain CSS** — apply named classes and style them in a stylesheet (replaces base-ui's "CSS Modules" / "CSS-in-JS" sections; matches the docs' established CSS+Tailwind variant story).
 
 ### 2. Composition — `/handbook/composition` (prose + code)
+
 Sections:
 - **Composing custom components** — use `Render` to render a part as your own Blazor component; the custom component must forward attributes/`@ref` to its root element.
 - **Composing multiple components** — nesting `Render` delegates (e.g. Tooltip trigger composed with a Dialog/Menu trigger).
@@ -53,6 +55,7 @@ Sections:
 - **Render with state** — the `RenderProps<TState>` context exposes attributes + component state for full control / conditional content.
 
 ### 3. Customization — `/handbook/customization` (prose + code)
+
 Sections:
 - **Blazix change events** — signature shape `OnOpenChange="EventCallback<…OpenChangeEventArgs>"`; the args object and its members (`Open`/`Value`, `Reason`, `Cancel`, `AllowPropagation`, `IsCanceled`, `IsPropagationAllowed`, `PreventUnmountOnClose`).
   - **Canceling a change** — `args.Cancel()` to keep a component uncontrolled while blocking a specific transition (reason-gated).
@@ -60,6 +63,7 @@ Sections:
 - **Controlling components with state** — uncontrolled by default; control via `@bind-Open`/`@bind-Value` or explicit `Open`+`OnOpenChange`; example opening a Dialog from a timer without a trigger.
 
 ### 4. Animation — `/handbook/animation` (prose + live demo)
+
 Sections:
 - Intro: components animate with CSS transitions or CSS animations via data attributes.
 - **CSS transitions** — `[data-starting-style]` / `[data-ending-style]` (recommended; cancellable mid-flight).
@@ -69,6 +73,7 @@ Sections:
 - **JavaScript-driven animation** — short note: animation driven by JS belongs in a JS interop module (per project JS-interop rules); no Motion/Framer port (decision below).
 
 ### 5. Forms — `/handbook/forms` (prose + live demo)
+
 Sections (Blazix Field/Fieldset/Form):
 - **Naming form controls** — `FieldRoot.Name` (precedence) / `FieldControl<TValue>.Name`.
 - **Describing the control** — `FieldDescription` (joins `aria-describedby`), `FieldError`.
