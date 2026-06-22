@@ -1,0 +1,117 @@
+@page "/handbook/animation"
+
+<PageTitle>Animation · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Handbook"
+               Title="Animation"
+               Subtitle="A guide to animating Blazix.BaseUI components."
+               MarkdownHref="/handbook/animation.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Components can be animated with CSS transitions or CSS animations. Each component provides data attributes to
+    target its states, plus a few attributes specifically for entry and exit animation.
+</p>
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <PopoverHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="CSS transitions" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use these attributes to transition a component as it becomes visible or hidden:
+</p>
+<ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li><code class="@LiquidGlassClasses.CodeInline">[data-starting-style]</code> — the initial style to transition from.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">[data-ending-style]</code> — the final style to transition to.</li>
+</ul>
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Transitions are recommended over CSS animations because a transition can be cancelled smoothly midway — if the
+    user closes a popup before it finishes opening, it animates back to closed without an abrupt jump.
+</p>
+<CodeBlock Code="@TransitionCode" Language="css" />
+
+<DocsHeading Title="CSS animations" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use these attributes to drive keyframe animations as a component becomes visible or hidden:
+</p>
+<ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li><code class="@LiquidGlassClasses.CodeInline">[data-open]</code> — applied while the component is visible.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">[data-closed]</code> — applied before the component is hidden.</li>
+</ul>
+<CodeBlock Code="@AnimationCode" Language="css" />
+
+<DocsHeading Title="Keeping components mounted" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Popup components are removed from the DOM when closed. Set
+    <code class="@LiquidGlassClasses.CodeInline">KeepMounted</code> on the
+    <code class="@LiquidGlassClasses.CodeInline">Portal</code> part to keep them rendered while closed.
+</p>
+<CodeBlock Code="@KeepMountedCode" />
+
+<DocsHeading Title="JavaScript-driven animation" />
+<p class="mb-0 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For animation that must be driven by JavaScript, do it from a JS module rather than from Blazor — high-frequency
+    and lifecycle-bound animation belongs in interop. The CSS transition and animation hooks above cover the common
+    enter/exit cases without any JavaScript.
+</p>
+
+@code {
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.Hero.Css.PopoverHeroCss.razor"),
+            new DemoFile("popover.css", "css", "wwwroot.demos.popover.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Popover.razor", "xml", "Components.Demos.Popover.Hero.Tailwind.PopoverHeroTailwind.razor"),
+        ]),
+    ];
+
+    private const string TransitionCode =
+        """
+        .popover-popup {
+            transform-origin: var(--transform-origin);
+            transition: transform 150ms, opacity 150ms;
+        }
+
+        .popover-popup[data-starting-style],
+        .popover-popup[data-ending-style] {
+            opacity: 0;
+            transform: scale(0.9);
+        }
+        """;
+
+    private const string AnimationCode =
+        """
+        @keyframes scale-in {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes scale-out {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.9); }
+        }
+
+        .popover-popup[data-open] {
+            animation: scale-in 250ms ease-out;
+        }
+
+        .popover-popup[data-closed] {
+            animation: scale-out 250ms ease-in;
+        }
+        """;
+
+    private const string KeepMountedCode =
+        """
+        <PopoverPortal KeepMounted="true">
+            <PopoverPositioner>
+                <PopoverPopup class="popover-popup">...</PopoverPopup>
+            </PopoverPositioner>
+        </PopoverPortal>
+        """;
+}

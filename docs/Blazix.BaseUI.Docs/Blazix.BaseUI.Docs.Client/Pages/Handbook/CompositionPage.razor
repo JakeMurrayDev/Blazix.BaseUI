@@ -1,0 +1,119 @@
+@page "/handbook/composition"
+
+<PageTitle>Composition · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Handbook"
+               Title="Composition"
+               Subtitle="A guide to composing Blazix.BaseUI components with your own Blazor components."
+               MarkdownHref="/handbook/composition.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Every part accepts a <code class="@LiquidGlassClasses.CodeInline">Render</code> parameter — a
+    <code class="@LiquidGlassClasses.CodeInline">RenderFragment&lt;RenderProps&lt;TState&gt;&gt;</code> that lets you
+    change the element a part renders, or take full control of how it renders, while keeping its behavior. It is the
+    Blazor equivalent of a render prop.
+</p>
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    The function receives a <code class="@LiquidGlassClasses.CodeInline">props</code> argument of type
+    <code class="@LiquidGlassClasses.CodeInline">RenderProps&lt;TState&gt;</code>, which carries everything the part
+    would otherwise render:
+</p>
+<ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li><code class="@LiquidGlassClasses.CodeInline">props.Attributes</code> — every computed attribute (aria-*, data-*, role, class, style). Apply them with <code class="@LiquidGlassClasses.CodeInline">builder.AddMultipleAttributes</code>.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.State</code> — the part's current public state.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.ChildContent</code> — the original child content, so you decide where it goes.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">props.ElementReferenceCallback</code> — forward it with <code class="@LiquidGlassClasses.CodeInline">builder.AddElementReferenceCapture</code> so the part can reach its element for interop.</li>
+</ul>
+
+<DocsHeading Title="Changing the rendered element" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For the common case of swapping the element, return
+    <code class="@LiquidGlassClasses.CodeInline">RenderUtilities.CreateElement</code> with the tag you want. It applies
+    the attributes, forwards the element reference, and places the child content for you.
+</p>
+<CodeBlock Code="@CreateElementCode" />
+
+<DocsHeading Title="Taking full control" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For complete control — wrapping the part in extra markup, adding your own attributes, or rendering your own
+    component — return a render fragment that builds the tree. Apply
+    <code class="@LiquidGlassClasses.CodeInline">props.Attributes</code>, forward
+    <code class="@LiquidGlassClasses.CodeInline">props.ElementReferenceCallback</code>, and place
+    <code class="@LiquidGlassClasses.CodeInline">props.ChildContent</code> so the part keeps working.
+</p>
+<CodeBlock Code="@FullControlCode" />
+<p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Each part renders the most appropriate element by default; rendering a different element is recommended only on
+    a case-by-case basis.
+</p>
+
+<DocsHeading Title="Rendering from state" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Because <code class="@LiquidGlassClasses.CodeInline">props.State</code> is available, the render function can vary
+    its content based on the part's current state.
+</p>
+<CodeBlock Code="@RenderFromStateCode" />
+
+@code {
+    private const string CreateElementCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Button
+
+        <Button NativeButton="false" Render="@RenderAsDiv">
+            A button that can contain complex children
+        </Button>
+
+        @code {
+            private RenderFragment<RenderProps<ButtonState>> RenderAsDiv => props =>
+                RenderUtilities.CreateElement("div", props);
+        }
+        """;
+
+    private const string FullControlCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Menu
+        @using Microsoft.AspNetCore.Components.Rendering
+
+        <MenuItem Render="@RenderAsLink">Add to Library</MenuItem>
+
+        @code {
+            private RenderFragment<RenderProps<MenuItemState>> RenderAsLink => props => builder =>
+            {
+                builder.OpenElement(0, "a");
+                builder.AddMultipleAttributes(1, props.Attributes);
+                builder.AddAttribute(2, "href", "https://blazix.dev");
+                if (props.ElementReferenceCallback is not null)
+                {
+                    builder.AddElementReferenceCapture(3, props.ElementReferenceCallback);
+                }
+                builder.AddContent(4, props.ChildContent);
+                builder.CloseElement();
+            };
+        }
+        """;
+
+    private const string RenderFromStateCode =
+        """
+        @using Blazix.BaseUI
+        @using Blazix.BaseUI.Switch
+        @using Microsoft.AspNetCore.Components.Rendering
+
+        <SwitchThumb Render="@RenderThumb" />
+
+        @code {
+            private RenderFragment<RenderProps<SwitchRootState>> RenderThumb => props => builder =>
+            {
+                builder.OpenElement(0, "span");
+                builder.AddMultipleAttributes(1, props.Attributes);
+                if (props.ElementReferenceCallback is not null)
+                {
+                    builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
+                }
+                builder.AddContent(3, props.State.Checked ? "On" : "Off");
+                builder.CloseElement();
+            };
+        }
+        """;
+}

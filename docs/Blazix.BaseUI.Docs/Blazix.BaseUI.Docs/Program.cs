@@ -29,22 +29,11 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
-app.MapGet("/components/{slug}.md", async (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
-{
-    if (slug.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
-    {
-        return Results.BadRequest("Invalid component slug.");
-    }
+app.MapGet("/components/{slug}.md", (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
+    ServeMarkdownAsync(slug, "Components", "component", environment, cancellationToken));
 
-    var markdownPath = Path.Combine(environment.ContentRootPath, "Content", "Components", $"{slug}.md");
-    if (!File.Exists(markdownPath))
-    {
-        return Results.NotFound();
-    }
-
-    var markdown = await File.ReadAllTextAsync(markdownPath, cancellationToken);
-    return Results.Text(markdown, "text/markdown; charset=utf-8");
-});
+app.MapGet("/handbook/{slug}.md", (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
+    ServeMarkdownAsync(slug, "Handbook", "handbook", environment, cancellationToken));
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
@@ -52,3 +41,25 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(Blazix.BaseUI.Docs.Client._Imports).Assembly);
 
 app.Run();
+
+static async Task<IResult> ServeMarkdownAsync(
+    string slug,
+    string contentFolder,
+    string slugType,
+    IWebHostEnvironment environment,
+    CancellationToken cancellationToken)
+{
+    if (slug.Any(character => !(char.IsAsciiLetterOrDigit(character) || character == '-')))
+    {
+        return Results.BadRequest($"Invalid {slugType} slug.");
+    }
+
+    var markdownPath = Path.Combine(environment.ContentRootPath, "Content", contentFolder, $"{slug}.md");
+    if (!File.Exists(markdownPath))
+    {
+        return Results.NotFound();
+    }
+
+    var markdown = await File.ReadAllTextAsync(markdownPath, cancellationToken);
+    return Results.Text(markdown, "text/markdown; charset=utf-8");
+}

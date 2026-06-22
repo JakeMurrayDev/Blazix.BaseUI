@@ -1,0 +1,141 @@
+@page "/handbook/styling"
+
+<PageTitle>Styling · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Handbook"
+               Title="Styling"
+               Subtitle="A guide to styling Blazix.BaseUI components with any styling solution."
+               MarkdownHref="/handbook/styling.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Blazix.BaseUI components are unstyled and ship no CSS. Each part renders a plain HTML element that you
+    style yourself — with Tailwind, plain CSS, or any other approach. You keep complete control of the styling layer.
+</p>
+
+<DocsHeading Title="Style hooks" />
+
+<DocsHeading Level="3" Title="CSS classes" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Parts that render an HTML element accept the standard <code class="@LiquidGlassClasses.CodeInline">class</code> attribute.
+</p>
+<CodeBlock Code="@ClassCode" />
+<p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    For classes that depend on the part's state, pass a function to
+    <code class="@LiquidGlassClasses.CodeInline">ClassValue</code>. It receives the part's state record and returns the class string.
+</p>
+<CodeBlock Code="@ClassValueCode" />
+
+<DocsHeading Level="3" Title="Data attributes" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Components expose data attributes for styling their states. For example, Switch can be styled through its
+    <code class="@LiquidGlassClasses.CodeInline">[data-checked]</code> and
+    <code class="@LiquidGlassClasses.CodeInline">[data-unchecked]</code> attributes, among others.
+</p>
+<CodeBlock Code="@DataAttributeCode" Language="css" />
+
+<DocsHeading Level="3" Title="CSS variables" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Components expose CSS variables to aid styling, often holding dynamic values used in sizing or transform
+    calculations. For example, Popover exposes variables such as
+    <code class="@LiquidGlassClasses.CodeInline">--available-height</code> and
+    <code class="@LiquidGlassClasses.CodeInline">--anchor-width</code> on its parts.
+</p>
+<CodeBlock Code="@CssVariableCode" Language="css" />
+<p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Check each component's API reference for its complete list of data attributes and CSS variables.
+</p>
+
+<DocsHeading Level="3" Title="Style attribute" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Parts also accept the standard <code class="@LiquidGlassClasses.CodeInline">style</code> attribute, and a
+    <code class="@LiquidGlassClasses.CodeInline">StyleValue</code> function for state-driven inline styles.
+</p>
+<CodeBlock Code="@StyleValueCode" />
+
+<DocsHeading Title="Tailwind CSS" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Apply Tailwind utility classes through <code class="@LiquidGlassClasses.CodeInline">class</code> (or
+    <code class="@LiquidGlassClasses.CodeInline">ClassValue</code> for state variants). Target component states
+    with arbitrary variants like <code class="@LiquidGlassClasses.CodeInline">data-[checked]:</code>.
+</p>
+<CodeBlock Code="@TailwindCode" />
+
+<DocsHeading Title="Plain CSS" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Apply your own class names through <code class="@LiquidGlassClasses.CodeInline">class</code>, then style
+    them in any stylesheet.
+</p>
+<CodeBlock Code="@PlainCssRazorCode" />
+<CodeBlock Code="@PlainCssStylesheetCode" Language="css" />
+
+@code {
+    private const string ClassCode =
+        """
+        <SwitchThumb class="switch-thumb" />
+        """;
+
+    private const string ClassValueCode =
+        """
+        <Toggle ClassValue="@(state => state.Pressed ? "toggle pressed" : "toggle")">
+            Bold
+        </Toggle>
+        """;
+
+    private const string DataAttributeCode =
+        """
+        .switch-thumb {
+            background-color: #d4d4d4;
+        }
+
+        .switch-thumb[data-checked] {
+            background-color: #16a34a;
+        }
+        """;
+
+    private const string CssVariableCode =
+        """
+        .popover-popup {
+            max-height: var(--available-height);
+            max-width: var(--available-width);
+            transform-origin: var(--transform-origin);
+        }
+        """;
+
+    private const string StyleValueCode =
+        """
+        <SwitchThumb style="height: 1.25rem;" />
+
+        <Toggle StyleValue="@(state => state.Pressed ? "color: #2563eb;" : "color: inherit;")">
+            Bold
+        </Toggle>
+        """;
+
+    private const string TailwindCode =
+        """
+        <SwitchRoot @bind-Checked="enabled"
+                    class="relative h-6 w-10 rounded-full bg-neutral-300 data-[checked]:bg-green-600">
+            <SwitchThumb class="size-5 rounded-full bg-white transition-transform data-[checked]:translate-x-4" />
+        </SwitchRoot>
+        """;
+
+    private const string PlainCssRazorCode =
+        """
+        <SwitchRoot @bind-Checked="enabled" class="switch">
+            <SwitchThumb class="switch-thumb" />
+        </SwitchRoot>
+        """;
+
+    private const string PlainCssStylesheetCode =
+        """
+        .switch {
+            width: 2.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            background-color: #d4d4d4;
+        }
+
+        .switch[data-checked] {
+            background-color: #16a34a;
+        }
+        """;
+}

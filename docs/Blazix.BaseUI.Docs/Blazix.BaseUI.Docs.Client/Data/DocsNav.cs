@@ -17,11 +17,11 @@ public static class DocsNav
         ]),
         new("Handbook", "handbook",
         [
-            new("Animation", "animation", "/handbook/animation", "A guide to animating Blazix.BaseUI components."),
-            new("Composition", "composition", "/handbook/composition", "A guide to composing Blazix.BaseUI components with your own Blazor components."),
-            new("Customization", "customization", "/handbook/customization", "A guide to customizing component behavior."),
-            new("Forms", "forms", "/handbook/forms", "A guide to using Blazix.BaseUI components in forms."),
-            new("Styling", "styling", "/handbook/styling", "A guide to styling Blazix.BaseUI components with any styling solution."),
+            new("Animation", "animation", "/handbook/animation", "A guide to animating Blazix.BaseUI components.", IsDocumented: true),
+            new("Composition", "composition", "/handbook/composition", "A guide to composing Blazix.BaseUI components with your own Blazor components.", IsDocumented: true),
+            new("Customization", "customization", "/handbook/customization", "A guide to customizing the behavior of Blazix.BaseUI components.", IsDocumented: true),
+            new("Forms", "forms", "/handbook/forms", "A guide to using Blazix.BaseUI components in forms.", IsDocumented: true),
+            new("Styling", "styling", "/handbook/styling", "A guide to styling Blazix.BaseUI components with any styling solution.", IsDocumented: true),
         ]),
         new("Components", "components",
         [
