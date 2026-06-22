@@ -35,6 +35,9 @@ app.MapGet("/components/{slug}.md", (string slug, IWebHostEnvironment environmen
 app.MapGet("/handbook/{slug}.md", (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
     ServeMarkdownAsync(slug, "Handbook", "handbook", environment, cancellationToken));
 
+app.MapGet("/utils/{slug}.md", (string slug, IWebHostEnvironment environment, CancellationToken cancellationToken) =>
+    ServeMarkdownAsync(slug, "Utils", "utils", environment, cancellationToken));
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
