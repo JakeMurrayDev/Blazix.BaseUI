@@ -1,0 +1,183 @@
+@using Microsoft.JSInterop
+@using Blazix.BaseUI.Portal
+@using Blazix.BaseUI.Utilities.FocusGuard
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+@if (ShouldRenderGuards)
+{
+    <FocusGuard data-blazix-base-ui-focus-guard-type="outside" @ref="beforeOutsideGuardRef" />
+}
+
+@if (ShouldRenderGuards && portalRef?.Element is not null)
+{
+    <span aria-owns="@portalRef.Element.Value.Id" style="@OwnerVisuallyHiddenStyle" />
+}
+
+<CascadingValue TValue="FloatingPortalContext" Value="portalContext" IsFixed="true">
+    <Portal Target="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalRef">
+        @ChildContent
+    </Portal>
+</CascadingValue>
+
+@if (ShouldRenderGuards)
+{
+    <FocusGuard data-blazix-base-ui-focus-guard-type="outside" @ref="afterOutsideGuardRef" />
+}
+
+@code {
+    private const string OwnerVisuallyHiddenStyle =
+        "position:fixed;overflow:hidden;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;clip-path:inset(50%);white-space:nowrap;border-width:0;";
+
+    private readonly FloatingPortalContext portalContext = new();
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private Portal? portalRef;
+    private FocusGuard? beforeOutsideGuardRef;
+    private FocusGuard? afterOutsideGuardRef;
+    private DotNetObjectReference<FloatingPortal>? dotNetRef;
+    private string? portalId;
+    private bool hasInitialized;
+
+    public FloatingPortal()
+    {
+        moduleTask = new(() => JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js").AsTask());
+    }
+
+    private bool ShouldRenderGuards
+    {
+        get
+        {
+            if (RenderGuards is bool explicit_)
+            {
+                return explicit_;
+            }
+
+            var fms = portalContext.FocusManagerState;
+            return fms is not null && !fms.Modal && fms.Open && portalRef?.Element is not null;
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets a CSS selector for the container to render the portal into.
+    /// Defaults to <c>"body"</c>.
+    /// </summary>
+    [Parameter]
+    public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets whether to render outside focus guards for tab management.
+    /// When <see langword="null"/>, guards are rendered automatically based on
+    /// focus manager state (non-modal + open + portal node available).
+    /// </summary>
+    [Parameter]
+    public bool? RenderGuards { get; set; }
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default portal element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<object>>? Render { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets a collection of additional attributes that will be applied to the portal element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the element reference of the portal container node.
+    /// </summary>
+    public ElementReference? Element => portalRef?.Element;
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            hasInitialized = true;
+        }
+
+        // Initialize JS portal focus management once guards and portal are available
+        if (hasInitialized && portalId is null && portalRef?.Element is not null)
+        {
+            try
+            {
+                dotNetRef ??= DotNetObjectReference.Create(this);
+
+                var module = await moduleTask.Value;
+                portalId = await module.InvokeAsync<string>("initializeFloatingPortal", new
+                {
+                    portalNode = portalRef.Element.Value,
+                    beforeOutsideGuard = beforeOutsideGuardRef?.Element,
+                    afterOutsideGuard = afterOutsideGuardRef?.Element,
+                    beforeInsideGuard = portalContext.BeforeInsideGuard,
+                    afterInsideGuard = portalContext.AfterInsideGuard,
+                    dotNetRef
+                });
+
+                portalContext.PortalNode = portalRef.Element;
+                portalContext.BeforeOutsideGuard = beforeOutsideGuardRef?.Element;
+                portalContext.AfterOutsideGuard = afterOutsideGuardRef?.Element;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (portalId is not null && moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("disposeFloatingPortal", portalId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
+        dotNetRef?.Dispose();
+
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Invoked by JS when focus leaves the floating portal and the element should close.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnPortalFocusOut()
+    {
+        var fms = portalContext.FocusManagerState;
+        if (fms?.OnOpenChangeAsync is not null)
+        {
+            await fms.OnOpenChangeAsync(false, "focus-out");
+        }
+    }
+}

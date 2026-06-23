@@ -1,5 +1,5 @@
 using Blazix.BaseUI.Field;
-using Blazix.BaseUI.FloatingFocusManager;
+using Blazix.BaseUI.Utilities.FloatingFocusManager;
 using Microsoft.AspNetCore.Components;
 
 namespace Blazix.BaseUI.Select;

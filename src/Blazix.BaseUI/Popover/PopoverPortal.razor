@@ -1,12 +1,12 @@
 @if (RootContext is not null && (RootContext.GetMounted() || KeepMounted))
 {
     <CascadingValue Value="portalContext" IsFixed="true">
-        <Blazix.BaseUI.Portal.FloatingPortal Container="@Container"
-                                             RenderGuards="@ShouldRenderFocusGuards"
-                                             Render="@Render"
-                                             @attributes="AdditionalAttributes">
+        <Blazix.BaseUI.Utilities.Portal.FloatingPortal Container="@Container"
+                                                       RenderGuards="@ShouldRenderFocusGuards"
+                                                       Render="@Render"
+                                                       @attributes="AdditionalAttributes">
             @ChildContent
-        </Blazix.BaseUI.Portal.FloatingPortal>
+        </Blazix.BaseUI.Utilities.Portal.FloatingPortal>
     </CascadingValue>
 }
 

@@ -13,7 +13,6 @@ NuGet link: TBD
 ## Projects
 
 - `src/Blazix.BaseUI`: component library.
-- `src/Blazix.BaseUI.Utilities`: shared utilities.
 - `src/Blazix.BaseUI.Analyzers`: Roslyn analyzers used by the library.
 - `demo/Blazix.BaseUI.Demo`: demo app.
 - `tests`: unit and Playwright tests.

@@ -1,5 +1,5 @@
 using Microsoft.JSInterop;
-using FocusManager = Blazix.BaseUI.FloatingFocusManager.FloatingFocusManager;
+using FocusManager = Blazix.BaseUI.Utilities.FloatingFocusManager.FloatingFocusManager;
 
 namespace Blazix.BaseUI.Tests.FloatingFocusManager;
 
@@ -24,7 +24,7 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         string? interactionType = null,
         bool disabled = false,
         RenderFragment? childContent = null,
-        IReadOnlyList<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>? order = null,
+        IReadOnlyList<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>? order = null,
         IReadOnlyList<ElementReference>? insideElements = null,
         ElementReference? nextFocusableElement = null,
         ElementReference? previousFocusableElement = null)
@@ -58,7 +58,7 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         bool returnFocus, bool restoreFocus, string? restoreFocusMode,
         bool closeOnFocusOut, string? interactionType, bool disabled,
         RenderFragment? childContent,
-        IReadOnlyList<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>? order,
+        IReadOnlyList<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>? order,
         IReadOnlyList<ElementReference>? insideElements,
         ElementReference? nextFocusableElement, ElementReference? previousFocusableElement)
     {
@@ -453,10 +453,10 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         module.Setup<string>("createFloatingFocusManager", _ => true).SetResult("fm-1");
         module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
 
-        var order = new List<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>
+        var order = new List<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>
         {
-            Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Reference,
-            Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Content
+            Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Reference,
+            Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Content
         };
 
         Render(CreateFocusManager(rootContext: CreateOpenRootContext(), order: order));
@@ -606,7 +606,7 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         module.Setup<string>("createFloatingFocusManager", _ => true).SetResult("fm-1");
         module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
 
-        var externalTree = new Blazix.BaseUI.FloatingTree.FloatingTreeContext("ext-tree-id");
+        var externalTree = new Blazix.BaseUI.Utilities.FloatingTree.FloatingTreeContext("ext-tree-id");
 
         Render(builder =>
         {
@@ -646,7 +646,7 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         var fmComponent = cut.FindComponent<FocusManager>();
         fmComponent.Instance.Order.ShouldNotBeNull();
         fmComponent.Instance.Order!.Count.ShouldBe(1);
-        fmComponent.Instance.Order![0].ShouldBe(Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Content);
+        fmComponent.Instance.Order![0].ShouldBe(Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Content);
 
         return Task.CompletedTask;
     }
@@ -732,24 +732,24 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         module.SetupVoid("updateFloatingFocusManager", _ => true).SetVoidResult();
         module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
 
-        var order1 = new List<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>
+        var order1 = new List<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>
         {
-            Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Content
+            Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Content
         };
 
         var cut = Render(builder =>
         {
             builder.OpenComponent<FocusManagerWrapper>(0);
             builder.AddAttribute(1, "RootContext", CreateOpenRootContext());
-            builder.AddAttribute(2, "Order", (IReadOnlyList<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>)order1);
+            builder.AddAttribute(2, "Order", (IReadOnlyList<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>)order1);
             builder.CloseComponent();
         });
 
         var wrapper = cut.FindComponent<FocusManagerWrapper>();
-        wrapper.Instance.Order = new List<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>
+        wrapper.Instance.Order = new List<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>
         {
-            Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Reference,
-            Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem.Content
+            Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Reference,
+            Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem.Content
         };
         wrapper.Render();
 
@@ -917,7 +917,7 @@ internal sealed class FocusManagerWrapper : ComponentBase
     [Parameter] public bool CloseOnFocusOut { get; set; } = true;
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public IReadOnlyList<ElementReference>? InsideElements { get; set; }
-    [Parameter] public IReadOnlyList<Blazix.BaseUI.FloatingFocusManager.FocusManagerOrderItem>? Order { get; set; }
+    [Parameter] public IReadOnlyList<Blazix.BaseUI.Utilities.FloatingFocusManager.FocusManagerOrderItem>? Order { get; set; }
     [Parameter] public Func<string?, bool>? ReturnFocusCallback { get; set; }
 
     public void TriggerReRender() => InvokeAsync(StateHasChanged);
@@ -930,7 +930,7 @@ internal sealed class FocusManagerWrapper : ComponentBase
             builder.AddAttribute(1, "Value", RootContext);
             builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
             {
-                inner.OpenComponent<Blazix.BaseUI.FloatingFocusManager.FloatingFocusManager>(0);
+                inner.OpenComponent<Blazix.BaseUI.Utilities.FloatingFocusManager.FloatingFocusManager>(0);
                 inner.AddAttribute(1, "Modal", Modal);
                 inner.AddAttribute(2, "ReturnFocus", ReturnFocus);
                 inner.AddAttribute(3, "CloseOnFocusOut", CloseOnFocusOut);

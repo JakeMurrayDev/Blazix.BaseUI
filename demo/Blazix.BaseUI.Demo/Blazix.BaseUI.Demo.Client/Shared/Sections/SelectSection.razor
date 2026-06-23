@@ -2,7 +2,7 @@
 @using Blazix.BaseUI.Csp
 @using Blazix.BaseUI.DirectionProvider
 @using Blazix.BaseUI.Field
-@using Blazix.BaseUI.FloatingFocusManager
+@using Blazix.BaseUI.Utilities.FloatingFocusManager
 
 <ComponentShowcase ComponentName="Select"
                    Description="A dropdown selection component that allows users to choose one or more items from a list. Provides keyboard navigation, typeahead, and full ARIA support."
@@ -319,7 +319,7 @@
                 <SelectPortal>
                     <SelectPositioner SideOffset="4">
                         <SelectPopup ClassValue="@(state => PopupClass(state))"
-                                     FinalFocus="@(Blazix.BaseUI.FloatingFocusManager.FinalFocusTarget.From(closeType => closeType == Blazix.BaseUI.InteractionType.Keyboard ? Blazix.BaseUI.FloatingFocusManager.FinalFocusResult.Default : Blazix.BaseUI.FloatingFocusManager.FinalFocusResult.To(continueButton)))">
+                                     FinalFocus="@(Blazix.BaseUI.Utilities.FloatingFocusManager.FinalFocusTarget.From(closeType => closeType == Blazix.BaseUI.InteractionType.Keyboard ? Blazix.BaseUI.Utilities.FloatingFocusManager.FinalFocusResult.Default : Blazix.BaseUI.Utilities.FloatingFocusManager.FinalFocusResult.To(continueButton)))">
                             <SelectItem TValue="string" Value="@("apple")" Label="Apple" ClassValue="@(state => ItemClass(state))">
                                 <SelectItemIndicator class="col-start-1">@CheckIcon</SelectItemIndicator>
                                 <SelectItemText class="col-start-2">Apple</SelectItemText>
