@@ -1,0 +1,55 @@
+@page "/utils/portal"
+
+<PageTitle>Portal · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Utils"
+               Title="Portal"
+               Subtitle="Renders its content in a different part of the DOM."
+               MarkdownHref="/utils/portal.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">Portal</code> moves its content out of the normal document flow and
+    appends it elsewhere — by default to <code class="@LiquidGlassClasses.CodeInline">&lt;body&gt;</code>. This is
+    useful for overlays that must escape the <code class="@LiquidGlassClasses.CodeInline">overflow: hidden</code> or
+    stacking-context constraints of a parent. It renders a
+    <code class="@LiquidGlassClasses.CodeInline">&lt;div&gt;</code>.
+</p>
+
+<DocsHeading Title="Anatomy" />
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Choosing a target" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Set <code class="@LiquidGlassClasses.CodeInline">Target</code> to any CSS selector to render into a different
+    parent element. It defaults to <code class="@LiquidGlassClasses.CodeInline">"body"</code>.
+</p>
+<CodeBlock Code="@TargetCode" />
+
+<DocsHeading Title="Composition" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Like every part, <code class="@LiquidGlassClasses.CodeInline">Portal</code> accepts a
+    <code class="@LiquidGlassClasses.CodeInline">Render</code> parameter to change the element it renders or compose it
+    with your own component. See the
+    <a class="text-sky-700 underline-offset-2 hover:underline dark:text-sky-300" href="/handbook/composition">Composition</a>
+    guide.
+</p>
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Portal
+
+        <Portal>
+            @* Content rendered into <body> *@
+        </Portal>
+        """;
+
+    private const string TargetCode =
+        """
+        @using Blazix.BaseUI.Portal
+
+        <Portal Target="#overlay-root">
+            @* Content rendered into #overlay-root *@
+        </Portal>
+        """;
+}

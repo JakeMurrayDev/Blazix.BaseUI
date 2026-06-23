@@ -1,0 +1,32 @@
+@namespace Blazix.BaseUI.DirectionProvider
+@using System.Globalization
+
+@* Direction can change at runtime (e.g. an RTL/language toggle), so the cascade must notify consumers — keep this non-fixed. *@
+<CascadingValue TValue="DirectionProviderContext" Value="context" IsFixed="false">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private readonly DirectionProviderContext context = new();
+
+    /// <summary>
+    /// Gets or sets the reading direction of the text. Defaults to <see cref="Blazix.BaseUI.Direction.Undefined"/>,
+    /// which resolves based on <see cref="CultureInfo.CurrentCulture"/>.
+    /// </summary>
+    [Parameter]
+    public Direction Direction { get; set; }
+
+    /// <summary>
+    /// Defines the child components of this instance.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        context.Direction = Direction != Direction.Undefined
+            ? Direction
+            : (CultureInfo.CurrentCulture.TextInfo.IsRightToLeft ? Direction.Rtl : Direction.Ltr);
+    }
+}

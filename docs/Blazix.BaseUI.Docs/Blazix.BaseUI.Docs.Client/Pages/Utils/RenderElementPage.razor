@@ -1,0 +1,70 @@
+@page "/utils/render-element"
+
+<PageTitle>Render Element · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Utils"
+               Title="Render Element"
+               Subtitle="The element-rendering primitive behind every Blazix.BaseUI component part."
+               MarkdownHref="/utils/render-element.md" />
+
+<p class="mb-3 mt-6 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">RenderElement&lt;TState&gt;</code> centralizes element output for
+    every part. It merges the consumer's attributes with the component-computed ones, composes
+    <code class="@LiquidGlassClasses.CodeInline">class</code> and
+    <code class="@LiquidGlassClasses.CodeInline">style</code> from state, and dispatches to either a
+    consumer-supplied <code class="@LiquidGlassClasses.CodeInline">Render</code> function or the default HTML element.
+</p>
+
+<div class="mb-4 mt-4">
+    <DocsCallout Title="Note">
+        <p class="m-0">
+            You rarely use <code class="@LiquidGlassClasses.CodeInline">RenderElement</code> directly — components wrap
+            it for you, and you customize output through the
+            <a class="font-medium text-sky-700 underline-offset-2 hover:underline dark:text-sky-300" href="/handbook/composition">Render</a>
+            parameter each part already exposes. It is documented here for authors building their own parts on the same
+            primitive.
+        </p>
+    </DocsCallout>
+</div>
+
+<DocsHeading Title="Key parameters" />
+<ul class="mb-3 ml-5 max-w-3xl list-disc text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li><code class="@LiquidGlassClasses.CodeInline">Tag</code> — the default HTML element to render.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">State</code> — the part's public state, passed to <code class="@LiquidGlassClasses.CodeInline">ClassValue</code>/<code class="@LiquidGlassClasses.CodeInline">StyleValue</code> and the <code class="@LiquidGlassClasses.CodeInline">Render</code> function.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">Render</code> — a <code class="@LiquidGlassClasses.CodeInline">RenderFragment&lt;RenderProps&lt;TState&gt;&gt;</code> that overrides the default element.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">ClassValue</code> / <code class="@LiquidGlassClasses.CodeInline">StyleValue</code> — functions that compute <code class="@LiquidGlassClasses.CodeInline">class</code>/<code class="@LiquidGlassClasses.CodeInline">style</code> from <code class="@LiquidGlassClasses.CodeInline">State</code>.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">ComponentAttributes</code> — internal attributes (aria-*, data-*, role) merged on top of the consumer's attributes.</li>
+    <li><code class="@LiquidGlassClasses.CodeInline">Enabled</code> — when <code class="@LiquidGlassClasses.CodeInline">false</code>, nothing renders.</li>
+</ul>
+
+<DocsHeading Title="Capturing the element reference" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Capture the rendered element with <code class="@LiquidGlassClasses.CodeInline">@@ref</code> and expose it through a
+    public <code class="@LiquidGlassClasses.CodeInline">Element</code> property.
+</p>
+<CodeBlock Code="@ElementRefCode" />
+<p class="mb-3 mt-4 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <code class="@LiquidGlassClasses.CodeInline">RenderElement.Element</code> is
+    <code class="@LiquidGlassClasses.CodeInline">ElementReference?</code>, so the public
+    <code class="@LiquidGlassClasses.CodeInline">Element</code> property returns
+    <code class="@LiquidGlassClasses.CodeInline">null</code> before the first render.
+</p>
+
+@code {
+    private const string ElementRefCode =
+        """
+        <RenderElement TState="MyComponentState"
+                       Tag="div"
+                       State="state"
+                       Render="Render"
+                       ComponentAttributes="componentAttributes"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+
+        @code {
+            private RenderElement<MyComponentState>? renderElementReference;
+
+            public ElementReference? Element => renderElementReference?.Element;
+        }
+        """;
+}

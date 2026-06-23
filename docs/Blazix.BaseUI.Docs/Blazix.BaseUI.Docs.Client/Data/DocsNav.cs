@@ -64,10 +64,10 @@ public static class DocsNav
         ]),
         new("Utils", "utils",
         [
-            new("CSP Provider", "csp-provider", "/utils/csp-provider", "Support for strict Content Security Policies."),
-            new("Direction Provider", "direction-provider", "/utils/direction-provider", "Enables right-to-left behavior for components."),
-            new("Portal", "portal", "/utils/portal", "Renders content in a different part of the DOM."),
-            new("Render Element", "render-element", "/utils/render-element", "The element-rendering primitive behind every component part."),
+            new("CSP Provider", "csp-provider", "/utils/csp-provider", "Configures Content Security Policy behavior for the inline style elements Blazix.BaseUI components inject at runtime.", IsDocumented: true),
+            new("Direction Provider", "direction-provider", "/utils/direction-provider", "Enables right-to-left behavior for Blazix.BaseUI components.", IsDocumented: true),
+            new("Portal", "portal", "/utils/portal", "Renders its content in a different part of the DOM.", IsDocumented: true),
+            new("Render Element", "render-element", "/utils/render-element", "The element-rendering primitive behind every Blazix.BaseUI component part.", IsDocumented: true),
         ]),
     ];
 

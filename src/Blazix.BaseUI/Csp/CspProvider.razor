@@ -1,11 +1,11 @@
 @namespace Blazix.BaseUI.Csp
 
-<CascadingValue TValue="CspProviderContext" Value="context" IsFixed="false">
+<CascadingValue TValue="CspProviderContext" Value="context" IsFixed="true">
     @ChildContent
 </CascadingValue>
 
 @code {
-    private CspProviderContext context = new(null, false);
+    private readonly CspProviderContext context = new();
 
     /// <summary>
     /// Gets or sets the nonce applied to runtime style elements.
@@ -28,6 +28,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        context = new CspProviderContext(Nonce, DisableStyleElements);
+        context.Nonce = Nonce;
+        context.DisableStyleElements = DisableStyleElements;
     }
 }
