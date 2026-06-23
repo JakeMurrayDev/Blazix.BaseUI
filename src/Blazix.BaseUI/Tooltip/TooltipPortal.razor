@@ -1,15 +1,15 @@
 @if (RootContext is not null && (RootContext.GetMounted() || KeepMounted))
 {
     <CascadingValue Value="portalContext" IsFixed="true">
-        <Blazix.BaseUI.Portal.FloatingPortalLite Container="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalLiteRef">
+        <Blazix.BaseUI.Utilities.Portal.FloatingPortalLite Container="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalLiteRef">
             @ChildContent
-        </Blazix.BaseUI.Portal.FloatingPortalLite>
+        </Blazix.BaseUI.Utilities.Portal.FloatingPortalLite>
     </CascadingValue>
 }
 
 @code {
     private TooltipPortalContext portalContext = null!;
-    private Blazix.BaseUI.Portal.FloatingPortalLite? portalLiteRef;
+    private Blazix.BaseUI.Utilities.Portal.FloatingPortalLite? portalLiteRef;
 
     [CascadingParameter]
     private TooltipRootContext? RootContext { get; set; }

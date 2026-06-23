@@ -1,0 +1,82 @@
+<CascadingValue Value="context">
+    @ChildContent
+</CascadingValue>
+
+@code {
+    private string? controlId;
+    private string? labelId;
+    private List<string> messageIds = [];
+    private LabelableContext context = null!;
+    private bool notifyPending;
+
+    /// <summary>
+    /// Gets or sets the initial control id provided to descendants. When <see langword="null"/>, a generated id is used.
+    /// </summary>
+    [Parameter]
+    public string? InitialControlId { get; set; }
+
+    /// <summary>
+    /// Defines the child content receiving the labelable context.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        controlId = InitialControlId ?? Guid.NewGuid().ToIdString();
+        context = CreateContext();
+    }
+
+    private LabelableContext CreateContext() => new(
+        ControlId: controlId,
+        SetControlId: SetControlId,
+        LabelId: labelId,
+        SetLabelId: SetLabelId,
+        MessageIds: messageIds,
+        UpdateMessageIds: UpdateMessageIds);
+
+    private void ScheduleStateHasChanged()
+    {
+        if (notifyPending)
+            return;
+
+        notifyPending = true;
+        _ = InvokeAsync(() =>
+        {
+            notifyPending = false;
+            context = CreateContext();
+            StateHasChanged();
+        });
+    }
+
+    private void SetControlId(string? id)
+    {
+        if (controlId == id) return;
+        controlId = id;
+        ScheduleStateHasChanged();
+    }
+
+    private void SetLabelId(string? id)
+    {
+        if (labelId == id) return;
+        labelId = id;
+        ScheduleStateHasChanged();
+    }
+
+    private void UpdateMessageIds(string id, bool add)
+    {
+        if (add)
+        {
+            if (messageIds.Contains(id)) return;
+            messageIds = [.. messageIds, id];
+        }
+        else
+        {
+            if (!messageIds.Contains(id)) return;
+            messageIds = messageIds.Where(m => m != id).ToList();
+        }
+
+        ScheduleStateHasChanged();
+    }
+}

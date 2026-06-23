@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.JSInterop;
-using DelayGroup = Blazix.BaseUI.FloatingDelayGroup.FloatingDelayGroup;
-using DelayGroupContext = Blazix.BaseUI.FloatingDelayGroup.FloatingDelayGroupContext;
+using DelayGroup = Blazix.BaseUI.Utilities.FloatingDelayGroup.FloatingDelayGroup;
+using DelayGroupContext = Blazix.BaseUI.Utilities.FloatingDelayGroup.FloatingDelayGroupContext;
 
 namespace Blazix.BaseUI.Tests.FloatingDelayGroup;
 
@@ -215,7 +215,7 @@ public class FloatingDelayGroupTests : BunitContext, IFloatingDelayGroupContract
 
         captured.ShouldNotBeNull();
 
-        var callback = new Blazix.BaseUI.FloatingDelayGroup.DelayGroupMemberCallback((_) => Task.CompletedTask);
+        var callback = new Blazix.BaseUI.Utilities.FloatingDelayGroup.DelayGroupMemberCallback((_) => Task.CompletedTask);
         var callbackRef = DotNetObjectReference.Create(callback);
 
         await captured!.RegisterMemberAsync("member-1", callbackRef);
@@ -244,7 +244,7 @@ public class FloatingDelayGroupTests : BunitContext, IFloatingDelayGroupContract
         captured.ShouldNotBeNull();
         captured!.IsInstantPhase.ShouldBeFalse();
 
-        var component = cut.FindComponent<Blazix.BaseUI.FloatingDelayGroup.FloatingDelayGroup>();
+        var component = cut.FindComponent<Blazix.BaseUI.Utilities.FloatingDelayGroup.FloatingDelayGroup>();
         component.Instance.SetIsInstantPhase(true);
 
         captured.IsInstantPhase.ShouldBeTrue();
@@ -268,7 +268,7 @@ public class FloatingDelayGroupTests : BunitContext, IFloatingDelayGroupContract
 
         captured.ShouldNotBeNull();
 
-        var component = cut.FindComponent<Blazix.BaseUI.FloatingDelayGroup.FloatingDelayGroup>();
+        var component = cut.FindComponent<Blazix.BaseUI.Utilities.FloatingDelayGroup.FloatingDelayGroup>();
         component.Instance.SetIsInstantPhase(true);
 
         var delay = captured!.GetDelay();

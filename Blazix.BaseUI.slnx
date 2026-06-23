@@ -4,7 +4,6 @@
   <Project Path="docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Blazix.BaseUI.Docs.Client.csproj" />
   <Project Path="docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.csproj" />
   <Project Path="src/Blazix.BaseUI.Analyzers/Blazix.BaseUI.Analyzers.csproj" />
-  <Project Path="src/Blazix.BaseUI.Utilities/Blazix.BaseUI.Utilities.csproj" Id="d8794365-8a79-477f-9999-1faa26d6c393" />
   <Project Path="src/Blazix.BaseUI/Blazix.BaseUI.csproj" Id="d7bfad9f-d1f2-42c5-9d80-9fec3257980b" />
   <Project Path="tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/Blazix.BaseUI.Playwright.Tests.Client.csproj" />
   <Project Path="tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj" />

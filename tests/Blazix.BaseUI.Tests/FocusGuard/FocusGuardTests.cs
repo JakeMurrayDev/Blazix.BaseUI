@@ -11,7 +11,7 @@ public class FocusGuardTests : BunitContext, IFocusGuardContract
     {
         return builder =>
         {
-            builder.OpenComponent<Blazix.BaseUI.FocusGuard.FocusGuard>(0);
+            builder.OpenComponent<Blazix.BaseUI.Utilities.FocusGuard.FocusGuard>(0);
             if (onFocus.HasValue)
             {
                 builder.AddAttribute(1, "OnFocus", onFocus.Value);

@@ -22,8 +22,9 @@ Blazix.BaseUI/
 ├── src/
 │   ├── Blazix.BaseUI/              # Main component library
 │   │   ├── [Component]/           # Component folders
+│   │   ├── Utilities/             # Shared utilities
 │   │   └── wwwroot/               # JavaScript modules
-│   └── Blazix.BaseUI.Utilities/    # Shared utilities
+│   └── Blazix.BaseUI.Analyzers/    # Roslyn analyzers
 ├── demo/
 │   └── Blazix.BaseUI.Demo/         # Demo application (Server + Client)
 └── tests/

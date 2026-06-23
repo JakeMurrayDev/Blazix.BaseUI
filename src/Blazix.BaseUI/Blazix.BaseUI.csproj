@@ -21,7 +21,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Blazix.BaseUI.Utilities\Blazix.BaseUI.Utilities.csproj" />
     <ProjectReference Include="..\Blazix.BaseUI.Analyzers\Blazix.BaseUI.Analyzers.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false"

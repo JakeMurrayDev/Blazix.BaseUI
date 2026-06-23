@@ -1,4 +1,4 @@
-using Blazix.BaseUI.FloatingFocusManager;
+using Blazix.BaseUI.Utilities.FloatingFocusManager;
 
 namespace Blazix.BaseUI.Tests.Select;
 
@@ -180,7 +180,7 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
             defaultOpen: true,
             finalFocus: FinalFocusTarget.None));
 
-        var manager = cut.FindComponent<global::Blazix.BaseUI.FloatingFocusManager.FloatingFocusManager>();
+        var manager = cut.FindComponent<global::Blazix.BaseUI.Utilities.FloatingFocusManager.FloatingFocusManager>();
         manager.Instance.FinalFocus.ShouldNotBeNull();
         // None resolves to Suppress for any close type.
         manager.Instance.FinalFocus!.Value.Resolve(InteractionType.Click).Suppress.ShouldBeTrue();
@@ -205,7 +205,7 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
     {
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true));
 
-        var manager = cut.FindComponent<global::Blazix.BaseUI.FloatingFocusManager.FloatingFocusManager>();
+        var manager = cut.FindComponent<global::Blazix.BaseUI.Utilities.FloatingFocusManager.FloatingFocusManager>();
         manager.Instance.FinalFocus.ShouldBeNull();
         // Legacy ReturnFocus default = true.
         manager.Instance.ReturnFocus.ShouldBeTrue();

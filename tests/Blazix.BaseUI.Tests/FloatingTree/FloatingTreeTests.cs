@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Components;
-using TreeContext = Blazix.BaseUI.FloatingTree.FloatingTreeContext;
-using Tree = Blazix.BaseUI.FloatingTree.FloatingTree;
+using TreeContext = Blazix.BaseUI.Utilities.FloatingTree.FloatingTreeContext;
+using Tree = Blazix.BaseUI.Utilities.FloatingTree.FloatingTree;
 
 namespace Blazix.BaseUI.Tests.FloatingTree;
 
