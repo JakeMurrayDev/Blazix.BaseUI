@@ -125,7 +125,7 @@
             }
 
             html.dark {
-                background: #05070c;
+                background: #000000;
                 color-scheme: dark;
             }
 
@@ -140,8 +140,8 @@
 
             html.dark body {
                 background:
-                    linear-gradient(135deg, rgba(5, 7, 12, 0.98), rgba(12, 26, 45, 0.9) 38%, rgba(7, 34, 39, 0.86) 68%, rgba(25, 20, 43, 0.92)),
-                    conic-gradient(from 220deg at 52% 28%, rgba(14, 165, 233, 0.22), rgba(168, 85, 247, 0.16), rgba(250, 204, 21, 0.08), rgba(45, 212, 191, 0.16), rgba(14, 165, 233, 0.22));
+                    linear-gradient(135deg, rgba(0, 0, 0, 0.98), rgba(20, 20, 20, 0.9) 38%, rgba(12, 12, 12, 0.86) 68%, rgba(26, 26, 26, 0.92)),
+                    conic-gradient(from 220deg at 52% 28%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.06));
             }
         }
 
@@ -193,11 +193,11 @@
 
             .dark .liquid-glass::before {
                 background:
-                    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%, rgba(125, 211, 252, 0.08)),
+                    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%, rgba(255, 255, 255, 0.08)),
                     radial-gradient(120% 120% at 12% 0%, rgba(255, 255, 255, 0.12), transparent 48%);
                 box-shadow:
                     inset 0 1px 1px rgba(255, 255, 255, 0.28),
-                    inset 0 -1px 1px rgba(125, 211, 252, 0.12),
+                    inset 0 -1px 1px rgba(255, 255, 255, 0.12),
                     inset 1px 0 1px rgba(255, 255, 255, 0.1),
                     inset -1px 0 1px rgba(255, 255, 255, 0.1);
                 opacity: 0.46;
@@ -216,7 +216,7 @@
             }
 
             .dark .liquid-glass::after {
-                background: linear-gradient(110deg, transparent 24%, rgba(186, 230, 253, 0.18) 42%, transparent 58%);
+                background: linear-gradient(110deg, transparent 24%, rgba(255, 255, 255, 0.18) 42%, transparent 58%);
             }
 
             .liquid-glass:hover::after {
@@ -365,8 +365,18 @@
 
             .dark .blazix-docs-hydration-status__pill {
                 border-color: rgba(255, 255, 255, 0.12);
-                background: rgba(15, 23, 42, 0.72);
+                background: rgba(0, 0, 0, 0.72);
                 color: #f8fafc;
+            }
+
+            .dark .blazix-docs-hydration-rail::before {
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.6), transparent);
+                box-shadow: 0 0 24px rgba(255, 255, 255, 0.28);
+            }
+
+            .dark .blazix-docs-hydration-status__dot {
+                background: #f8fafc;
+                box-shadow: 0 0 18px rgba(255, 255, 255, 0.5);
             }
 
             @@keyframes liquid-ambient {
@@ -524,7 +534,7 @@
                 }
 
                 html.dark .liquid-glass {
-                    background-color: rgba(2, 6, 23, 0.94) !important;
+                    background-color: rgba(0, 0, 0, 0.94) !important;
                 }
 
                 .liquid-glass::before,
@@ -541,7 +551,7 @@
                 }
 
                 html.dark .liquid-glass {
-                    background-color: rgba(2, 6, 23, 0.97) !important;
+                    background-color: rgba(0, 0, 0, 0.97) !important;
                 }
 
                 .liquid-glass::before,
