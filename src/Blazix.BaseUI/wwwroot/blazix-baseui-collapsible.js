@@ -597,6 +597,6 @@ function invokeBeforeMatch(dotNetRef) {
 
 function invokeAnimationTypeDetected(dotNetRef, animationType) {
     try {
-        dotNetRef.invokeMethodAsync('OnAnimationTypeDetected', animationType);
+        dotNetRef.invokeMethodAsync('OnAnimationTypeDetected', animationType).catch(() => { });
     } catch (e) { }
 }

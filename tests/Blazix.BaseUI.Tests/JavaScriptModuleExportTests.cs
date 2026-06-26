@@ -27,6 +27,18 @@ public class JavaScriptModuleExportTests
         source.ShouldNotContain("invokeMethodAsync('OnKeyboardOpen')");
     }
 
+    [Fact]
+    public async Task CollapsibleModule_HandlesAnimationTypeDetectionInteropRejection()
+    {
+        var source = await File.ReadAllTextAsync(GetRepositoryFile(
+            "src",
+            "Blazix.BaseUI",
+            "wwwroot",
+            "blazix-baseui-collapsible.js"));
+
+        source.ShouldContain("dotNetRef.invokeMethodAsync('OnAnimationTypeDetected', animationType).catch(() => { });");
+    }
+
     private static string GetRepositoryFile(params string[] pathSegments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

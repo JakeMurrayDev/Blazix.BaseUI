@@ -1,12 +1,12 @@
   Determining projects to restore...
   All projects are up-to-date for restore.
-  Blazix.BaseUI.Tests.Contracts -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests.Contracts/bin/Debug/net10.0/Blazix.BaseUI.Tests.Contracts.dll
-  Blazix.BaseUI.Analyzers -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI.Analyzers/bin/Debug/netstandard2.0/Blazix.BaseUI.Analyzers.dll
-  Blazix.BaseUI -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI/bin/Debug/net10.0/Blazix.BaseUI.dll
-  Blazix.BaseUI.Playwright.Tests.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.Client.dll
-  Blazix.BaseUI.Playwright.Tests.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/wwwroot
-  Blazix.BaseUI.Playwright.Tests -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.dll
-Test run for /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.dll (.NETCoreApp,Version=v10.0)
+  Blazix.BaseUI.Tests.Contracts -> tests/Blazix.BaseUI.Tests.Contracts/bin/Debug/net10.0/Blazix.BaseUI.Tests.Contracts.dll
+  Blazix.BaseUI.Analyzers -> src/Blazix.BaseUI.Analyzers/bin/Debug/netstandard2.0/Blazix.BaseUI.Analyzers.dll
+  Blazix.BaseUI -> src/Blazix.BaseUI/bin/Debug/net10.0/Blazix.BaseUI.dll
+  Blazix.BaseUI.Playwright.Tests.Client -> tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.Client.dll
+  Blazix.BaseUI.Playwright.Tests.Client (Blazor output) -> tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Playwright.Tests -> tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.dll
+Test run for tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 
 Passed!  - Failed:     0, Passed:    68, Skipped:     0, Total:    68, Duration: 35 s - Blazix.BaseUI.Playwright.Tests.dll (net10.0)

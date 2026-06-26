@@ -1,14 +1,14 @@
   Determining projects to restore...
   All projects are up-to-date for restore.
-  Blazix.BaseUI.Tests.Contracts -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests.Contracts/bin/Debug/net10.0/Blazix.BaseUI.Tests.Contracts.dll
-  Blazix.BaseUI.Analyzers -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI.Analyzers/bin/Debug/netstandard2.0/Blazix.BaseUI.Analyzers.dll
-  Blazix.BaseUI -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI/bin/Debug/net10.0/Blazix.BaseUI.dll
-  Blazix.BaseUI.Demo.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/Blazix.BaseUI.Demo.Client.dll
-  Blazix.BaseUI.Demo.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/wwwroot
-  Blazix.BaseUI.Docs.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/Blazix.BaseUI.Docs.Client.dll
-  Blazix.BaseUI.Docs.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/wwwroot
-  Blazix.BaseUI.Tests -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests/bin/Debug/net10.0/Blazix.BaseUI.Tests.dll
-Test run for /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests/bin/Debug/net10.0/Blazix.BaseUI.Tests.dll (.NETCoreApp,Version=v10.0)
+  Blazix.BaseUI.Tests.Contracts -> tests/Blazix.BaseUI.Tests.Contracts/bin/Debug/net10.0/Blazix.BaseUI.Tests.Contracts.dll
+  Blazix.BaseUI.Analyzers -> src/Blazix.BaseUI.Analyzers/bin/Debug/netstandard2.0/Blazix.BaseUI.Analyzers.dll
+  Blazix.BaseUI -> src/Blazix.BaseUI/bin/Debug/net10.0/Blazix.BaseUI.dll
+  Blazix.BaseUI.Demo.Client -> demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/Blazix.BaseUI.Demo.Client.dll
+  Blazix.BaseUI.Demo.Client (Blazor output) -> demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Docs.Client -> docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/Blazix.BaseUI.Docs.Client.dll
+  Blazix.BaseUI.Docs.Client (Blazor output) -> docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Tests -> tests/Blazix.BaseUI.Tests/bin/Debug/net10.0/Blazix.BaseUI.Tests.dll
+Test run for tests/Blazix.BaseUI.Tests/bin/Debug/net10.0/Blazix.BaseUI.Tests.dll (.NETCoreApp,Version=v10.0)
 A total of 1 test files matched the specified pattern.
 
 Passed!  - Failed:     0, Passed:    64, Skipped:     0, Total:    64, Duration: 225 ms - Blazix.BaseUI.Tests.dll (net10.0)

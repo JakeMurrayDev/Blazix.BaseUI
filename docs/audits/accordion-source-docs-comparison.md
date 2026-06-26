@@ -35,7 +35,7 @@ Route checked through the in-app browser:
 
 - `http://127.0.0.1:5309/tests/accordion/server?keepMounted=true&hiddenUntilFound=true&animated=true&animationDuration=123&multiple=true&showThirdItem=true&showFourthItem=true`
 
-Observed matching component parts:
+Observed matching parts:
 
 | Source docs part | Blazor rendered part | Result |
 | --- | --- | --- |
