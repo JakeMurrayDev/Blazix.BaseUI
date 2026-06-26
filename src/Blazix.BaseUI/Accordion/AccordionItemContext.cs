@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+
 namespace Blazix.BaseUI.Accordion;
 
 /// <summary>
@@ -66,7 +69,9 @@ internal interface IAccordionItemContext
     /// <summary>
     /// Invokes the trigger action to toggle the accordion item.
     /// </summary>
-    Task HandleTrigger();
+    /// <param name="triggerEvent">The mouse event that triggered the change.</param>
+    /// <param name="triggerElement">The trigger element that caused the change.</param>
+    Task HandleTrigger(MouseEventArgs? triggerEvent = null, ElementReference? triggerElement = null);
 }
 
 /// <summary>
@@ -88,10 +93,13 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     public bool Disabled { get; set; }
 
     /// <summary>The action invoked when the trigger is activated.</summary>
-    public Func<Task> TriggerHandler { get; set; } = null!;
+    public Func<MouseEventArgs?, ElementReference?, Task> TriggerHandler { get; set; } = null!;
 
     /// <summary>The action invoked to set the panel ID.</summary>
     public Action<string> PanelIdSetter { get; set; } = null!;
+
+    /// <summary>The action invoked to set the trigger ID.</summary>
+    public Action<string?> TriggerIdSetter { get; set; } = null!;
 
     /// <summary>The action invoked to set the panel mounted state.</summary>
     public Action<bool> PanelMountedSetter { get; set; } = null!;
@@ -125,6 +133,7 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     public void SetTriggerId(string? id)
     {
         TriggerId = id;
+        TriggerIdSetter(id);
     }
 
     /// <inheritdoc />
@@ -134,5 +143,6 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     }
 
     /// <inheritdoc />
-    public Task HandleTrigger() => TriggerHandler();
+    public Task HandleTrigger(MouseEventArgs? triggerEvent = null, ElementReference? triggerElement = null) =>
+        TriggerHandler(triggerEvent, triggerElement);
 }

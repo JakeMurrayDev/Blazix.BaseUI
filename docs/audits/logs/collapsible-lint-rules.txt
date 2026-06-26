@@ -1,0 +1,16 @@
+========================================
+Blazix.BaseUI Lint Rules (textual subset)
+========================================
+
+
+========================================
+Summary
+========================================
+RULE-01 (No logic in stubs): 0 violations
+RULE-04 (No partition comments): 0 violations
+RULE-05 (Data attribute prefix): 0 violations
+RULE-06 (No empty-string standalone attrs): 0 violations
+
+Total: 0 violations
+Note: structural rules (R02, R03, R07, R09–R15) are enforced by
+      src/Blazix.BaseUI.Analyzers via 'dotnet build'.

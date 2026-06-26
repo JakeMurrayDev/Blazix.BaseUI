@@ -1,0 +1,21 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  Blazix.BaseUI.Analyzers -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI.Analyzers/bin/Debug/netstandard2.0/Blazix.BaseUI.Analyzers.dll
+  Blazix.BaseUI.Tests.Contracts -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests.Contracts/bin/Debug/net10.0/Blazix.BaseUI.Tests.Contracts.dll
+  Blazix.BaseUI -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/src/Blazix.BaseUI/bin/Debug/net10.0/Blazix.BaseUI.dll
+  Blazix.BaseUI.Demo.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/Blazix.BaseUI.Demo.Client.dll
+  Blazix.BaseUI.Demo.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Playwright.Tests.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.Client.dll
+  Blazix.BaseUI.Playwright.Tests.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Docs.Client -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/Blazix.BaseUI.Docs.Client.dll
+  Blazix.BaseUI.Docs.Client (Blazor output) -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/bin/Debug/net10.0/wwwroot
+  Blazix.BaseUI.Tests -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Tests/bin/Debug/net10.0/Blazix.BaseUI.Tests.dll
+  Blazix.BaseUI.Demo -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/demo/Blazix.BaseUI.Demo/Blazix.BaseUI.Demo/bin/Debug/net10.0/Blazix.BaseUI.Demo.dll
+  Blazix.BaseUI.Docs -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/bin/Debug/net10.0/Blazix.BaseUI.Docs.dll
+  Blazix.BaseUI.Playwright.Tests -> /Users/jakemurray/RiderProjects/Blazix.BaseUI/tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/bin/Debug/net10.0/Blazix.BaseUI.Playwright.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.82

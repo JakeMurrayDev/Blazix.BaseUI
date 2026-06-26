@@ -1,0 +1,14 @@
+Command: pnpm docs:dev
+Observed server: http://localhost:3005
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+HTTP/1.1 200 OK
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding
+link: </fonts/die-grotesk-a-regular.woff2>; rel=preload; as="font"; crossorigin="anonymous"; type="font/woff2", </fonts/die-grotesk-a-bold.woff2>; rel=preload; as="font"; crossorigin="anonymous"; type="font/woff2", </fonts/die-grotesk-b-bold.woff2>; rel=preload; as="font"; crossorigin="anonymous"; type="font/woff2", </fonts/paper-mono.woff2>; rel=preload; as="font"; crossorigin="anonymous"; type="font/woff2"
+Cache-Control: no-store, must-revalidate
+X-Powered-By: Next.js
+Content-Type: text/html; charset=utf-8
+Date: Fri, 26 Jun 2026 14:14:51 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5

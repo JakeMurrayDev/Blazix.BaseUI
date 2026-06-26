@@ -28,6 +28,8 @@
     private bool isMounted;
     private bool jsInitialized;
     private bool shouldPreventMountAnimation;
+    private bool beforeMatchOpenPending;
+    private string? animationType;
     private DotNetObjectReference<CollapsiblePanel>? dotNetRef;
     private CollapsiblePanelState state = new(false, false, TransitionStatus.Undefined);
     private AnimationAction pendingAnimation = AnimationAction.None;
@@ -171,11 +173,15 @@
             if (currentOpen)
             {
                 isMounted = true;
+                beforeMatchOpenPending = Context?.OpenChangeReason == CollapsibleOpenChangeReason.None;
+                Context?.ClearOpenChangeReason();
                 pendingAnimation = AnimationAction.Open;
                 nextTransitionStatus = TransitionStatus.Starting;
             }
             else
             {
+                Context?.ClearOpenChangeReason();
+                shouldPreventMountAnimation = false;
                 pendingAnimation = AnimationAction.Close;
             }
         }
@@ -220,7 +226,7 @@
                     await module.InvokeVoidAsync("initialize", Element.Value, dotNetRef, CurrentOpen, null, HiddenUntilFound, KeepMounted);
                     jsInitialized = true;
                 }
-                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
                 {
                     _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
@@ -252,7 +258,7 @@
                 await module.InvokeVoidAsync("dispose", Element.Value);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -326,13 +332,32 @@
     /// Called from JavaScript when the browser's "find in page" reveals <c>hidden="until-found"</c> content.
     /// </summary>
     [JSInvokable]
-    public async Task OnBeforeMatch()
+    public async Task<bool> OnBeforeMatch()
     {
         // Called when browser's "find in page" reveals hidden="until-found" content
         if (Context is not null)
         {
-            await Context.HandleBeforeMatch();
+            return await Context.HandleBeforeMatch();
         }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Called from JavaScript when the panel's active animation mechanism is detected.
+    /// </summary>
+    /// <param name="detectedAnimationType">The detected animation type.</param>
+    [JSInvokable]
+    public void OnAnimationTypeDetected(string detectedAnimationType)
+    {
+        if (animationType == detectedAnimationType)
+        {
+            return;
+        }
+
+        animationType = detectedAnimationType;
+        BuildComponentAttributes();
+        StateHasChanged();
     }
 
     private void BuildComponentAttributes()
@@ -350,6 +375,10 @@
         attrs["data-closed"] = !state.Open;
         attrs["data-disabled"] = state.Disabled;
         TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, state.TransitionStatus);
+        if (HiddenUntilFound && IsHidden && animationType != "css-animation")
+        {
+            attrs["data-starting-style"] = true;
+        }
 
         componentAttributes = attrs;
     }
@@ -372,9 +401,11 @@
                 jsInitialized = true;
             }
 
-            await module.InvokeVoidAsync("open", Element.Value, false);
+            var beforeMatchOpen = beforeMatchOpenPending;
+            beforeMatchOpenPending = false;
+            await module.InvokeVoidAsync("open", Element.Value, false, beforeMatchOpen);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -392,7 +423,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("close", Element.Value);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

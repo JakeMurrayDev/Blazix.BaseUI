@@ -1,0 +1,77 @@
+{
+  "sourceDocs": {
+    "tool": "in-app browser",
+    "url": "http://localhost:3005/react/components/collapsible",
+    "title": "Collapsible · Base UI",
+    "headings": [
+      "Collapsible",
+      "Anatomy",
+      "API reference",
+      "Root",
+      "Trigger",
+      "Panel"
+    ],
+    "documentedSurface": [
+      "Collapsible.Root",
+      "Collapsible.Trigger",
+      "Collapsible.Panel",
+      "defaultOpen",
+      "open",
+      "onOpenChange",
+      "disabled",
+      "hiddenUntilFound",
+      "keepMounted",
+      "data-panel-open",
+      "data-open",
+      "data-closed",
+      "data-starting-style",
+      "data-ending-style"
+    ]
+  },
+  "blazorPage": {
+    "tool": "in-app browser",
+    "url": "http://127.0.0.1:5137/tests/collapsible/server?hiddenUntilFound=true&keepMounted=true&animated=true&animationDuration=123",
+    "initialClosedState": {
+      "rootAttributes": [
+        "data-closed",
+        "data-testid"
+      ],
+      "triggerAttributes": {
+        "aria-expanded": "false",
+        "tabindex": "0",
+        "type": "button"
+      },
+      "panelAttributes": {
+        "hidden": "until-found",
+        "data-closed": "",
+        "data-starting-style": "",
+        "styleContains": [
+          "--collapsible-panel-height: auto",
+          "--collapsible-panel-width: auto"
+        ]
+      }
+    },
+    "openStateAfterTrigger": {
+      "rootAttributes": [
+        "data-open",
+        "data-testid"
+      ],
+      "triggerAttributes": {
+        "aria-expanded": "true",
+        "aria-controls": "panel id",
+        "data-panel-open": "",
+        "tabindex": "0",
+        "type": "button"
+      },
+      "panelAttributes": {
+        "data-open": "",
+        "hidden": null,
+        "styleContains": [
+          "--collapsible-panel-height",
+          "--collapsible-panel-width"
+        ]
+      }
+    }
+  },
+  "result": "Rendered source docs and Blazor test page surfaces match for the audited Collapsible API and required state attributes."
+}

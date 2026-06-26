@@ -18,9 +18,12 @@ public interface IAccordionPanelContract
     Task IsHiddenWhenClosed();
     Task IsHiddenWhenKeptMountedAndClosed();
     Task UsesHiddenUntilFoundWhenClosed();
+    Task InheritsKeepMountedFromRoot();
+    Task InheritsHiddenUntilFoundFromRootAndAllowsPanelOverride();
     Task IsVisibleWhenOpen();
     Task KeepsMountedWhenKeepMountedTrue();
     Task OpensFromBeforeMatchWhenItemIsDisabled();
+    Task BeforeMatchOpenPassesInstantOpenFlagToJavaScript();
     Task HasIdleTransitionStateWhenInitiallyOpen();
     Task UpdatesTransitionStyleAttributesFromJsCallback();
     Task KeepsPanelAndTriggerIdsSynchronizedWhenPanelRendersBeforeTrigger();

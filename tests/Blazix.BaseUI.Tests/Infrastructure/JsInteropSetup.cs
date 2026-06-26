@@ -50,15 +50,22 @@ public static class JsInteropSetup
     }
 
     private const string CollapsiblePanelModule = "./_content/Blazix.BaseUI/blazix-baseui-collapsible.js";
+    private const string CollapsiblePanelMinModule = "./_content/Blazix.BaseUI/blazix-baseui-collapsible.min.js";
 
     public static void SetupCollapsiblePanel(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(CollapsiblePanelModule);
-        module.SetupVoid("initialize", _ => true);
-        module.SetupVoid("open", _ => true);
-        module.SetupVoid("close", _ => true);
-        module.SetupVoid("updateDimensions", _ => true);
-        module.SetupVoid("dispose", _ => true);
+        SetupCollapsiblePanelPath(CollapsiblePanelModule);
+        SetupCollapsiblePanelPath(CollapsiblePanelMinModule);
+
+        void SetupCollapsiblePanelPath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initialize", _ => true).SetVoidResult();
+            module.SetupVoid("open", _ => true).SetVoidResult();
+            module.SetupVoid("close", _ => true).SetVoidResult();
+            module.SetupVoid("updateDimensions", _ => true).SetVoidResult();
+            module.SetupVoid("dispose", _ => true).SetVoidResult();
+        }
     }
 
     private const string MenuModule = "./_content/Blazix.BaseUI/blazix-baseui-menu.js";
@@ -106,13 +113,20 @@ public static class JsInteropSetup
     }
 
     private const string AccordionTriggerModule = "./_content/Blazix.BaseUI/blazix-baseui-accordion-trigger.js";
+    private const string AccordionTriggerMinModule = "./_content/Blazix.BaseUI/blazix-baseui-accordion-trigger.min.js";
 
     public static void SetupAccordionTrigger(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(AccordionTriggerModule);
-        module.SetupVoid("initialize", _ => true);
-        module.SetupVoid("updateConfig", _ => true);
-        module.SetupVoid("dispose", _ => true);
+        SetupAccordionTriggerPath(AccordionTriggerModule);
+        SetupAccordionTriggerPath(AccordionTriggerMinModule);
+
+        void SetupAccordionTriggerPath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initialize", _ => true).SetVoidResult();
+            module.SetupVoid("updateConfig", _ => true).SetVoidResult();
+            module.SetupVoid("dispose", _ => true).SetVoidResult();
+        }
     }
 
     public static void SetupAccordionModules(BunitJSInterop jsInterop)

@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+
 namespace Blazix.BaseUI.Accordion;
 
 /// <summary>
@@ -47,7 +50,16 @@ internal interface IAccordionRootContext
     /// </summary>
     /// <param name="value">The value of the item being toggled.</param>
     /// <param name="nextOpen">Whether the item should be opened.</param>
-    Task HandleValueChange(object value, bool nextOpen);
+    /// <param name="reason">The reason for the value change.</param>
+    /// <param name="triggerEvent">The mouse event that triggered the change, when caused by a trigger press.</param>
+    /// <param name="triggerElement">The trigger element that caused the change, when caused by a trigger press.</param>
+    /// <returns><see langword="true"/> if the change was accepted; otherwise, <see langword="false"/>.</returns>
+    Task<bool> HandleValueChange(
+        object value,
+        bool nextOpen,
+        AccordionValueChangeReason reason,
+        MouseEventArgs? triggerEvent = null,
+        ElementReference? triggerElement = null);
 
     /// <summary>
     /// Registers an accordion item and returns its index.
@@ -100,7 +112,7 @@ internal sealed class AccordionRootContext<TValue> : IAccordionRootContext
     public bool KeepMounted { get; set; }
 
     /// <summary>The callback invoked when a value changes.</summary>
-    public Func<TValue, bool, Task> OnValueChange { get; set; } = null!;
+    public Func<TValue, bool, AccordionValueChangeReason, MouseEventArgs?, ElementReference?, Task<bool>> OnValueChange { get; set; } = null!;
 
     /// <inheritdoc />
     public bool IsValueOpen(object value)
@@ -111,12 +123,17 @@ internal sealed class AccordionRootContext<TValue> : IAccordionRootContext
     }
 
     /// <inheritdoc />
-    public Task HandleValueChange(object value, bool nextOpen)
+    public Task<bool> HandleValueChange(
+        object value,
+        bool nextOpen,
+        AccordionValueChangeReason reason,
+        MouseEventArgs? triggerEvent = null,
+        ElementReference? triggerElement = null)
     {
         if (value is TValue typedValue)
-            return OnValueChange(typedValue, nextOpen);
+            return OnValueChange(typedValue, nextOpen, reason, triggerEvent, triggerElement);
 
-        return Task.CompletedTask;
+        return Task.FromResult(false);
     }
 
     /// <inheritdoc />

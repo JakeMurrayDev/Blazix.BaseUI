@@ -160,7 +160,7 @@
                 await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -205,7 +205,7 @@
 
         if (Context is not null)
         {
-            await Context.HandleTrigger();
+            await Context.HandleTrigger(args, Element);
         }
 
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);
@@ -224,7 +224,7 @@
             // focusableWhenDisabled is always true for collapsible triggers (matches React's useButton config)
             await module.InvokeVoidAsync("sync", Element.Value, ResolvedDisabled, true, NativeButton, dispose);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

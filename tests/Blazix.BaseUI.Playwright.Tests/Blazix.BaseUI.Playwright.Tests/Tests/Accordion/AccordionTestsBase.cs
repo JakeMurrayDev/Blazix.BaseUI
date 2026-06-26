@@ -575,39 +575,46 @@ public abstract class AccordionTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task ArrowUpDownMovesFocusBetweenTriggersAndLoops()
+    public virtual async Task SpaceKeyTogglesOnKeyUp()
     {
-        // Use showThirdItem to ensure there are 3 items for comprehensive loop testing
+        await NavigateAsync(CreateUrl("/tests/accordion"));
+
+        var trigger = GetByTestId("accordion-trigger-1");
+
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "false");
+        await trigger.FocusAsync();
+
+        await Page.Keyboard.DownAsync(" ");
+        await Page.WaitForTimeoutAsync(100);
+
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "false");
+
+        await Page.Keyboard.UpAsync(" ");
+
+        await WaitForAttributeValueAsync(trigger, "aria-expanded", "true");
+    }
+
+    [Fact]
+    public virtual async Task ArrowUpDownDoNotMoveFocusBetweenTriggers()
+    {
         await NavigateAsync(CreateUrl("/tests/accordion").WithShowThirdItem(true));
 
         var trigger1 = GetByTestId("accordion-trigger-1");
-        var trigger2 = GetByTestId("accordion-trigger-2");
-        var trigger3 = GetByTestId("accordion-trigger-3");
 
         await Page.Keyboard.PressAsync("Tab");
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await trigger1.PressAsync("ArrowDown");
         await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger2).ToBeFocusedAsync();
-
-        await trigger2.PressAsync("ArrowDown");
-        await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
-
-        // Loop back to first
-        await trigger3.PressAsync("ArrowDown");
-        await Page.WaitForTimeoutAsync(100);
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
-        // And back up to loop to last
         await trigger1.PressAsync("ArrowUp");
         await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
     }
 
     [Fact]
-    public virtual async Task ArrowKeysSkipDisabledItems()
+    public virtual async Task ArrowKeysDoNotMoveFocusAcrossDisabledItems()
     {
         await NavigateAsync(CreateUrl("/tests/accordion")
             .WithShowThirdItem(true)
@@ -620,14 +627,16 @@ public abstract class AccordionTestsBase : TestBase
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("ArrowDown");
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("ArrowUp");
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
+
+        await Assertions.Expect(trigger3).Not.ToBeFocusedAsync();
     }
 
     [Fact]
-    public virtual async Task EndKeyMovesFocusToLastTrigger()
+    public virtual async Task EndKeyDoesNotMoveFocusToLastTrigger()
     {
         await NavigateAsync(CreateUrl("/tests/accordion")
             .WithShowThirdItem(true)
@@ -641,11 +650,12 @@ public abstract class AccordionTestsBase : TestBase
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("End");
-        await Assertions.Expect(trigger4).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
+        await Assertions.Expect(trigger4).Not.ToBeFocusedAsync();
     }
 
     [Fact]
-    public virtual async Task HomeKeyMovesFocusToFirstTrigger()
+    public virtual async Task HomeKeyDoesNotMoveFocusToFirstTrigger()
     {
         await NavigateAsync(CreateUrl("/tests/accordion")
             .WithShowThirdItem(true)
@@ -659,25 +669,25 @@ public abstract class AccordionTestsBase : TestBase
         await Assertions.Expect(trigger4).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("Home");
-        await Assertions.Expect(trigger1).ToBeFocusedAsync();
+        await Assertions.Expect(trigger4).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).Not.ToBeFocusedAsync();
     }
 
     [Fact]
-    public virtual async Task LoopFocusFalseDisablesLooping()
+    public virtual async Task LoopFocusFalseDoesNotAffectArrowKeys()
     {
         await NavigateAsync(CreateUrl("/tests/accordion").WithLoopFocus(false));
 
         var trigger1 = GetByTestId("accordion-trigger-1");
-        var trigger2 = GetByTestId("accordion-trigger-2");
 
         await Page.Keyboard.PressAsync("Tab");
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("ArrowDown");
-        await Assertions.Expect(trigger2).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await Page.Keyboard.PressAsync("ArrowDown");
-        await Assertions.Expect(trigger2).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
     }
 
     [Fact]
@@ -706,37 +716,24 @@ public abstract class AccordionTestsBase : TestBase
     #region Horizontal Orientation Tests
 
     [Fact]
-    public virtual async Task ArrowLeftRightMovesFocusInHorizontalOrientation()
+    public virtual async Task ArrowLeftRightDoNotMoveFocusInHorizontalOrientation()
     {
-        // Use showThirdItem to ensure there are 3 items for comprehensive testing
         await NavigateAsync(CreateUrl("/tests/accordion")
             .WithHorizontal(true)
             .WithShowThirdItem(true));
 
         var trigger1 = GetByTestId("accordion-trigger-1");
-        var trigger2 = GetByTestId("accordion-trigger-2");
-        var trigger3 = GetByTestId("accordion-trigger-3");
 
         await Page.Keyboard.PressAsync("Tab");
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
         await trigger1.PressAsync("ArrowRight");
         await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger2).ToBeFocusedAsync();
-
-        await trigger2.PressAsync("ArrowRight");
-        await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
-
-        // Loop back to first
-        await trigger3.PressAsync("ArrowRight");
-        await Page.WaitForTimeoutAsync(100);
         await Assertions.Expect(trigger1).ToBeFocusedAsync();
 
-        // And back left to loop to last
         await trigger1.PressAsync("ArrowLeft");
         await Page.WaitForTimeoutAsync(100);
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+        await Assertions.Expect(trigger1).ToBeFocusedAsync();
     }
 
     #endregion

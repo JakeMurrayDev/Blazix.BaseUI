@@ -1,4 +1,6 @@
 {
+  "supersededBy": "docs/audits/logs/accordion-in-app-browser-comparison-2026-06-26.json",
+  "currentBehaviorNote": "Historical evidence only. Current React Base UI Accordion removed roving trigger focus and Accordion.Root no longer renders role=\"region\".",
   "target": "http://127.0.0.1:5110/tests/accordion/server",
   "checks": {
     "hiddenUntilFoundClosedState": {

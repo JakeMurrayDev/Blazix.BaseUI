@@ -48,6 +48,18 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithCancelBeforeMatch(bool value)
+    {
+        queryParams["cancelBeforeMatch"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithCancelBeforeMatchDelay(int delayMs)
+    {
+        queryParams["cancelBeforeMatchDelay"] = delayMs.ToString();
+        return this;
+    }
+
     public TestPageUrlBuilder WithAnimated(bool value)
     {
         queryParams["animated"] = value.ToString().ToLowerInvariant();

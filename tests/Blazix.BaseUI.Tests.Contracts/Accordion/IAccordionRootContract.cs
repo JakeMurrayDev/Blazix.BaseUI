@@ -10,9 +10,13 @@ public interface IAccordionRootContract
     Task CombinesClassFromBothSources();
     Task RendersCorrectAriaAttributes();
     Task ReferencesManualPanelIdInTriggerAriaControls();
+    Task ReferencesManualTriggerIdInPanelAriaLabelledBy();
+    Task RestoresGeneratedTriggerIdWhenManualTriggerIdIsRemoved();
+    Task UpdatesPanelAriaLabelledByWhenManualTriggerIdChanges();
     Task UncontrolledOpenState();
     Task UncontrolledDefaultValueWithCustomItemValue();
     Task ControlledOpenState();
+    Task ControlledValueDoesNotMutateWithoutParameterUpdate();
     Task ControlledValueWithCustomItemValue();
     Task CanDisableWholeAccordion();
     Task CanDisableOneAccordionItem();
@@ -23,5 +27,7 @@ public interface IAccordionRootContract
     Task OnValueChangeWithCustomItemValue();
     Task OnValueChangeWhenMultipleFalse();
     Task AsyncOnValueChangeCancellationPreventsStateChange();
+    Task ItemOnOpenChangeCancellationPreventsRootValueChange();
+    Task BeforeMatchCanceledByRootOnValueChangeReturnsFalseAndKeepsClosed();
     Task CascadesContextToChildren();
 }

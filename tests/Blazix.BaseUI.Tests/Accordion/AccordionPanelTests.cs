@@ -270,6 +270,105 @@ public class AccordionPanelTests : BunitContext, IAccordionPanelContract
     }
 
     [Fact]
+    public Task InheritsKeepMountedFromRoot()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AccordionRoot<string>>(0);
+            builder.AddAttribute(1, "KeepMounted", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<AccordionItem<string>>(0);
+                rootBuilder.AddAttribute(1, "Value", "test-item");
+                rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel Content")));
+                    itemBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var panel = cut.Find("div[role='region'][id]");
+        panel.HasAttribute("hidden").ShouldBeTrue();
+        panel.TextContent.ShouldContain("Panel Content");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InheritsHiddenUntilFoundFromRootAndAllowsPanelOverride()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AccordionRoot<string>>(0);
+            builder.AddAttribute(1, "HiddenUntilFound", true);
+            builder.AddAttribute(2, "KeepMounted", true);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(rootBuilder =>
+            {
+                rootBuilder.OpenComponent<AccordionItem<string>>(0);
+                rootBuilder.AddAttribute(1, "Value", "first");
+                rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 1")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Inherited Panel")));
+                    itemBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+
+                rootBuilder.OpenComponent<AccordionItem<string>>(3);
+                rootBuilder.AddAttribute(4, "Value", "second");
+                rootBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger 2")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "HiddenUntilFound", false);
+                    itemBuilder.AddAttribute(4, "KeepMounted", false);
+                    itemBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Overridden Panel")));
+                    itemBuilder.CloseComponent();
+                }));
+                rootBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var panel = cut.Find("div[role='region'][id]");
+        panel.GetAttribute("hidden").ShouldBe("until-found");
+        panel.TextContent.ShouldContain("Inherited Panel");
+        cut.Markup.ShouldNotContain("Overridden Panel");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task IsVisibleWhenOpen()
     {
         var cut = Render(CreateAccordionWithPanel(defaultValue: ["test-item"]));
@@ -310,6 +409,32 @@ public class AccordionPanelTests : BunitContext, IAccordionPanelContract
 
         var panel = cut.Find("div[role='region'][id]");
         panel.HasAttribute("data-open").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task BeforeMatchOpenPassesInstantOpenFlagToJavaScript()
+    {
+        var cut = Render(CreateAccordionWithPanel(
+            keepMounted: false,
+            rootHiddenUntilFound: true));
+        var panelComponent = cut.FindComponent<AccordionPanel>();
+        var openInvocationCount = JSInterop.Invocations.Count(invocation => invocation.Identifier == "open");
+
+        var accepted = await panelComponent.InvokeAsync(() => panelComponent.Instance.OnBeforeMatch());
+
+        accepted.ShouldBeTrue();
+        cut.WaitForAssertion(() =>
+        {
+            var openInvocations = JSInterop.Invocations
+                .Skip(openInvocationCount)
+                .Where(invocation => invocation.Identifier == "open")
+                .ToArray();
+
+            openInvocations.ShouldNotBeEmpty();
+            var openInvocation = openInvocations[^1];
+            openInvocation.Arguments.Count.ShouldBeGreaterThanOrEqualTo(3);
+            openInvocation.Arguments[2].ShouldBe(true);
+        });
     }
 
     [Fact]

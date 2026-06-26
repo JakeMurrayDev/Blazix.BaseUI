@@ -19,6 +19,7 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
         Orientation orientation = Orientation.Vertical,
         bool loopFocus = true,
         bool keepMounted = false,
+        bool hiddenUntilFound = false,
         EventCallback<AccordionValueChangeEventArgs<string>>? onValueChange = null,
         Func<AccordionRootState<string>, string>? classValue = null,
         Func<AccordionRootState<string>, string>? styleValue = null,
@@ -40,6 +41,7 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
             builder.AddAttribute(attrIndex++, "Orientation", orientation);
             builder.AddAttribute(attrIndex++, "LoopFocus", loopFocus);
             builder.AddAttribute(attrIndex++, "KeepMounted", keepMounted);
+            builder.AddAttribute(attrIndex++, "HiddenUntilFound", hiddenUntilFound);
             if (onValueChange.HasValue)
                 builder.AddAttribute(attrIndex++, "OnValueChange", onValueChange.Value);
             if (classValue is not null)
@@ -110,8 +112,9 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
     {
         var cut = Render(CreateAccordionRoot());
 
-        var root = cut.Find("div[role='region']");
+        var root = cut.Find("div[data-blazix-base-ui-accordion-root]");
         root.ShouldNotBeNull();
+        root.HasAttribute("role").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -129,8 +132,9 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
             }
         ));
 
-        var section = cut.Find("section[role='region']");
+        var section = cut.Find("section[data-blazix-base-ui-accordion-root]");
         section.ShouldNotBeNull();
+        section.HasAttribute("role").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
@@ -198,8 +202,9 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
     {
         var cut = Render(CreateAccordionRoot(defaultValue: ["first"]));
 
-        var root = cut.Find("div[role='region']");
+        var root = cut.Find("div[data-blazix-base-ui-accordion-root]");
         root.ShouldNotBeNull();
+        root.HasAttribute("role").ShouldBeFalse();
 
         var trigger = cut.Find("button");
         trigger.HasAttribute("aria-controls").ShouldBeTrue();
@@ -229,6 +234,74 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
         panel.ShouldNotBeNull();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ReferencesManualTriggerIdInPanelAriaLabelledBy()
+    {
+        var cut = Render(CreateAccordionRoot(
+            defaultValue: ["first"],
+            childContent: builder =>
+            {
+                builder.OpenComponent<AccordionItem<string>>(0);
+                builder.AddAttribute(1, "Value", "first");
+                builder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object> { { "id", "custom-trigger-id" } });
+                        headerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "KeepMounted", true);
+                    itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel")));
+                    itemBuilder.CloseComponent();
+                }));
+                builder.CloseComponent();
+            }
+        ));
+
+        var panel = cut.Find("div[role='region']");
+        panel.GetAttribute("aria-labelledby").ShouldBe("custom-trigger-id");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task RestoresGeneratedTriggerIdWhenManualTriggerIdIsRemoved()
+    {
+        var cut = Render<AccordionTriggerIdRemovalHost>();
+
+        var trigger = cut.Find("button");
+        var panel = cut.Find("div[role='region']");
+        panel.GetAttribute("aria-labelledby").ShouldBe("custom-trigger-id");
+
+        await cut.InvokeAsync(cut.Instance.ClearTriggerId);
+
+        trigger = cut.Find("button");
+        panel = cut.Find("div[role='region']");
+        trigger.GetAttribute("id").ShouldNotBeNullOrEmpty();
+        trigger.GetAttribute("id").ShouldNotBe("custom-trigger-id");
+        panel.GetAttribute("aria-labelledby").ShouldBe(trigger.GetAttribute("id"));
+    }
+
+    [Fact]
+    public async Task UpdatesPanelAriaLabelledByWhenManualTriggerIdChanges()
+    {
+        var cut = Render<AccordionTriggerIdChangeHost>();
+
+        var panel = cut.Find("div[role='region']");
+        panel.GetAttribute("aria-labelledby").ShouldBe("trigger-a");
+
+        await cut.InvokeAsync(cut.Instance.ChangeTriggerId);
+
+        panel = cut.Find("div[role='region']");
+        panel.GetAttribute("aria-labelledby").ShouldBe("trigger-b");
     }
 
     [Fact]
@@ -284,6 +357,24 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
         var triggerOpen = cutOpen.Find("button");
         triggerOpen.GetAttribute("aria-expanded").ShouldBe("true");
         triggerOpen.HasAttribute("data-panel-open").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ControlledValueDoesNotMutateWithoutParameterUpdate()
+    {
+        var cut = Render(CreateAccordionRoot(value: []));
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        trigger.Click();
+
+        trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+        trigger.HasAttribute("data-panel-open").ShouldBeFalse();
+        cut.FindAll("div[data-open][role='region']").ShouldBeEmpty();
 
         return Task.CompletedTask;
     }
@@ -409,7 +500,7 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
     {
         var cut = Render(CreateAccordionRoot(orientation: Orientation.Horizontal));
 
-        var root = cut.Find("div[role='region']");
+        var root = cut.Find("div[data-blazix-base-ui-accordion-root]");
         root.GetAttribute("data-orientation").ShouldBe("horizontal");
 
         return Task.CompletedTask;
@@ -420,6 +511,9 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
     {
         var callCount = 0;
         string[]? receivedValue = null;
+        AccordionValueChangeReason? receivedReason = null;
+        MouseEventArgs? receivedTriggerEvent = null;
+        ElementReference? receivedTriggerElement = null;
 
         var cut = Render(CreateAccordionRoot(
             multiple: true,
@@ -427,21 +521,29 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
             {
                 callCount++;
                 receivedValue = args.Value;
+                receivedReason = args.Reason;
+                receivedTriggerEvent = args.TriggerEvent;
+                receivedTriggerElement = args.TriggerElement;
             })
         ));
 
         callCount.ShouldBe(0);
 
         var triggers = cut.FindAll("button");
-        triggers[0].Click();
+        triggers[0].Click(new MouseEventArgs { Detail = 2 });
 
         callCount.ShouldBe(1);
         receivedValue.ShouldBe(["first"]);
+        receivedReason.ShouldBe(AccordionValueChangeReason.TriggerPress);
+        receivedTriggerEvent.ShouldNotBeNull();
+        receivedTriggerEvent!.Detail.ShouldBe(2);
+        receivedTriggerElement.ShouldNotBeNull();
 
         triggers[1].Click();
 
         callCount.ShouldBe(2);
         receivedValue.ShouldBe(["first", "second"]);
+        receivedReason.ShouldBe(AccordionValueChangeReason.TriggerPress);
 
         return Task.CompletedTask;
     }
@@ -532,6 +634,73 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
     }
 
     [Fact]
+    public async Task ItemOnOpenChangeCancellationPreventsRootValueChange()
+    {
+        var rootChangeCount = 0;
+        var cut = Render(CreateAccordionRoot(
+            onValueChange: EventCallback.Factory.Create<AccordionValueChangeEventArgs<string>>(this, _ => rootChangeCount++),
+            childContent: builder =>
+            {
+                builder.OpenComponent<AccordionItem<string>>(0);
+                builder.AddAttribute(1, "Value", "first");
+                builder.AddAttribute(2, "OnOpenChange", EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(
+                    this,
+                    args => args.Cancel()));
+                builder.AddAttribute(3, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "KeepMounted", true);
+                    itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel")));
+                    itemBuilder.CloseComponent();
+                }));
+                builder.CloseComponent();
+            }));
+
+        var trigger = cut.Find("button");
+
+        await trigger.ClickAsync(new MouseEventArgs());
+
+        rootChangeCount.ShouldBe(0);
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+        trigger.HasAttribute("data-panel-open").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task BeforeMatchCanceledByRootOnValueChangeReturnsFalseAndKeepsClosed()
+    {
+        var cut = Render(CreateAccordionRoot(
+            hiddenUntilFound: true,
+            onValueChange: EventCallback.Factory.Create<AccordionValueChangeEventArgs<string>>(this, args =>
+            {
+                if (args.Reason == AccordionValueChangeReason.None)
+                {
+                    args.Cancel();
+                }
+            })
+        ));
+
+        var panelComponent = cut.FindComponent<AccordionPanel>();
+
+        var accepted = await panelComponent.InvokeAsync(() => panelComponent.Instance.OnBeforeMatch());
+
+        accepted.ShouldBeFalse();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+        trigger.HasAttribute("data-panel-open").ShouldBeFalse();
+        cut.Find("div[role='region']").HasAttribute("data-closed").ShouldBeTrue();
+    }
+
+    [Fact]
     public Task CascadesContextToChildren()
     {
         var cut = Render(builder =>
@@ -571,5 +740,90 @@ public class AccordionRootTests : BunitContext, IAccordionRootContract
         trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
         return Task.CompletedTask;
+    }
+}
+
+internal sealed class AccordionTriggerIdRemovalHost : ComponentBase
+{
+    private string? triggerId = "custom-trigger-id";
+
+    public void ClearTriggerId()
+    {
+        triggerId = null;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<AccordionRoot<string>>(0);
+        builder.AddAttribute(1, "DefaultValue", new[] { "first" });
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(rootBuilder =>
+        {
+            rootBuilder.OpenComponent<AccordionItem<string>>(0);
+            rootBuilder.AddAttribute(1, "Value", "first");
+            rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+            {
+                itemBuilder.OpenComponent<AccordionHeader>(0);
+                itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                {
+                    headerBuilder.OpenComponent<AccordionTrigger>(0);
+                    headerBuilder.AddAttribute(1, "AdditionalAttributes",
+                        triggerId is null
+                            ? new Dictionary<string, object>()
+                            : new Dictionary<string, object> { { "id", triggerId } });
+                    headerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                    headerBuilder.CloseComponent();
+                }));
+                itemBuilder.CloseComponent();
+
+                itemBuilder.OpenComponent<AccordionPanel>(2);
+                itemBuilder.AddAttribute(3, "KeepMounted", true);
+                itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel")));
+                itemBuilder.CloseComponent();
+            }));
+            rootBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class AccordionTriggerIdChangeHost : ComponentBase
+{
+    private string triggerId = "trigger-a";
+
+    public void ChangeTriggerId()
+    {
+        triggerId = "trigger-b";
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<AccordionRoot<string>>(0);
+        builder.AddAttribute(1, "DefaultValue", new[] { "first" });
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(rootBuilder =>
+        {
+            rootBuilder.OpenComponent<AccordionItem<string>>(0);
+            rootBuilder.AddAttribute(1, "Value", "first");
+            rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+            {
+                itemBuilder.OpenComponent<AccordionHeader>(0);
+                itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                {
+                    headerBuilder.OpenComponent<AccordionTrigger>(0);
+                    headerBuilder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object> { { "id", triggerId } });
+                    headerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                    headerBuilder.CloseComponent();
+                }));
+                itemBuilder.CloseComponent();
+
+                itemBuilder.OpenComponent<AccordionPanel>(2);
+                itemBuilder.AddAttribute(3, "KeepMounted", true);
+                itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel")));
+                itemBuilder.CloseComponent();
+            }));
+            rootBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

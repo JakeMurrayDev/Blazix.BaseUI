@@ -1,4 +1,5 @@
 @using Blazix.BaseUI.Collapsible
+@using Microsoft.AspNetCore.Components.Web
 
 @typeparam TValue where TValue : notnull
 @implements IDisposable
@@ -135,6 +136,7 @@
                 Disabled = ResolvedDisabled,
                 TriggerHandler = HandleTrigger,
                 PanelIdSetter = SetPanelId,
+                TriggerIdSetter = SetTriggerId,
                 PanelMountedSetter = SetPanelMounted,
                 PanelId = panelId,
                 TriggerId = triggerId,
@@ -150,7 +152,8 @@
                 HandleTrigger = HandleTrigger,
                 HandleBeforeMatch = HandleBeforeMatch,
                 SetPanelId = SetPanelId,
-                SetTransitionStatus = SetTransitionStatus
+                SetTransitionStatus = SetTransitionStatus,
+                ClearOpenChangeReason = ClearOpenChangeReason
             };
 
             BuildComponentAttributes();
@@ -188,6 +191,7 @@
                 Disabled = currentDisabled,
                 TriggerHandler = HandleTrigger,
                 PanelIdSetter = SetPanelId,
+                TriggerIdSetter = SetTriggerId,
                 PanelMountedSetter = SetPanelMounted,
                 PanelId = panelId,
                 TriggerId = triggerId,
@@ -214,7 +218,8 @@
                 HandleTrigger = HandleTrigger,
                 HandleBeforeMatch = HandleBeforeMatch,
                 SetPanelId = SetPanelId,
-                SetTransitionStatus = SetTransitionStatus
+                SetTransitionStatus = SetTransitionStatus,
+                ClearOpenChangeReason = ClearOpenChangeReason
             };
         }
         else
@@ -278,6 +283,12 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    private void SetTriggerId(string? id)
+    {
+        triggerId = id ?? string.Empty;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private void SetPanelMounted(bool mounted)
     {
         if (panelMounted == mounted)
@@ -314,7 +325,15 @@
         }
     }
 
-    private async Task HandleTrigger()
+    private void ClearOpenChangeReason()
+    {
+        if (collapsibleContext is not null)
+        {
+            collapsibleContext.OpenChangeReason = null;
+        }
+    }
+
+    private async Task HandleTrigger(MouseEventArgs? triggerEvent = null, ElementReference? triggerElement = null)
     {
         if (ResolvedDisabled)
         {
@@ -322,7 +341,7 @@
         }
 
         var nextOpen = !IsOpen;
-        var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
+        var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress, triggerEvent, triggerElement);
 
         await OnOpenChange.InvokeAsync(args);
 
@@ -333,15 +352,30 @@
 
         if (RootContext is not null)
         {
-            await RootContext.HandleValueChange(resolvedValue, nextOpen);
+            if (collapsibleContext is not null)
+            {
+                collapsibleContext.OpenChangeReason = CollapsibleOpenChangeReason.TriggerPress;
+            }
+
+            var accepted = await RootContext.HandleValueChange(
+                resolvedValue,
+                nextOpen,
+                AccordionValueChangeReason.TriggerPress,
+                triggerEvent,
+                triggerElement);
+
+            if (!accepted)
+            {
+                ClearOpenChangeReason();
+            }
         }
     }
 
-    private async Task HandleBeforeMatch()
+    private async Task<bool> HandleBeforeMatch()
     {
         if (IsOpen)
         {
-            return;
+            return false;
         }
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
@@ -350,13 +384,26 @@
 
         if (args.IsCanceled)
         {
-            return;
+            return false;
         }
 
         if (RootContext is not null)
         {
-            await RootContext.HandleValueChange(resolvedValue, true);
+            if (collapsibleContext is not null)
+            {
+                collapsibleContext.OpenChangeReason = CollapsibleOpenChangeReason.None;
+            }
+
+            var accepted = await RootContext.HandleValueChange(resolvedValue, true, AccordionValueChangeReason.None);
+            if (!accepted)
+            {
+                ClearOpenChangeReason();
+            }
+
+            return accepted;
         }
+
+        return false;
     }
 
     private void BuildComponentAttributes()
