@@ -76,11 +76,7 @@ public abstract class CollapsibleTestsBase : TestBase
         var panelId = await panel.GetAttributeAsync("id");
         Assert.False(string.IsNullOrEmpty(panelId), "Panel should have an ID");
 
-        // aria-controls attribute exists on trigger
-        // Note: Due to render order, aria-controls may be empty on initial render
-        // The component sets it via cascading parameter which updates asynchronously
-        var ariaControls = await trigger.GetAttributeAsync("aria-controls");
-        Assert.NotNull(ariaControls);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-controls", panelId);
     }
 
     [Fact]
@@ -247,6 +243,163 @@ public abstract class CollapsibleTestsBase : TestBase
         await Assertions.Expect(changeCount).ToHaveTextAsync("1");
     }
 
+    [Fact]
+    public virtual async Task CanceledBeforeMatch_ShouldNotSuppressNextTriggerOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithHiddenUntilFound(true)
+            .WithKeepMounted(true)
+            .WithAnimated(true)
+            .WithAnimationDuration(999)
+            .WithCancelBeforeMatch(true));
+
+        var panel = GetByTestId("collapsible-panel");
+        var trigger = GetByTestId("collapsible-trigger");
+        var changeCount = GetByTestId("change-count");
+        var lastCanceled = GetByTestId("last-canceled");
+
+        await panel.EvaluateAsync(@"(el) => {
+            const event = new Event('beforematch', { bubbles: true, cancelable: false });
+            el.dispatchEvent(event);
+        }");
+
+        await Assertions.Expect(changeCount).ToHaveTextAsync("1");
+        await Assertions.Expect(lastCanceled).ToHaveTextAsync("true");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "false");
+        await Assertions.Expect(panel).ToHaveAttributeAsync("data-closed", "");
+
+        await trigger.ClickAsync();
+        await Assertions.Expect(changeCount).ToHaveTextAsync("2");
+        await WaitForAttributeValueAsync(panel, "data-open", "");
+
+        var inlineTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => el.style.transitionDuration");
+        Assert.NotEqual("0s", inlineTransitionDuration);
+    }
+
+    [Fact]
+    public virtual async Task PendingCanceledBeforeMatch_ShouldNotSuppressInterveningTriggerOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithHiddenUntilFound(true)
+            .WithKeepMounted(true)
+            .WithAnimated(true)
+            .WithAnimationDuration(999)
+            .WithCancelBeforeMatch(true)
+            .WithCancelBeforeMatchDelay(500));
+
+        var panel = GetByTestId("collapsible-panel");
+        var trigger = GetByTestId("collapsible-trigger");
+
+        await panel.EvaluateAsync(@"(el) => {
+            const event = new Event('beforematch', { bubbles: true, cancelable: false });
+            el.dispatchEvent(event);
+        }");
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(panel, "data-open", "");
+
+        await Page.WaitForFunctionAsync(
+            @"() => /^\d+(\.\d+)?px$/.test(document.querySelector('[data-testid=""collapsible-panel""]')?.style.getPropertyValue('--collapsible-panel-height').trim() ?? '')",
+            new PageWaitForFunctionOptions { Timeout = 250 * TimeoutMultiplier });
+
+        await WaitForDelayAsync(600);
+
+        var inlineTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => el.style.transitionDuration");
+        Assert.NotEqual("0s", inlineTransitionDuration);
+    }
+
+    [Fact]
+    public virtual async Task PendingAcceptedBeforeMatch_ShouldNotSuppressInterveningTriggerOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithHiddenUntilFound(true)
+            .WithKeepMounted(true)
+            .WithAnimated(true)
+            .WithAnimationDuration(999)
+            .WithCancelBeforeMatchDelay(500));
+
+        var panel = GetByTestId("collapsible-panel");
+        var trigger = GetByTestId("collapsible-trigger");
+
+        await panel.EvaluateAsync(@"(el) => {
+            const event = new Event('beforematch', { bubbles: true, cancelable: false });
+            el.dispatchEvent(event);
+        }");
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(panel, "data-open", "");
+
+        await Page.WaitForFunctionAsync(
+            @"() => /^\d+(\.\d+)?px$/.test(document.querySelector('[data-testid=""collapsible-panel""]')?.style.getPropertyValue('--collapsible-panel-height').trim() ?? '')",
+            new PageWaitForFunctionOptions { Timeout = 250 * TimeoutMultiplier });
+
+        await WaitForDelayAsync(600);
+
+        var inlineTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => el.style.transitionDuration");
+        Assert.NotEqual("0s", inlineTransitionDuration);
+    }
+
+    [Fact]
+    public virtual async Task AcceptedBeforeMatch_ShouldTemporarilySuppressOpenAndRestoreBeforeClose()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithHiddenUntilFound(true)
+            .WithKeepMounted(true)
+            .WithAnimated(true)
+            .WithAnimationDuration(123));
+
+        var panel = GetByTestId("collapsible-panel");
+        var trigger = GetByTestId("collapsible-trigger");
+
+        await panel.EvaluateAsync(@"(el) => {
+            const event = new Event('beforematch', { bubbles: true, cancelable: false });
+            el.dispatchEvent(event);
+        }");
+
+        await WaitForAttributeValueAsync(panel, "data-open", "");
+        await Page.WaitForFunctionAsync(
+            @"() => document.querySelector('[data-testid=""collapsible-panel""]')?.style.transitionDuration === '0s'",
+            new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
+        var beforeMatchTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => el.style.transitionDuration");
+        Assert.Equal("0s", beforeMatchTransitionDuration);
+
+        await trigger.ClickAsync();
+        await WaitForAttributeValueAsync(panel, "data-ending-style", "");
+
+        var inlineTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => el.style.transitionDuration");
+        var computedTransitionDuration = await panel.EvaluateAsync<string>(
+            "el => getComputedStyle(el).transitionDuration");
+
+        Assert.NotEqual("0s", inlineTransitionDuration);
+        Assert.Contains("0.123s", computedTransitionDuration);
+    }
+
+    [Fact]
+    public virtual async Task HiddenUntilFoundPanel_ShouldNotLeaveRunningAnimationsAfterClose()
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible")
+            .WithHiddenUntilFound(true)
+            .WithKeepMounted(true)
+            .WithAnimated(true)
+            .WithDefaultOpen(true)
+            .WithAnimationDuration(200));
+
+        var panel = GetByTestId("collapsible-panel");
+
+        await ClickTriggerAsync();
+        await Assertions.Expect(panel).ToHaveAttributeAsync("hidden", "until-found");
+        await Assertions.Expect(panel).ToHaveAttributeAsync("data-starting-style", "");
+
+        var runningAnimationCount = await panel.EvaluateAsync<int>(
+            "el => el.getAnimations().filter((animation) => animation.playState !== 'finished' && animation.playState !== 'idle').length");
+        Assert.Equal(0, runningAnimationCount);
+    }
+
     #endregion
 
     #region Keyboard and Focus Tests
@@ -308,6 +461,22 @@ public abstract class CollapsibleTestsBase : TestBase
         await WaitForAttributeValueAsync(trigger, "aria-expanded", "false");
     }
 
+    [Theory]
+    [InlineData("Enter")]
+    [InlineData(" ")]
+    public virtual async Task DisabledTrigger_ShouldNotInvokeOnOpenChange_OnKeyPress(string key)
+    {
+        await NavigateAsync(CreateUrl("/tests/collapsible").WithDisabled(true));
+
+        var trigger = GetByTestId("collapsible-trigger");
+        var changeCount = GetByTestId("change-count");
+
+        await trigger.PressAsync(key);
+
+        await Assertions.Expect(changeCount).ToHaveTextAsync("0");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "false");
+    }
+
     [Fact]
     public virtual async Task Trigger_ShouldReceiveFocus_OnTab()
     {
@@ -332,10 +501,7 @@ public abstract class CollapsibleTestsBase : TestBase
         // Panel should have the custom ID
         await Assertions.Expect(panel).ToHaveAttributeAsync("id", "custom-panel-id");
 
-        // aria-controls attribute exists on trigger
-        // Note: Due to render order, aria-controls may not be synced with panel ID on initial render
-        var ariaControls = await trigger.GetAttributeAsync("aria-controls");
-        Assert.NotNull(ariaControls);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-controls", "custom-panel-id");
     }
 
     #endregion
@@ -373,6 +539,8 @@ public abstract class CollapsibleTestsBase : TestBase
             "() => window.__startingStyleDetected === true",
             new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
 
+        await Assertions.Expect(panel).ToHaveAttributeAsync("data-open", "");
+
         await panel.EvaluateAsync("() => window.__startingStyleObserver?.disconnect()");
     }
 
@@ -407,6 +575,10 @@ public abstract class CollapsibleTestsBase : TestBase
         await Page.WaitForFunctionAsync(
             "() => window.__endingStyleDetected === true",
             new PageWaitForFunctionOptions { Timeout = 1000 * TimeoutMultiplier });
+
+        var endingHeightVar = await panel.EvaluateAsync<string>(
+            "el => el.style.getPropertyValue('--collapsible-panel-height').trim()");
+        Assert.Matches(@"^\d+(\.\d+)?px$", endingHeightVar);
 
         await panel.EvaluateAsync("() => window.__endingStyleObserver?.disconnect()");
     }

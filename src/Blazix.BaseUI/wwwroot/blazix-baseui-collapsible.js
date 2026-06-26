@@ -32,6 +32,9 @@ function getVarNames(prefix) {
  * @property {Function | null} beforeMatchHandler
  * @property {'opening' | 'closing' | 'idle'} animationDirection
  * @property {boolean} isBeforeMatch
+ * @property {boolean} beforeMatchPending
+ * @property {Promise<boolean> | null} beforeMatchPromise
+ * @property {boolean} openedWhileBeforeMatchPending
  * @property {boolean} cancelInitialTransition
  * @property {boolean} cancelInitialAnimation
  * @property {boolean} keepMounted
@@ -51,6 +54,9 @@ function getOrCreateState(panel, dotNetRef, prefix) {
             beforeMatchHandler: null,
             animationDirection: 'idle',
             isBeforeMatch: false,
+            beforeMatchPending: false,
+            beforeMatchPromise: null,
+            openedWhileBeforeMatchPending: false,
             cancelInitialTransition: false,
             cancelInitialAnimation: false,
             keepMounted: false,
@@ -191,6 +197,9 @@ export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFou
         }
     }
 
+    const initialAnimationType = detectAnimationType(panel);
+    invokeAnimationTypeDetected(state.dotNetRef, initialAnimationType);
+
     if (initialOpen) {
         // Use auto so the panel can resize naturally when nested content changes
         setCssVariables(panel, {
@@ -208,8 +217,7 @@ export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFou
         // hidden attribute changes to "until-found" (different display properties).
         // Matches React's useCollapsiblePanel behavior.
         if (hiddenUntilFound) {
-            const animationType = detectAnimationType(panel);
-            if (animationType !== 'css-animation') {
+            if (initialAnimationType !== 'css-animation') {
                 setDataAttribute(panel, 'starting-style', true);
             }
         }
@@ -225,14 +233,28 @@ export function initialize(panel, dotNetRef, initialOpen, prefix, hiddenUntilFou
     // Add beforematch event listener for hidden="until-found" support
     if (!state.beforeMatchHandler) {
         state.beforeMatchHandler = () => {
-            state.isBeforeMatch = true;
-            invokeBeforeMatch(state.dotNetRef);
+            state.beforeMatchPending = true;
+            state.openedWhileBeforeMatchPending = false;
+            state.beforeMatchPromise = invokeBeforeMatch(state.dotNetRef).then((accepted) => {
+                const shouldSkipNextOpen = !!accepted && !state.openedWhileBeforeMatchPending;
+                state.beforeMatchPending = false;
+                state.openedWhileBeforeMatchPending = false;
+                state.isBeforeMatch = shouldSkipNextOpen;
+                state.beforeMatchPromise = null;
+                return shouldSkipNextOpen;
+            }).catch(() => {
+                state.beforeMatchPending = false;
+                state.openedWhileBeforeMatchPending = false;
+                state.isBeforeMatch = false;
+                state.beforeMatchPromise = null;
+                return false;
+            });
         };
         panel.addEventListener('beforematch', state.beforeMatchHandler);
     }
 }
 
-export async function open(panel, skipAnimation) {
+export async function open(panel, skipAnimation, beforeMatchOpen) {
     const state = panelStates.get(panel);
     if (!state) return;
 
@@ -242,6 +264,14 @@ export async function open(panel, skipAnimation) {
     // Abort any ongoing animation and finalize its CSS state immediately
     abortAndFinalize(state, panel, vars);
 
+    if (state.beforeMatchPending) {
+        state.openedWhileBeforeMatchPending = true;
+    }
+
+    if (beforeMatchOpen) {
+        state.isBeforeMatch = true;
+    }
+
     // Handle beforematch-triggered open: suppress animation so content appears instantly
     // when revealed by browser find-in-page (matches React's isBeforeMatchRef behavior)
     if (state.isBeforeMatch) {
@@ -250,6 +280,7 @@ export async function open(panel, skipAnimation) {
         setDataAttribute(panel, 'starting-style', false);
 
         const animationType = detectAnimationType(panel);
+        invokeAnimationTypeDetected(state.dotNetRef, animationType);
         const dims = measureDimensions(panel);
         setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
 
@@ -301,6 +332,7 @@ export async function open(panel, skipAnimation) {
     });
 
     const animationType = detectAnimationType(panel);
+    invokeAnimationTypeDetected(state.dotNetRef, animationType);
 
     if (skipAnimation || animationType === 'none') {
         setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
@@ -417,6 +449,8 @@ export async function close(panel) {
 
     // Abort any ongoing animation and finalize its CSS state immediately
     abortAndFinalize(state, panel, vars);
+    state.cancelInitialTransition = false;
+    state.cancelInitialAnimation = false;
 
     // Clear starting-style from any previous animation
     setDataAttribute(panel, 'starting-style', false);
@@ -434,6 +468,7 @@ export async function close(panel) {
     setCssVariables(panel, makeDimVars(vars, dim, `${dims.height}px`, `${dims.width}px`));
 
     const animationType = detectAnimationType(panel);
+    invokeAnimationTypeDetected(state.dotNetRef, animationType);
 
     if (animationType === 'none') {
         setCssVariables(panel, { [vars.height]: 'auto', [vars.width]: 'auto' });
@@ -532,6 +567,10 @@ export function dispose(panel) {
         panel.removeEventListener('beforematch', state.beforeMatchHandler);
     }
 
+    state.beforeMatchPending = false;
+    state.isBeforeMatch = false;
+    state.beforeMatchPromise = null;
+    state.openedWhileBeforeMatchPending = false;
     restorePendingTemporaryStyle(state);
     panelStates.delete(panel);
 }
@@ -550,6 +589,14 @@ function invokeAnimationEnded(dotNetRef, animationType, completed) {
 
 function invokeBeforeMatch(dotNetRef) {
     try {
-        dotNetRef.invokeMethodAsync('OnBeforeMatch');
+        return dotNetRef.invokeMethodAsync('OnBeforeMatch').then(Boolean, () => false);
+    } catch (e) {
+        return Promise.resolve(false);
+    }
+}
+
+function invokeAnimationTypeDetected(dotNetRef, animationType) {
+    try {
+        dotNetRef.invokeMethodAsync('OnAnimationTypeDetected', animationType);
     } catch (e) { }
 }

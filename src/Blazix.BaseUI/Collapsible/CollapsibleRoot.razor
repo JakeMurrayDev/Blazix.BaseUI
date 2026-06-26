@@ -114,7 +114,8 @@
             HandleTrigger = HandleTrigger,
             HandleBeforeMatch = HandleBeforeMatch,
             SetPanelId = SetPanelId,
-            SetTransitionStatus = SetTransitionStatus
+            SetTransitionStatus = SetTransitionStatus,
+            ClearOpenChangeReason = ClearOpenChangeReason
         };
         state = new CollapsibleRootState(CurrentOpen, Disabled, transitionStatus);
         BuildComponentAttributes();
@@ -170,6 +171,14 @@
         }
     }
 
+    /// <summary>
+    /// Clears the pending internally initiated open change reason after the panel consumes it.
+    /// </summary>
+    internal void ClearOpenChangeReason()
+    {
+        context.OpenChangeReason = null;
+    }
+
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
@@ -182,15 +191,10 @@
         componentAttributes = attrs;
     }
 
-    private async Task HandleTrigger()
+    private async Task HandleTrigger(MouseEventArgs? triggerEvent = null, ElementReference? triggerElement = null)
     {
-        if (Disabled)
-        {
-            return;
-        }
-
         var nextOpen = !CurrentOpen;
-        var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress);
+        var args = new CollapsibleOpenChangeEventArgs(nextOpen, CollapsibleOpenChangeReason.TriggerPress, triggerEvent, triggerElement);
 
         await OnOpenChange.InvokeAsync(args);
 
@@ -198,6 +202,8 @@
         {
             return;
         }
+
+        context.OpenChangeReason = CollapsibleOpenChangeReason.TriggerPress;
 
         if (!IsControlled)
         {
@@ -219,12 +225,12 @@
         StateHasChanged();
     }
 
-    private async Task HandleBeforeMatch()
+    private async Task<bool> HandleBeforeMatch()
     {
         // beforematch event should only open, not toggle
-        if (CurrentOpen || Disabled)
+        if (CurrentOpen)
         {
-            return;
+            return false;
         }
 
         var args = new CollapsibleOpenChangeEventArgs(true, CollapsibleOpenChangeReason.None);
@@ -233,8 +239,15 @@
 
         if (args.IsCanceled)
         {
-            return;
+            return false;
         }
+
+        if (CurrentOpen)
+        {
+            return false;
+        }
+
+        context.OpenChangeReason = CollapsibleOpenChangeReason.None;
 
         if (!IsControlled)
         {
@@ -254,5 +267,6 @@
         context.TransitionStatus = transitionStatus;
         BuildComponentAttributes();
         StateHasChanged();
+        return true;
     }
 }

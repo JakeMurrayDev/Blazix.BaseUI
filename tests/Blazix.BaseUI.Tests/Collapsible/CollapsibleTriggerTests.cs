@@ -11,6 +11,7 @@ public class CollapsibleTriggerTests : BunitContext, ICollapsibleTriggerContract
     private RenderFragment CreateTriggerInRoot(
         bool defaultOpen = false,
         bool disabled = false,
+        bool? triggerDisabled = null,
         Func<CollapsibleRootState, string>? classValue = null,
         Func<CollapsibleRootState, string>? styleValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
@@ -29,6 +30,8 @@ public class CollapsibleTriggerTests : BunitContext, ICollapsibleTriggerContract
                 innerBuilder.OpenComponent<CollapsibleTrigger>(0);
                 var attrIndex = 1;
 
+                if (triggerDisabled.HasValue)
+                    innerBuilder.AddAttribute(attrIndex++, "Disabled", triggerDisabled.Value);
                 if (classValue is not null)
                     innerBuilder.AddAttribute(attrIndex++, "ClassValue", classValue);
                 if (styleValue is not null)
@@ -99,6 +102,22 @@ public class CollapsibleTriggerTests : BunitContext, ICollapsibleTriggerContract
         var trigger = cut.Find("button");
         trigger.GetAttribute("data-testid").ShouldBe("trigger");
         trigger.GetAttribute("aria-label").ShouldBe("Toggle panel");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ForwardsIdAttribute()
+    {
+        var cut = Render(CreateTriggerInRoot(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "id", "custom-trigger-id" }
+            }
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("id").ShouldBe("custom-trigger-id");
 
         return Task.CompletedTask;
     }
@@ -264,6 +283,22 @@ public class CollapsibleTriggerTests : BunitContext, ICollapsibleTriggerContract
         trigger.Click();
 
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task TriggerDisabledFalseOverridesDisabledRoot()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: false, disabled: true, triggerDisabled: false));
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-disabled").ShouldBeFalse();
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        trigger.Click();
+
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
         return Task.CompletedTask;
     }

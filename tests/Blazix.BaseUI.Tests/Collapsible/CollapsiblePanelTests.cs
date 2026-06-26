@@ -197,6 +197,17 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
     }
 
     [Fact]
+    public Task HiddenUntilFoundClosedPanelPersistsStartingStyle()
+    {
+        var cut = Render(CreatePanelInRoot(defaultOpen: false, keepMounted: false, hiddenUntilFound: true));
+
+        var panel = cut.FindAll("div[data-closed]").Last();
+        panel.HasAttribute("data-starting-style").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task HasDataOpenWhenOpen()
     {
         var cut = Render(CreatePanelInRoot(defaultOpen: true));
@@ -241,6 +252,28 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
         style.ShouldNotBeNull();
         style!.ShouldContain("animation-name: panel-slide-down");
         style.ShouldEndWith("animation-name: none");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InitialOpenPanelDoesNotSuppressReopenAfterCloseRequest()
+    {
+        var cut = Render(CreatePanelInRoot(
+            defaultOpen: true,
+            styleValue: _ => "animation-name: panel-slide-down; animation-duration: 100ms"
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.Click();
+        trigger.Click();
+
+        var panel = cut.FindAll("div[data-open]").Last();
+        var style = panel.GetAttribute("style");
+
+        style.ShouldNotBeNull();
+        style!.ShouldContain("animation-name: panel-slide-down");
+        style.ShouldNotEndWith("animation-name: none");
 
         return Task.CompletedTask;
     }

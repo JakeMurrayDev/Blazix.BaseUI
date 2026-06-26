@@ -12,6 +12,7 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
         bool? open = null,
         bool defaultOpen = false,
         bool disabled = false,
+        bool hiddenUntilFound = false,
         Func<CollapsibleRootState, string>? classValue = null,
         Func<CollapsibleRootState, string>? styleValue = null,
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
@@ -41,12 +42,12 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
             if (onOpenChange.HasValue)
                 builder.AddAttribute(attrIndex++, "OnOpenChange", onOpenChange.Value);
 
-            builder.AddAttribute(attrIndex++, "ChildContent", CreateChildContent(includeTrigger, includePanel));
+            builder.AddAttribute(attrIndex++, "ChildContent", CreateChildContent(includeTrigger, includePanel, hiddenUntilFound));
             builder.CloseComponent();
         };
     }
 
-    private static RenderFragment CreateChildContent(bool includeTrigger = true, bool includePanel = true)
+    private static RenderFragment CreateChildContent(bool includeTrigger = true, bool includePanel = true, bool hiddenUntilFound = false)
     {
         return builder =>
         {
@@ -60,7 +61,8 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
             {
                 builder.OpenComponent<CollapsiblePanel>(2);
                 builder.AddAttribute(3, "KeepMounted", true);
-                builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel Content")));
+                builder.AddAttribute(4, "HiddenUntilFound", hiddenUntilFound);
+                builder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel Content")));
                 builder.CloseComponent();
             }
         };
@@ -250,6 +252,30 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
     }
 
     [Fact]
+    public Task OnOpenChangeReceivesTriggerEventDetails()
+    {
+        MouseEventArgs? receivedTriggerEvent = null;
+        ElementReference? receivedTriggerElement = null;
+
+        var cut = Render(CreateCollapsibleRoot(
+            onOpenChange: EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(this, args =>
+            {
+                receivedTriggerEvent = args.TriggerEvent;
+                receivedTriggerElement = args.TriggerElement;
+            })
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.Click(new MouseEventArgs { Detail = 2 });
+
+        receivedTriggerEvent.ShouldNotBeNull();
+        receivedTriggerEvent!.Detail.ShouldBe(2);
+        receivedTriggerElement.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task OnOpenChangeCancellationPreventsStateChange()
     {
         var cut = Render(CreateCollapsibleRoot(
@@ -267,6 +293,65 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnOpenChangeCancellationPreventsClosing()
+    {
+        var cut = Render(CreateCollapsibleRoot(
+            defaultOpen: true,
+            onOpenChange: EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(this, args =>
+            {
+                args.Cancel();
+            })
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+
+        trigger.Click();
+
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+        cut.Find("div[data-open]").ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DisabledTriggerDoesNotInvokeOnOpenChange()
+    {
+        var callCount = 0;
+
+        var cut = Render(CreateCollapsibleRoot(
+            disabled: true,
+            onOpenChange: EventCallback.Factory.Create<CollapsibleOpenChangeEventArgs>(this, _ =>
+            {
+                callCount++;
+            })
+        ));
+
+        var trigger = cut.Find("button");
+        trigger.Click();
+
+        callCount.ShouldBe(0);
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task BeforeMatchOpensWhenRootDisabled()
+    {
+        var cut = Render(CreateCollapsibleRoot(disabled: true, hiddenUntilFound: true));
+        var panelComponent = cut.FindComponent<CollapsiblePanel>();
+
+        var accepted = await panelComponent.InvokeAsync(() => panelComponent.Instance.OnBeforeMatch());
+
+        accepted.ShouldBeTrue();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+        cut.Find("div[data-open]").ShouldNotBeNull();
     }
 
     [Fact]
@@ -302,6 +387,60 @@ public class CollapsibleRootTests : BunitContext, ICollapsibleRootContract
         capturedState.ShouldNotBeNull();
         capturedState!.Open.ShouldBeTrue();
         capturedState.Disabled.ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task StateCallbacksUpdateAcrossRootTriggerAndPanel()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<CollapsibleRoot>(0);
+            builder.AddAttribute(1, "data-testid", "root");
+            builder.AddAttribute(2, "ClassValue", (Func<CollapsibleRootState, string>)(state =>
+                state.Open ? "root-open" : "root-closed"));
+            builder.AddAttribute(3, "StyleValue", (Func<CollapsibleRootState, string>)(state =>
+                state.Open ? "opacity: 1" : "opacity: 0.5"));
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<CollapsibleTrigger>(0);
+                innerBuilder.AddAttribute(1, "data-testid", "trigger");
+                innerBuilder.AddAttribute(2, "ClassValue", (Func<CollapsibleRootState, string>)(state =>
+                    state.Open ? "trigger-open" : "trigger-closed"));
+                innerBuilder.AddAttribute(3, "StyleValue", (Func<CollapsibleRootState, string>)(state =>
+                    state.Open ? "color: green" : "color: red"));
+                innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<CollapsiblePanel>(5);
+                innerBuilder.AddAttribute(6, "data-testid", "panel");
+                innerBuilder.AddAttribute(7, "KeepMounted", true);
+                innerBuilder.AddAttribute(8, "ClassValue", (Func<CollapsiblePanelState, string>)(state =>
+                    state.Open ? "panel-open" : "panel-closed"));
+                innerBuilder.AddAttribute(9, "StyleValue", (Func<CollapsiblePanelState, string>)(state =>
+                    state.Open ? "display: block" : "display: none"));
+                innerBuilder.AddAttribute(10, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel Content")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[data-testid='root']").GetAttribute("class")!.ShouldContain("root-closed");
+        cut.Find("[data-testid='root']").GetAttribute("style")!.ShouldContain("opacity: 0.5");
+        cut.Find("[data-testid='trigger']").GetAttribute("class")!.ShouldContain("trigger-closed");
+        cut.Find("[data-testid='trigger']").GetAttribute("style")!.ShouldContain("color: red");
+        cut.Find("[data-testid='panel']").GetAttribute("class")!.ShouldContain("panel-closed");
+        cut.Find("[data-testid='panel']").GetAttribute("style")!.ShouldContain("display: none");
+
+        cut.Find("[data-testid='trigger']").Click();
+
+        cut.Find("[data-testid='root']").GetAttribute("class")!.ShouldContain("root-open");
+        cut.Find("[data-testid='root']").GetAttribute("style")!.ShouldContain("opacity: 1");
+        cut.Find("[data-testid='trigger']").GetAttribute("class")!.ShouldContain("trigger-open");
+        cut.Find("[data-testid='trigger']").GetAttribute("style")!.ShouldContain("color: green");
+        cut.Find("[data-testid='panel']").GetAttribute("class")!.ShouldContain("panel-open");
+        cut.Find("[data-testid='panel']").GetAttribute("style")!.ShouldContain("display: block");
 
         return Task.CompletedTask;
     }

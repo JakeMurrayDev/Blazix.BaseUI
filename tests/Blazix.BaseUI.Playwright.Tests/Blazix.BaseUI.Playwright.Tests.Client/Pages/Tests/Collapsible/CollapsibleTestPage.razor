@@ -69,6 +69,12 @@
     [SupplyParameterFromQuery(Name = "hiddenUntilFound")]
     public bool HiddenUntilFound { get; set; }
 
+    [SupplyParameterFromQuery(Name = "cancelBeforeMatch")]
+    public bool CancelBeforeMatch { get; set; }
+
+    [SupplyParameterFromQuery(Name = "cancelBeforeMatchDelay")]
+    public int CancelBeforeMatchDelay { get; set; }
+
     [SupplyParameterFromQuery(Name = "animated")]
     public bool Animated { get; set; }
 
@@ -95,11 +101,22 @@
         isOpen = DefaultOpen;
     }
 
-    private void HandleOpenChange(CollapsibleOpenChangeEventArgs args)
+    private async Task HandleOpenChange(CollapsibleOpenChangeEventArgs args)
     {
         changeCount++;
-        lastCanceled = args.IsCanceled;
         lastReason = args.Reason.ToString();
         lastOpen = args.Open;
+
+        if (args.Reason == CollapsibleOpenChangeReason.None && CancelBeforeMatchDelay > 0)
+        {
+            await Task.Delay(CancelBeforeMatchDelay);
+        }
+
+        if (CancelBeforeMatch && args.Reason == CollapsibleOpenChangeReason.None)
+        {
+            args.Cancel();
+        }
+
+        lastCanceled = args.IsCanceled;
     }
 }
