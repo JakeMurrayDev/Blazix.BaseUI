@@ -1,5 +1,6 @@
 @using Blazix.BaseUI.DirectionProvider
 @using Microsoft.AspNetCore.Components.Rendering
+@using Microsoft.AspNetCore.Components.Web
 
 @typeparam TValue where TValue : notnull
 
@@ -59,14 +60,13 @@
 
     /// <summary>
     /// Gets or sets the visual orientation of the accordion.
-    /// Controls whether roving focus uses left/right or up/down arrow keys.
+    /// This value is exposed through state and data attributes and does not control trigger keyboard focus.
     /// </summary>
     [Parameter]
     public Orientation Orientation { get; set; } = Orientation.Vertical;
 
     /// <summary>
-    /// Determines whether to loop keyboard focus back to the first item
-    /// when the end of the list is reached while using the arrow keys. Defaults to <see langword="true"/>.
+    /// Deprecated. This value is retained for source compatibility and does not control trigger keyboard focus.
     /// </summary>
     [Parameter]
     public bool LoopFocus { get; set; } = true;
@@ -184,7 +184,6 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["dir"] = direction.ToAttributeString()!;
-        attrs["role"] = "region";
         attrs["data-blazix-base-ui-accordion-root"] = true;
         attrs["data-orientation"] = state.Orientation.ToDataAttributeString()!;
         attrs["data-disabled"] = state.Disabled;
@@ -192,7 +191,12 @@
         componentAttributes = attrs;
     }
 
-    private async Task HandleValueChangeAsync(TValue itemValue, bool nextOpen)
+    private async Task<bool> HandleValueChangeAsync(
+        TValue itemValue,
+        bool nextOpen,
+        AccordionValueChangeReason reason,
+        MouseEventArgs? triggerEvent = null,
+        ElementReference? triggerElement = null)
     {
         TValue[] nextValue;
 
@@ -211,24 +215,24 @@
             nextValue = [.. CurrentValue.Where(v => !EqualityComparer<TValue>.Default.Equals(v, itemValue))];
         }
 
-        var args = new AccordionValueChangeEventArgs<TValue>(nextValue);
+        var args = new AccordionValueChangeEventArgs<TValue>(nextValue, reason, triggerEvent, triggerElement);
         await OnValueChange.InvokeAsync(args);
 
         if (args.IsCanceled)
         {
-            return;
+            return false;
         }
 
         if (!IsControlled)
         {
             currentValue = nextValue;
+            context.Value = nextValue;
+            state = state with { Value = nextValue };
+            BuildComponentAttributes();
+            await InvokeAsync(StateHasChanged);
         }
 
         await ValueChanged.InvokeAsync(nextValue);
-
-        context.Value = nextValue;
-        state = state with { Value = nextValue };
-        BuildComponentAttributes();
-        await InvokeAsync(StateHasChanged);
+        return true;
     }
 }

@@ -2,6 +2,17 @@
 
 Date: 2026-06-01
 
+## Superseded
+
+This audit is retained as historical evidence only. It was superseded on 2026-06-26 by:
+
+- `docs/audits/accordion-functional-audit.md`
+- `docs/audits/accordion-parity-matrix.md`
+- `docs/audits/accordion-source-docs-comparison.md`
+- `docs/audits/accordion-verification-report.md`
+
+Current React Base UI Accordion behavior no longer includes roving trigger focus, and `Accordion.Root` no longer renders `role="region"`. Use the 2026-06-26 audit set for current parity conclusions.
+
 ## Scope
 
 - Component: `Accordion`
@@ -26,7 +37,7 @@ Date: 2026-06-01
 | Trigger state attributes | Trigger emits state-derived `data-index`, `data-orientation`, `data-hidden`, disabled state, and `data-panel-open`. | Trigger state now carries index/hidden and emits the missing attributes. |
 | Trigger JS config | Keyboard activation depends on `nativeButton` after parameter changes. | `updateConfig` now carries `isNativeButton`; bUnit JS interop setup was updated. |
 | Explicit item value changes | React recomputes explicit `value` props. | Item now refreshes `resolvedValue` when an explicit `Value` parameter changes. |
-| Playwright focus coverage | Arrow-key focus loops are core Accordion behavior. | Server/WASM focus tests are unskipped and pass; query binding preserves `LoopFocus=true` default. |
+| Playwright focus coverage | Historical only: this row was superseded by the 2026-06-26 audit after React Base UI removed roving trigger focus. | Current Playwright coverage verifies native trigger activation timing and no longer treats arrow-key focus loops as Accordion behavior. |
 
 ## Parity Matrix
 
@@ -44,7 +55,7 @@ Date: 2026-06-01
 | `accordionStateAttributesMapping` | Item/Header/Panel attribute builders | Data attribute unit coverage |
 | `triggerOpenStateMapping` | Trigger attribute builder and JS handlers | Trigger unit coverage and Playwright focus tests |
 | `useButton` | `AccessibilityUtilities.ApplyNativeButtonAttributes` / `ApplyButtonAttributes` | Trigger unit coverage |
-| Composite keyboard helpers | `blazor-baseui-accordion-trigger.js` keydown handlers | Server/WASM focus loop tests and in-app browser check |
+| Composite keyboard helpers | Historical only: superseded by current APG-aligned trigger key handling. | Current trigger JS prevents Space scroll on keydown and activates on keyup. |
 | `beforematch` event listener | Shared Collapsible JS module invoking `OnBeforeMatch` | Unit and Playwright hidden-until-found tests |
 | Animation finish utilities | Shared Collapsible JS animation measurement/waiting | Panel transition tests and Playwright runs |
 | Development-only React warning branch | Behavior implemented; warning branch documented in adjacent spec. Root cannot distinguish explicit `keepMounted={false}` from default `false` with current bool API. | No functional runtime effect; hidden-until-found override verified |
@@ -53,7 +64,7 @@ Date: 2026-06-01
 
 | Part | React attributes | Verified Blazor attributes |
 | --- | --- | --- |
-| Root | `dir`, `role="region"`, `data-orientation`, `data-disabled` when disabled | Present through root attribute builder and existing tests |
+| Root | Current React source: `dir`, no `role`, `data-orientation`, `data-disabled` when disabled | Current root role behavior is verified in `docs/audits/accordion-functional-audit.md`. |
 | Item | `data-open`/`data-closed`, `data-disabled`, `data-hidden`, `data-index`, `data-orientation` | Unit tests cover open, closed, disabled, hidden, index, orientation |
 | Header | Item state attributes | Unit coverage through state propagation and added hidden state |
 | Trigger | `id`, `type`/`role`, `tabindex`, `aria-expanded`, conditional `aria-controls`, `data-panel-open`, `data-disabled`, `data-hidden`, `data-index`, `data-orientation`, `data-value` | Unit tests and in-app browser check |
@@ -73,11 +84,11 @@ Date: 2026-06-01
 
 Log: `docs/audits/logs/accordion-in-app-browser-check.json`
 
-Verified against `http://127.0.0.1:5110/tests/accordion/server`:
+Historical check against `http://127.0.0.1:5110/tests/accordion/server`. This evidence is superseded by `docs/audits/logs/accordion-in-app-browser-comparison-2026-06-26.json`.
 
 - Closed hidden-until-found panel has `hidden="until-found"`, `data-hidden`, trigger `data-hidden`, trigger `data-index="0"`, and trigger `data-orientation="vertical"`.
 - Opening removes `hidden` and `data-hidden`, sets `aria-expanded="true"`, and makes the panel visible.
-- Vertical focus loop sequence: trigger 1 ArrowDown -> trigger 2, ArrowDown -> trigger 3, ArrowDown -> trigger 1, ArrowUp -> trigger 3.
+- Historical vertical focus loop sequence: trigger 1 ArrowDown -> trigger 2, ArrowDown -> trigger 3, ArrowDown -> trigger 1, ArrowUp -> trigger 3. Current React Base UI no longer treats this as Accordion behavior.
 
 ## Notes
 

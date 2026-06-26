@@ -1,3 +1,6 @@
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+
 namespace Blazix.BaseUI.Accordion;
 
 /// <summary>
@@ -23,10 +26,18 @@ public sealed class AccordionValueChangeEventArgs<TValue> : EventArgs
     /// </summary>
     /// <param name="value">The new value of the expanded item(s).</param>
     /// <param name="reason">The reason for the value change.</param>
-    public AccordionValueChangeEventArgs(TValue[] value, AccordionValueChangeReason reason = AccordionValueChangeReason.None)
+    /// <param name="triggerEvent">The mouse event that triggered the change, when the change was caused by a trigger press.</param>
+    /// <param name="triggerElement">The trigger element that caused the change, when the change was caused by a trigger press.</param>
+    public AccordionValueChangeEventArgs(
+        TValue[] value,
+        AccordionValueChangeReason reason = AccordionValueChangeReason.None,
+        MouseEventArgs? triggerEvent = null,
+        ElementReference? triggerElement = null)
     {
         Value = value;
         Reason = reason;
+        TriggerEvent = triggerEvent;
+        TriggerElement = triggerElement;
     }
 
     /// <summary>
@@ -38,6 +49,16 @@ public sealed class AccordionValueChangeEventArgs<TValue> : EventArgs
     /// Gets the reason for the value change.
     /// </summary>
     public AccordionValueChangeReason Reason { get; }
+
+    /// <summary>
+    /// Gets the mouse event that triggered the change, when the change was caused by a trigger press.
+    /// </summary>
+    public MouseEventArgs? TriggerEvent { get; }
+
+    /// <summary>
+    /// Gets the trigger element that caused the change, when the change was caused by a trigger press.
+    /// </summary>
+    public ElementReference? TriggerElement { get; }
 
     /// <summary>
     /// Gets a value indicating whether the value change has been canceled.

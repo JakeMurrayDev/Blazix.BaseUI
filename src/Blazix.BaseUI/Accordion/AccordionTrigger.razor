@@ -23,24 +23,18 @@
     private string? defaultId;
     private bool hasRendered;
     private bool pendingConfigUpdate;
-    private bool previousIsHorizontal;
-    private bool previousIsRtl;
-    private bool previousLoopFocus;
     private bool previousNativeButton;
     private AccordionTriggerState state = null!;
     private RenderElement<AccordionTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
-    private bool ResolvedDisabled => Disabled ?? ItemContext?.Disabled ?? false;
+    private bool ResolvedDisabled => Disabled == true || (ItemContext?.Disabled ?? false);
 
     private string ResolvedId
     {
         get
         {
-            var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () =>
-                string.IsNullOrEmpty(ItemContext?.TriggerId)
-                    ? defaultId ??= Guid.NewGuid().ToIdString()
-                    : ItemContext.TriggerId);
+            var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
             if (id != ItemContext?.TriggerId)
             {
                 ItemContext?.SetTriggerId(id);
@@ -60,7 +54,7 @@
 
     /// <summary>
     /// Determines whether the component should ignore user interaction.
-    /// When <see langword="null"/>, inherits from the parent <see cref="AccordionItem{TValue}"/>.
+    /// The parent <see cref="AccordionItem{TValue}"/> disabled state always disables the trigger.
     /// </summary>
     [Parameter]
     public bool? Disabled { get; set; }
@@ -115,6 +109,17 @@
     }
 
     /// <inheritdoc />
+    public override Task SetParametersAsync(ParameterView parameters)
+    {
+        if (!parameters.TryGetValue<IReadOnlyDictionary<string, object>?>(nameof(AdditionalAttributes), out _))
+        {
+            AdditionalAttributes = null;
+        }
+
+        return base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
     protected override void OnParametersSet()
     {
         var currentOpen = ItemContext?.Open ?? false;
@@ -123,6 +128,11 @@
         var currentValue = ItemContext?.StringValue ?? string.Empty;
         var currentDisabled = ResolvedDisabled;
         var currentHidden = ItemContext?.Hidden ?? true;
+
+        if (defaultId is null && !string.IsNullOrEmpty(ItemContext?.TriggerId))
+        {
+            defaultId = ItemContext.TriggerId;
+        }
 
         if (state is null)
         {
@@ -133,13 +143,9 @@
             state = state with { Open = currentOpen, Orientation = currentOrientation, Index = currentIndex, Value = currentValue, Disabled = currentDisabled, Hidden = currentHidden };
         }
 
-        if (hasRendered && RootContext is not null)
+        if (hasRendered)
         {
-            var isHorizontal = RootContext.Orientation == Orientation.Horizontal;
-            var isRtl = RootContext.Direction == Direction.Rtl;
-            var loopFocus = RootContext.LoopFocus;
-
-            if (isHorizontal != previousIsHorizontal || isRtl != previousIsRtl || loopFocus != previousLoopFocus || NativeButton != previousNativeButton)
+            if (NativeButton != previousNativeButton)
             {
                 pendingConfigUpdate = true;
             }
@@ -160,18 +166,12 @@
                 try
                 {
                     var module = await moduleTask.Value;
-                    var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
-                    var isRtl = RootContext?.Direction == Direction.Rtl;
-                    var loopFocus = RootContext?.LoopFocus ?? true;
 
-                    previousIsHorizontal = isHorizontal;
-                    previousIsRtl = isRtl;
-                    previousLoopFocus = loopFocus;
                     previousNativeButton = NativeButton;
 
-                    await module.InvokeVoidAsync("initialize", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
+                    await module.InvokeVoidAsync("initialize", Element.Value, NativeButton);
                 }
-                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
                 {
                     _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
@@ -184,18 +184,12 @@
             try
             {
                 var module = await moduleTask.Value;
-                var isHorizontal = RootContext?.Orientation == Orientation.Horizontal;
-                var isRtl = RootContext?.Direction == Direction.Rtl;
-                var loopFocus = RootContext?.LoopFocus ?? true;
 
-                previousIsHorizontal = isHorizontal;
-                previousIsRtl = isRtl;
-                previousLoopFocus = loopFocus;
                 previousNativeButton = NativeButton;
 
-                await module.InvokeVoidAsync("updateConfig", Element.Value, isHorizontal, isRtl, loopFocus, NativeButton);
+                await module.InvokeVoidAsync("updateConfig", Element.Value, NativeButton);
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -215,10 +209,10 @@
                 await module.InvokeVoidAsync("dispose", Element.Value);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+                {
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
+                }
         }
     }
 
@@ -260,7 +254,7 @@
 
         if (ItemContext is not null)
         {
-            await ItemContext.HandleTrigger();
+            await ItemContext.HandleTrigger(args, Element);
         }
 
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, args);

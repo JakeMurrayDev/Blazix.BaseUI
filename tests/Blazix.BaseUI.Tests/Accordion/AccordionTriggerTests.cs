@@ -11,7 +11,7 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
     private RenderFragment CreateAccordionWithTrigger(
         string itemValue = "test-item",
         bool itemDisabled = false,
-        bool triggerDisabled = false,
+        bool? triggerDisabled = null,
         bool nativeButton = true,
         string[]? defaultValue = null,
         Orientation orientation = Orientation.Vertical,
@@ -37,8 +37,8 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
                     {
                         headerBuilder.OpenComponent<AccordionTrigger>(0);
                         headerBuilder.AddAttribute(1, "NativeButton", nativeButton);
-                        if (triggerDisabled)
-                            headerBuilder.AddAttribute(2, "Disabled", true);
+                        if (triggerDisabled.HasValue)
+                            headerBuilder.AddAttribute(2, "Disabled", triggerDisabled.Value);
                         if (classValue is not null)
                             headerBuilder.AddAttribute(3, "ClassValue", classValue);
                         if (styleValue is not null)
@@ -192,6 +192,17 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
 
         var trigger = cut.Find("button[data-disabled]");
         trigger.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task TriggerDisabledFalseDoesNotOverrideDisabledItem()
+    {
+        var cut = Render(CreateAccordionWithTrigger(itemDisabled: true, triggerDisabled: false));
+
+        var trigger = cut.Find("button[data-disabled]");
+        trigger.GetAttribute("aria-disabled").ShouldBe("true");
 
         return Task.CompletedTask;
     }
