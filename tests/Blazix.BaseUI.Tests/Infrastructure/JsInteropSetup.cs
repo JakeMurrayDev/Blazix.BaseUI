@@ -226,6 +226,7 @@ public static class JsInteropSetup
             module.SetupVoid("setRootOpen", _ => true).SetVoidResult();
             module.SetupVoid("syncTriggerOpenAttributes", _ => true).SetVoidResult();
             module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
+            module.Setup<string?>("resolveRenderedTriggerId", _ => true).SetResult(null);
             module.SetupVoid("registerTriggerElement", _ => true).SetVoidResult();
             module.SetupVoid("unregisterTriggerElement", _ => true).SetVoidResult();
             module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();

@@ -24,6 +24,13 @@ internal interface IComponentHandleSubscriberBase<TReason>
     void OnTriggerElementUpdated(string triggerId, ElementReference? element);
 
     /// <summary>
+    /// Called when a trigger's focus target element reference is updated.
+    /// </summary>
+    void OnTriggerFocusTargetUpdated(string triggerId, ElementReference? element)
+    {
+    }
+
+    /// <summary>
     /// Called when an open/close state change is requested.
     /// </summary>
     void OnOpenChangeRequested(bool open, TReason reason, string? triggerId, string? interactionType = null);
@@ -49,7 +56,10 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     private bool isOpen;
     private string? activeTriggerId;
     private TPayload? payload;
+    private string? rootId;
     private string? popupId;
+    private bool mounted;
+    private bool focusManagerModal;
 
     /// <summary>
     /// Gets the list of subscribers for derived classes that need direct access.
@@ -75,6 +85,21 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     /// Gets the ID of the popup controlled by this handle.
     /// </summary>
     internal string? HandledPopupId => popupId;
+
+    /// <summary>
+    /// Gets the ID of the root controlled by this handle.
+    /// </summary>
+    internal string? HandledRootId => rootId;
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup is mounted.
+    /// </summary>
+    internal bool HandledMounted => mounted;
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup's focus manager is modal.
+    /// </summary>
+    internal bool HandledFocusManagerModal => focusManagerModal;
 
     /// <summary>
     /// Gets the imperative action reason value for this component's reason enum.
@@ -119,13 +144,18 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     /// <summary>
     /// Registers a trigger with this handle.
     /// </summary>
-    internal void RegisterTrigger(string triggerId, ElementReference? element, TPayload? triggerPayload)
+    internal void RegisterTrigger(
+        string triggerId,
+        ElementReference? element,
+        TPayload? triggerPayload,
+        ElementReference? focusTarget = null)
     {
-        registeredTriggers[triggerId] = new TriggerData(element, triggerPayload);
+        registeredTriggers[triggerId] = new TriggerData(element, focusTarget, triggerPayload);
 
         foreach (var subscriber in subscribers.ToArray())
         {
             subscriber.OnTriggerRegistered(triggerId, element);
+            subscriber.OnTriggerFocusTargetUpdated(triggerId, focusTarget);
         }
     }
 
@@ -154,6 +184,22 @@ public abstract class ComponentHandleBase<TPayload, TReason>
             foreach (var subscriber in subscribers.ToArray())
             {
                 subscriber.OnTriggerElementUpdated(triggerId, element);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates the focus target element reference for a trigger.
+    /// </summary>
+    internal void UpdateTriggerFocusTarget(string triggerId, ElementReference? element)
+    {
+        if (registeredTriggers.TryGetValue(triggerId, out var data))
+        {
+            registeredTriggers[triggerId] = data with { FocusTarget = element };
+
+            foreach (var subscriber in subscribers.ToArray())
+            {
+                subscriber.OnTriggerFocusTargetUpdated(triggerId, element);
             }
         }
     }
@@ -188,6 +234,19 @@ public abstract class ComponentHandleBase<TPayload, TReason>
         if (triggerId is not null && registeredTriggers.TryGetValue(triggerId, out var data))
         {
             return data.Element;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the focus target element reference for a trigger.
+    /// </summary>
+    internal ElementReference? GetTriggerFocusTarget(string? triggerId)
+    {
+        if (triggerId is not null && registeredTriggers.TryGetValue(triggerId, out var data))
+        {
+            return data.FocusTarget;
         }
 
         return null;
@@ -290,6 +349,27 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     }
 
     /// <summary>
+    /// Called by the root to sync root-owned state needed by detached triggers.
+    /// </summary>
+    internal void SyncRootState(string? currentRootId, string? currentPopupId, bool currentMounted, bool currentFocusManagerModal)
+    {
+        var changed = rootId != currentRootId
+            || popupId != currentPopupId
+            || mounted != currentMounted
+            || focusManagerModal != currentFocusManagerModal;
+
+        rootId = currentRootId;
+        popupId = currentPopupId;
+        mounted = currentMounted;
+        focusManagerModal = currentFocusManagerModal;
+
+        if (changed)
+        {
+            NotifyStateChanged();
+        }
+    }
+
+    /// <summary>
     /// Core state change method. Validates, updates active trigger, and notifies subscribers.
     /// </summary>
     protected virtual void SetOpenInternal(bool nextOpen, TReason reason, string? triggerId, string? interactionType = null)
@@ -322,5 +402,5 @@ public abstract class ComponentHandleBase<TPayload, TReason>
         }
     }
 
-    private readonly record struct TriggerData(ElementReference? Element, TPayload? Payload);
+    private readonly record struct TriggerData(ElementReference? Element, ElementReference? FocusTarget, TPayload? Payload);
 }

@@ -35,9 +35,34 @@ public interface IPopoverHandle
     internal ElementReference? GetTriggerElement(string? triggerId);
 
     /// <summary>
+    /// Gets the focus target element reference for a trigger.
+    /// </summary>
+    internal ElementReference? GetTriggerFocusTarget(string? triggerId);
+
+    /// <summary>
     /// Gets the payload for a trigger as an object.
     /// </summary>
     internal object? GetTriggerPayloadAsObject(string? triggerId);
+
+    /// <summary>
+    /// Gets the ID of the popup controlled by this handle.
+    /// </summary>
+    internal string? PopupId { get; }
+
+    /// <summary>
+    /// Gets the ID of the root controlled by this handle.
+    /// </summary>
+    internal string? RootId { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup is mounted.
+    /// </summary>
+    internal bool Mounted { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup's focus manager is modal.
+    /// </summary>
+    internal bool FocusManagerModal { get; }
 
     /// <summary>
     /// Subscribes a component to handle state changes.
@@ -53,6 +78,16 @@ public interface IPopoverHandle
     /// Called by root to sync state back to handle after processing.
     /// </summary>
     internal void SyncState(bool open, string? triggerId, object? payload);
+
+    /// <summary>
+    /// Called by root to sync root-owned state back to handle after processing.
+    /// </summary>
+    internal void SyncRootState(string? rootId, string? popupId, bool mounted, bool focusManagerModal);
+
+    /// <summary>
+    /// Notifies detached trigger subscribers that handle-derived state should be re-read.
+    /// </summary>
+    internal void NotifyStateChanged();
 }
 
 /// <summary>
@@ -68,11 +103,46 @@ public class PopoverHandle<TPayload> : ComponentHandleBase<TPayload, PopoverOpen
     /// <inheritdoc />
     protected override string ComponentName => "Popover";
 
+    /// <summary>
+    /// Gets the ID of the popup controlled by this handle.
+    /// </summary>
+    internal string? PopupId => HandledPopupId;
+
+    /// <summary>
+    /// Gets the ID of the root controlled by this handle.
+    /// </summary>
+    internal string? RootId => HandledRootId;
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup is mounted.
+    /// </summary>
+    internal bool Mounted => HandledMounted;
+
+    /// <summary>
+    /// Gets a value indicating whether the handled popup's focus manager is modal.
+    /// </summary>
+    internal bool FocusManagerModal => HandledFocusManagerModal;
+
     /// <inheritdoc />
     ElementReference? IPopoverHandle.GetTriggerElement(string? triggerId) => GetTriggerElement(triggerId);
 
     /// <inheritdoc />
+    ElementReference? IPopoverHandle.GetTriggerFocusTarget(string? triggerId) => GetTriggerFocusTarget(triggerId);
+
+    /// <inheritdoc />
     object? IPopoverHandle.GetTriggerPayloadAsObject(string? triggerId) => GetTriggerPayload(triggerId);
+
+    /// <inheritdoc />
+    string? IPopoverHandle.PopupId => HandledPopupId;
+
+    /// <inheritdoc />
+    string? IPopoverHandle.RootId => HandledRootId;
+
+    /// <inheritdoc />
+    bool IPopoverHandle.Mounted => HandledMounted;
+
+    /// <inheritdoc />
+    bool IPopoverHandle.FocusManagerModal => HandledFocusManagerModal;
 
     /// <inheritdoc />
     void IPopoverHandle.Subscribe(IPopoverHandleSubscriber subscriber) => Subscribe(subscriber);
@@ -83,6 +153,13 @@ public class PopoverHandle<TPayload> : ComponentHandleBase<TPayload, PopoverOpen
     /// <inheritdoc />
     void IPopoverHandle.SyncState(bool open, string? triggerId, object? payload)
         => SyncState(open, triggerId, payload is TPayload typedPayload ? typedPayload : default);
+
+    /// <inheritdoc />
+    void IPopoverHandle.SyncRootState(string? rootId, string? popupId, bool mounted, bool focusManagerModal)
+        => SyncRootState(rootId, popupId, mounted, focusManagerModal);
+
+    /// <inheritdoc />
+    void IPopoverHandle.NotifyStateChanged() => base.NotifyStateChanged();
 }
 
 /// <summary>

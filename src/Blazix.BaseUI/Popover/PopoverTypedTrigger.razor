@@ -5,6 +5,7 @@
 @typeparam TPayload
 
 @implements IAsyncDisposable
+@implements IComponentHandleSubscriberBase<PopoverOpenChangeReason>
 
 @inject IJSRuntime JSRuntime
 
@@ -57,10 +58,11 @@
 
     private bool HasRootContext => RootContext is not null;
 
-    private bool ShouldRenderFocusGuards =>
-        HasRootContext &&
-        IsOpenedByThisTrigger() &&
-        !RootContext!.FocusManagerModal;
+    private bool ShouldRenderFocusGuards => IsMountedByThisTrigger() && !CurrentFocusManagerModal;
+
+    private string? CurrentRootId => RootContext?.RootId ?? Handle?.RootId;
+
+    private bool CurrentFocusManagerModal => RootContext?.FocusManagerModal ?? Handle?.FocusManagerModal ?? false;
 
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
@@ -213,7 +215,8 @@
 
             if (HasHandle)
             {
-                Handle!.RegisterTrigger(triggerId, Element, Payload);
+                Handle!.Subscribe(this);
+                Handle!.RegisterTrigger(triggerId, Element, Payload, postGuardRef?.Element);
                 registeredHandle = Handle;
             }
             else
@@ -264,9 +267,10 @@
 
         var open = IsOpenedByThisTrigger();
         attrs["aria-expanded"] = open ? "true" : "false";
-        if (open && !string.IsNullOrEmpty(RootContext?.PopupId))
+        var popupId = RootContext?.PopupId ?? Handle?.PopupId;
+        if (open && !string.IsNullOrEmpty(popupId))
         {
-            attrs["aria-controls"] = RootContext.PopupId;
+            attrs["aria-controls"] = popupId;
         }
         attrs["id"] = triggerId;
 
@@ -304,7 +308,7 @@
                 await module.InvokeVoidAsync("disposeHoverInteraction", hoverRootId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -331,6 +335,10 @@
         {
             RootContext?.SetTriggerFocusTargetById(triggerId, previousFocusTarget);
         }
+        else
+        {
+            Handle!.UpdateTriggerFocusTarget(triggerId, previousFocusTarget);
+        }
     }
 
     private void UnregisterFromCurrentStore(string id)
@@ -343,6 +351,7 @@
         if (handle is not null)
         {
             handle.UnregisterTrigger(id);
+            handle.Unsubscribe(this);
         }
         else
         {
@@ -354,7 +363,8 @@
     {
         if (HasHandle)
         {
-            Handle!.RegisterTrigger(triggerId, Element, Payload);
+            Handle!.Subscribe(this);
+            Handle!.RegisterTrigger(triggerId, Element, Payload, postGuardRef?.Element);
         }
         else
         {
@@ -392,6 +402,28 @@
         return activeTriggerId == triggerId || (activeTriggerId is null && rootOpen);
     }
 
+    private bool IsMountedByThisTrigger()
+    {
+        if (HasHandle)
+        {
+            if (!Handle!.Mounted)
+            {
+                return false;
+            }
+
+            var activeId = Handle.ActiveTriggerId;
+            return activeId == triggerId || (activeId is null && Handle.IsOpen);
+        }
+
+        if (RootContext is null || !RootContext.GetMounted())
+        {
+            return false;
+        }
+
+        var activeTriggerId = RootContext.ActiveTriggerId;
+        return activeTriggerId == triggerId || (activeTriggerId is null && RootContext.GetOpen());
+    }
+
     private Task HandlePointerDownAsync(PointerEventArgs e)
     {
         lastPointerType = e.PointerType ?? string.Empty;
@@ -420,18 +452,18 @@
                 var stuck = await module.InvokeAsync<bool>("consumeStickIfOpen", RootContext!.RootId);
                 if (stuck)
                 {
-                    await RequestOpenAsync(true, PopoverOpenChangeReason.TriggerPress, detectedInteractionType);
+                    await RequestOpenAsync(true, PopoverOpenChangeReason.TriggerPress, detectedInteractionType, e);
                     await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
                     return;
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
-        await RequestOpenAsync(nextOpen, PopoverOpenChangeReason.TriggerPress, detectedInteractionType);
+        await RequestOpenAsync(nextOpen, PopoverOpenChangeReason.TriggerPress, detectedInteractionType, e);
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
@@ -527,7 +559,7 @@
                 hoverRootId = hoverId;
                 CancelHoverOpenFallback();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -547,7 +579,7 @@
                 hoverRootId = RootContext.RootId;
                 CancelHoverOpenFallback();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -562,7 +594,7 @@
     {
         if (HasHandle)
         {
-            Handle!.RequestOpen(triggerId, PopoverOpenChangeReason.TriggerHover);
+            Handle!.RequestOpen(triggerId, PopoverOpenChangeReason.TriggerHover, "mouse");
         }
         return Task.CompletedTask;
     }
@@ -575,14 +607,45 @@
     {
         if (HasHandle)
         {
-            Handle!.RequestClose(PopoverOpenChangeReason.TriggerHover);
+            Handle!.RequestClose(PopoverOpenChangeReason.TriggerHover, "mouse");
         }
         return Task.CompletedTask;
     }
 
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerUnregistered(string triggerId)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnOpenChangeRequested(
+        bool open,
+        PopoverOpenChangeReason reason,
+        string? triggerId,
+        string? interactionType)
+    {
+    }
+
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnStateChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            state = new PopoverTriggerState(IsOpenedByThisTrigger(), Disabled);
+            BuildComponentAttributes();
+            StateHasChanged();
+        });
+    }
+
     private async Task HandlePreGuardFocusAsync()
     {
-        if (!HasRootContext || preGuardRef is null)
+        var rootId = CurrentRootId;
+        if (rootId is null || preGuardRef is null)
         {
             return;
         }
@@ -593,12 +656,12 @@
             var module = await ModuleTask.Value;
             var result = await module.InvokeAsync<string>(
                 "handleTriggerPreGuardFocus",
-                RootContext!.RootId,
+                rootId,
                 preGuardRef.Element);
 
             shouldClose = result != "handled";
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -615,7 +678,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("focusPreviousTabbable", preGuardRef.Element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -623,14 +686,15 @@
 
     private async Task HandlePostGuardFocusAsync()
     {
-        if (!HasRootContext || postGuardRef is null) return;
+        var rootId = CurrentRootId;
+        if (rootId is null || postGuardRef is null) return;
 
         try
         {
             var module = await ModuleTask.Value;
             var result = await module.InvokeAsync<string>(
                 "handleTriggerPostGuardFocus",
-                RootContext!.RootId,
+                rootId,
                 postGuardRef.Element);
 
             if (result == "close")
@@ -638,13 +702,17 @@
                 await RequestOpenAsync(false, PopoverOpenChangeReason.FocusOut);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
     }
 
-    private Task RequestOpenAsync(bool open, PopoverOpenChangeReason reason, string? requestInteractionType = null)
+    private Task RequestOpenAsync(
+        bool open,
+        PopoverOpenChangeReason reason,
+        string? requestInteractionType = null,
+        EventArgs? nativeEvent = null)
     {
         if (HasHandle)
         {
@@ -667,7 +735,7 @@
                 RootContext.SetInteractionType(requestInteractionType);
             }
 
-            return RootContext.SetOpenAsync(open, reason, open ? Payload : null, triggerId);
+            return RootContext.SetOpenAsync(open, reason, open ? Payload : null, triggerId, requestInteractionType, nativeEvent);
         }
 
         return Task.CompletedTask;

@@ -264,7 +264,7 @@
                     await module.InvokeVoidAsync("setInternalBackdrop", RootContext.RootId,
                         internalBackdropElement.HasValue ? internalBackdropElement.Value : null);
                 }
-                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
                 {
                     _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
@@ -318,9 +318,6 @@
         {
             attrs["data-instant"] = instantAttr;
         }
-
-        var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
-        TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 
         componentAttributes = attrs;
     }
@@ -512,7 +509,7 @@
                 AlignOffsetFunction is not null,
                 RootContext?.HasViewport ?? false);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

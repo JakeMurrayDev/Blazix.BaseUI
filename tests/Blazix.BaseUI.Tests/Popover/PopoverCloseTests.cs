@@ -4,6 +4,7 @@ using Blazix.BaseUI.Tests.Infrastructure;
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace Blazix.BaseUI.Tests.Popover;
 
@@ -192,6 +193,62 @@ public class PopoverCloseTests : BunitContext, IPopoverCloseContract
 
         // Verify that close was requested (OnOpenChange fired with Open=false)
         closeRequested.ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ClosePressPreservesActiveTriggerDetails()
+    {
+        PopoverOpenChangeEventArgs? receivedArgs = null;
+
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<PopoverRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "DefaultTriggerId", "trigger-a");
+            builder.AddAttribute(3, "OnOpenChange", EventCallback.Factory.Create<PopoverOpenChangeEventArgs>(this, args => receivedArgs = args));
+            builder.AddAttribute(4, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-a");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PopoverPortal>(10);
+                innerBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<PopoverClose>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Close")));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(content);
+        var closeButton = cut.Find("[role='dialog'] button[type='button']");
+        closeButton.PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        closeButton.Click(new MouseEventArgs { Detail = 1 });
+
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs.Open.ShouldBeFalse();
+        receivedArgs.Reason.ShouldBe(PopoverOpenChangeReason.ClosePress);
+        receivedArgs.TriggerId.ShouldBe("trigger-a");
+        receivedArgs.Trigger.HasValue.ShouldBeTrue();
+        receivedArgs.Event.ShouldBeOfType<MouseEventArgs>();
+        receivedArgs.InteractionType.ShouldBe("mouse");
 
         return Task.CompletedTask;
     }

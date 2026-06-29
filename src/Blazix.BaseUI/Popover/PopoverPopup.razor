@@ -24,7 +24,8 @@
                           RestoreFocus="true"
                           RestoreFocusMode="popup"
                           PreviousFocusableElement="@(RootContext?.GetTriggerElement())"
-                          NextFocusableElement="@(RootContext?.GetTriggerFocusTarget())">
+                          NextFocusableElement="@(RootContext?.GetTriggerFocusTarget())"
+                          InsideElements="@GetInsideElements()">
         @ChildContent
     </FloatingFocusManager>
 </RenderElement>
@@ -128,6 +129,7 @@
         {
             RootContext.PopupId = popupId;
             RootContext.FocusManagerModal = isModal;
+            RootContext.SyncHandleRootState();
         }
 
         if (!open)
@@ -261,7 +263,7 @@
                 initialMode, initialElement, finalMode, finalElement,
                 ToolbarContext is not null);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -299,7 +301,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setInitialFocusElement", RootContext.RootId, mode, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -317,7 +319,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setFinalFocusElement", RootContext.RootId, mode, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -353,6 +355,11 @@
         };
     }
 
+    private IReadOnlyList<ElementReference> GetInsideElements()
+    {
+        return RootContext?.GetTriggerElements() ?? Array.Empty<ElementReference>();
+    }
+
     private async Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
         await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
@@ -369,7 +376,7 @@
                 await module.InvokeVoidAsync("disposePopup", RootContext?.RootId, Element.Value);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }

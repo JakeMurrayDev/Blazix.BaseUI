@@ -8,6 +8,7 @@ import { acquireScrollLock } from './blazix-baseui-scroll-lock.min.js';
 import { requestDoubleAnimationFrame } from './blazix-baseui-animations.min.js';
 
 const PATIENT_CLICK_THRESHOLD = 500;
+const VIEWPORT_WIDTH_TOLERANCE_PX = 20;
 
 import {
     TABBABLE_SELECTOR,
@@ -534,7 +535,10 @@ export function initializeRoot(rootId, dotNetRef, modal) {
         compositeKeyCleanup: null,
         viewportElement: null,
         viewportDotNetRef: null,
-        backdropCutoutCleanup: null
+        pendingViewportTransition: null,
+        backdropCutoutCleanup: null,
+        triggerElementCleanups: new Map(),
+        viewportTransitionCleanup: null
     });
 }
 
@@ -566,8 +570,12 @@ export function disposeRoot(rootId) {
         cleanupTransitionState(rootState);
 
         // Clean up viewport
+        cleanupViewportTransition(rootState);
         rootState.viewportDotNetRef = null;
         rootState.viewportElement = null;
+
+        // Clean up registered trigger listeners
+        cleanupRegisteredTriggerElements(rootState);
 
         // Release scroll lock
         if (rootState.releaseScrollLock) {
@@ -583,13 +591,41 @@ export function updateScrollLock(rootId, modal) {
     if (!rootState) return;
 
     rootState.modal = modal;
+    syncScrollLock(rootState);
+}
 
-    if (modal === 'true' && !rootState.releaseScrollLock) {
+function syncScrollLock(rootState) {
+    const shouldLock = shouldLockScroll(rootState);
+
+    if (shouldLock && !rootState.releaseScrollLock) {
         rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
-    } else if (modal !== 'true' && rootState.releaseScrollLock) {
+    } else if (!shouldLock && rootState.releaseScrollLock) {
         rootState.releaseScrollLock();
         rootState.releaseScrollLock = null;
     }
+}
+
+function shouldLockScroll(rootState) {
+    if (!rootState?.isOpen || rootState.modal !== 'true' || rootState.openReason === 'trigger-hover') {
+        return false;
+    }
+
+    if (rootState.interactionType !== 'touch') {
+        return true;
+    }
+
+    const positioner = rootState.positionerElement;
+    if (!positioner) {
+        return false;
+    }
+
+    const doc = positioner.ownerDocument || document;
+    const viewportWidth = doc.documentElement?.clientWidth ?? 0;
+    const positionerWidth = positioner.offsetWidth ?? 0;
+
+    return viewportWidth > 0 &&
+        positionerWidth > 0 &&
+        positionerWidth >= viewportWidth - VIEWPORT_WIDTH_TOLERANCE_PX;
 }
 
 export function hydrateRootOpen(rootId, isOpen, reason, interactionType) {
@@ -619,9 +655,7 @@ export function hydrateRootOpen(rootId, isOpen, reason, interactionType) {
     syncBackdropHidden(rootState);
 
     if (isOpen) {
-        if (rootState.modal === 'true' && reason !== 'trigger-hover' && rootState.interactionType !== 'touch' && !rootState.releaseScrollLock) {
-            rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
-        }
+        syncScrollLock(rootState);
 
         if (rootState.internalBackdropElement) {
             setupBackdropCutoutTracking(rootState);
@@ -673,10 +707,7 @@ export function setRootOpen(rootId, isOpen, reason, interactionType) {
             startPatientClickProtection(rootState);
         }
 
-        // Acquire scroll lock for modal popovers (skip for hover-opened and touch)
-        if (rootState.modal === 'true' && reason !== 'trigger-hover' && rootState.interactionType !== 'touch') {
-            rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
-        }
+        syncScrollLock(rootState);
 
         // Set up backdrop cutout tracking if internal backdrop is present
         if (rootState.internalBackdropElement) {
@@ -909,7 +940,7 @@ function focusFinalElementWhenReady(rootState) {
 
         attempts += 1;
         if (document.contains(element)) {
-            element.focus();
+            element.focus({ preventScroll: true });
             if (document.activeElement === element || attempts >= maxAttempts) return;
         }
 
@@ -937,7 +968,7 @@ function focusDefaultFinalElementWhenReady(rootState) {
 
         attempts += 1;
         if (document.contains(element)) {
-            element.focus();
+            element.focus({ preventScroll: true });
             if (document.activeElement === element || attempts >= maxAttempts) return;
         }
 
@@ -1059,17 +1090,119 @@ async function startTransition(rootState, isOpen) {
 export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
+        enableTriggerChangeTransitions(rootState, element);
         rootState.triggerElement = element;
         updateRootPositioner(rootState);
     }
 }
 
+function enableTriggerChangeTransitions(rootState, nextTriggerElement) {
+    if (!rootState.viewportElement || !rootState.triggerElement || !nextTriggerElement || rootState.triggerElement === nextTriggerElement) {
+        return;
+    }
+
+    rootState.positionerElement?.removeAttribute('data-instant');
+    rootState.popupElement?.removeAttribute('data-instant');
+    rootState.viewportElement?.removeAttribute('data-instant');
+}
+
+function cleanupRegisteredTriggerElement(rootState, triggerId) {
+    const cleanup = rootState.triggerElementCleanups?.get(triggerId);
+    if (!cleanup) {
+        return;
+    }
+
+    cleanup();
+    rootState.triggerElementCleanups.delete(triggerId);
+}
+
+function cleanupRegisteredTriggerElements(rootState) {
+    if (!rootState.triggerElementCleanups) {
+        return;
+    }
+
+    for (const cleanup of rootState.triggerElementCleanups.values()) {
+        cleanup();
+    }
+
+    rootState.triggerElementCleanups.clear();
+}
+
+function attachRegisteredTriggerInstantClear(rootState, triggerId, element) {
+    cleanupRegisteredTriggerElement(rootState, triggerId);
+
+    if (!element) {
+        return;
+    }
+
+    rootState.triggerElementCleanups ??= new Map();
+
+    const clear = () => {
+        enableTriggerChangeTransitions(rootState, element);
+    };
+    const handleKeyDown = (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            clear();
+        }
+    };
+
+    element.addEventListener('pointerdown', clear);
+    element.addEventListener('click', clear);
+    element.addEventListener('keydown', handleKeyDown);
+
+    rootState.triggerElementCleanups.set(triggerId, () => {
+        element.removeEventListener('pointerdown', clear);
+        element.removeEventListener('click', clear);
+        element.removeEventListener('keydown', handleKeyDown);
+    });
+}
+
+export function resolveRenderedTriggerId(rootId, activeTriggerId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !activeTriggerId || !rootState.triggerElements) {
+        return null;
+    }
+
+    if (rootState.triggerElements.has(activeTriggerId)) {
+        return activeTriggerId;
+    }
+
+    for (const [registeredId, element] of rootState.triggerElements.entries()) {
+        if (element === rootState.triggerElement ||
+            (element instanceof HTMLElement && element.id === activeTriggerId)) {
+            return registeredId;
+        }
+    }
+
+    return null;
+}
+
 function updateRootPositioner(rootState) {
     if (!rootState.positionerId) return;
 
-    floatingUpdatePositioner(rootState.positionerId, {
+    const options = {
         triggerElement: rootState.triggerElement ?? null
-    }).catch(() => { });
+    };
+    const arrowElement = resolveRootArrowElement(rootState);
+
+    if (arrowElement) {
+        options.arrowElement = arrowElement;
+    }
+
+    floatingUpdatePositioner(rootState.positionerId, options).catch(() => { });
+}
+
+function resolveRootArrowElement(rootState) {
+    if (rootState.arrowElement?.isConnected) {
+        return rootState.arrowElement;
+    }
+
+    const arrowElement = rootState.positionerElement?.querySelector('[data-blazix-base-ui-popover-arrow]') ?? null;
+    if (arrowElement) {
+        rootState.arrowElement = arrowElement;
+    }
+
+    return arrowElement;
 }
 
 export function registerTriggerElement(rootId, triggerId, element) {
@@ -1082,8 +1215,10 @@ export function registerTriggerElement(rootId, triggerId, element) {
 
     if (element) {
         rootState.triggerElements.set(triggerId, element);
+        attachRegisteredTriggerInstantClear(rootState, triggerId, element);
     } else {
         rootState.triggerElements.delete(triggerId);
+        cleanupRegisteredTriggerElement(rootState, triggerId);
     }
 }
 
@@ -1092,6 +1227,7 @@ export function unregisterTriggerElement(rootId, triggerId) {
     if (!rootState?.triggerElements || !triggerId) return;
 
     rootState.triggerElements.delete(triggerId);
+    cleanupRegisteredTriggerElement(rootState, triggerId);
 }
 
 export function setPopupElement(rootId, element) {
@@ -1134,9 +1270,7 @@ export function setPositionerElement(rootId, element) {
 
     rootState.positionerElement = element;
 
-    if (rootState.isOpen && rootState.modal === 'true' && rootState.openReason !== 'trigger-hover' && rootState.interactionType !== 'touch' && !rootState.releaseScrollLock) {
-        rootState.releaseScrollLock = acquireScrollLock(rootState.positionerElement);
-    }
+    syncScrollLock(rootState);
 }
 
 // ============================================================================
@@ -1183,11 +1317,12 @@ export async function initializePositioner(positionerElement, triggerElement, si
     });
 
     if (positionerId) {
-        state.positioners.set(positionerId, { positionerId });
+        state.positioners.set(positionerId, { positionerId, rootId });
         const rootState = state.roots.get(rootId);
         if (rootState) {
             rootState.positionerId = positionerId;
             rootState.positionerElement = positionerElement;
+            rootState.arrowElement = arrowElement || resolveRootArrowElement(rootState);
         }
     }
 
@@ -1195,6 +1330,14 @@ export async function initializePositioner(positionerElement, triggerElement, si
 }
 
 export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, hasSideOffsetFn, hasAlignOffsetFn, hasViewport) {
+    const positionerState = state.positioners.get(positionerId);
+    const rootState = positionerState?.rootId ? state.roots.get(positionerState.rootId) : null;
+    const resolvedArrowElement = arrowElement || (rootState ? resolveRootArrowElement(rootState) : null);
+
+    if (rootState && resolvedArrowElement) {
+        rootState.arrowElement = resolvedArrowElement;
+    }
+
     await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
@@ -1204,7 +1347,7 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
         collisionPadding,
         collisionBoundary: collisionBoundary || 'clipping-ancestors',
         arrowPadding,
-        arrowElement,
+        arrowElement: resolvedArrowElement,
         sticky: sticky || false,
         positionMethod: positionMethod || 'fixed',
         collisionAvoidance: buildCollisionAvoidance(collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback),
@@ -1334,6 +1477,10 @@ export function initializePopup(rootId, popupElement, dotNetRef, modal, initialM
     state.popups.set(popupElement, popupState);
 
     const updatePopupDimensions = () => {
+        if (rootState?.autoResizeObserver) {
+            return;
+        }
+
         const width = popupElement.offsetWidth;
         const height = popupElement.offsetHeight;
         popupElement.style.setProperty('--popup-width', `${width}px`);
@@ -1488,6 +1635,7 @@ function remeasurePopupAutoResize(rootState) {
 
     requestAnimationFrame(() => {
         setPopupCssSize(popupElement, newDimensions);
+        updateRootPositioner(rootState);
         const animations = popupElement.getAnimations?.() || [];
         if (animations.length > 0) {
             Promise.all(animations.map(a => a.finished.catch(() => {}))).then(() => {
@@ -1520,6 +1668,147 @@ export function disposeAutoResize(rootId) {
 
 const DIRECTION_TOLERANCE = 5;
 
+function parseCssTimeList(value) {
+    return value.split(',').map(part => {
+        const time = part.trim();
+        if (time.endsWith('ms')) {
+            return Number.parseFloat(time) || 0;
+        }
+
+        if (time.endsWith('s')) {
+            return (Number.parseFloat(time) || 0) * 1000;
+        }
+
+        return Number.parseFloat(time) || 0;
+    });
+}
+
+function getMaxCssTimeMs(durations, delays) {
+    const length = Math.max(durations.length, delays.length);
+    let maxTime = 0;
+
+    for (let index = 0; index < length; index += 1) {
+        const duration = durations[index % durations.length] || 0;
+        const delay = delays[index % delays.length] || 0;
+        maxTime = Math.max(maxTime, duration + delay);
+    }
+
+    return maxTime;
+}
+
+function getViewportAnimationFallbackMs(element) {
+    const animations = typeof element.getAnimations === 'function'
+        ? element.getAnimations()
+        : [];
+    let maxDuration = 0;
+
+    for (const animation of animations) {
+        const timing = animation.effect?.getTiming?.();
+        if (!timing) {
+            continue;
+        }
+
+        const delay = Number(timing.delay) || 0;
+        const duration = Number(timing.duration) || 0;
+        const iterations = Number.isFinite(timing.iterations) ? timing.iterations : 1;
+        maxDuration = Math.max(maxDuration, delay + duration * iterations);
+    }
+
+    const style = getComputedStyle(element);
+    const maxTransitionDuration = getMaxCssTimeMs(
+        parseCssTimeList(style.transitionDuration),
+        parseCssTimeList(style.transitionDelay));
+    const maxAnimationDuration = getMaxCssTimeMs(
+        parseCssTimeList(style.animationDuration),
+        parseCssTimeList(style.animationDelay));
+
+    return Math.max(500, maxDuration + 100, maxTransitionDuration + 100, maxAnimationDuration + 100);
+}
+
+function waitForViewportAnimations(elements, onFinished) {
+    const animationElements = Array.isArray(elements) ? elements : [elements];
+    let disposed = false;
+    let fallbackId = null;
+
+    const finish = () => {
+        if (disposed) {
+            return;
+        }
+
+        disposed = true;
+        if (fallbackId !== null) {
+            clearTimeout(fallbackId);
+            fallbackId = null;
+        }
+        onFinished();
+    };
+
+    const check = () => {
+        if (disposed) {
+            return;
+        }
+
+        const animations = animationElements.flatMap(element => {
+            if (typeof element?.getAnimations !== 'function') {
+                return [];
+            }
+
+            return element.getAnimations();
+        });
+
+        if (animations.length === 0 && animationElements.every(element => typeof element?.getAnimations !== 'function')) {
+            finish();
+            return;
+        }
+
+        if (animations.length === 0) {
+            finish();
+            return;
+        }
+
+        if (fallbackId === null) {
+            const fallbackMs = Math.max(...animationElements.map(element => getViewportAnimationFallbackMs(element)));
+            fallbackId = setTimeout(finish, fallbackMs);
+        }
+
+        const unfinished = animations.filter(animation => animation.pending || animation.playState !== 'finished');
+        if (unfinished.length === 0) {
+            finish();
+            return;
+        }
+
+        Promise.all(unfinished.map(animation => animation.finished)).then(finish).catch(() => {
+            if (!disposed) {
+                requestAnimationFrame(check);
+            }
+        });
+    };
+
+    requestAnimationFrame(check);
+
+    return () => {
+        disposed = true;
+        if (fallbackId !== null) {
+            clearTimeout(fallbackId);
+            fallbackId = null;
+        }
+    };
+}
+
+function cleanupViewportTransition(rootState) {
+    if (rootState.viewportTransitionCleanup) {
+        rootState.viewportTransitionCleanup();
+        rootState.viewportTransitionCleanup = null;
+    }
+
+    if (rootState.viewportElement) {
+        const clones = rootState.viewportElement.querySelectorAll('[data-previous]');
+        clones.forEach(clone => clone.remove());
+    }
+
+    rootState.pendingViewportTransition = null;
+}
+
 export function initializeViewport(rootId, viewportElement, dotNetRef) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
@@ -1531,6 +1820,8 @@ export function initializeViewport(rootId, viewportElement, dotNetRef) {
 export function disposeViewport(rootId) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
+        cleanupViewportTransition(rootState);
+
         // Remove any leftover cloned elements inside the viewport
         if (rootState.viewportElement) {
             const clones = rootState.viewportElement.querySelectorAll('[data-previous]');
@@ -1541,13 +1832,15 @@ export function disposeViewport(rootId) {
     }
 }
 
-export async function onViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement) {
+export function prepareViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement) {
     const rootState = state.roots.get(rootId);
     if (!rootState?.viewportElement || !rootState.viewportDotNetRef) return;
 
     const viewport = rootState.viewportElement;
     const currentDiv = viewport.querySelector('[data-current]');
     if (!currentDiv) return;
+
+    cleanupViewportTransition(rootState);
 
     // Clone the inner data-current div as "previous" content
     const clone = currentDiv.cloneNode(true);
@@ -1579,41 +1872,81 @@ export async function onViewportTriggerChange(rootId, previousTriggerElement, ne
     const vertical = Math.abs(dy) < DIRECTION_TOLERANCE ? '' : (dy > 0 ? 'down' : 'up');
     const direction = `${horizontal} ${vertical}`.trim() || 'none';
 
-    // Frame 0: only data-starting-style on current (data-ending-style is staggered to next frame)
-    currentDiv.setAttribute('data-starting-style', '');
-
     // Insert clone inside viewport, before the current div
     viewport.insertBefore(clone, currentDiv);
+    rootState.pendingViewportTransition = { clone, direction };
+    viewport.setAttribute('data-activation-direction', direction);
+    viewport.setAttribute('data-transitioning', '');
+    viewport.removeAttribute('data-instant');
 
     // Notify Blazor of transition start
     rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionStart', direction).catch(() => { });
+}
+
+export async function completeViewportTriggerChange(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState?.viewportElement || !rootState.viewportDotNetRef) return;
+
+    const pending = rootState.pendingViewportTransition;
+    if (!pending) return;
+
+    const viewport = rootState.viewportElement;
+    const currentDiv = viewport.querySelector('[data-current]');
+    if (!currentDiv) {
+        cleanupViewportTransition(rootState);
+        return;
+    }
+
+    const { clone } = pending;
+    if (!clone.isConnected) {
+        viewport.insertBefore(clone, currentDiv);
+    }
+
+    // Frame 0: only data-starting-style on current (data-ending-style is staggered to next frame)
+    currentDiv.setAttribute('data-starting-style', '');
 
     // Remeasure auto-resize for the new content dimensions
     remeasurePopupAutoResize(rootState);
 
     // Wait two rAF frames then apply ending/remove starting style attributes
     await requestDoubleAnimationFrame();
+    if (rootState.pendingViewportTransition !== pending) {
+        return;
+    }
 
     // Staggered: apply data-ending-style on clone and remove data-starting-style from current
     clone.setAttribute('data-ending-style', '');
     currentDiv.removeAttribute('data-starting-style');
     let ended = false;
-    const onEnd = (event) => {
-        if (event && event.target !== clone) return;
+    let stopWaitingForAnimations = null;
+    let cleanup = null;
+    const onEnd = () => {
         if (ended) return;
         ended = true;
-        clone.removeEventListener('transitionend', onEnd);
-        clone.removeEventListener('animationend', onEnd);
-        clearTimeout(fallbackId);
-        clone.remove();
+        cleanup?.();
+        if (rootState.viewportTransitionCleanup === cleanup) {
+            rootState.viewportTransitionCleanup = null;
+        }
+        if (rootState.pendingViewportTransition === pending) {
+            rootState.pendingViewportTransition = null;
+        }
+        viewport.removeAttribute('data-activation-direction');
+        viewport.removeAttribute('data-transitioning');
         if (rootState.viewportDotNetRef) {
             rootState.viewportDotNetRef.invokeMethodAsync('OnViewportTransitionEnd').catch(() => { });
         }
     };
+    cleanup = () => {
+        stopWaitingForAnimations?.();
+        stopWaitingForAnimations = null;
+        clone.remove();
+    };
 
-    clone.addEventListener('transitionend', onEnd);
-    clone.addEventListener('animationend', onEnd);
+    stopWaitingForAnimations = waitForViewportAnimations([currentDiv, clone], onEnd);
+    rootState.viewportTransitionCleanup = cleanup;
+}
 
-    // Fallback timeout in case no transition/animation fires
-    const fallbackId = setTimeout(onEnd, 500);
+export async function onViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement) {
+    prepareViewportTriggerChange(rootId, previousTriggerElement, newTriggerElement);
+    await completeViewportTriggerChange(rootId);
 }

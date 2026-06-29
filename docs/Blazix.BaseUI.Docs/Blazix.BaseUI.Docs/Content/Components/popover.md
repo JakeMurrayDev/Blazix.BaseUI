@@ -90,7 +90,7 @@ Control `Open` and `TriggerId` together when application state owns which trigge
 
 ### Animating the Popover
 
-Animate position on `PopoverPositioner`, size on `PopoverPopup`, and content swaps through `PopoverViewport`. The viewport wraps current content with `data-current` and exposes `data-activation-direction` during trigger changes.
+Animate position on `PopoverPositioner`, size on `PopoverPopup`, and content swaps through `PopoverViewport`. The viewport wraps current content with `data-current` and exposes `data-activation-direction` during trigger changes. The value is a space-separated set of up to two axis tokens, for example `right down`; match a single token with selectors such as `[data-activation-direction~='right']`.
 
 ## API reference
 
@@ -102,7 +102,7 @@ Manages open state, modal mode, active trigger id, payload, transitions, and han
 | --- | --- | --- | --- |
 | `Open` | `bool?` | `null` | Controlled open state. |
 | `DefaultOpen` | `bool` | `false` | Initial uncontrolled open state. |
-| `Modal` | `PopoverModalMode` | `False` | Modal behavior. |
+| `Modal` | `PopoverModalMode` | `False` | Modal behavior. `True` limits interaction to the popover, locks scroll, and disables outside pointer interaction; on touch devices, outside taps are blocked but page scroll remains unless the popup nearly spans the viewport width. `TrapFocus` traps focus without locking scroll or blocking outside pointer interaction. `False` allows outside interaction. |
 | `TriggerId` | `string?` | `null` | Controlled active trigger id. |
 | `DefaultTriggerId` | `string?` | `null` | Initial active trigger id. |
 | `ActionsRef` | `PopoverRootActions?` | `null` | Imperative unmount and close actions. |
@@ -147,7 +147,7 @@ Positions the popup and exposes placement data plus sizing CSS variables.
 
 Key parameters: `Side`, `Align`, `SideOffset`, `SideOffsetFunction`, `AlignOffset`, `AlignOffsetFunction`, `CollisionPadding`, `CollisionPaddingPerSide`, `CollisionBoundary`, `ArrowPadding`, `Sticky`, `DisableAnchorTracking`, `PositionMethod`, `CollisionAvoidance`, `Anchor`, `Render`, `ClassValue`, `StyleValue`, and `ChildContent`.
 
-Data and CSS: `data-side`, `data-align`, `data-open`, `data-closed`, `data-anchor-hidden`, `data-instant`, `--available-width`, `--available-height`, `--anchor-width`, `--anchor-height`, `--transform-origin`, `--positioner-width`, and `--positioner-height`.
+Data and CSS: `data-side`, `data-align`, `data-open`, `data-closed`, `data-anchor-hidden`, `data-instant`, numeric CSS variables `--available-width`, `--available-height`, `--anchor-width`, `--anchor-height`, `--positioner-width`, `--positioner-height`, and string CSS variable `--transform-origin`.
 
 ### Popup
 
@@ -173,7 +173,7 @@ Closes the popover. Parameters: `Disabled`, `NativeButton`, `Render`, `ClassValu
 
 ### Viewport
 
-Wraps changing payload content and exposes `data-current`, `data-previous`, `data-activation-direction`, `data-transitioning`, and `data-instant`.
+Wraps changing payload content and exposes `data-current`, `data-previous`, `data-activation-direction`, `data-transitioning`, and `data-instant`. `data-activation-direction` contains space-separated axis tokens for horizontal and vertical movement.
 
 ### Handle
 

@@ -39,6 +39,20 @@
     private bool hasViewport;
     private bool preventUnmountingOnClose;
     private PopoverModalMode previousModal;
+    private string? previousTriggerIdParameter;
+    private string? reassociatedTriggerId;
+    private bool pendingViewportTriggerChangeCompletion;
+    // Set whenever this component initiates an open/re-anchor (trigger press, hover,
+    // imperative). The resulting controlled-parameter echo is then recognized as
+    // self-initiated so it does not arm the programmatic-open outside-press guard.
+    private bool selfInitiatedOpenChange;
+    // While the popover is open, a single click on an external element can both
+    // (re)open it via the controlled Open/TriggerId parameters AND be seen as an
+    // outside press. Because Blazor processes the UI click before the JS-interop
+    // outside-press, the close would otherwise win. When a *programmatic* controlled
+    // re-anchor is detected, ignore the racing outside-press until this tick.
+    private long outsidePressGuardUntilTicks;
+    private const long OutsidePressGuardMs = 500;
     private PopoverRootState state;
     private PopoverRootContext context = null!;
     private DotNetObjectReference<PopoverRoot>? dotNetRef;
@@ -126,7 +140,7 @@
 
     private bool CurrentOpen => IsControlled ? Open!.Value : isOpen;
 
-    private string? CurrentTriggerId => TriggerId ?? activeTriggerId;
+    private string? CurrentTriggerId => activeTriggerId ?? TriggerId;
 
     /// <inheritdoc />
     protected override void OnInitialized()
@@ -148,6 +162,7 @@
             Mounted = transition.IsMounted,
             Modal = Modal,
             PopoverOpenChangeReason = openChangeReason,
+            CloseInteractionType = InteractionType.None,
             TransitionStatus = transition.TransitionStatus,
             PopoverInstantType = instantType,
             TitleId = titleId,
@@ -157,6 +172,7 @@
             GetOpen = () => CurrentOpen,
             GetMounted = () => transition.IsMounted,
             GetTriggerElement = GetTriggerElement,
+            GetTriggerElements = GetTriggerElements,
             GetTriggerFocusTarget = GetTriggerFocusTarget,
             GetPositionerElement = () => positionerElement,
             GetPopupElement = () => popupElement,
@@ -179,7 +195,8 @@
             ForceUnmount = ForceUnmount,
             SetHasViewport = SetHasViewport,
             SetPopoverInstantType = SetPopoverInstantTypeValue,
-            RegisterClosePart = RegisterClosePartImpl
+            RegisterClosePart = RegisterClosePartImpl,
+            SyncHandleRootState = SyncHandleRootState
         };
 
         context.FloatingRootContext = new PopoverFloatingRootContextAdapter(context);
@@ -187,7 +204,7 @@
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, null);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, CurrentTriggerId);
         }
 
         SubscribeToHandle();
@@ -196,12 +213,15 @@
         {
             SyncHandleState(true, activeTriggerId);
         }
+        SyncHandleRootState();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
         var currentOpen = CurrentOpen;
+        var previousOpen = state.Open;
+        var triggerIdChanged = TriggerId is not null && TriggerId != previousTriggerIdParameter;
         if (state.Open != currentOpen)
         {
             state = new PopoverRootState(currentOpen);
@@ -211,12 +231,68 @@
             }
             context.Open = currentOpen;
             context.Mounted = transition.IsMounted;
+            SyncHandleRootState();
         }
 
         if (TriggerId is not null)
         {
-            activeTriggerId = TriggerId;
+            if (TriggerId != previousTriggerIdParameter)
+            {
+                previousTriggerIdParameter = TriggerId;
+                reassociatedTriggerId = null;
+            }
+
+            activeTriggerId = reassociatedTriggerId ?? TriggerId;
             context.ActiveTriggerId = activeTriggerId;
+        }
+        else if (previousTriggerIdParameter is not null)
+        {
+            previousTriggerIdParameter = null;
+            reassociatedTriggerId = null;
+        }
+
+        // Controlled open-state/trigger changes set via parameters (e.g. an external
+        // "open programmatically" button) do not pass through SetOpenAsync, so they
+        // need extra handling that self-initiated changes already perform.
+        var openStateChanged = currentOpen != previousOpen;
+        var reanchorWhileOpen = currentOpen && previousOpen && triggerIdChanged;
+        if (reanchorWhileOpen)
+        {
+            instantType = PopoverInstantType.None;
+            context.PopoverInstantType = instantType;
+        }
+
+        if (openStateChanged || reanchorWhileOpen)
+        {
+            var wasSelfInitiated = selfInitiatedOpenChange;
+            selfInitiatedOpenChange = false;
+
+            if (IsControlled && !wasSelfInitiated)
+            {
+                // Fix B: a programmatic re-anchor shares the same click as an outside
+                // press; arm a short guard so OnOutsidePress doesn't close the popover
+                // that the same interaction just re-opened.
+                if (reanchorWhileOpen)
+                {
+                    outsidePressGuardUntilTicks = Environment.TickCount64 + OutsidePressGuardMs;
+                }
+
+                // Fix (aria sync): propagate the new state to the handle so detached
+                // triggers update aria-expanded/aria-controls. SyncState is idempotent.
+                if (currentOpen)
+                {
+                    if (activeTriggerId is not null)
+                    {
+                        payload = ResolvePayload(activeTriggerId, null);
+                        context.Payload = payload;
+                    }
+                    SyncHandleState(true, activeTriggerId);
+                }
+                else
+                {
+                    SyncHandleState(false, null);
+                }
+            }
         }
 
         context.Modal = Modal;
@@ -233,7 +309,7 @@
         if (ActionsRef is not null)
         {
             ActionsRef.Unmount = ForceUnmount;
-            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, null);
+            ActionsRef.Close = () => _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ImperativeAction, CurrentTriggerId);
         }
 
         // Handle change of handle parameter
@@ -253,6 +329,9 @@
             dotNetRef = DotNetObjectReference.Create(this);
             await InitializeJsAsync();
         }
+
+        await ResolveRenderedTriggerIdOwnershipAsync();
+        await CompletePendingViewportTriggerChangeAsync();
     }
 
     private async Task InitializeJsAsync()
@@ -297,9 +376,54 @@
                 await module.InvokeVoidAsync("hydrateRootOpen", rootId, true, GetReasonString(openChangeReason), interactionType);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task ResolveRenderedTriggerIdOwnershipAsync()
+    {
+        if (!CurrentOpen || activeTriggerId is null || triggerElements.ContainsKey(activeTriggerId))
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            var resolvedTriggerId = await module.InvokeAsync<string?>("resolveRenderedTriggerId", rootId, activeTriggerId);
+
+            if (string.IsNullOrEmpty(resolvedTriggerId) ||
+                resolvedTriggerId == activeTriggerId ||
+                !triggerElements.ContainsKey(resolvedTriggerId))
+            {
+                return;
+            }
+
+            if (TriggerId is not null && TriggerId != resolvedTriggerId)
+            {
+                reassociatedTriggerId = resolvedTriggerId;
+            }
+
+            activeTriggerId = resolvedTriggerId;
+            context.ActiveTriggerId = resolvedTriggerId;
+
+            payload = ResolvePayload(resolvedTriggerId, null);
+            context.Payload = payload;
+
+            triggerElement = GetTriggerElementById(resolvedTriggerId);
+            if (triggerElement.HasValue)
+            {
+                await module.InvokeVoidAsync("setTriggerElement", rootId, triggerElement.Value);
+            }
+
+            SyncHandleState(CurrentOpen, activeTriggerId);
+            StateHasChanged();
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect or portal teardown.
         }
     }
 
@@ -316,7 +440,7 @@
             };
             await module.InvokeVoidAsync("updateScrollLock", rootId, modalString);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -483,7 +607,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setTriggerElement", rootId, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -496,7 +620,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("registerTriggerElement", rootId, triggerId, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -516,7 +640,7 @@
                 await module.InvokeVoidAsync("setTriggerElement", rootId, replacementTriggerElement);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -539,7 +663,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setPositionerElement", rootId, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -562,7 +686,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setBackdropElement", rootId, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -585,20 +709,26 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setPopupElement", rootId, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
-    private Task SetOpenAsyncFromContext(bool nextOpen, PopoverOpenChangeReason reason, object? payloadFromTrigger, string? triggerId)
+    private Task SetOpenAsyncFromContext(
+        bool nextOpen,
+        PopoverOpenChangeReason reason,
+        object? payloadFromTrigger,
+        string? triggerId,
+        string? requestInteractionType,
+        EventArgs? nativeEvent)
     {
-        return SetOpenAsync(nextOpen, reason, triggerId, payloadFromTrigger);
+        return SetOpenAsync(nextOpen, reason, triggerId, payloadFromTrigger, requestInteractionType, nativeEvent);
     }
 
     private void Close()
     {
-        _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ClosePress, null);
+        _ = SetOpenWithExceptionHandlingAsync(false, PopoverOpenChangeReason.ClosePress, CurrentTriggerId);
     }
 
     private void ForceUnmount()
@@ -612,8 +742,11 @@
         context.Payload = null;
         openChangeReason = PopoverOpenChangeReason.None;
         context.PopoverOpenChangeReason = PopoverOpenChangeReason.None;
+        context.CloseInteractionType = InteractionType.None;
         interactionType = null;
         context.InteractionType = null;
+        SyncHandleState(false, null);
+        SyncHandleRootState();
         _ = InvokeOpenChangeCompleteAsync(false);
         StateHasChanged();
     }
@@ -624,6 +757,15 @@
     [JSInvokable]
     public async Task OnOutsidePress()
     {
+        // Ignore the outside press that races with a programmatic re-open of this
+        // same popover (e.g. an external button that re-anchors it to another
+        // trigger). Consume the guard so a subsequent genuine outside press closes.
+        if (Environment.TickCount64 < outsidePressGuardUntilTicks)
+        {
+            outsidePressGuardUntilTicks = 0;
+            return;
+        }
+
         await SetOpenAsync(false, PopoverOpenChangeReason.OutsidePress, null);
     }
 
@@ -655,7 +797,7 @@
     [JSInvokable]
     public async Task OnHoverOpen()
     {
-        await SetOpenAsync(true, PopoverOpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(true, PopoverOpenChangeReason.TriggerHover, null, null, "mouse");
     }
 
     /// <summary>
@@ -669,7 +811,7 @@
             return;
         }
 
-        await SetOpenAsync(false, PopoverOpenChangeReason.TriggerHover, null);
+        await SetOpenAsync(false, PopoverOpenChangeReason.TriggerHover, null, null, "mouse");
     }
 
     /// <summary>
@@ -710,6 +852,7 @@
             openChangeReason = PopoverOpenChangeReason.None;
             context.PopoverOpenChangeReason = PopoverOpenChangeReason.None;
             SetInteractionType(null);
+            SyncHandleRootState();
         }
 
         instantType = PopoverInstantType.None;
@@ -719,8 +862,40 @@
         StateHasChanged();
     }
 
-    private async Task HandleViewportTriggerSwapAsync(string newTriggerId, object? payloadFromContext)
+    private async Task HandleViewportTriggerSwapAsync(
+        string newTriggerId,
+        object? payloadFromContext,
+        PopoverOpenChangeReason reason,
+        string? requestInteractionType)
     {
+        // A trigger press that switches the active trigger while the popover stays open
+        // must still emit OnOpenChange (matching upstream, which always fires onOpenChange
+        // on a trigger press) so controlled consumers that derive the active trigger from
+        // the event stay in sync. Programmatic/controlled swaps do not re-emit.
+        if (reason == PopoverOpenChangeReason.TriggerPress)
+        {
+            var switchArgs = new PopoverOpenChangeEventArgs(
+                true,
+                PopoverOpenChangeReason.TriggerPress,
+                null,
+                GetTriggerElementById(newTriggerId),
+                newTriggerId,
+                requestInteractionType ?? interactionType);
+            // Component-initiated re-anchor; mark so its controlled-parameter echo is not
+            // treated as an external programmatic change (no outside-press guard needed).
+            selfInitiatedOpenChange = true;
+            await OnOpenChange.InvokeAsync(switchArgs);
+
+            if (switchArgs.IsCanceled)
+            {
+                SyncHandleState(CurrentOpen, activeTriggerId, forceNotify: true);
+                return;
+            }
+
+            openChangeReason = PopoverOpenChangeReason.TriggerPress;
+            context.PopoverOpenChangeReason = PopoverOpenChangeReason.TriggerPress;
+        }
+
         var previousTriggerId = activeTriggerId;
         context.PreviousActiveTriggerId = previousTriggerId;
 
@@ -730,6 +905,11 @@
         payload = ResolvePayload(newTriggerId, payloadFromContext);
         context.Payload = payload;
 
+        // Clear instant type before syncing the new trigger element. The JS positioner
+        // updates immediately when the reference changes, so transitions must already be enabled.
+        instantType = PopoverInstantType.None;
+        context.PopoverInstantType = instantType;
+
         var activeElement = GetTriggerElement();
         if (hasRendered && activeElement.HasValue)
         {
@@ -737,10 +917,6 @@
         }
 
         SyncHandleState(true, activeTriggerId);
-
-        // Clear instant type to allow animation during viewport swap
-        instantType = PopoverInstantType.None;
-        context.PopoverInstantType = instantType;
 
         if (hasRendered)
         {
@@ -751,17 +927,40 @@
                 var newTriggerElement = GetTriggerElementById(newTriggerId);
                 if (prevTriggerElement.HasValue && newTriggerElement.HasValue)
                 {
-                    await module.InvokeVoidAsync("onViewportTriggerChange", rootId, prevTriggerElement.Value, newTriggerElement.Value);
+                    await module.InvokeVoidAsync("prepareViewportTriggerChange", rootId, prevTriggerElement.Value, newTriggerElement.Value);
+                    pendingViewportTriggerChangeCompletion = true;
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
         }
 
+        Handle?.NotifyStateChanged();
         StateHasChanged();
     }
+
+    private async Task CompletePendingViewportTriggerChangeAsync()
+    {
+        if (!pendingViewportTriggerChangeCompletion)
+        {
+            return;
+        }
+
+        pendingViewportTriggerChangeCompletion = false;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("completeViewportTriggerChange", rootId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect or portal teardown.
+        }
+    }
+
 
     private ElementReference? GetTriggerElementById(string? triggerId)
     {
@@ -796,7 +995,7 @@
                 await module.InvokeVoidAsync("disposeRoot", rootId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -811,19 +1010,34 @@
     /// <param name="nextOpen">The desired open state.</param>
     /// <param name="reason">The reason for the state change.</param>
     /// <param name="triggerId">The ID of the trigger initiating the change, or <see langword="null"/>.</param>
-    internal async Task SetOpenAsync(bool nextOpen, PopoverOpenChangeReason reason, string? triggerId, object? payloadFromContext = null)
+    internal async Task SetOpenAsync(
+        bool nextOpen,
+        PopoverOpenChangeReason reason,
+        string? triggerId,
+        object? payloadFromContext = null,
+        string? requestInteractionType = null,
+        EventArgs? nativeEvent = null)
     {
+        if (!string.IsNullOrEmpty(requestInteractionType))
+        {
+            SetInteractionType(requestInteractionType);
+        }
+
         if (CurrentOpen == nextOpen)
         {
-            if (nextOpen && reason == PopoverOpenChangeReason.TriggerPress)
-            {
-                await UpdateOpenTriggerPressAsync(triggerId, payloadFromContext);
-            }
-
-            // Handle trigger swap for viewport transitions: popover stays open but switches trigger
+            // A trigger switch while open with a viewport morphs from the outgoing
+            // trigger's content/position to the new one. Route it to the swap path
+            // first so it is not pre-empted by UpdateOpenTriggerPressAsync overwriting
+            // activeTriggerId (which would make the swap guard below never match and
+            // skip the morph entirely). The swap path re-emits OnOpenChange itself for
+            // trigger presses, so controlled consumers still stay in sync.
             if (nextOpen && triggerId is not null && triggerId != activeTriggerId && hasViewport)
             {
-                await HandleViewportTriggerSwapAsync(triggerId, payloadFromContext);
+                await HandleViewportTriggerSwapAsync(triggerId, payloadFromContext, reason, requestInteractionType);
+            }
+            else if (nextOpen && reason == PopoverOpenChangeReason.TriggerPress)
+            {
+                await UpdateOpenTriggerPressAsync(triggerId, payloadFromContext, requestInteractionType);
             }
 
             return;
@@ -834,7 +1048,18 @@
             triggerId = triggerElements.Keys.First();
         }
 
-        var args = new PopoverOpenChangeEventArgs(nextOpen, reason);
+        var eventTriggerId = ResolveEventTriggerId(nextOpen, reason, triggerId);
+        var eventTriggerElement = GetTriggerElementById(eventTriggerId);
+        var args = new PopoverOpenChangeEventArgs(
+            nextOpen,
+            reason,
+            nativeEvent,
+            eventTriggerElement,
+            eventTriggerId,
+            requestInteractionType ?? interactionType);
+        // This open/close is component-initiated; mark it so the controlled-parameter
+        // echo it produces is not mistaken for an external programmatic change.
+        selfInitiatedOpenChange = true;
         await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
@@ -854,6 +1079,7 @@
 
         if (nextOpen)
         {
+            context.CloseInteractionType = InteractionType.None;
             var effectiveTriggerId = triggerId ?? CurrentTriggerId;
             if (effectiveTriggerId is not null)
             {
@@ -875,6 +1101,7 @@
         }
         else
         {
+            context.CloseInteractionType = ResolveCloseInteractionType(reason, requestInteractionType ?? interactionType);
             instantType = isKeyboardClick ? PopoverInstantType.Click
                 : reason is PopoverOpenChangeReason.EscapeKey or PopoverOpenChangeReason.None ? PopoverInstantType.Dismiss
                 : reason == PopoverOpenChangeReason.FocusOut ? PopoverInstantType.Focus
@@ -895,6 +1122,7 @@
         context.Open = nextOpen;
 
         SyncHandleState(nextOpen, activeTriggerId);
+        SyncHandleRootState();
 
         if (hasRendered)
         {
@@ -904,7 +1132,7 @@
                 var reasonString = GetReasonString(reason);
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, interactionType);
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -914,8 +1142,31 @@
         StateHasChanged();
     }
 
-    private async Task UpdateOpenTriggerPressAsync(string? triggerId, object? payloadFromContext)
+    private async Task UpdateOpenTriggerPressAsync(string? triggerId, object? payloadFromContext, string? requestInteractionType)
     {
+        // Switching to another trigger while open keeps the popover open but changes
+        // its owner. Emit OnOpenChange with the new trigger (matching upstream, which
+        // always fires onOpenChange on a trigger press) so controlled consumers that
+        // derive the active trigger from the event stay in sync.
+        var eventTriggerId = triggerId ?? CurrentTriggerId;
+        var switchArgs = new PopoverOpenChangeEventArgs(
+            true,
+            PopoverOpenChangeReason.TriggerPress,
+            null,
+            GetTriggerElementById(eventTriggerId),
+            eventTriggerId,
+            requestInteractionType ?? interactionType);
+        // Component-initiated re-anchor; mark so its controlled-parameter echo is not
+        // treated as an external programmatic change (no outside-press guard needed).
+        selfInitiatedOpenChange = true;
+        await OnOpenChange.InvokeAsync(switchArgs);
+
+        if (switchArgs.IsCanceled)
+        {
+            SyncHandleState(CurrentOpen, activeTriggerId, forceNotify: true);
+            return;
+        }
+
         var effectiveTriggerId = triggerId ?? CurrentTriggerId;
         if (effectiveTriggerId is not null)
         {
@@ -934,14 +1185,15 @@
 
         openChangeReason = PopoverOpenChangeReason.TriggerPress;
         context.PopoverOpenChangeReason = PopoverOpenChangeReason.TriggerPress;
-        instantType = interactionType == "keyboard" ? PopoverInstantType.Click : PopoverInstantType.None;
+        instantType = (requestInteractionType ?? interactionType) == "keyboard" ? PopoverInstantType.Click : PopoverInstantType.None;
         context.PopoverInstantType = instantType;
         context.TransitionStatus = transition.TransitionStatus;
         context.Mounted = transition.IsMounted;
         state = new PopoverRootState(true);
         context.Open = true;
 
-        SyncHandleState(true, activeTriggerId);
+        SyncHandleState(true, activeTriggerId, forceNotify: true);
+        SyncHandleRootState();
 
         if (hasRendered)
         {
@@ -951,7 +1203,7 @@
                 var reasonString = GetReasonString(PopoverOpenChangeReason.TriggerPress);
                 await module.InvokeVoidAsync("setRootOpen", rootId, true, reasonString, interactionType);
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -987,6 +1239,7 @@
     void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
         triggerElements.Remove(triggerId);
+        triggerFocusTargetElements.Remove(triggerId);
 
         ElementReference? replacementTriggerElement = null;
         var syncReplacementTriggerElement = false;
@@ -1036,6 +1289,16 @@
         }
     }
 
+    void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnTriggerFocusTargetUpdated(string triggerId, ElementReference? element)
+    {
+        triggerFocusTargetElements[triggerId] = element;
+
+        if (activeTriggerId == triggerId)
+        {
+            triggerFocusTargetElement = element;
+        }
+    }
+
     void IComponentHandleSubscriberBase<PopoverOpenChangeReason>.OnOpenChangeRequested(bool open, PopoverOpenChangeReason reason, string? triggerId, string? handleInteractionType)
     {
         _ = InvokeAsync(async () =>
@@ -1047,7 +1310,7 @@
                     SetInteractionType(handleInteractionType);
                 }
 
-                await SetOpenAsync(open, reason, triggerId);
+                await SetOpenAsync(open, reason, triggerId, null, handleInteractionType);
             }
             catch (Exception ex)
             {
@@ -1061,11 +1324,16 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private async Task SetOpenWithExceptionHandlingAsync(bool nextOpen, PopoverOpenChangeReason reason, string? triggerId)
+    private async Task SetOpenWithExceptionHandlingAsync(
+        bool nextOpen,
+        PopoverOpenChangeReason reason,
+        string? triggerId,
+        string? requestInteractionType = null,
+        EventArgs? nativeEvent = null)
     {
         try
         {
-            await SetOpenAsync(nextOpen, reason, triggerId);
+            await SetOpenAsync(nextOpen, reason, triggerId, null, requestInteractionType, nativeEvent);
         }
         catch (Exception ex)
         {
@@ -1107,9 +1375,23 @@
         subscribedHandle = null;
     }
 
-    private void SyncHandleState(bool open, string? triggerId)
+    private void SyncHandleState(bool open, string? triggerId, bool forceNotify = false)
     {
-        Handle?.SyncState(open, triggerId, payload);
+        if (Handle is null)
+        {
+            return;
+        }
+
+        Handle.SyncState(open, triggerId, payload);
+        if (forceNotify)
+        {
+            Handle.NotifyStateChanged();
+        }
+    }
+
+    private void SyncHandleRootState()
+    {
+        Handle?.SyncRootState(rootId, context.PopupId, transition.IsMounted, context.FocusManagerModal);
     }
 
     private object? GetPayloadFromHandle(string triggerId)
@@ -1120,6 +1402,11 @@
     private ElementReference? GetTriggerElementFromHandle(string triggerId)
     {
         return Handle?.GetTriggerElement(triggerId);
+    }
+
+    private ElementReference? GetTriggerFocusTargetFromHandle(string triggerId)
+    {
+        return Handle?.GetTriggerFocusTarget(triggerId);
     }
 
     private ElementReference? GetTriggerElement()
@@ -1147,12 +1434,29 @@
         return triggerElements.Values.FirstOrDefault();
     }
 
+    private IReadOnlyList<ElementReference> GetTriggerElements()
+    {
+        return triggerElements.Values
+            .Where(element => element.HasValue)
+            .Select(element => element!.Value)
+            .ToArray();
+    }
+
     private ElementReference? GetTriggerFocusTarget()
     {
         var triggerId = CurrentTriggerId;
         if (triggerId is not null && triggerFocusTargetElements.TryGetValue(triggerId, out var element))
         {
             return element;
+        }
+
+        if (Handle is not null && triggerId is not null)
+        {
+            var handleElement = GetTriggerFocusTargetFromHandle(triggerId);
+            if (handleElement.HasValue)
+            {
+                return handleElement;
+            }
         }
 
         if (triggerFocusTargetElement.HasValue)
@@ -1203,6 +1507,54 @@
         }
 
         return fallbackPayload;
+    }
+
+    private string? ResolveEventTriggerId(bool nextOpen, PopoverOpenChangeReason reason, string? triggerId)
+    {
+        if (triggerId is not null)
+        {
+            return triggerId;
+        }
+
+        if (!nextOpen && reason == PopoverOpenChangeReason.ClosePress)
+        {
+            return CurrentTriggerId;
+        }
+
+        return nextOpen ? CurrentTriggerId : activeTriggerId;
+    }
+
+    private static InteractionType ResolveCloseInteractionType(PopoverOpenChangeReason reason, string? value)
+    {
+        var parsed = ParseInteractionType(value);
+        if (parsed != InteractionType.None)
+        {
+            return parsed;
+        }
+
+        return reason switch
+        {
+            PopoverOpenChangeReason.EscapeKey => InteractionType.Keyboard,
+            PopoverOpenChangeReason.FocusOut => InteractionType.Keyboard,
+            PopoverOpenChangeReason.TriggerPress => InteractionType.Mouse,
+            PopoverOpenChangeReason.ClosePress => InteractionType.Mouse,
+            PopoverOpenChangeReason.OutsidePress => InteractionType.Mouse,
+            PopoverOpenChangeReason.ImperativeAction => InteractionType.None,
+            _ => InteractionType.None
+        };
+    }
+
+    private static InteractionType ParseInteractionType(string? value)
+    {
+        return value switch
+        {
+            "keyboard" => InteractionType.Keyboard,
+            "mouse" => InteractionType.Mouse,
+            "click" => InteractionType.Click,
+            "touch" => InteractionType.Touch,
+            "pen" => InteractionType.Pen,
+            _ => InteractionType.None
+        };
     }
 
     private static string? GetReasonString(PopoverOpenChangeReason reason) => reason switch

@@ -22,6 +22,7 @@
     private bool hasRendered;
     private bool previousDisabled;
     private bool previousNativeButton;
+    private string lastPointerType = string.Empty;
     private Action? unregisterClosePart;
     private PopoverCloseState state;
     private RenderElement<PopoverCloseState>? renderElementReference;
@@ -158,7 +159,7 @@
                 await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -178,9 +179,16 @@
             AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
         }
 
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
 
         componentAttributes = attrs;
+    }
+
+    private Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        lastPointerType = e.PointerType ?? string.Empty;
+        return Task.CompletedTask;
     }
 
     private async Task HandleClickAsync(MouseEventArgs e)
@@ -190,7 +198,10 @@
             return;
         }
 
-        await RootContext.SetOpenAsync(false, PopoverOpenChangeReason.ClosePress, null, null);
+        var detectedInteractionType = e.Detail == 0 ? "keyboard" : string.IsNullOrEmpty(lastPointerType) ? "mouse" : lastPointerType;
+        lastPointerType = string.Empty;
+
+        await RootContext.SetOpenAsync(false, PopoverOpenChangeReason.ClosePress, null, null, detectedInteractionType, e);
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
@@ -206,7 +217,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("sync", Element.Value, Disabled, false, NativeButton, dispose);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

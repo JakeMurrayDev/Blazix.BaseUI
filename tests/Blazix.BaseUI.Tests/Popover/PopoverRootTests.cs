@@ -388,6 +388,178 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
     }
 
     [Fact]
+    public Task Handle_DetachedTriggerReceivesAriaControlsWhenOpen()
+    {
+        var handle = new PopoverHandle<string>();
+        var cut = Render(CreateHandlePopover(handle));
+
+        handle.Open("trigger-a");
+
+        cut.WaitForAssertion(() =>
+        {
+            var popupId = cut.Find("[role='dialog']").Id;
+            popupId.ShouldNotBeNullOrEmpty();
+            cut.Find("#trigger-a").GetAttribute("aria-controls").ShouldBe(popupId);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Handle_DetachedTriggerRendersFocusGuardsWhenMountedAndNonModal()
+    {
+        var handle = new PopoverHandle<string>();
+        var cut = Render(CreateHandlePopover(handle));
+
+        handle.Open("trigger-a");
+
+        cut.WaitForAssertion(() =>
+        {
+            var trigger = cut.Find("#trigger-a");
+            trigger.PreviousElementSibling?.HasAttribute("data-blazix-base-ui-focus-guard").ShouldBeTrue();
+            trigger.NextElementSibling?.HasAttribute("data-blazix-base-ui-focus-guard").ShouldBeTrue();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task HandleViewportSwapClearsInstantOnNextTriggerPress()
+    {
+        var handle = new PopoverHandle<string>();
+        var cut = Render(CreateHandleViewportPopover(handle));
+
+        cut.Find("#trigger-a").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("#trigger-a").Click(new MouseEventArgs { Detail = 1 });
+
+        cut.WaitForAssertion(() => cut.Find("[role='dialog']").ShouldNotBeNull());
+
+        var viewport = cut.FindComponent<PopoverViewport>();
+        await cut.InvokeAsync(() => viewport.Instance.OnViewportTransitionEnd());
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='presentation']").GetAttribute("data-instant").ShouldBe("trigger-change");
+        });
+
+        cut.Find("#trigger-b").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("#trigger-b").Click(new MouseEventArgs { Detail = 1 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='presentation']").HasAttribute("data-instant").ShouldBeFalse();
+        });
+    }
+
+    [Fact]
+    public Task HandleViewportSwapMovesDetachedTriggerOpenState()
+    {
+        var handle = new PopoverHandle<string>();
+        var cut = Render(CreateHandleViewportPopover(handle));
+
+        cut.Find("#trigger-a").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("#trigger-a").Click(new MouseEventArgs { Detail = 1 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#trigger-a").GetAttribute("data-popup-open").ShouldBe(string.Empty);
+            cut.Find("#trigger-b").HasAttribute("data-popup-open").ShouldBeFalse();
+        });
+
+        cut.Find("#trigger-b").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("#trigger-b").Click(new MouseEventArgs { Detail = 1 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#trigger-a").HasAttribute("data-popup-open").ShouldBeFalse();
+            cut.Find("#trigger-b").GetAttribute("data-popup-open").ShouldBe(string.Empty);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task HandleViewportSwapKeepsThreeDetachedTriggersAssociatedAfterReturningToFirstTrigger()
+    {
+        var handle = new PopoverHandle<string>();
+        var cut = Render(CreateThreeTriggerHandleViewportPopover(handle));
+
+        ClickTrigger(cut, "profile");
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='payload']").TextContent.ShouldBe("Profile");
+            AssertOnlyTriggerOpen(cut, "profile");
+        });
+
+        ClickTrigger(cut, "notifications");
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='payload']").TextContent.ShouldBe("Notifications");
+            AssertOnlyTriggerOpen(cut, "notifications");
+        });
+
+        ClickTrigger(cut, "profile");
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='payload']").TextContent.ShouldBe("Profile");
+            AssertOnlyTriggerOpen(cut, "profile");
+        });
+
+        ClickTrigger(cut, "activity");
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='payload']").TextContent.ShouldBe("Activity");
+            handle.ActiveTriggerId.ShouldBe("activity");
+            AssertOnlyTriggerOpen(cut, "activity");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnOpenChangeReceivesTriggerEventDetails()
+    {
+        PopoverOpenChangeEventArgs? receivedArgs = null;
+        var cut = Render(CreatePopover(
+            onOpenChange: EventCallback.Factory.Create<PopoverOpenChangeEventArgs>(this, args => receivedArgs = args),
+            customContent: _ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-a");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PopoverPortal>(10);
+                innerBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+
+        var trigger = cut.Find("#trigger-a");
+        trigger.PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        trigger.Click(new MouseEventArgs { Detail = 1 });
+
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs.Open.ShouldBeTrue();
+        receivedArgs.Reason.ShouldBe(PopoverOpenChangeReason.TriggerPress);
+        receivedArgs.TriggerId.ShouldBe("trigger-a");
+        receivedArgs.Trigger.HasValue.ShouldBeTrue();
+        receivedArgs.Event.ShouldBeOfType<MouseEventArgs>();
+        receivedArgs.InteractionType.ShouldBe("mouse");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task SetsInstantClickOnlyForKeyboardTriggerPress()
     {
         var cut = Render(CreatePopover(defaultOpen: false));
@@ -683,6 +855,131 @@ public class PopoverRootTests : BunitContext, IPopoverRootContract
             }));
             builder.CloseComponent();
         };
+    }
+
+    private static RenderFragment CreateHandleViewportPopover(PopoverHandle<string> handle)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<PopoverTypedTrigger<string>>(0);
+            builder.AddAttribute(1, "Id", "trigger-a");
+            builder.AddAttribute(2, "Handle", handle);
+            builder.AddAttribute(3, "Payload", "Panel A");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger A")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<PopoverTypedTrigger<string>>(10);
+            builder.AddAttribute(11, "Id", "trigger-b");
+            builder.AddAttribute(12, "Handle", handle);
+            builder.AddAttribute(13, "Payload", "Panel B");
+            builder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger B")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<PopoverRoot>(20);
+            builder.AddAttribute(21, "Handle", (IPopoverHandle)handle);
+            builder.AddAttribute(22, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(context => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<PopoverViewport>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(viewportBuilder =>
+                            {
+                                viewportBuilder.OpenElement(0, "span");
+                                viewportBuilder.AddContent(1, context.Payload?.ToString() ?? "none");
+                                viewportBuilder.CloseElement();
+                            }));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreateThreeTriggerHandleViewportPopover(PopoverHandle<string> handle)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<PopoverTypedTrigger<string>>(0);
+            builder.AddAttribute(1, "Id", "notifications");
+            builder.AddAttribute(2, "Handle", handle);
+            builder.AddAttribute(3, "Payload", "Notifications");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Notifications")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<PopoverTypedTrigger<string>>(10);
+            builder.AddAttribute(11, "Id", "activity");
+            builder.AddAttribute(12, "Handle", handle);
+            builder.AddAttribute(13, "Payload", "Activity");
+            builder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Activity")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<PopoverTypedTrigger<string>>(20);
+            builder.AddAttribute(21, "Id", "profile");
+            builder.AddAttribute(22, "Handle", handle);
+            builder.AddAttribute(23, "Payload", "Profile");
+            builder.AddAttribute(24, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Profile")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<PopoverRoot>(30);
+            builder.AddAttribute(31, "Handle", (IPopoverHandle)handle);
+            builder.AddAttribute(32, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(context => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<PopoverViewport>(0);
+                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(viewportBuilder =>
+                            {
+                                viewportBuilder.OpenElement(0, "span");
+                                viewportBuilder.AddAttribute(1, "data-testid", "payload");
+                                viewportBuilder.AddContent(2, context.Payload?.ToString() ?? "none");
+                                viewportBuilder.CloseElement();
+                            }));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static void ClickTrigger(IRenderedComponent<ContainerFragment> cut, string triggerId)
+    {
+        var trigger = cut.Find($"#{triggerId}");
+        trigger.PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        trigger.Click(new MouseEventArgs { Detail = 1 });
+    }
+
+    private static void AssertOnlyTriggerOpen(IRenderedComponent<ContainerFragment> cut, string triggerId)
+    {
+        foreach (var id in new[] { "notifications", "activity", "profile" })
+        {
+            var trigger = cut.Find($"#{id}");
+            trigger.GetAttribute("aria-expanded").ShouldBe(id == triggerId ? "true" : "false");
+            trigger.HasAttribute("data-popup-open").ShouldBe(id == triggerId);
+        }
     }
 }
 

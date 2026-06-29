@@ -4,14 +4,183 @@
 
 <PageTitle>Popover Test Page (WASM)</PageTitle>
 
+@if (Scenario == "scroll-handoff")
+{
+    <div data-testid="test-container" data-scenario="scroll-handoff" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+        <PopoverRoot @bind-Open="firstScrollOpen">
+            <PopoverTrigger data-testid="first-scroll-trigger">
+                First Popover
+            </PopoverTrigger>
+            <PopoverPortal>
+                <PopoverPositioner SideOffset="8">
+                    <PopoverPopup data-testid="first-scroll-popup">
+                        <div data-testid="first-scroll-content">First content</div>
+                    </PopoverPopup>
+                </PopoverPositioner>
+            </PopoverPortal>
+        </PopoverRoot>
+
+        <div data-testid="scroll-handoff-spacer" style="height: 1800px;"></div>
+
+        <PopoverRoot @bind-Open="secondScrollOpen">
+            <PopoverTrigger data-testid="second-scroll-trigger">
+                Second Popover
+            </PopoverTrigger>
+            <PopoverPortal>
+                <PopoverPositioner SideOffset="8">
+                    <PopoverPopup data-testid="second-scroll-popup">
+                        <div data-testid="second-scroll-content">Second content</div>
+                    </PopoverPopup>
+                </PopoverPositioner>
+            </PopoverPortal>
+        </PopoverRoot>
+
+        <div style="height: 600px;"></div>
+
+        <div data-testid="scroll-handoff-state">
+            <div>First Open: <span data-testid="first-scroll-open">@firstScrollOpen.ToString().ToLowerInvariant()</span></div>
+            <div>Second Open: <span data-testid="second-scroll-open">@secondScrollOpen.ToString().ToLowerInvariant()</span></div>
+        </div>
+    </div>
+}
+else if (Scenario == "adjacent-roots")
+{
+    <div data-testid="test-container" data-scenario="adjacent-roots" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+        <div style="display: flex; flex-direction: column; gap: 96px; min-height: 1100px; padding: 32px;">
+            <PopoverRoot @bind-Open="firstAdjacentOpen">
+                <PopoverTrigger data-testid="first-adjacent-trigger">
+                    First Popover
+                </PopoverTrigger>
+                <PopoverPortal>
+                    <PopoverPositioner SideOffset="8">
+                        <PopoverPopup data-testid="first-adjacent-popup">
+                            <div data-testid="first-adjacent-content">First visible content</div>
+                        </PopoverPopup>
+                    </PopoverPositioner>
+                </PopoverPortal>
+            </PopoverRoot>
+
+            <PopoverRoot @bind-Open="secondAdjacentOpen">
+                <PopoverTrigger data-testid="second-adjacent-trigger">
+                    Second Popover
+                </PopoverTrigger>
+                <PopoverPortal>
+                    <PopoverPositioner SideOffset="8">
+                        <PopoverPopup data-testid="second-adjacent-popup">
+                            <div data-testid="second-adjacent-content">Second visible content</div>
+                        </PopoverPopup>
+                    </PopoverPositioner>
+                </PopoverPortal>
+            </PopoverRoot>
+        </div>
+
+        <div data-testid="adjacent-state">
+            <div>First Open: <span data-testid="first-adjacent-open">@firstAdjacentOpen.ToString().ToLowerInvariant()</span></div>
+            <div>Second Open: <span data-testid="second-adjacent-open">@secondAdjacentOpen.ToString().ToLowerInvariant()</span></div>
+        </div>
+    </div>
+}
+else if (Scenario == "viewport-swap")
+{
+    <div data-testid="test-container" data-scenario="viewport-swap" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+        <style>
+            .vp-positioner {
+                width: var(--positioner-width);
+                height: var(--positioner-height);
+                transition-property: top, left, right, bottom, transform;
+                transition-duration: @(AnimationDuration)ms;
+                transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            .vp-positioner[data-instant] {
+                transition: none;
+            }
+
+            .vp-popup {
+                width: var(--popup-width, auto);
+                height: var(--popup-height, auto);
+                transition-property: width, height, opacity, transform;
+                transition-duration: @(AnimationDuration)ms;
+                transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            .vp-popup[data-instant] {
+                transition: none;
+            }
+
+            .vp-arrow {
+                display: block;
+                position: relative;
+                width: 12px;
+                height: 6px;
+                transition: left @(AnimationDuration)ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            .vp-viewport { position: relative; display: block; width: 100%; height: 100%; min-width: 160px; overflow: clip; }
+            .vp-viewport [data-current],
+            .vp-viewport [data-previous] {
+                opacity: 1;
+                transform: translateX(0);
+                transition:
+                    transform @(AnimationDuration)ms cubic-bezier(0.22, 1, 0.36, 1),
+                    opacity @(AnimationDuration / 2)ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+            .vp-viewport[data-activation-direction~="right"] [data-previous][data-ending-style],
+            .vp-viewport[data-activation-direction~="left"] [data-current][data-starting-style] {
+                opacity: 0;
+                transform: translateX(-50%);
+            }
+            .vp-viewport[data-activation-direction~="left"] [data-previous][data-ending-style],
+            .vp-viewport[data-activation-direction~="right"] [data-current][data-starting-style] {
+                opacity: 0;
+                transform: translateX(50%);
+            }
+        </style>
+        <div style="display: flex; justify-content: center; gap: 8px; padding: 32px;">
+            <PopoverTypedTrigger TPayload="string" Handle="@viewportHandle" Id="vp-one" Payload="@("vp-one")" data-testid="vp-trigger-one">One</PopoverTypedTrigger>
+            <PopoverTypedTrigger TPayload="string" Handle="@viewportHandle" Id="vp-two" Payload="@("vp-two")" data-testid="vp-trigger-two">Two</PopoverTypedTrigger>
+            <PopoverTypedTrigger TPayload="string" Handle="@viewportHandle" Id="vp-three" Payload="@("vp-three")" data-testid="vp-trigger-three">Three</PopoverTypedTrigger>
+        </div>
+        <PopoverRoot Handle="@viewportHandle">
+            <ChildContent Context="ctx">
+                <PopoverPortal>
+                    <PopoverPositioner SideOffset="8" class="vp-positioner" data-testid="vp-positioner">
+                        <PopoverPopup class="vp-popup" data-testid="vp-popup">
+                            <PopoverArrow class="vp-arrow" data-testid="vp-arrow" />
+                            <PopoverViewport class="vp-viewport" data-testid="vp-viewport">
+                                @{
+                                    var selected = ctx.Payload as string ?? "vp-one";
+                                    var contentStyle = selected switch
+                                    {
+                                        "vp-one" => "width: 224px; min-height: 44px;",
+                                        "vp-two" => "width: 269px; min-height: 64px;",
+                                        "vp-three" => "width: 175px; min-height: 104px;",
+                                        _ => "width: 160px; min-height: 44px;"
+                                    };
+                                }
+                                <div data-testid="vp-content" style="@contentStyle">@selected content</div>
+                            </PopoverViewport>
+                        </PopoverPopup>
+                    </PopoverPositioner>
+                </PopoverPortal>
+            </ChildContent>
+        </PopoverRoot>
+    </div>
+}
+else
+{
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
     <PopoverRoot
         @bind-Open="isOpen"
         DefaultOpen="@DefaultOpen"
+        DefaultTriggerId="@DefaultTriggerId"
+        TriggerId="@TriggerId"
         Modal="@(Modal ? PopoverModalMode.True : PopoverModalMode.False)"
         OnOpenChange="HandleOpenChange"
         OnOpenChangeComplete="HandleOpenChangeComplete">
         <PopoverTrigger
+            Id="@RegisteredTriggerId"
+            Render="@TriggerRender"
             OpenOnHover="@OpenOnHover"
             Delay="@OpenDelay"
             CloseDelay="@CloseDelay"
@@ -67,10 +236,23 @@
     <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
     <input data-testid="focusable-input" type="text" placeholder="Focusable input" style="margin-top: 10px;" />
 </div>
+}
 
 @code {
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultTriggerId")]
+    public string? DefaultTriggerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "triggerId")]
+    public string? TriggerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "registeredTriggerId")]
+    public string? RegisteredTriggerId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "renderedTriggerDomId")]
+    public string? RenderedTriggerDomId { get; set; }
 
     [SupplyParameterFromQuery(Name = "modal")]
     public bool Modal { get; set; }
@@ -117,10 +299,23 @@
     [SupplyParameterFromQuery(Name = "showFocusableContent")]
     public bool ShowFocusableContent { get; set; }
 
+    [SupplyParameterFromQuery(Name = "scenario")]
+    public string? Scenario { get; set; }
+
+    [SupplyParameterFromQuery(Name = "animationDuration")]
+    public int AnimationDuration { get; set; } = 400;
+
     private bool isOpen;
+    private bool firstScrollOpen;
+    private bool secondScrollOpen;
+    private bool firstAdjacentOpen;
+    private bool secondAdjacentOpen;
+    private readonly PopoverHandle<string> viewportHandle = PopoverHandleFactory.CreateHandle<string>();
     private int changeCount;
     private string lastReason = "";
     private int completeCount;
+    private RenderFragment<RenderProps<PopoverTriggerState>>? TriggerRender =>
+        string.IsNullOrEmpty(RenderedTriggerDomId) ? null : RenderTriggerWithDomId;
 
     protected override void OnInitialized()
     {
@@ -137,4 +332,17 @@
     {
         completeCount++;
     }
+
+    private RenderFragment RenderTriggerWithDomId(RenderProps<PopoverTriggerState> props) => builder =>
+    {
+        builder.OpenElement(0, "button");
+        builder.AddMultipleAttributes(1, props.Attributes);
+        builder.AddAttribute(2, "id", RenderedTriggerDomId);
+        if (props.ElementReferenceCallback is not null)
+        {
+            builder.AddElementReferenceCapture(3, props.ElementReferenceCallback);
+        }
+        builder.AddContent(4, props.ChildContent);
+        builder.CloseElement();
+    };
 }
