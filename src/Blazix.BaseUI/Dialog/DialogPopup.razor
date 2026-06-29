@@ -134,6 +134,12 @@
             Context.ResolveFinalFocusForClose = FinalFocus is FocusTarget.Callback
                 ? ResolveFinalFocusForClose
                 : null;
+
+            // For a callback finalFocus, also let the root re-send the open-time target on every open
+            // so a kept-mounted popup is refreshed after a close overwrote the shared JS state.
+            Context.ResolveFinalFocusForOpen = FinalFocus is FocusTarget.Callback
+                ? ResolveFinalFocusTargetForOpen
+                : null;
         }
 
         UpdateShouldRender();
@@ -221,6 +227,7 @@
         if (Context is not null)
         {
             Context.ResolveFinalFocusForClose = null;
+            Context.ResolveFinalFocusForOpen = null;
         }
 
         Context?.SetPopupId(null);

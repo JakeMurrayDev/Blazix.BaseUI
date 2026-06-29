@@ -702,6 +702,13 @@
                     var (finalMode, finalElement) = resolveFinalFocus(ResolveCloseInteractionType(reason));
                     await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
                 }
+                // On open, re-send the open-time callback finalFocus target before the focus manager is
+                // (re)created, so a kept-mounted popup is not left with the previous close-cycle target.
+                else if (nextOpen && context.ResolveFinalFocusForOpen is { } resolveOpenFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveOpenFinalFocus();
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
 
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, context.InteractionType);
             }

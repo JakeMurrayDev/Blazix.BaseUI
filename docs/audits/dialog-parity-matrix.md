@@ -38,7 +38,7 @@ Date: 2026-06-29 — React Base UI `.base-ui` @ `748f4228d` ↔ Blazix.BaseUI Di
 
 | React | Blazor | Status |
 | --- | --- | --- |
-| reasons `trigger-press`/`outside-press`/`escape-key`/`close-press`/`focus-out`/`imperative-action`/`none` | `DialogOpenChangeReason.{TriggerPress,OutsidePress,EscapeKey,ClosePress,FocusOut,ImperativeAction,None}` | Present (`Swipe`/`CloseWatcher` are extra unused members) |
+| reasons `trigger-press`/`outside-press`/`escape-key`/`close-press`/`focus-out`/`imperative-action`/`none` | `DialogOpenChangeReason.{TriggerPress,OutsidePress,EscapeKey,ClosePress,FocusOut,ImperativeAction,None}` | Present (`Swipe`/`CloseWatcher` are emitted by the Drawer, which shares this enum; the Dialog itself never emits them) |
 | `cancel()` / `isCanceled` | `args.Cancel()` / `IsCanceled` | Present |
 | `allowPropagation()` / `isPropagationAllowed` | `args.AllowPropagation()` / `IsPropagationAllowed` (base `OpenChangeEventArgs`) | Present |
 | `preventUnmountOnClose()` | `args.PreventUnmountOnClose()` / `PreventUnmount` | Present |

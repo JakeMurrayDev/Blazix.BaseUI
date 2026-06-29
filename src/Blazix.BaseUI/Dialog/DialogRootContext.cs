@@ -80,6 +80,15 @@ internal sealed class DialogRootContext
     /// </summary>
     public Func<string?, (string? Mode, ElementReference? Element)>? ResolveFinalFocusForClose { get; set; }
 
+    /// <summary>
+    /// Resolves the popup's open-time <c>finalFocus</c> target. Registered by <see cref="DialogPopup"/>
+    /// only when <c>FinalFocus</c> is a callback, so the root can re-send the open-time target on every
+    /// open. This refreshes the shared JS state for kept-mounted popups (which do not re-initialize on
+    /// reopen) after a close has overwritten it with the close-resolved target. <see langword="null"/>
+    /// when no re-send is needed.
+    /// </summary>
+    public Func<(string? Mode, ElementReference? Element)>? ResolveFinalFocusForOpen { get; set; }
+
     public Func<bool, DialogOpenChangeReason, Task> SetOpenAsync { get; set; } = null!;
 
     public Func<object?, DialogOpenChangeReason, Task> SetOpenWithPayloadAsync { get; set; } = null!;

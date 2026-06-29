@@ -218,7 +218,7 @@
   color: oklch(14.5% 0 0deg);
 }
 
-.blx-dialog-status[data-open="True"] {
+.blx-dialog-status[data-open] {
   background-color: oklch(14.5% 0 0deg);
   color: white;
 }
@@ -228,7 +228,7 @@
   color: white;
 }
 
-.dark .blx-dialog-status[data-open="True"] {
+.dark .blx-dialog-status[data-open] {
   background-color: white;
   color: oklch(14.5% 0 0deg);
 }
