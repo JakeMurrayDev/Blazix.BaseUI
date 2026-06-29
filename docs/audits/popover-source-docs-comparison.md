@@ -1,104 +1,82 @@
 # Popover Source Docs Comparison
 
-Date: 2026-06-07
+Date: 2026-06-27
 
 ## Scope
 
-Compared the audited Blazor Popover component against the vendored React Base UI Popover documentation and generated API docs under `.base-ui/docs/src/app/(docs)/react/components/popover`.
+Compared React Base UI Popover documentation and generated API metadata against the Blazix.BaseUI Popover docs and API metadata.
 
-The comparison used the upstream docs application through PNPM, the in-app browser, the generated `types.md` API reference, and the local Blazor component surface under `src/BlazorBaseUI/Popover`.
+Source docs:
 
-## Source Docs Commands
+- `.base-ui/docs/src/app/(docs)/react/components/popover/page.mdx`
+- `.base-ui/docs/src/app/(docs)/react/components/popover/types.md`
+- `.base-ui/packages/react/src/popover/root/PopoverRoot.tsx`
+- `.base-ui/packages/react/src/popover/positioner/PopoverPositionerCssVars.ts`
+- `.base-ui/packages/react/src/popover/viewport/PopoverViewportDataAttributes.ts`
+
+Local docs:
+
+- `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Content/Components/popover.md`
+- `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Data/PopoverApi.cs`
+- `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Docs/ApiPartReference.razor`
+
+## Commands
 
 | Command | Result | Log |
 | --- | --- | --- |
-| `pnpm --version` | GREEN: `11.1.3` available. | Console inspection |
-| `pnpm -C .base-ui docs:dev` | GREEN: Base UI docs app started on `http://localhost:3005`, Next.js reported ready. | `docs/audits/logs/popover-source-docs-dev.log` |
-| In-app browser inspection of `http://127.0.0.1:3005/react/components/popover` | GREEN: page title `Popover · Base UI`; API reference and all expected headings loaded; no page errors. | `docs/audits/logs/popover-source-docs-browser.log` |
-| `pnpm -C .base-ui docs:validate "(docs)/react/components/popover"` | GREEN: processed one `page.mdx` file and one `types.md` file; no files needed updating. | `docs/audits/logs/popover-source-docs-validate.log` |
+| `pnpm -C .base-ui docs:validate "(docs)/react/components/popover"` | Passed; one `page.mdx` and one `types.md` processed, no updates required. | `docs/audits/logs/popover-source-docs-validate.log` |
+| `pnpm -C .base-ui docs:dev` | Passed; Base UI docs served on `http://localhost:3005` for in-app browser inspection. | Console session; browser facts stored below |
+| In-app browser inspection of `http://127.0.0.1:3005/react/components/popover` | Passed; source Popover page rendered with API tables. | `docs/audits/logs/popover-source-docs-browser.log` |
+| `dotnet run --project docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.csproj --urls http://127.0.0.1:5216` | Passed; Blazix docs served for comparison. | Console session; browser facts stored below |
+| In-app browser inspection of `http://127.0.0.1:5216/components/popover` | Passed; Blazix Popover page rendered updated modal, data-attribute, and CSS-variable docs. | `docs/audits/logs/popover-source-docs-browser.log` |
 
-## Source Docs Inventory
+## Documented Upstream Changes
 
-| React docs section | Documented behavior | Blazor equivalent | Status |
-| --- | --- | --- | --- |
-| Anatomy | `Root`, `Trigger`, `Portal`, `Backdrop`, `Positioner`, `Popup`, `Arrow`, `Viewport`, `Title`, `Description`, `Close`. | Matching Popover parts exist under `src/BlazorBaseUI/Popover`. | Verified |
-| Opening on hover | `openOnHover`, `delay`, and hover-triggered open timing. | `PopoverTrigger.OpenOnHover`, `Delay`, `CloseDelay`, hover timers and hover/click engagement in component JS. | Verified by Popover Playwright and bUnit suites |
-| Detached triggers | `Popover.createHandle()` connects triggers outside `Root`. | `PopoverHandleFactory.CreateHandle()` and `PopoverHandle<TPayload>` connect detached `PopoverTrigger` and `PopoverRoot`. | Verified by multi-trigger Playwright tests |
-| Multiple triggers | Shared handle or contained triggers; active trigger determines content. | Contained and detached trigger registry, active trigger id, payload, and positioner re-anchor behavior. | Verified by multi-trigger Playwright tests |
-| Payload child rendering | Root children can receive `payload` from active trigger. | `PopoverRoot.ChildContent` receives `PopoverRootPayloadContext` with active `Payload`. | Verified by bUnit and Playwright payload tests |
-| Controlled mode with multiple triggers | Controlled `open`, `onOpenChange`, `triggerId`, and trigger `id`. | `Open`, `OpenChanged`, `OnOpenChange`, `TriggerId`, `DefaultTriggerId`, and trigger `Id`. | Verified by bUnit root tests and Playwright controlled scenarios |
-| Animating Popover | Positioner and popup expose side, align, transition, width, height, and viewport content transition data. | Positioner, popup, and viewport emit matching transition, side/align, instant, activation direction, and CSS variable state. | Verified by Popover viewport, transition, and positioning tests |
-| API reference | Generated `types.md` documents Root, Trigger, Portal, Backdrop, Positioner, Popup, Arrow, Title, Description, Close, Viewport, `createHandle`, and `Handle`. | Blazor API surface maps each React part to a Razor component or handle class. | Verified |
+| Upstream docs/source change | Required local docs behavior | Local result |
+| --- | --- | --- |
+| `PopoverRoot.modal` JSDoc now states that touch devices block outside taps while leaving page scrollable unless the popup nearly spans viewport width. | `PopoverRoot.Modal` docs must describe `True` scroll lock with the same touch exception. | Updated in markdown docs and `PopoverApi.RootRows`. |
+| `PopoverPositionerCssVars.ts` now declares typed CSS variable metadata for available/anchor/positioner dimensions and transform origin. | Blazix API reference must render data/CSS type columns and show number/string types where available. | `ApiPartReference.razor` conditionally renders type columns; `PopoverApi.Positioner` includes number/string types. |
+| `PopoverViewportDataAttributes.ts` states `data-activation-direction` contains space-separated horizontal/vertical axis values. | Blazix viewport docs must document space-separated axis tokens and not imply a single direction enum. | Updated markdown docs and `PopoverApi.Viewport` data attribute row. |
+| Source Popover docs include viewport popup dimension CSS variables. | Blazix viewport docs must include parent popup width/height variables for transition wrappers. | `PopoverApi.Viewport` includes `--popup-width` and `--popup-height`. |
 
 ## API Surface Comparison
 
-| React docs API | Blazor API | Notes |
+| React API | Blazix API | Status |
 | --- | --- | --- |
-| `Popover.Root.defaultOpen` | `PopoverRoot.DefaultOpen` | Same uncontrolled initial-open responsibility. |
-| `Popover.Root.open` | `PopoverRoot.Open` plus `OpenChanged` | Blazor bindable parameter replaces React controlled prop pattern. |
-| `Popover.Root.onOpenChange` | `PopoverRoot.OnOpenChange` with `PopoverOpenChangeEventArgs` | Includes `Open`, `Reason`, `Cancel()`, `AllowPropagation()`, `IsCanceled`, `IsPropagationAllowed`, and `PreventUnmountOnClose()` through shared `OpenChangeEventArgs<TReason>`. Browser `event` and raw `trigger` element are not exposed as C# objects; trigger identity is modeled through active trigger id and handle state. |
-| `Popover.Root.actionsRef` | `PopoverRoot.ActionsRef` with `PopoverRootActions` | Supports `Unmount` and `Close`. |
-| `Popover.Root.defaultTriggerId` | `PopoverRoot.DefaultTriggerId` | Same initial active-trigger association. |
-| `Popover.Root.handle` | `PopoverRoot.Handle` | Uses `IPopoverHandle` / `PopoverHandle<TPayload>`. |
-| `Popover.Root.modal` | `PopoverRoot.Modal` | Blazor enum `PopoverModalMode.False`, `True`, `TrapFocus` maps React `false`, `true`, and `'trap-focus'`. |
-| `Popover.Root.onOpenChangeComplete` | `PopoverRoot.OnOpenChangeComplete` | Same post-transition callback responsibility. |
-| `Popover.Root.triggerId` | `PopoverRoot.TriggerId` | Same controlled active trigger association. |
-| `Popover.Root.children` payload render function | `RenderFragment<PopoverRootPayloadContext> ChildContent` | Blazor-native render fragment equivalent. No RenderFragment caching is used. |
-| `Popover.Trigger.handle` | `PopoverTrigger.Handle` | Connects detached triggers. |
-| `Popover.Trigger.nativeButton` | `PopoverTrigger.NativeButton` | Preserves native/non-native trigger semantics. |
-| `Popover.Trigger.payload` | `PopoverTrigger.Payload` | Supports typed handle payloads through `PopoverHandle<TPayload>`. |
-| `Popover.Trigger.openOnHover` | `PopoverTrigger.OpenOnHover` | Same hover-open opt-in. |
-| `Popover.Trigger.delay` | `PopoverTrigger.Delay` | Same default of 300 ms. |
-| `Popover.Trigger.closeDelay` | `PopoverTrigger.CloseDelay` | Same default of 0 ms. |
-| `Popover.Trigger.id` | `PopoverTrigger.Id` | Forwarded to rendered element and used for active trigger selection. |
-| `className` / `style` function props | `ClassValue` / `StyleValue` plus `AdditionalAttributes` | Blazor uses state functions for component-owned class/style and attribute splatting for literal `class` / `style`. |
-| `render` prop | `Render` parameter using `RenderElement<TState>` | Blazor render-prop equivalent. |
-| `Popover.Portal.container` | `PopoverPortal.Container` | Blazor accepts a CSS selector string and defaults to `body`; React accepts DOM element, shadow root, ref, or null. This is an intentional interop shape difference, with equivalent portal-target behavior in Blazor. |
-| `Popover.Portal.keepMounted` | `PopoverPortal.KeepMounted` | Same keep-mounted behavior. |
-| Positioner `side`, `align`, offsets, arrow padding, anchor, collision, sticky, method | `PopoverPositioner` parameters | Side, align, side/align offset numbers and callbacks, collision boundary/padding/avoidance, anchor, sticky, and absolute/fixed positioning are present. |
-| Popup `initialFocus` / `finalFocus` | `PopoverPopup.InitialFocus` / `FinalFocus` | Blazor focus options map into component JS focus handling. |
-| `Popover.Close.nativeButton` | `PopoverClose.NativeButton` | Same native/non-native close semantics. |
-| `Popover.createHandle()` | `PopoverHandleFactory.CreateHandle()` | Factory creates non-generic or typed handle. |
-| `Popover.Handle.isOpen` | `IPopoverHandle.IsOpen` | Same readonly state visibility. |
+| `Popover.Root.defaultOpen` | `PopoverRoot.DefaultOpen` | Present |
+| `Popover.Root.open` | `PopoverRoot.Open` / `OpenChanged` | Present |
+| `Popover.Root.onOpenChange` | `PopoverRoot.OnOpenChange` / `PopoverOpenChangeEventArgs` | Present; Blazor event args include cancel, event, trigger ref, trigger id, reason, and interaction type. |
+| `Popover.Root.onOpenChangeComplete` | `PopoverRoot.OnOpenChangeComplete` | Present |
+| `Popover.Root.defaultTriggerId` | `PopoverRoot.DefaultTriggerId` | Present |
+| `Popover.Root.triggerId` | `PopoverRoot.TriggerId` | Present; rendered id ownership fix integrated. |
+| `Popover.Root.actionsRef` | `PopoverRoot.ActionsRef` | Present |
+| `Popover.Root.handle` | `PopoverRoot.Handle` / `PopoverHandleFactory.CreateHandle()` | Present |
+| `Popover.Root.modal` | `PopoverRoot.Modal` / `PopoverModalMode` | Present |
+| `Popover.Trigger.handle` | `PopoverTrigger.Handle` | Present |
+| `Popover.Trigger.payload` | `PopoverTrigger.Payload` | Present |
+| `Popover.Trigger.openOnHover` | `PopoverTrigger.OpenOnHover` | Present |
+| `Popover.Trigger.delay` | `PopoverTrigger.Delay` | Present |
+| `Popover.Trigger.closeDelay` | `PopoverTrigger.CloseDelay` | Present |
+| `Popover.Trigger.id` | `PopoverTrigger.Id` | Present |
+| `Popover.Portal.keepMounted` | `PopoverPortal.KeepMounted` | Present |
+| `Popover.Positioner` side/align/offset/collision/sticky/method/anchor props | `PopoverPositioner` parameters | Present |
+| `Popover.Popup.initialFocus` | `PopoverPopup.InitialFocus` | Present |
+| `Popover.Popup.finalFocus` | `PopoverPopup.FinalFocus` | Present; close interaction type verified. |
+| `Popover.Close.nativeButton` | `PopoverClose.NativeButton` | Present |
+| `render` prop | `RenderFragment<RenderProps<TState>>? Render` via `RenderElement<TState>` | Present |
+| `className` / `style` functions | `ClassValue` / `StyleValue` | Present |
 
-## Attribute Comparison
+## Rendered Docs Comparison
 
-| Element | React docs attributes | Blazor status |
+| Rendered signal | Source docs | Blazix docs |
 | --- | --- | --- |
-| Trigger | `data-popup-open`, `data-pressed`; audited source also requires `type`, `tabindex`, `aria-haspopup`, `aria-expanded`, `aria-controls`, disabled state, and click-trigger marker. | Present and covered by bUnit trigger tests plus Playwright click, hover, disabled, and focus tests. |
-| Backdrop | `data-open`, `data-closed`, `data-starting-style`, `data-ending-style`. | Present and covered by backdrop/modal tests. |
-| Positioner | `data-open`, `data-closed`, `data-align`, `data-side`, `data-anchor-hidden`, transition attrs, CSS variables. | Present and covered by positioning, transition, and multi-trigger tests. |
-| Popup | `data-open`, `data-closed`, `data-align`, `data-instant`, `data-side`, `data-starting-style`, `data-ending-style`, `--popup-height`, `--popup-width`. | Present and covered by popup, viewport, focus, transition, and browser modal probe logs. |
-| Arrow | `data-open`, `data-closed`, `data-uncentered`, `data-align`, `data-side`. | Present through positioner context and covered by arrow tests. |
-| Viewport | `data-activation-direction`, `data-current`, `data-instant`, `data-previous`, `data-transitioning`, popup dimension CSS variables. | Present and covered by viewport bUnit and Playwright tests. |
-| Title / Description / Close | Render/class/style APIs; title and description register popup ARIA ids; close emits close reason. | Present and covered by popup ARIA and close tests. |
-
-## Consumer Test Coverage
-
-Local source-level consumers of Popover types outside `src/BlazorBaseUI/Popover` are:
-
-| Consumer | Popover dependency | Test command | Result |
-| --- | --- | --- | --- |
-| Tooltip | Uses Popover state/enumeration types for popup, trigger, arrow, positioner, and context parity. | `dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Tests.Tooltip\|FullyQualifiedName~BlazorBaseUI.Tests.PreviewCard" -v minimal` | GREEN: 171 passed |
-| PreviewCard | Uses Popover state/enumeration types for popup, arrow, and positioner parity. | Same bUnit command above. | GREEN: included in 171 passed |
-| Tooltip | Browser behavior for hover, focus, close, actions, portal, and positioning. | `dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.Tooltip\|FullyQualifiedName~BlazorBaseUI.Playwright.Tests.Tests.PreviewCard" -v minimal` | GREEN: 124 passed |
-| PreviewCard | Browser behavior for hover, focus, close, actions, portal, and positioning. | Same Playwright command above. | GREEN: included in 124 passed |
-
-An exploratory broad bUnit command was also run for `Tooltip|PreviewCard|Select|Toolbar|Tabs|NavigationMenu`. It failed with 49 unrelated failures because the filter selected entire non-consumer suites, including `Select` and `NavigationMenu`, and also matched substring names such as `Selector`. The failing broad log is preserved as `docs/audits/logs/popover-consumers-bunit.log` but is not used as the Popover consumer verdict.
-
-## Upstream Integration Checks
-
-React source tests outside the Popover package exercise Popover integration with Toolbar, Select, NavigationMenu, and Tabs. Local `rg` inspection found no equivalent non-Popover local tests that import or render Popover in those component test suites. Current Blazor Popover Playwright coverage already includes the underlying interaction categories:
-
-| Upstream React integration | Local coverage present |
-| --- | --- |
-| Toolbar button rendered as `Popover.Trigger`, including disabled keyboard behavior. | Popover trigger keyboard and disabled behavior is covered in Popover bUnit/Playwright tests. No local Toolbar-plus-Popover integration test file exists. |
-| Select inside Popover, including outside press and Escape ownership. | Popover outside press, Escape, nested floating ownership, and focus-out behavior are covered. No local Select-inside-Popover integration test file exists. |
-| NavigationMenu with nested Popover. | Nested Popover ownership is covered by `PopoverNestedTestPage`. No local NavigationMenu-plus-Popover integration test file exists. |
-| Tabs inside Popover, with initial focus. | Popover focus and tab navigation are covered by `PopoverFocusTestPage` and `PopoverTabNavigationTestPage`. No local Tabs-inside-Popover integration test file exists. |
+| Page rendered | `Popover · Base UI` | `Popover · Blazix.BaseUI` |
+| Modal touch-scroll behavior | Source JSDoc/API metadata inspected; local page includes equivalent wording. | Present |
+| Positioner CSS variable docs | `--available-width`, `--available-height`, `--anchor-width`, `--anchor-height`, `--positioner-width`, `--positioner-height`, `--transform-origin`. | Present with type column. |
+| Popup CSS variable docs | `--popup-width`, `--popup-height`. | Present. |
+| Viewport activation direction | Space-separated horizontal/vertical axis values. | Present in type and description. |
+| Viewport popup variables | Parent popup width/height variables for transitions. | Present. |
 
 ## Final Assessment
 
-The source docs comparison found no additional Popover implementation gaps beyond the already repaired audit scope. The documented anatomy, examples, generated API props, data attributes, CSS variables, handle behavior, hover behavior, payload behavior, controlled active-trigger behavior, transition markers, and viewport markers are present in the Blazor port or represented by Blazor-native equivalents.
-
-Direct Blazor components that consume Popover types, Tooltip and PreviewCard, pass both targeted bUnit and Playwright suites. Upstream-only component integration scenarios are documented above as coverage observations because those exact local integration tests do not exist outside the Popover suite.
+The source documentation comparison found no additional Popover implementation gap after the repair. The upstream docs changes from #5094 are represented in Blazix docs and API metadata, and the in-app browser confirmed both source and local pages render the relevant Popover documentation/API signals.
