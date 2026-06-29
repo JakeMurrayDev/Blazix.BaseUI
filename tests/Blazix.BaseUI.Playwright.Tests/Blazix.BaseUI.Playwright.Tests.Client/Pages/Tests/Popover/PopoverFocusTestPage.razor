@@ -8,8 +8,10 @@
     <PopoverRoot
         @bind-Open="isOpen"
         DefaultOpen="@DefaultOpen"
+        TriggerId="@(ProgrammaticOpen ? "popover-trigger" : null)"
         OnOpenChange="HandleOpenChange">
         <PopoverTrigger
+            Id="@(ProgrammaticOpen ? "popover-trigger" : null)"
             OpenOnHover="@OpenOnHover"
             Delay="@OpenDelay"
             CloseDelay="@CloseDelay"
@@ -20,7 +22,7 @@
             <PopoverPositioner data-testid="popover-positioner">
                 <PopoverPopup
                     InitialFocus="@(DisableInitialFocus ? new FocusTarget.None() : UseInitialFocus ? specificButtonRef : null)"
-                    FinalFocus="@(UseFinalFocus ? finalFocusButtonRef : null)"
+                    FinalFocus="@ResolveFinalFocus()"
                     data-testid="popover-popup">
                     <button data-testid="first-button">First Button</button>
                     <button @ref="specificButtonRef" data-testid="specific-button">Specific Button</button>
@@ -32,16 +34,27 @@
     </PopoverRoot>
 
     <button @ref="finalFocusButtonRef" data-testid="final-focus-target" style="margin-top: 10px;">Final Focus Target</button>
+    @if (ProgrammaticOpen)
+    {
+        <button data-testid="programmatic-open"
+                @onmousedown:preventDefault
+                @onclick="OpenProgrammatically"
+                style="margin-top: 10px;">
+            Open Programmatically
+        </button>
+    }
     <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
 
     <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
         <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Last Final Focus Type: <span data-testid="last-final-focus-type">@lastFinalFocusType</span></div>
     </div>
 </div>
 
 @code {
     private ElementReference specificButtonRef;
     private ElementReference finalFocusButtonRef;
+    private string lastFinalFocusType = "";
 
     [SupplyParameterFromQuery(Name = "useInitialFocus")]
     public bool UseInitialFocus { get; set; }
@@ -49,11 +62,17 @@
     [SupplyParameterFromQuery(Name = "useFinalFocus")]
     public bool UseFinalFocus { get; set; }
 
+    [SupplyParameterFromQuery(Name = "useFinalFocusCallback")]
+    public bool UseFinalFocusCallback { get; set; }
+
     [SupplyParameterFromQuery(Name = "disableInitialFocus")]
     public bool DisableInitialFocus { get; set; }
 
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "programmaticOpen")]
+    public bool ProgrammaticOpen { get; set; }
 
     [SupplyParameterFromQuery(Name = "openOnHover")]
     public bool OpenOnHover { get; set; }
@@ -73,5 +92,27 @@
 
     private void HandleOpenChange(PopoverOpenChangeEventArgs args)
     {
+    }
+
+    private FocusTarget? ResolveFinalFocus()
+    {
+        if (UseFinalFocusCallback)
+        {
+            return new FocusTarget.Callback(ResolveFinalFocusCallback);
+        }
+
+        return UseFinalFocus ? new FocusTarget.Element(finalFocusButtonRef) : null;
+    }
+
+    private ElementReference? ResolveFinalFocusCallback(string interactionType)
+    {
+        lastFinalFocusType = interactionType;
+        _ = InvokeAsync(StateHasChanged);
+        return finalFocusButtonRef;
+    }
+
+    private void OpenProgrammatically()
+    {
+        isOpen = true;
     }
 }

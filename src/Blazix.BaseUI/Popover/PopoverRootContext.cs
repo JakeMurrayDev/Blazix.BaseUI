@@ -38,6 +38,11 @@ internal sealed class PopoverRootContext
     public string? InteractionType { get; set; }
 
     /// <summary>
+    /// Gets or sets the interaction type that closed the popover.
+    /// </summary>
+    public InteractionType CloseInteractionType { get; set; }
+
+    /// <summary>
     /// Gets or sets the current transition status of the popover.
     /// </summary>
     public TransitionStatus TransitionStatus { get; set; }
@@ -86,6 +91,11 @@ internal sealed class PopoverRootContext
     /// Gets or sets a delegate that returns the trigger element reference.
     /// </summary>
     public Func<ElementReference?> GetTriggerElement { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that returns all registered trigger element references.
+    /// </summary>
+    public Func<IReadOnlyList<ElementReference>> GetTriggerElements { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets a delegate that returns the trigger's post-focus-guard element,
@@ -171,7 +181,7 @@ internal sealed class PopoverRootContext
     /// <summary>
     /// Gets or sets a delegate that asynchronously sets the open state with a reason, optional payload, and optional trigger ID.
     /// </summary>
-    public Func<bool, PopoverOpenChangeReason, object?, string?, Task> SetOpenAsync { get; set; } = null!;
+    public Func<bool, PopoverOpenChangeReason, object?, string?, string?, EventArgs?, Task> SetOpenAsync { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets a delegate that closes the popover.
@@ -202,6 +212,11 @@ internal sealed class PopoverRootContext
     /// Gets or sets a delegate that sets the instant type for transitions.
     /// </summary>
     public Action<PopoverInstantType> SetPopoverInstantType { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets a delegate that syncs root-owned state to a detached handle.
+    /// </summary>
+    public Action SyncHandleRootState { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the ID of the previously active trigger, used for viewport transitions.

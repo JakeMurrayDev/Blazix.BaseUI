@@ -1,11 +1,11 @@
 <div class="flex flex-wrap justify-center gap-2">
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-1" class="@TriggerClasses" @onclick='@(() => triggerId = "trigger-1")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-1" class="@TriggerClasses">
         Trigger 1
     </PopoverTrigger>
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-2" class="@TriggerClasses" @onclick='@(() => triggerId = "trigger-2")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-2" class="@TriggerClasses">
         Trigger 2
     </PopoverTrigger>
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-3" class="@TriggerClasses" @onclick='@(() => triggerId = "trigger-3")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-3" class="@TriggerClasses">
         Trigger 3
     </PopoverTrigger>
     <button type="button" class="@TriggerClasses" @onclick="OpenProgrammatically">
@@ -15,7 +15,6 @@
 
 <PopoverRoot Handle="@demoPopover"
              Open="@open"
-             OpenChanged="HandleOpenChanged"
              OnOpenChange="HandleOpenChange"
              TriggerId="@triggerId">
     <ChildContent Context="payloadContext">
@@ -48,14 +47,10 @@
     private bool open;
     private string? triggerId;
 
-    private void HandleOpenChanged(bool value)
-    {
-        open = value;
-    }
-
     private void HandleOpenChange(PopoverOpenChangeEventArgs args)
     {
         open = args.Open;
+        triggerId = args.TriggerId;
     }
 
     private void OpenProgrammatically()

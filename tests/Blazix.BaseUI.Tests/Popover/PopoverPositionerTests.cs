@@ -215,6 +215,20 @@ public class PopoverPositionerTests : BunitContext, IPopoverPositionerContract
     }
 
     [Fact]
+    public async Task DoesNotEmitTransitionStyleAttributes()
+    {
+        var cut = Render(CreatePositionerInPopover(defaultOpen: false));
+        var root = cut.FindComponent<PopoverRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.OnHoverOpen());
+        await cut.InvokeAsync(() => root.Instance.OnStartingStyleApplied());
+
+        var positionerElement = cut.Find("[role='presentation']");
+        positionerElement.HasAttribute("data-starting-style").ShouldBeFalse();
+        positionerElement.HasAttribute("data-ending-style").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task RendersInternalBackdropWhenModalAndPressed()
     {
         var cut = Render(CreatePositionerInPopoverWithModal(Blazix.BaseUI.Popover.PopoverModalMode.True));

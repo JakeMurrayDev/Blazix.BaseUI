@@ -1,11 +1,11 @@
 <div class="blx-popover-button-row">
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-1" class="blx-popover-button" @onclick='@(() => triggerId = "trigger-1")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-1" class="blx-popover-button">
         Trigger 1
     </PopoverTrigger>
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-2" class="blx-popover-button" @onclick='@(() => triggerId = "trigger-2")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-2" class="blx-popover-button">
         Trigger 2
     </PopoverTrigger>
-    <PopoverTrigger Handle="@demoPopover" Id="trigger-3" class="blx-popover-button" @onclick='@(() => triggerId = "trigger-3")'>
+    <PopoverTrigger Handle="@demoPopover" Id="trigger-3" class="blx-popover-button">
         Trigger 3
     </PopoverTrigger>
     <button type="button" class="blx-popover-button" @onclick="OpenProgrammatically">
@@ -15,7 +15,6 @@
 
 <PopoverRoot Handle="@demoPopover"
              Open="@open"
-             OpenChanged="HandleOpenChanged"
              OnOpenChange="HandleOpenChange"
              TriggerId="@triggerId">
     <ChildContent Context="payloadContext">
@@ -38,14 +37,10 @@
     private bool open;
     private string? triggerId;
 
-    private void HandleOpenChanged(bool value)
-    {
-        open = value;
-    }
-
     private void HandleOpenChange(PopoverOpenChangeEventArgs args)
     {
         open = args.Open;
+        triggerId = args.TriggerId;
     }
 
     private void OpenProgrammatically()

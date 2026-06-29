@@ -162,6 +162,7 @@ public class PopoverBackdropTests : BunitContext, IPopoverBackdropContract
 
         var backdrop = cut.Find("div[role='presentation']");
         backdrop.GetAttribute("style")!.ShouldContain("pointer-events: none");
+        backdrop.HasAttribute("hidden").ShouldBeFalse();
     }
 
 }

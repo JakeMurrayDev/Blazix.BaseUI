@@ -28,5 +28,8 @@ internal sealed class PopoverFloatingRootContextAdapter : IFloatingRootContext
     public void SetPopupElement(ElementReference element) => context.SetPopupElement(element);
 
     /// <inheritdoc />
-    public Task SetOpenAsync(bool open) => context.SetOpenAsync(open, PopoverOpenChangeReason.FocusOut, null, null);
+    public Task SetOpenAsync(bool open) => context.SetOpenAsync(open, PopoverOpenChangeReason.FocusOut, null, null, null, null);
+
+    /// <inheritdoc />
+    public InteractionType CloseInteractionType => context.CloseInteractionType;
 }

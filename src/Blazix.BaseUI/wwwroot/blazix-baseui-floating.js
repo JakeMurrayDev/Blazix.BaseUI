@@ -419,6 +419,115 @@ function fromFloatingPlacement(placement) {
     return { side, align };
 }
 
+function getSide(placement) {
+    return placement.split('-')[0];
+}
+
+function getAlignment(placement) {
+    return placement.split('-')[1] || null;
+}
+
+function getSideAxis(side) {
+    return side === 'top' || side === 'bottom' ? 'y' : 'x';
+}
+
+function getAlignmentAxis(placement) {
+    return getSideAxis(getSide(placement)) === 'x' ? 'y' : 'x';
+}
+
+function getAxisLength(axis) {
+    return axis === 'y' ? 'height' : 'width';
+}
+
+function getPaddingObject(padding) {
+    if (typeof padding === 'number') {
+        return {
+            top: padding,
+            right: padding,
+            bottom: padding,
+            left: padding
+        };
+    }
+
+    return {
+        top: padding?.top || 0,
+        right: padding?.right || 0,
+        bottom: padding?.bottom || 0,
+        left: padding?.left || 0
+    };
+}
+
+function clamp(min, value, max) {
+    return Math.max(min, Math.min(value, max));
+}
+
+function evaluateOption(options, state) {
+    return typeof options === 'function' ? options(state) : options;
+}
+
+function baseArrow(options) {
+    return {
+        name: 'arrow',
+        options,
+        async fn(state) {
+            const { x, y, placement, rects, platform, elements, middlewareData } = state;
+            const { element, padding = 0, offsetParent = 'real' } = evaluateOption(options, state) || {};
+
+            if (element == null) {
+                return {};
+            }
+
+            const paddingObject = getPaddingObject(padding);
+            const coords = { x, y };
+            const axis = getAlignmentAxis(placement);
+            const length = getAxisLength(axis);
+            const arrowDimensions = await platform.getDimensions(element);
+            const isYAxis = axis === 'y';
+            const minProp = isYAxis ? 'top' : 'left';
+            const maxProp = isYAxis ? 'bottom' : 'right';
+            const clientProp = isYAxis ? 'clientHeight' : 'clientWidth';
+            const endDiff =
+                rects.reference[length] + rects.reference[axis] - coords[axis] - rects.floating[length];
+            const startDiff = coords[axis] - rects.reference[axis];
+            const arrowOffsetParent =
+                offsetParent === 'real' ? await platform.getOffsetParent?.(element) : elements.floating;
+            let clientSize = elements.floating[clientProp] || rects.floating[length];
+
+            if (!clientSize || !(await platform.isElement?.(arrowOffsetParent))) {
+                clientSize = elements.floating[clientProp] || rects.floating[length];
+            }
+
+            const centerToReference = endDiff / 2 - startDiff / 2;
+            const largestPossiblePadding = clientSize / 2 - arrowDimensions[length] / 2 - 1;
+            const minPadding = Math.min(paddingObject[minProp], largestPossiblePadding);
+            const maxPadding = Math.min(paddingObject[maxProp], largestPossiblePadding);
+            const min = minPadding;
+            const max = clientSize - arrowDimensions[length] - maxPadding;
+            const center = clientSize / 2 - arrowDimensions[length] / 2 + centerToReference;
+            const offset = clamp(min, center, max);
+            const shouldAddOffset =
+                !middlewareData.arrow &&
+                getAlignment(placement) != null &&
+                center !== offset &&
+                rects.reference[length] / 2 -
+                    (center < min ? minPadding : maxPadding) -
+                    arrowDimensions[length] / 2 <
+                    0;
+            const alignmentOffset = shouldAddOffset ? (center < min ? center - min : center - max) : 0;
+
+            return {
+                [axis]: coords[axis] + alignmentOffset,
+                data: {
+                    [axis]: offset,
+                    centerOffset: center - offset - alignmentOffset,
+                    ...(shouldAddOffset && { alignmentOffset })
+                },
+                reset: shouldAddOffset
+            };
+        }
+    };
+}
+
 export async function initializePositioner(options) {
     const {
         positionerElement,
@@ -732,9 +841,10 @@ async function updatePositionInternal(positionerState) {
 
         // Arrow middleware
         if (arrowElement) {
-            middleware.push(FloatingUI.arrow({
+            middleware.push(baseArrow({
                 element: arrowElement,
-                padding: positionerState.arrowPadding || 0
+                padding: positionerState.arrowPadding || 0,
+                offsetParent: 'floating'
             }));
         }
 
@@ -2344,9 +2454,16 @@ let pendingFocusRafId = 0;
  * Enqueues a focus call on the next animation frame, optionally cancelling
  * any previously enqueued focus to prevent focus race conditions.
  */
-function enqueueFocus(el, { preventScroll = false, cancelPrevious = true } = {}) {
+function enqueueFocus(el, { preventScroll = false, cancelPrevious = true, focusVisible = false } = {}) {
     if (cancelPrevious) cancelAnimationFrame(pendingFocusRafId);
-    pendingFocusRafId = requestAnimationFrame(() => el?.focus({ preventScroll }));
+    pendingFocusRafId = requestAnimationFrame(() => {
+        if (!el) return;
+        const focusOptions = { preventScroll };
+        // Restore a visible focus ring when the popup is closed via the keyboard
+        // (e.g. Escape), matching upstream Base UI #5093 for Safari/Firefox.
+        if (focusVisible) focusOptions.focusVisible = true;
+        el.focus(focusOptions);
+    });
 }
 
 /**
@@ -2758,19 +2875,24 @@ function createFocusOutHandler(mgr, interactionCtx) {
                 }
             }
 
-            // Restore focus if element was removed from DOM (A1)
+            // Restore focus if element was removed from DOM (A1).
+            // Use preventScroll: restoring focus must never scroll an off-screen
+            // popup back into view. Without it, pressing another popover's trigger
+            // (which blurs focus to <body> on browsers that don't focus buttons on
+            // click) scrolls the popup into view, moving the pressed trigger out
+            // from under the pointer so its click never lands.
             if (mgr.restoreFocus && event.currentTarget !== mgr.triggerElement) {
                 const target = event.target;
                 const activeEl = document.activeElement;
                 if (activeEl === document.body || (target && !target.isConnected)) {
                     if (mgr.restoreFocusMode === 'popup') {
-                        mgr.floatingElement.focus();
+                        mgr.floatingElement.focus({ preventScroll: true });
                         return;
                     }
                     const tabbableContent = getTabbableElements(mgr.floatingElement);
                     const nodeToFocus = tabbableContent[mgr.tabbableIndex] ||
                         tabbableContent[tabbableContent.length - 1] || mgr.floatingElement;
-                    if (nodeToFocus && nodeToFocus.focus) nodeToFocus.focus();
+                    if (nodeToFocus && nodeToFocus.focus) nodeToFocus.focus({ preventScroll: true });
                     return;
                 }
             }
@@ -2945,8 +3067,23 @@ export function createFloatingFocusManager(options) {
     const isUntrappedTypeableCombobox = isTypeableCombobox(triggerElement) && !initialFocus;
 
     // Apply aria-modal in modal mode
+    let modalFocusRecordCleanup = null;
     if (modal) {
         floatingElement.setAttribute('aria-modal', 'true');
+
+        // When focus is lost to the body (e.g. on a backdrop press), record the
+        // element inside the popup that had focus so a confirmation dialog opened
+        // while the body is focused can return focus to it. Scoped to modal to avoid
+        // non-modal popups polluting the shared previously-focused stack (#5024).
+        const handleModalFocusOutRecord = (event) => {
+            if (event.relatedTarget == null &&
+                event.target != null &&
+                contains(floatingElement, event.target)) {
+                addPreviouslyFocusedElement(event.target);
+            }
+        };
+        floatingElement.addEventListener('focusout', handleModalFocusOutRecord);
+        modalFocusRecordCleanup = () => floatingElement.removeEventListener('focusout', handleModalFocusOutRecord);
     }
 
     // Mark other elements as inert/aria-hidden in modal or untrapped combobox mode
@@ -3007,9 +3144,23 @@ export function createFloatingFocusManager(options) {
         return floatingElement;
     }
 
+    // Whether focus was already inside the popup when initial focus was scheduled.
+    // If so, the initial-focus flow is allowed to proceed; otherwise a focus that
+    // moves inside the popup before the frame runs must not be stolen back (#4775).
+    const hadFocusInsideAtSchedule = contains(floatingElement, activeElement(doc));
+
     function setInitialFocus(attempt = 0) {
         const target = getInitialFocusTarget();
         if (!(target instanceof HTMLElement)) return;
+
+        // Don't steal initial focus if focus has already moved to a different element
+        // inside the popup between scheduling and now (#4775).
+        if (!hadFocusInsideAtSchedule) {
+            const current = activeElement(doc);
+            if (current !== target && contains(floatingElement, current)) {
+                return;
+            }
+        }
 
         if (document.contains(target)) {
             target.focus();
@@ -3040,15 +3191,17 @@ export function createFloatingFocusManager(options) {
         mutationObserver = new MutationObserver(() => {
             const active = activeElement(doc);
             if (!active || active === doc.body) {
+                // preventScroll: restoring focus must not scroll an off-screen popup
+                // into view (see the focusout restore handler for the full rationale).
                 if (restoreFocusMode === 'popup') {
-                    floatingElement.focus();
+                    floatingElement.focus({ preventScroll: true });
                 } else {
                     const tabbable = getTabbableElements(floatingElement);
                     if (tabbable.length > 0) {
                         const targetIndex = Math.min(lastFocusedIndex, tabbable.length - 1);
-                        tabbable[targetIndex].focus();
+                        tabbable[targetIndex].focus({ preventScroll: true });
                     } else {
-                        floatingElement.focus();
+                        floatingElement.focus({ preventScroll: true });
                     }
                 }
             }
@@ -3138,7 +3291,13 @@ export function createFloatingFocusManager(options) {
         });
         const tabIndex = floatingEl.getAttribute('tabindex');
         if ((orderOption && orderOption.includes('floating')) || tabbableContent.length === 0) {
-            if (tabIndex !== '0') floatingEl.setAttribute('tabindex', '0');
+            if (tabIndex !== '0') {
+                floatingEl.setAttribute('tabindex', '0');
+                // Mark our own write so the externally-managed early-return above
+                // doesn't mistake it for a user-authored `tabindex` and freeze
+                // tabindex management on the next invocation (#5030).
+                floatingEl.setAttribute('data-tabindex', '0');
+            }
         } else if (
             tabIndex !== '-1' ||
             (floatingEl.hasAttribute('data-tabindex') &&
@@ -3195,6 +3354,9 @@ export function createFloatingFocusManager(options) {
             // Clean up trigger focusout listener (FFM-F13)
             triggerFocusOutCleanup?.();
 
+            // Clean up modal focus-out recorder (#5024)
+            modalFocusRecordCleanup?.();
+
             // Clean up Tab keydown listener
             tabKeydownCleanup?.();
 
@@ -3235,11 +3397,14 @@ export function createFloatingFocusManager(options) {
                         const returnEl = this.returnFocus instanceof HTMLElement
                             ? this.returnFocus
                             : this.returnFocusElement || this.previouslyFocusedElement || returnTarget;
+                        // When the close was driven by the keyboard, return focus with a
+                        // visible focus ring so the trigger shows :focus-visible (#5093).
+                        const returnFocusVisible = lastInteractionType === 'keyboard';
                         if (returnEl?.isConnected) {
-                            enqueueFocus(returnEl);
+                            enqueueFocus(returnEl, { preventScroll: true, focusVisible: returnFocusVisible });
                         } else if (returnFocusFallback?.isConnected) {
                             // Fallback span for when trigger disconnects (FFM-F14)
-                            enqueueFocus(returnFocusFallback);
+                            enqueueFocus(returnFocusFallback, { preventScroll: true, focusVisible: returnFocusVisible });
                         }
                     }
                 }

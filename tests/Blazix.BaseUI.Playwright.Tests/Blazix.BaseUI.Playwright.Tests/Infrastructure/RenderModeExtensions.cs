@@ -553,9 +553,21 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithPopoverUseFinalFocusCallback(bool value)
+    {
+        queryParams["useFinalFocusCallback"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithDisableInitialFocus(bool value)
     {
         queryParams["disableInitialFocus"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithProgrammaticOpen(bool value)
+    {
+        queryParams["programmaticOpen"] = value.ToString().ToLowerInvariant();
         return this;
     }
 
@@ -604,6 +616,24 @@ public sealed class TestPageUrlBuilder
     public TestPageUrlBuilder WithDefaultTriggerId(string triggerId)
     {
         queryParams["defaultTriggerId"] = triggerId;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithTriggerId(string triggerId)
+    {
+        queryParams["triggerId"] = triggerId;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithRegisteredTriggerId(string triggerId)
+    {
+        queryParams["registeredTriggerId"] = triggerId;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithRenderedTriggerDomId(string triggerId)
+    {
+        queryParams["renderedTriggerDomId"] = triggerId;
         return this;
     }
 

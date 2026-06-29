@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Blazix.BaseUI.Playwright.Tests.Fixtures;
 using Blazix.BaseUI.Playwright.Tests.Infrastructure;
 using Microsoft.Playwright;
@@ -168,6 +169,163 @@ public abstract class PopoverTestsBase : TestBase
         await outsideButton.ClickAsync();
 
         await WaitForPopoverClosedAsync();
+    }
+
+    /// <summary>
+    /// Tests that scrolling the page while a popover is open does not close it.
+    /// </summary>
+    [Fact]
+    public virtual async Task ScrollWhilePopoverOpen_DoesNotClosePopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover").WithTestScenario("scroll-handoff"));
+
+        var firstTrigger = GetByTestId("first-scroll-trigger");
+        await firstTrigger.ClickAsync();
+
+        var firstPopup = GetByTestId("first-scroll-popup");
+        await Assertions.Expect(firstPopup).ToBeVisibleAsync();
+
+        var scrollBefore = await Page.EvaluateAsync<double>("() => window.scrollY");
+        await Page.Mouse.MoveAsync(300, 300);
+        await Page.Mouse.WheelAsync(0, 900);
+        await WaitForDelayAsync(100);
+
+        var scrollAfter = await Page.EvaluateAsync<double>("() => window.scrollY");
+        Assert.True(
+            scrollAfter > scrollBefore + 100,
+            $"Expected wheel scrolling to move the document below {scrollBefore}, but scrollY was {scrollAfter}.");
+
+        await WaitForTextContentAsync(GetByTestId("first-scroll-open"), "true");
+        await Assertions.Expect(firstPopup).ToBeVisibleAsync();
+    }
+
+    /// <summary>
+    /// Tests that closing one open popover by pressing another trigger does not
+    /// return focus with document scrolling to the previously active popover.
+    /// </summary>
+    [Fact]
+    public virtual async Task OutsidePressOnAnotherTrigger_DoesNotScrollBackToActivePopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover").WithTestScenario("scroll-handoff"));
+
+        var firstTrigger = GetByTestId("first-scroll-trigger");
+        await firstTrigger.ClickAsync();
+
+        var firstPopup = GetByTestId("first-scroll-popup");
+        await Assertions.Expect(firstPopup).ToBeVisibleAsync();
+        await firstPopup.FocusAsync();
+
+        await Page.EvaluateAsync(
+            """
+            const preventSecondTriggerFocus = (event) => {
+                const target = event.target;
+                if (target instanceof Element && target.closest('[data-testid="second-scroll-trigger"]')) {
+                    event.preventDefault();
+                }
+            };
+            document.addEventListener('pointerdown', preventSecondTriggerFocus, true);
+            document.addEventListener('mousedown', preventSecondTriggerFocus, true);
+            """);
+
+        var secondTrigger = GetByTestId("second-scroll-trigger");
+        await secondTrigger.ScrollIntoViewIfNeededAsync();
+        await WaitForTextContentAsync(GetByTestId("first-scroll-open"), "true");
+        var scrollBefore = await Page.EvaluateAsync<double>("window.scrollY");
+
+        await secondTrigger.ClickAsync();
+
+        var secondPopup = GetByTestId("second-scroll-popup");
+        await Assertions.Expect(secondPopup).ToBeVisibleAsync();
+        await WaitForTextContentAsync(GetByTestId("first-scroll-open"), "false");
+        await WaitForTextContentAsync(GetByTestId("second-scroll-open"), "true");
+        await WaitForDelayAsync(300);
+
+        var scrollAfter = await Page.EvaluateAsync<double>("window.scrollY");
+        Assert.True(
+            Math.Abs(scrollAfter - scrollBefore) < 80,
+            $"Expected second trigger press to preserve scroll near {scrollBefore}, but scrollY was {scrollAfter}.");
+
+        var activeInsideFirstPopup = await Page.EvaluateAsync<bool>(
+            """
+            () => {
+                const popup = document.querySelector('[data-testid="first-scroll-popup"]');
+                return popup ? popup.contains(document.activeElement) : false;
+            }
+            """);
+        Assert.False(activeInsideFirstPopup);
+    }
+
+    /// <summary>
+    /// Tests that clicking a visible trigger from another root while a popover is
+    /// active does not restore focus to the previously active popup.
+    /// </summary>
+    [Fact]
+    public virtual async Task OutsidePressOnVisibleTrigger_OpensNextPopoverWithoutReturningToPrevious()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover").WithTestScenario("adjacent-roots"));
+
+        var firstTrigger = GetByTestId("first-adjacent-trigger");
+        var secondTrigger = GetByTestId("second-adjacent-trigger");
+
+        await firstTrigger.ClickAsync();
+
+        var firstPopup = GetByTestId("first-adjacent-popup");
+        await Assertions.Expect(firstPopup).ToBeVisibleAsync();
+        await firstPopup.FocusAsync();
+        await Assertions.Expect(firstPopup).ToBeFocusedAsync();
+
+        var scrollBefore = await Page.EvaluateAsync<double>("window.scrollY");
+        await secondTrigger.ClickAsync();
+
+        var secondPopup = GetByTestId("second-adjacent-popup");
+        await Assertions.Expect(secondPopup).ToBeVisibleAsync();
+        await WaitForTextContentAsync(GetByTestId("first-adjacent-open"), "false");
+        await WaitForTextContentAsync(GetByTestId("second-adjacent-open"), "true");
+        await WaitForDelayAsync(300);
+
+        var scrollAfter = await Page.EvaluateAsync<double>("window.scrollY");
+        Assert.True(
+            Math.Abs(scrollAfter - scrollBefore) < 80,
+            $"Expected visible trigger handoff to preserve scroll near {scrollBefore}, but scrollY was {scrollAfter}.");
+
+        var activeInsideFirstPopup = await Page.EvaluateAsync<bool>(
+            """
+            () => {
+                const popup = document.querySelector('[data-testid="first-adjacent-popup"]');
+                return popup ? popup.contains(document.activeElement) : false;
+            }
+            """);
+        Assert.False(activeInsideFirstPopup);
+    }
+
+    /// <summary>
+    /// React source: FloatingFocusManager returns focus with preventScroll so
+    /// closing an offscreen popover does not jump the document to its trigger.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_ReturnToOffscreenTrigger_DoesNotScrollDocument()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover").WithTestScenario("scroll-handoff"));
+
+        var firstTrigger = GetByTestId("first-scroll-trigger");
+        await firstTrigger.ClickAsync();
+
+        var firstPopup = GetByTestId("first-scroll-popup");
+        await Assertions.Expect(firstPopup).ToBeVisibleAsync();
+        await firstPopup.FocusAsync();
+
+        var secondTrigger = GetByTestId("second-scroll-trigger");
+        await secondTrigger.ScrollIntoViewIfNeededAsync();
+        var scrollBefore = await Page.EvaluateAsync<double>("window.scrollY");
+
+        await Page.Keyboard.PressAsync("Escape");
+        await WaitForTextContentAsync(GetByTestId("first-scroll-open"), "false");
+        await WaitForDelayAsync(300);
+
+        var scrollAfter = await Page.EvaluateAsync<double>("window.scrollY");
+        Assert.True(
+            Math.Abs(scrollAfter - scrollBefore) < 80,
+            $"Expected close focus return to preserve scroll near {scrollBefore}, but scrollY was {scrollAfter}.");
     }
 
     #endregion
@@ -374,6 +532,28 @@ public abstract class PopoverTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/popover").WithDefaultOpen(true));
 
         var trigger = GetByTestId("popover-trigger");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "true");
+    }
+
+    /// <summary>
+    /// Tests that a default-open root reassociates a rendered DOM trigger id to
+    /// the Base UI registered trigger id, matching upstream rendered-id ownership.
+    /// </summary>
+    [Fact]
+    public virtual async Task Trigger_ReassociatesRenderedDomId_WhenDefaultOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithDefaultOpen(true)
+            .WithDefaultTriggerId("dom-trigger")
+            .WithRegisteredTriggerId("registered-trigger")
+            .WithRenderedTriggerDomId("dom-trigger"));
+
+        var popup = GetByTestId("popover-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var trigger = GetByTestId("popover-trigger");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("id", "dom-trigger");
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-popup-open", "");
         await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "true");
     }
 
@@ -1451,6 +1631,34 @@ public abstract class PopoverTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that a controlled programmatic open returns focus to the active
+    /// trigger rather than the programmatic opener.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_ProgrammaticOpenReturnsFocusToActiveTrigger()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover-focus")
+            .WithProgrammaticOpen(true));
+
+        var opener = GetByTestId("programmatic-open");
+        await opener.ClickAsync();
+
+        var popup = GetByTestId("popover-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await WaitForDelayAsync(200);
+
+        var closeButton = GetByTestId("popover-close");
+        await closeButton.ClickAsync();
+
+        var openState = GetByTestId("open-state");
+        await WaitForTextContentAsync(openState, "false");
+        await WaitForDelayAsync(200);
+
+        var trigger = GetByTestId("popover-trigger");
+        await Assertions.Expect(trigger).ToBeFocusedAsync();
+    }
+
+    /// <summary>
     /// Tests that FinalFocus directs focus to the specified element on close.
     /// </summary>
     [Fact]
@@ -1473,6 +1681,35 @@ public abstract class PopoverTestsBase : TestBase
         var openState = GetByTestId("open-state");
         await WaitForTextContentAsync(openState, "false");
         await WaitForDelayAsync(200);
+
+        var finalFocusTarget = GetByTestId("final-focus-target");
+        await Assertions.Expect(finalFocusTarget).ToBeFocusedAsync();
+    }
+
+    /// <summary>
+    /// Tests that FinalFocus callback receives the close interaction type.
+    /// </summary>
+    [Fact]
+    public virtual async Task Focus_FinalFocusCallbackReceivesMouseCloseType()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover-focus")
+            .WithPopoverUseFinalFocusCallback(true));
+
+        var trigger = GetByTestId("popover-trigger");
+        await trigger.ClickAsync();
+
+        var popup = GetByTestId("popover-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await WaitForDelayAsync(200);
+
+        var closeButton = GetByTestId("popover-close");
+        await closeButton.ClickAsync();
+
+        var openState = GetByTestId("open-state");
+        await WaitForTextContentAsync(openState, "false");
+
+        var lastFinalFocusType = GetByTestId("last-final-focus-type");
+        await WaitForTextContentAsync(lastFinalFocusType, "mouse");
 
         var finalFocusTarget = GetByTestId("final-focus-target");
         await Assertions.Expect(finalFocusTarget).ToBeFocusedAsync();
@@ -1559,7 +1796,10 @@ public abstract class PopoverTestsBase : TestBase
         var viewport = GetByTestId("popover-viewport");
         await Assertions.Expect(viewport).ToBeVisibleAsync();
 
-        var content = GetByTestId("popup-content");
+        // Scope to the live [data-current] wrapper: while the morph transition runs, the
+        // viewport also contains a transient [data-previous] clone of the outgoing content
+        // carrying the same data-testid, so an unscoped locator would match two elements.
+        var content = Page.Locator("[data-current] [data-testid='popup-content']");
         await Assertions.Expect(content).ToHaveTextAsync("Content A");
 
         // Switch to trigger B
@@ -1592,7 +1832,8 @@ public abstract class PopoverTestsBase : TestBase
         await triggerA.ClickAsync();
         await WaitForDelayAsync(500);
 
-        var content = GetByTestId("popup-content");
+        // Scope to the live [data-current] wrapper (see Viewport_SwitchTrigger_TransitionsContent).
+        var content = Page.Locator("[data-current] [data-testid='popup-content']");
         await Assertions.Expect(content).ToHaveTextAsync("Content A");
     }
 
@@ -1903,6 +2144,376 @@ public abstract class PopoverTestsBase : TestBase
         // Outside elements should be either inert or aria-hidden when modal is open
         Assert.True(isInert is not null || ariaHidden == "true",
             "Outside element should be inert or aria-hidden when modal popover is open");
+    }
+
+    /// <summary>
+    /// Switching between triggers of a viewport popover while it stays open must run the
+    /// viewport morph transition (which sets data-activation-direction on the viewport for
+    /// the duration of the transition), not an un-animated content swap. Regression test:
+    /// the trigger-press swap path was pre-empted by UpdateOpenTriggerPressAsync overwriting
+    /// the active trigger id before the viewport swap guard, so onViewportTriggerChange
+    /// never ran. React source: Popover viewport activation direction.
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_SwitchingTriggers_RunsMorphTransition()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(900));
+
+        await GetByTestId("vp-trigger-one").ClickAsync();
+
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+
+        // Scope to the live [data-current] wrapper so the transient [data-previous] clone
+        // (which is a copy of the same content with the same data-testid) is not matched.
+        var currentContent = Page.Locator("[data-current] [data-testid='vp-content']");
+        await Assertions.Expect(currentContent).ToHaveTextAsync("vp-one content");
+
+        // Switch to the trigger on the right while the popover stays open. The morph must run:
+        // it clones the outgoing content into a [data-previous] layer and cross-fades to the
+        // new content. The clone existing at all proves the morph ran (an instant swap would
+        // never create one); its text proves the clone captured the OUTGOING panel.
+        await GetByTestId("vp-trigger-two").ClickAsync();
+
+        var previousContent = Page.Locator("[data-previous] [data-testid='vp-content']");
+        await Assertions.Expect(previousContent).ToHaveTextAsync("vp-one content");
+
+        await Assertions.Expect(currentContent).ToHaveTextAsync("vp-two content");
+    }
+
+    /// <summary>
+    /// Viewport trigger switches must measure popup dimensions after the new payload
+    /// renders. Measuring immediately after cloning the previous content commits the
+    /// outgoing panel size and makes larger later panels appear clipped before snapping
+    /// wider/taller. React source: usePopupAutoResize measures in a layout effect after
+    /// the current content render.
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_SwitchingToLargerPayload_MeasuresAfterNewContentRender()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(900));
+
+        await GetByTestId("vp-trigger-three").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+        await Assertions.Expect(Page.Locator("[data-current] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-three content");
+
+        await GetByTestId("vp-trigger-two").ClickAsync();
+        await Assertions.Expect(Page.Locator("[data-current] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-two content");
+        await WaitForDelayAsync(950);
+
+        await GetByTestId("vp-trigger-three").ClickAsync();
+
+        await Assertions.Expect(Page.Locator("[data-previous] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-two content");
+        await Assertions.Expect(Page.Locator("[data-current] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-three content");
+
+        var dimensions = await Page.EvaluateAsync<double[]>(
+            """
+            async () => {
+                const popup = document.querySelector('[data-testid="vp-popup"]');
+                const viewport = document.querySelector('[data-testid="vp-viewport"]');
+
+                for (let index = 0; index < 30; index += 1) {
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+                    const current = document.querySelector('[data-current] [data-testid="vp-content"]');
+                    if (current?.textContent?.includes('vp-three') && viewport?.hasAttribute('data-transitioning')) {
+                        const popupStyle = getComputedStyle(popup);
+                        const popupRect = popup.getBoundingClientRect();
+                        const currentRect = current.getBoundingClientRect();
+                        const widthSamples = [];
+                        const heightSamples = [];
+
+                        for (let sampleIndex = 0; sampleIndex < 20; sampleIndex += 1) {
+                            await new Promise((resolve) => requestAnimationFrame(resolve));
+                            const sampleRect = popup.getBoundingClientRect();
+                            widthSamples.push(Math.round(sampleRect.width * 10) / 10);
+                            heightSamples.push(Math.round(sampleRect.height * 10) / 10);
+                        }
+
+                        return [
+                            parseFloat(popupStyle.getPropertyValue('--popup-width')) || 0,
+                            parseFloat(popupStyle.getPropertyValue('--popup-height')) || 0,
+                            popupRect.width,
+                            popupRect.height,
+                            currentRect.width,
+                            currentRect.height,
+                            new Set(widthSamples).size,
+                            new Set(heightSamples).size
+                        ];
+                    }
+                }
+
+                return [0, 0, 0, 0, 0, 0, 0, 0];
+            }
+            """);
+
+        Assert.True(
+            dimensions[0] >= dimensions[4],
+            $"Expected popup target width to be measured from the new content. Samples: [{string.Join(", ", dimensions.Select(value => value.ToString("F2")))}].");
+        Assert.True(
+            dimensions[1] >= dimensions[5],
+            $"Expected popup target height to be measured from the new content. Samples: [{string.Join(", ", dimensions.Select(value => value.ToString("F2")))}].");
+        Assert.True(
+            dimensions[6] >= 4,
+            $"Expected popup width to animate through intermediate values. Samples: [{string.Join(", ", dimensions.Select(value => value.ToString("F2")))}].");
+        Assert.True(
+            dimensions[7] >= 4,
+            $"Expected popup height to animate through intermediate values. Samples: [{string.Join(", ", dimensions.Select(value => value.ToString("F2")))}].");
+    }
+
+    /// <summary>
+    /// Viewport cleanup must wait for the longest current-content animation, not the
+    /// first transitionend event. The docs/source demo animates opacity for half the
+    /// duration and transform for the full duration; ending on opacity restores
+    /// data-instant too early and interrupts the positioner/arrow transition.
+    /// React source: usePopupViewport waits on currentContainer.getAnimations().
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_SplitTransitionTiming_KeepsInstantDisabledUntilTransformFinishes()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(900));
+
+        await GetByTestId("vp-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+        await Assertions.Expect(Page.Locator("[data-current] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-one content");
+
+        var midTransitionState = await Page.EvaluateAsync<bool[]>(
+            """
+            async () => {
+                const trigger = document.querySelector('[data-testid="vp-trigger-two"]');
+                const positioner = document.querySelector('[data-testid="vp-positioner"]');
+                const popup = document.querySelector('[data-testid="vp-popup"]');
+                const viewport = document.querySelector('[data-testid="vp-viewport"]');
+                const samples = [];
+
+                const sample = () => {
+                    const current = document.querySelector('[data-current]');
+                    samples.push({
+                        activationDirection: viewport.getAttribute('data-activation-direction') ?? '',
+                        hasInstant: positioner.hasAttribute('data-instant') ||
+                            popup.hasAttribute('data-instant') ||
+                            viewport.hasAttribute('data-instant'),
+                        transitioning: viewport.hasAttribute('data-transitioning'),
+                        hasPrevious: document.querySelector('[data-previous]') !== null,
+                        hasFullDurationAnimation: [current, document.querySelector('[data-previous]')].some((element) =>
+                            element?.getAnimations?.().some((animation) => {
+                                const timing = animation.effect?.getTiming?.();
+                                return animation.playState !== 'finished' && Number(timing?.duration) >= 800;
+                            }) ?? false),
+                    });
+                };
+
+                const start = performance.now();
+                trigger.click();
+                while (performance.now() - start < 560) {
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+                    sample();
+                }
+
+                const mid = samples.at(-1) ?? {
+                    hasInstant: true,
+                    transitioning: false,
+                    hasPrevious: false,
+                    hasFullDurationAnimation: false,
+                };
+
+                return [
+                    samples.some((entry) => entry.activationDirection.includes('right')),
+                    mid.hasInstant,
+                    mid.transitioning,
+                    mid.hasPrevious,
+                    mid.hasFullDurationAnimation,
+                ];
+            }
+            """);
+
+        Assert.True(
+            midTransitionState[0],
+            "Expected the viewport to expose rightward activation during the trigger switch.");
+        Assert.False(
+            midTransitionState[1],
+            "Expected data-instant to remain absent until the full transform transition finishes.");
+        Assert.True(
+            midTransitionState[2],
+            "Expected the viewport to keep data-transitioning after the shorter opacity transition finishes.");
+        Assert.True(
+            midTransitionState[3],
+            "Expected the previous content snapshot to remain mounted through the full transform transition.");
+        Assert.True(
+            midTransitionState[4],
+            "Expected the full-duration transform transition to still be running at the midpoint.");
+
+        await Page.WaitForTimeoutAsync(520);
+        await Assertions.Expect(GetByTestId("vp-positioner"))
+            .ToHaveAttributeAsync("data-instant", "trigger-change");
+    }
+
+    /// <summary>
+    /// Arrow positioning must be recalculated when popup auto-resize commits the
+    /// new viewport payload dimensions. Otherwise the positioner animates toward the
+    /// new trigger while the arrow keeps the old popup-width offset, visually
+    /// overshooting the target trigger before sliding back.
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_SwitchingSizedPayload_DoesNotOvershootArrowPastTarget()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(350));
+
+        await GetByTestId("vp-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+        await Assertions.Expect(Page.Locator("[data-current] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-one content");
+
+        var maxOvershoot = await Page.EvaluateAsync<double>(
+            """
+            async () => {
+                const trigger = document.querySelector('[data-testid="vp-trigger-three"]');
+                const arrow = document.querySelector('[data-testid="vp-arrow"]');
+                const startRect = arrow.getBoundingClientRect();
+                const triggerRect = trigger.getBoundingClientRect();
+                const targetCenter = triggerRect.left + triggerRect.width / 2;
+                const startCenter = startRect.left + startRect.width / 2;
+                const direction = Math.sign(targetCenter - startCenter) || 1;
+                let maxOvershoot = 0;
+
+                const start = performance.now();
+                trigger.click();
+                while (performance.now() - start < 700) {
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+                    const rect = arrow.getBoundingClientRect();
+                    const center = rect.left + rect.width / 2;
+                    maxOvershoot = Math.max(maxOvershoot, (center - targetCenter) * direction);
+                }
+
+                return maxOvershoot;
+            }
+            """);
+
+        Assert.True(
+            maxOvershoot <= 6,
+            $"Expected the arrow not to overshoot the target trigger by more than 6px, but it overshot by {maxOvershoot:F2}px.");
+    }
+
+    /// <summary>
+    /// After a viewport swap completes, the positioner carries data-instant="trigger-change".
+    /// Pressing another trigger must clear that instant state before JS writes the new anchor
+    /// coordinates, otherwise CSS disables the top/left transition and the popup jumps.
+    /// React source: PopoverPositioner clears instantType when the reference changes, then
+    /// restores trigger-change after the movement animation finishes.
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_SwitchingAfterCompletedTransition_AnimatesPositioner()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(900));
+
+        await GetByTestId("vp-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+
+        await GetByTestId("vp-trigger-two").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-viewport"))
+            .ToHaveAttributeAsync("data-activation-direction", new Regex("right"));
+
+        await Assertions.Expect(GetByTestId("vp-positioner"))
+            .ToHaveAttributeAsync("data-instant", "trigger-change");
+
+        var startLeft = await GetByTestId("vp-positioner")
+            .EvaluateAsync<double>("element => element.getBoundingClientRect().left");
+
+        await GetByTestId("vp-trigger-three").ClickAsync();
+
+        await Assertions.Expect(GetByTestId("vp-trigger-two")).Not.ToHaveAttributeAsync("data-popup-open", "");
+        await Assertions.Expect(GetByTestId("vp-trigger-three")).ToHaveAttributeAsync("data-popup-open", "");
+
+        var instantSamples = await Page.EvaluateAsync<bool[]>(
+            """
+            async () => {
+                const positioner = document.querySelector('[data-testid="vp-positioner"]');
+                const popup = document.querySelector('[data-testid="vp-popup"]');
+                const viewport = document.querySelector('[data-testid="vp-viewport"]');
+                const values = [];
+
+                for (let index = 0; index < 8; index += 1) {
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+                    values.push(
+                        positioner.hasAttribute('data-instant') ||
+                        popup.hasAttribute('data-instant') ||
+                        viewport.hasAttribute('data-instant')
+                    );
+                }
+
+                return values;
+            }
+            """);
+
+        Assert.DoesNotContain(true, instantSamples);
+
+        var samples = await Page.EvaluateAsync<double[]>(
+            """
+            async () => {
+                const element = document.querySelector('[data-testid="vp-positioner"]');
+                const values = [];
+
+                for (let index = 0; index < 10; index += 1) {
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+                    values.push(element.getBoundingClientRect().left);
+                }
+
+                return values;
+            }
+            """);
+
+        var range = samples.Max() - samples.Min();
+        Assert.True(
+            range > 1,
+            $"Expected the positioner to move over animation frames from left {startLeft:F2}, but sampled [{string.Join(", ", samples.Select(value => value.ToString("F2")))}].");
+
+        await WaitForDelayAsync(950);
+        await Assertions.Expect(GetByTestId("vp-positioner"))
+            .ToHaveAttributeAsync("data-instant", "trigger-change");
+    }
+
+    /// <summary>
+    /// Rapid trigger switches should replace the previous viewport snapshot with the
+    /// immediate outgoing content. Keeping an older [data-previous] clone causes the
+    /// animation to cross-fade through the first popover content while moving to later
+    /// triggers. React source: usePopupViewport captures the latest current content
+    /// during an in-progress transition.
+    /// </summary>
+    [Fact]
+    public virtual async Task Viewport_RapidSwitch_ReplacesPreviousSnapshot()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithTestScenario("viewport-swap")
+            .WithAnimationDuration(900));
+
+        await GetByTestId("vp-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("vp-popup")).ToBeVisibleAsync();
+
+        await GetByTestId("vp-trigger-two").ClickAsync();
+        await Assertions.Expect(Page.Locator("[data-previous] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-one content");
+
+        await WaitForDelayAsync(100);
+        await GetByTestId("vp-trigger-three").ClickAsync();
+
+        await Assertions.Expect(Page.Locator("[data-previous] [data-testid='vp-content']"))
+            .ToHaveTextAsync("vp-two content");
+        await Assertions.Expect(Page.Locator("[data-previous]"))
+            .ToHaveCountAsync(1);
     }
 
     #endregion
