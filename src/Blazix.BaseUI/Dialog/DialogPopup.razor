@@ -128,6 +128,12 @@
         if (Context is not null)
         {
             state = new DialogPopupState(Context.Open, Context.TransitionStatus, Context.Nested, Context.NestedDialogCount > 0);
+
+            // Only a callback finalFocus can depend on the close interaction type, so only then do we
+            // need the root to re-resolve the target at close. Static targets are resolved eagerly.
+            Context.ResolveFinalFocusForClose = FinalFocus is FocusTarget.Callback
+                ? ResolveFinalFocusForClose
+                : null;
         }
 
         UpdateShouldRender();
@@ -146,7 +152,7 @@
             if (!Equals(FinalFocus, previousFinalFocus))
             {
                 previousFinalFocus = FinalFocus;
-                var (mode, element) = ResolveFocusTarget(FinalFocus);
+                var (mode, element) = ResolveFinalFocusTargetForOpen();
                 _ = SetFinalFocusElementAsync(mode, element);
             }
         }
@@ -170,7 +176,7 @@
         if (firstRender && Element.HasValue && Context is not null)
         {
             var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
-            var (finalMode, finalElement) = ResolveFocusTarget(FinalFocus);
+            var (finalMode, finalElement) = ResolveFinalFocusTargetForOpen();
 
             try
             {
@@ -210,6 +216,11 @@
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
+        }
+
+        if (Context is not null)
+        {
+            Context.ResolveFinalFocusForClose = null;
         }
 
         Context?.SetPopupId(null);
@@ -341,6 +352,34 @@
         var interactionType = Context?.InteractionType ?? string.Empty;
         var result = cb.Fn(interactionType);
         return result.HasValue ? ("element", result.Value) : ("default", null);
+    }
+
+    // Invoked by the root at close time with the resolved close interaction type, so a callback
+    // finalFocus observes how the dialog was closed (mirrors React's close-time evaluation) instead
+    // of the open-time interaction type that was baked in when the popup mounted.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusForClose(string? closeInteractionType)
+    {
+        if (FinalFocus is FocusTarget.Callback cb)
+        {
+            var result = cb.Fn(closeInteractionType ?? string.Empty);
+            return result.HasValue ? ("element", result.Value) : ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
+    }
+
+    // At open, a callback finalFocus is deferred (the manager defaults to returning focus to the
+    // trigger) because its result can depend on the close interaction type, which is unknown until
+    // close. The root re-resolves it at close via ResolveFinalFocusForClose. Static targets resolve
+    // eagerly here, matching their unconditional behavior.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusTargetForOpen()
+    {
+        if (FinalFocus is FocusTarget.Callback)
+        {
+            return ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
     }
 
     private bool ComputeInitialFocus()

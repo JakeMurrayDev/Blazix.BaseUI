@@ -17,4 +17,6 @@ public interface IDialogRootContract
     Task ActionsRefUnmountMethodUnmountsDialog();
     Task HandleOpenWithPayloadOpensDialogWithPayload();
     Task OnFocusOutClosesNonModalDialog();
+    Task OnOpenChangeIncludesTriggerAssociation();
+    Task FinalFocusCallbackReceivesCloseInteractionType();
 }

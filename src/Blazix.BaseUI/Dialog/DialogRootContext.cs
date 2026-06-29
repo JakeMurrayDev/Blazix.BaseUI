@@ -71,6 +71,15 @@ internal sealed class DialogRootContext
 
     public Action<string?> SetInteractionType { get; set; } = null!;
 
+    /// <summary>
+    /// Re-resolves the popup's <c>finalFocus</c> target at close time using the close interaction type.
+    /// Registered by <see cref="DialogPopup"/> only when <c>FinalFocus</c> is a callback, since the
+    /// callback result can depend on how the dialog was closed (mouse/keyboard/touch/pen). Mirrors
+    /// React, which evaluates the <c>finalFocus</c> function at close with the close interaction type
+    /// rather than eagerly at open. <see langword="null"/> when no close-time re-resolution is needed.
+    /// </summary>
+    public Func<string?, (string? Mode, ElementReference? Element)>? ResolveFinalFocusForClose { get; set; }
+
     public Func<bool, DialogOpenChangeReason, Task> SetOpenAsync { get; set; } = null!;
 
     public Func<object?, DialogOpenChangeReason, Task> SetOpenWithPayloadAsync { get; set; } = null!;

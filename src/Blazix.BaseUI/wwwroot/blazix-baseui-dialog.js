@@ -117,7 +117,7 @@ export function setRootOpen(rootId, isOpen, interactionType) {
 
         cleanupOutsideClick(rootState);
         cleanupBackdropClick(rootState);
-        cleanupFocusManager(rootState);
+        cleanupFocusManager(rootState, true);
         startTransition(rootState, isOpen);
     }
 }
@@ -272,9 +272,16 @@ function focusPopup(rootState, popupElement) {
     });
 }
 
-function cleanupFocusManager(rootState) {
+function cleanupFocusManager(rootState, useFinalFocusOverride = false) {
     if (rootState.focusManagerId) {
-        disposeFloatingFocusManager(rootState.focusManagerId, true);
+        // On close, honor a finalFocus target that was (re)resolved to an element after the manager
+        // was created — e.g. a callback finalFocus re-resolved with the close interaction type. For
+        // non-element modes the override is null and the manager's captured return target is used.
+        const overrideReturnFocusElement =
+            useFinalFocusOverride && rootState.finalFocusMode === 'element' && rootState.finalFocusElement
+                ? rootState.finalFocusElement
+                : null;
+        disposeFloatingFocusManager(rootState.focusManagerId, true, overrideReturnFocusElement);
         rootState.focusManagerId = null;
     }
 }
