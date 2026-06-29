@@ -1,7 +1,16 @@
+using System.Text.RegularExpressions;
+
 namespace Blazix.BaseUI.Tests.Popover;
 
 public class PopoverInteropGuardTests
 {
+    // Matches any `catch (...) when (<filter>)` clause so the guard can be asserted
+    // semantically on the filter contents instead of on one verbatim clause string
+    // (which a reorder or reformat would slip past).
+    private static readonly Regex CatchFilterPattern = new(
+        @"catch\s*\([^)]*\)\s*when\s*\((?<filter>[^)]*)\)",
+        RegexOptions.Singleline | RegexOptions.Compiled);
+
     [Fact]
     public async Task PopoverInteropCatchFiltersIncludeObjectDisposedException()
     {
@@ -12,9 +21,19 @@ public class PopoverInteropGuardTests
         foreach (var sourceFile in sourceFiles)
         {
             var source = await File.ReadAllTextAsync(sourceFile);
-            if (source.Contains("catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)", StringComparison.Ordinal))
+
+            foreach (Match match in CatchFilterPattern.Matches(source))
             {
-                offenders.Add(Path.GetFileName(sourceFile));
+                var filter = match.Groups["filter"].Value;
+
+                // A teardown guard that catches the JS-interop disconnect exceptions must
+                // also tolerate ObjectDisposedException, regardless of type order/format.
+                if (filter.Contains("JSDisconnectedException", StringComparison.Ordinal)
+                    && !filter.Contains("ObjectDisposedException", StringComparison.Ordinal))
+                {
+                    offenders.Add(Path.GetFileName(sourceFile));
+                    break;
+                }
             }
         }
 

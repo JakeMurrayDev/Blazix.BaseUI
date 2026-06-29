@@ -85,7 +85,7 @@
         var attrs = new Dictionary<string, object>();
 
         attrs["aria-hidden"] = "true";
-        attrs["data-blazix-base-ui-popover-arrow"] = string.Empty;
+        attrs["data-blazix-base-ui-popover-arrow"] = true;
         attrs["data-side"] = (PositionerContext?.Side ?? Side.Bottom).ToDataAttributeString()!;
         attrs["data-align"] = (PositionerContext?.Align ?? Align.Center).ToDataAttributeString()!;
 

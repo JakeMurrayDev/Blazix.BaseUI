@@ -888,6 +888,9 @@
 
             if (switchArgs.IsCanceled)
             {
+                // No controlled-parameter echo follows a canceled change, so clear the
+                // marker; otherwise the next external change is misclassified.
+                selfInitiatedOpenChange = false;
                 SyncHandleState(CurrentOpen, activeTriggerId, forceNotify: true);
                 return;
             }
@@ -1064,6 +1067,9 @@
 
         if (args.IsCanceled)
         {
+            // No controlled-parameter echo follows a canceled change, so clear the
+            // marker; otherwise the next external change is misclassified.
+            selfInitiatedOpenChange = false;
             return;
         }
 
@@ -1163,6 +1169,9 @@
 
         if (switchArgs.IsCanceled)
         {
+            // No controlled-parameter echo follows a canceled change, so clear the
+            // marker; otherwise the next external change is misclassified.
+            selfInitiatedOpenChange = false;
             SyncHandleState(CurrentOpen, activeTriggerId, forceNotify: true);
             return;
         }

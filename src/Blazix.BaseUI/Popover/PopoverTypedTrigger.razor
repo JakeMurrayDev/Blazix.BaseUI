@@ -424,10 +424,10 @@
         return activeTriggerId == triggerId || (activeTriggerId is null && RootContext.GetOpen());
     }
 
-    private Task HandlePointerDownAsync(PointerEventArgs e)
+    private async Task HandlePointerDownAsync(PointerEventArgs e)
     {
         lastPointerType = e.PointerType ?? string.Empty;
-        return Task.CompletedTask;
+        await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleClickAsync(MouseEventArgs e)

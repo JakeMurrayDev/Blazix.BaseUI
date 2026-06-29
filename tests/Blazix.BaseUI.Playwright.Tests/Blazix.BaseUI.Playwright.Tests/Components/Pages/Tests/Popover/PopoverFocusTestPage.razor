@@ -11,6 +11,7 @@
         TriggerId="@(ProgrammaticOpen ? "popover-trigger" : null)"
         OnOpenChange="HandleOpenChange">
         <PopoverTrigger
+            Id="@(ProgrammaticOpen ? "popover-trigger" : null)"
             OpenOnHover="@OpenOnHover"
             Delay="@OpenDelay"
             CloseDelay="@CloseDelay"
