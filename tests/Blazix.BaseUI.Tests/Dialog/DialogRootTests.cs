@@ -25,7 +25,8 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         RenderFragment? customPopupContent = null,
         bool includeTitle = false,
         bool includeDescription = false,
-        bool includeBackdrop = false)
+        bool includeBackdrop = false,
+        FocusTarget? finalFocus = null)
     {
         return builder =>
         {
@@ -81,6 +82,12 @@ public class DialogRootTests : BunitContext, IDialogRootContract
                         popupBuilder.AddAttribute(31, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Close")));
                         popupBuilder.CloseComponent();
                     })));
+
+                    if (finalFocus is not null)
+                    {
+                        portalBuilder.AddAttribute(13, "FinalFocus", finalFocus);
+                    }
+
                     portalBuilder.CloseComponent();
                 }));
                 innerBuilder.CloseComponent();
@@ -193,6 +200,53 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         trigger.Click();
 
         capturedReason.ShouldBe(Blazix.BaseUI.Dialog.DialogOpenChangeReason.TriggerPress);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnOpenChangeIncludesTriggerAssociation()
+    {
+        DialogOpenChangeEventArgs? captured = null;
+
+        var cut = Render(CreateDialog(
+            defaultOpen: false,
+            onOpenChange: EventCallback.Factory.Create<DialogOpenChangeEventArgs>(this, args => captured = args)
+        ));
+
+        var trigger = cut.Find("button");
+        var triggerId = trigger.GetAttribute("id");
+        trigger.Click();
+
+        captured.ShouldNotBeNull();
+        // React surfaces the owning trigger on the change event details; the Blazor event args must
+        // expose the same association (trigger id + element).
+        captured!.TriggerId.ShouldBe(triggerId);
+        captured.Trigger.ShouldNotBeNull();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FinalFocusCallbackReceivesCloseInteractionType()
+    {
+        string? receivedCloseType = null;
+
+        var cut = Render(CreateDialog(
+            defaultOpen: true,
+            finalFocus: new FocusTarget.Callback(type =>
+            {
+                receivedCloseType = type;
+                return null;
+            })
+        ));
+
+        // The callback must observe the close interaction type, not the open interaction type.
+        // Closing via the close button is a close-press, which resolves to a pointer interaction.
+        var closeButton = cut.FindAll("button").First(b => b.TextContent.Contains("Close"));
+        closeButton.Click();
+
+        receivedCloseType.ShouldBe("mouse");
 
         return Task.CompletedTask;
     }

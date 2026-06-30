@@ -608,7 +608,22 @@
             return;
         }
 
-        var args = new DialogOpenChangeEventArgs(nextOpen, reason);
+        // Resolve the trigger association exposed on the event details. Mirrors React `setOpen`,
+        // which sets `eventDetails.trigger = activeTriggerElement` so consumers can identify the
+        // owning trigger on both open and close.
+        var eventTriggerId = activeTriggerId;
+        if (nextOpen && string.IsNullOrEmpty(eventTriggerId) && triggerElements.Count == 1)
+        {
+            eventTriggerId = triggerElements.First().Key;
+        }
+
+        var args = new DialogOpenChangeEventArgs(
+            nextOpen,
+            reason,
+            nativeEvent: null,
+            trigger: GetTriggerElement(),
+            triggerId: eventTriggerId,
+            interactionType: context.InteractionType);
         await OnOpenChange.InvokeAsync(args);
 
         if (args.IsCanceled)
@@ -677,6 +692,24 @@
             try
             {
                 var module = await ModuleTask.Value;
+
+                // On close, re-resolve a callback finalFocus with the actual close interaction type and
+                // push the resolved target into the shared focus-manager state before it returns focus,
+                // so the callback observes how the dialog was closed rather than how it was opened.
+                // Mirrors React, which evaluates the finalFocus function at close time.
+                if (!nextOpen && context.ResolveFinalFocusForClose is { } resolveFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveFinalFocus(ResolveCloseInteractionType(reason));
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
+                // On open, re-send the open-time callback finalFocus target before the focus manager is
+                // (re)created, so a kept-mounted popup is not left with the previous close-cycle target.
+                else if (nextOpen && context.ResolveFinalFocusForOpen is { } resolveOpenFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveOpenFinalFocus();
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
+
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, context.InteractionType);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -828,6 +861,18 @@
     {
         Handle?.SyncState(open, triggerId, payload);
     }
+
+    // Maps the close reason to the interaction-type string consumed by a callback finalFocus,
+    // matching the close-reason mapping used by the sibling Popover/Select ports.
+    private static string ResolveCloseInteractionType(DialogOpenChangeReason reason) => reason switch
+    {
+        DialogOpenChangeReason.EscapeKey => "keyboard",
+        DialogOpenChangeReason.FocusOut => "keyboard",
+        DialogOpenChangeReason.ClosePress => "mouse",
+        DialogOpenChangeReason.OutsidePress => "mouse",
+        DialogOpenChangeReason.TriggerPress => "mouse",
+        _ => string.Empty
+    };
 
     private void SyncHandlePopupId()
     {
