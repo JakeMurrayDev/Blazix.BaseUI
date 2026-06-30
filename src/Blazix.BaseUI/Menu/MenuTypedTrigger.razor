@@ -661,6 +661,7 @@
             if (!IsOpenedByThisTrigger())
             {
                 var highlightLast = e.Key == "ArrowUp";
+                RootContext?.SetInteractionType?.Invoke("keyboard");
 
                 if (HasHandle)
                 {

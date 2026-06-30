@@ -5,4 +5,5 @@ public interface IMenuPopupContract
     Task DefaultReturnFocusIsTrue();
     Task FinalFocusNoneDisablesReturnFocus();
     Task FinalFocusDefaultEnablesReturnFocus();
+    Task PopupIsLabelledByTrigger();
 }

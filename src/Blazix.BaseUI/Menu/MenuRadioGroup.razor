@@ -1,19 +1,23 @@
-<CascadingValue TValue="IMenuRadioGroupContext" Value="groupContext" IsFixed="true">
-    <RenderElement TState="MenuRadioGroupState"
-                   Tag="div"
-                   State="state"
-                   Render="Render"
-                   ClassValue="ClassValue"
-                   StyleValue="StyleValue"
-                   ComponentAttributes="componentAttributes"
-                   ChildContent="ChildContent"
-                   @attributes="AdditionalAttributes"
-                   @ref="renderElementReference" />
+<CascadingValue TValue="IMenuGroupContext" Value="menuGroupContext" IsFixed="true">
+    <CascadingValue TValue="IMenuRadioGroupContext" Value="groupContext" IsFixed="true">
+        <RenderElement TState="MenuRadioGroupState"
+                       Tag="div"
+                       State="state"
+                       Render="Render"
+                       ClassValue="ClassValue"
+                       StyleValue="StyleValue"
+                       ComponentAttributes="componentAttributes"
+                       ChildContent="ChildContent"
+                       @attributes="AdditionalAttributes"
+                       @ref="renderElementReference" />
+    </CascadingValue>
 </CascadingValue>
 
 @code {
     private object? internalValue;
+    private string? labelId;
     private MenuRadioGroupContext? groupContext;
+    private MenuGroupContext? menuGroupContext;
     private MenuRadioGroupState state;
     private RenderElement<MenuRadioGroupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -101,6 +105,11 @@
             GetValue = () => CurrentValue,
             SetValue = SetValueInternalAsync
         };
+
+        // Mirror React: <MenuGroupContext.Provider value={setLabelId}> wrapping the radio
+        // group so a Menu.GroupLabel placed inside a radio group wires its generated id into
+        // the group's aria-labelledby (#4826).
+        menuGroupContext = new MenuGroupContext { SetLabelIdAction = SetLabelId };
     }
 
     /// <inheritdoc />
@@ -115,11 +124,28 @@
         BuildComponentAttributes();
     }
 
+    private void SetLabelId(string? id)
+    {
+        if (labelId != id)
+        {
+            labelId = id;
+            BuildComponentAttributes();
+            StateHasChanged();
+        }
+    }
+
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
 
         attrs["role"] = "group";
+
+        // React: aria-labelledby={ariaLabelledByProp ?? labelId}. A user-supplied
+        // aria-labelledby arrives via AdditionalAttributes and overrides this default.
+        if (!string.IsNullOrEmpty(labelId))
+        {
+            attrs["aria-labelledby"] = labelId;
+        }
 
         if (Disabled)
         {

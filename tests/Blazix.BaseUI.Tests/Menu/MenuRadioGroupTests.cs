@@ -193,4 +193,63 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
 
         return Task.CompletedTask;
     }
+
+    // Upstream parity: [menu] Support group labels in radio groups (#4826). A
+    // Menu.GroupLabel placed inside a RadioGroup must wire its generated id into the
+    // group's aria-labelledby, exactly as it does for Menu.Group.
+    [Fact]
+    public Task GroupLabelWiresAriaLabelledby()
+    {
+        var cut = Render(CreateRadioGroupWithLabelInRoot());
+
+        var group = cut.Find("[role='group']");
+        var labelId = group.GetAttribute("aria-labelledby");
+        labelId.ShouldNotBeNullOrEmpty();
+
+        var label = cut.Find($"[id='{labelId}']");
+        label.GetAttribute("role")!.ShouldBe("presentation");
+        label.TextContent.ShouldBe("Sort");
+
+        return Task.CompletedTask;
+    }
+
+    private static RenderFragment CreateRadioGroupWithLabelInRoot()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<MenuRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MenuTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<MenuPositioner>(2);
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<MenuPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                    {
+                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+                        {
+                            groupBuilder.OpenComponent<MenuGroupLabel>(0);
+                            groupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Sort")));
+                            groupBuilder.CloseComponent();
+
+                            groupBuilder.OpenComponent<MenuRadioItem>(2);
+                            groupBuilder.AddAttribute(3, "Value", "option1");
+                            groupBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 1")));
+                            groupBuilder.CloseComponent();
+                        }));
+                        popupBuilder.CloseComponent();
+                    }));
+                    posBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
 }

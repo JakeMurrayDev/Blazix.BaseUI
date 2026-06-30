@@ -191,7 +191,8 @@
             attrs["aria-disabled"] = "true";
         }
 
-        attrs["tabindex"] = highlighted ? 0 : -1;
+        // React: tabIndex = open && highlighted ? 0 : -1 (#4931).
+        attrs["tabindex"] = ((RootContext?.GetOpen() ?? false) && highlighted) ? 0 : -1;
         attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
         attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
         attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseMoveAsync);

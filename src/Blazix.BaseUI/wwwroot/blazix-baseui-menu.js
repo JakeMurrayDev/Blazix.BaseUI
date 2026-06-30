@@ -205,6 +205,7 @@ function handleGlobalKeyDown(e) {
 
                     for (let i = 0; i < items.length; i++) {
                         const idx = (spaceStartIndex + i) % items.length;
+                        if (!isMenuItemVisible(items[idx])) continue;
                         const label = items[idx].getAttribute('data-label');
                         const text = (label ?? items[idx].textContent)?.trim().toLowerCase() || '';
                         if (text.startsWith(spaceSearchString)) {
@@ -261,6 +262,7 @@ function handleGlobalKeyDown(e) {
 
                     for (let i = 0; i < items.length; i++) {
                         const idx = (startIndex + i) % items.length;
+                        if (!isMenuItemVisible(items[idx])) continue;
                         const label = items[idx].getAttribute('data-label');
                         const text = (label ?? items[idx].textContent)?.trim().toLowerCase() || '';
                         if (text.startsWith(searchString)) {
@@ -272,6 +274,7 @@ function handleGlobalKeyDown(e) {
                     // No match: clear buffer and end session
                     if (newIndex === currentIndex) {
                         const hasMatch = items.some(item => {
+                            if (!isMenuItemVisible(item)) return false;
                             const text = (item.getAttribute('data-label') ?? item.textContent)?.trim().toLowerCase() || '';
                             return text.startsWith(searchString);
                         });
@@ -398,6 +401,24 @@ function getMenuItems(popupElement) {
     return Array.from(popupElement.querySelectorAll(selector));
 }
 
+// Mirrors React floating-ui isElementVisible (utils/composite.ts). Used to skip
+// CSS-hidden items (display:none / visibility:hidden / content-visibility) during
+// typeahead matching (#4195). List-navigation arrow keys do NOT skip hidden items
+// (React's useListNavigation doesn't either), so this is intentionally typeahead-only.
+function isMenuItemVisible(element) {
+    if (!element || !element.isConnected) {
+        return false;
+    }
+    if (typeof element.checkVisibility === 'function') {
+        return element.checkVisibility();
+    }
+    const styles = getComputedStyle(element);
+    return styles.display !== 'none' &&
+        styles.display !== 'contents' &&
+        styles.visibility !== 'hidden' &&
+        styles.visibility !== 'collapse';
+}
+
 function updateItemHighlight(items, index) {
     items.forEach((item, i) => {
         if (i === index) {
@@ -479,6 +500,19 @@ function handleGlobalPointerDown(e) {
             clickedOnTrigger = true;
         }
 
+        // Exclude clicks on ANY trigger registered for this root (multi-trigger / handle),
+        // mirroring React useDismiss excluding every store.context.triggerElements. Without
+        // this, clicking a sibling trigger to switch the menu is treated as an outside press
+        // and dismisses it, racing the switch ("briefly opens then closes").
+        if (!clickedOnTrigger && rootState.triggerIds && rootState.triggerIds.size > 0) {
+            const triggerHost = e.target instanceof Element
+                ? e.target.closest('[aria-haspopup="menu"]')
+                : null;
+            if (triggerHost && rootState.triggerIds.has(triggerHost.id)) {
+                clickedOnTrigger = true;
+            }
+        }
+
         const allMenuPopups = document.querySelectorAll('[role="menu"]');
         for (const popup of allMenuPopups) {
             if (popup.contains(e.target)) {
@@ -517,6 +551,7 @@ export function initializeRoot(rootId, dotNetRef, closeParentOnEsc, loopFocus, m
         dotNetRef,
         isOpen: false,
         triggerElement: null,
+        triggerIds: new Set(),
         positionerElement: null,
         popupElement: null,
         activeIndex: -1,
@@ -561,6 +596,15 @@ export function updateRoot(rootId, modal, orientation, loopFocus, highlightItemO
     rootState.menubarElement = menubarElement || null;
     rootState.parentType = parentType || null;
     rootState.isNested = isNested || false;
+}
+
+// Registers the full set of trigger DOM ids associated with a root (inline + handle/detached
+// triggers) so the outside-press handler does not dismiss the menu when a sibling trigger is
+// clicked to switch it. Mirrors React useDismiss consulting store.context.triggerElements.
+export function setTriggerIds(rootId, ids) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+    rootState.triggerIds = new Set(ids || []);
 }
 
 function isRootEffectivelyOpen(rootState) {
