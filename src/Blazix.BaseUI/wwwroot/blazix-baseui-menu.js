@@ -247,6 +247,7 @@ function handleGlobalKeyDown(e) {
                     // Repeated-character cycling: if all items have different first two chars,
                     // typing the same letter repeatedly cycles through items starting with that letter
                     const allowCycling = items.every(item => {
+                        if (!isMenuItemVisible(item)) return true;
                         const text = (item.getAttribute('data-label') ?? item.textContent)?.trim().toLowerCase() || '';
                         return text.length < 2 || text[0] !== text[1];
                     });
@@ -409,14 +410,17 @@ function isMenuItemVisible(element) {
     if (!element || !element.isConnected) {
         return false;
     }
+    // Mirror React isElementVisible ordering: isHiddenByStyles (visibility hidden/collapse)
+    // is checked BEFORE checkVisibility(), because checkVisibility() without options does not
+    // account for the `visibility` property.
+    const styles = getComputedStyle(element);
+    if (styles.visibility === 'hidden' || styles.visibility === 'collapse') {
+        return false;
+    }
     if (typeof element.checkVisibility === 'function') {
         return element.checkVisibility();
     }
-    const styles = getComputedStyle(element);
-    return styles.display !== 'none' &&
-        styles.display !== 'contents' &&
-        styles.visibility !== 'hidden' &&
-        styles.visibility !== 'collapse';
+    return styles.display !== 'none' && styles.display !== 'contents';
 }
 
 function updateItemHighlight(items, index) {
