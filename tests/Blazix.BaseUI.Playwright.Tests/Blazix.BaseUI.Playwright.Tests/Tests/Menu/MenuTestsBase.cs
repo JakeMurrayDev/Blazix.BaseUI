@@ -173,6 +173,60 @@ public abstract class MenuTestsBase : TestBase
         await Assertions.Expect(triggerB).ToHaveAttributeAsync("data-popup-open", "");
     }
 
+    /// <summary>
+    /// Switching triggers while the menu is open must keep it open and swap content,
+    /// not dismiss it. A sibling trigger click was being treated as an outside press,
+    /// closing the menu ("briefly opens then closes").
+    /// </summary>
+    [Fact]
+    public virtual async Task MultiTrigger_Contained_SwitchWhileOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger"));
+
+        var triggerA = GetByTestId("trigger-a");
+        await triggerA.ClickAsync();
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Payload A");
+
+        // Click trigger B WITHOUT closing first — the menu must switch, not dismiss.
+        var triggerB = GetByTestId("trigger-b");
+        await triggerB.ClickAsync(new LocatorClickOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Payload B");
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    /// <summary>
+    /// Handle/detached variant of switching triggers while open.
+    /// </summary>
+    [Fact]
+    public virtual async Task MultiTrigger_Handle_SwitchWhileOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger").WithUseHandle(true));
+
+        var triggerA = GetByTestId("trigger-a");
+        await triggerA.ClickAsync();
+
+        var popup = GetByTestId("menu-popup");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(content).ToHaveTextAsync("Content A");
+
+        // Click trigger B WITHOUT closing first — the menu must switch, not dismiss.
+        var triggerB = GetByTestId("trigger-b");
+        await triggerB.ClickAsync(new LocatorClickOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Content B");
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
     #endregion
 
     #region Menu Item Interaction Tests

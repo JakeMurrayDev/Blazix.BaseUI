@@ -170,6 +170,13 @@
             attrs["id"] = RootContext.PopupId;
         }
 
+        // React: 'aria-labelledby': activeTriggerElement?.id — the menu is labelled by its
+        // (active) trigger. RootContext.TriggerId holds the active trigger's rendered DOM id.
+        if (!string.IsNullOrEmpty(RootContext?.TriggerId))
+        {
+            attrs["aria-labelledby"] = RootContext.TriggerId;
+        }
+
         attrs["data-side"] = state.Side.ToDataAttributeString()!;
         attrs["data-align"] = state.Align.ToDataAttributeString()!;
 

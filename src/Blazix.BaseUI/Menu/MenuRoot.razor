@@ -17,6 +17,11 @@
 @code {
     private readonly string rootId = Guid.NewGuid().ToIdString();
     private readonly Dictionary<string, MenuRootTriggerData> registeredTriggers = [];
+    // All trigger DOM ids associated with this root (inline triggers via RegisterTrigger +
+    // detached/handle triggers via the handle subscriber). Pushed to JS so the outside-press
+    // handler excludes every trigger, not just the active one — without this, clicking a
+    // sibling trigger to switch a multi-trigger menu is dismissed as an outside press.
+    private readonly HashSet<string> knownTriggerIds = [];
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
@@ -661,6 +666,8 @@
             };
             await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, CloseParentOnEsc, LoopFocus, modal, menubarElement, orientationStr, HighlightItemOnHover, directionStr, isNested, context?.FinalFocusMode, context?.FinalFocusElement, parentTypeStr);
 
+            await module.InvokeVoidAsync("setTriggerIds", rootId, knownTriggerIds);
+
             if (triggerElement.HasValue)
             {
                 await module.InvokeVoidAsync("setTriggerElement", rootId, triggerElement.Value);
@@ -720,6 +727,11 @@
 
         registeredTriggers[triggerId] = new MenuRootTriggerData(element, payload);
 
+        if (knownTriggerIds.Add(triggerId))
+        {
+            PushTriggerIds();
+        }
+
         if (element.HasValue &&
             !triggerElement.HasValue &&
             activeTriggerId is null &&
@@ -746,6 +758,33 @@
     private void UnregisterTrigger(string triggerId)
     {
         registeredTriggers.Remove(triggerId);
+
+        if (knownTriggerIds.Remove(triggerId))
+        {
+            PushTriggerIds();
+        }
+    }
+
+    private void PushTriggerIds()
+    {
+        _ = PushTriggerIdsAsync();
+    }
+
+    private async Task PushTriggerIdsAsync()
+    {
+        if (!hasRendered || moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setTriggerIds", rootId, knownTriggerIds);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+        }
     }
 
     private void UpdateTriggerElement(string triggerId, ElementReference? element)
@@ -1056,6 +1095,11 @@
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
+        if (knownTriggerIds.Add(triggerId))
+        {
+            PushTriggerIds();
+        }
+
         if (element.HasValue && (activeTriggerId is null || activeTriggerId == triggerId))
         {
             SetTriggerElement(element);
@@ -1075,6 +1119,10 @@
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerUnregistered(string triggerId)
     {
+        if (knownTriggerIds.Remove(triggerId))
+        {
+            PushTriggerIds();
+        }
     }
 
     void IComponentHandleSubscriberBase<MenuOpenChangeReason>.OnTriggerElementUpdated(string triggerId, ElementReference? element)
