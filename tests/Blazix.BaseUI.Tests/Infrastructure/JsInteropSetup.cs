@@ -576,15 +576,23 @@ public static class JsInteropSetup
     }
 
     private const string ContextMenuModule = "./_content/Blazix.BaseUI/blazix-baseui-context-menu.js";
+    private const string ContextMenuMinModule = "./_content/Blazix.BaseUI/blazix-baseui-context-menu.min.js";
 
     public static void SetupContextMenuModule(BunitJSInterop jsInterop)
     {
-        var module = jsInterop.SetupModule(ContextMenuModule);
-        module.SetupVoid("initializeContextMenu", _ => true).SetVoidResult();
-        module.SetupVoid("setBackdropElement", _ => true).SetVoidResult();
-        module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
-        module.SetupVoid("setContextMenuDisabled", _ => true).SetVoidResult();
-        module.SetupVoid("disposeContextMenu", _ => true).SetVoidResult();
+        SetupContextMenuModulePath(ContextMenuModule);
+        SetupContextMenuModulePath(ContextMenuMinModule);
+
+        void SetupContextMenuModulePath(string path)
+        {
+            var module = jsInterop.SetupModule(path);
+            module.SetupVoid("initializeContextMenu", _ => true).SetVoidResult();
+            module.SetupVoid("setBackdropElement", _ => true).SetVoidResult();
+            module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
+            module.SetupVoid("setContextMenuDisabled", _ => true).SetVoidResult();
+            module.SetupVoid("setContextMenuOpen", _ => true).SetVoidResult();
+            module.SetupVoid("disposeContextMenu", _ => true).SetVoidResult();
+        }
     }
 
     private const string FloatingModule = "./_content/Blazix.BaseUI/blazix-baseui-floating.js";

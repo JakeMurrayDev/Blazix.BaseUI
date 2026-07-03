@@ -23,6 +23,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool previousDisabled;
+    private bool previousOpen;
     private ContextMenuTriggerState state;
     private RenderElement<ContextMenuTriggerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -120,6 +121,16 @@
         {
             previousDisabled = disabled;
         }
+
+        if (hasRendered && open != previousOpen)
+        {
+            previousOpen = open;
+            _ = UpdateJsOpenAsync(open);
+        }
+        else
+        {
+            previousOpen = open;
+        }
     }
 
     /// <inheritdoc />
@@ -165,8 +176,22 @@
     [JSInvokable]
     public async Task OnContextMenu(double x, double y, bool isTouchEvent)
     {
-        if (state.Open || CurrentDisabled || RootContext is null)
+        if (CurrentDisabled || RootContext is null)
         {
+            return;
+        }
+
+        if (RootContext.GetOpen())
+        {
+            // Already open: a second right-click inside the trigger re-anchors the menu to the
+            // new cursor (the virtual anchor was moved by JS before this call). Recompute the
+            // popup position so it follows the cursor, matching React. The press itself is kept
+            // from dismissing the menu by the trigger's pointerdown handler in JS.
+            if (ContextMenuContext?.RequestReposition is not null)
+            {
+                await ContextMenuContext.RequestReposition();
+            }
+
             return;
         }
 
@@ -178,8 +203,10 @@
             isTouchEvent ? "touch" : "mouse",
             false);
 
-        state = new ContextMenuTriggerState(RootContext.GetOpen());
+        var open = RootContext.GetOpen();
+        state = new ContextMenuTriggerState(open);
         BuildComponentAttributes();
+        await UpdateJsOpenAsync(open);
         StateHasChanged();
     }
 
@@ -196,8 +223,10 @@
 
         await RootContext.SetOpenAsync(false, MenuOpenChangeReason.CancelOpen, null);
 
-        state = new ContextMenuTriggerState(RootContext.GetOpen());
+        var open = RootContext.GetOpen();
+        state = new ContextMenuTriggerState(open);
         BuildComponentAttributes();
+        await UpdateJsOpenAsync(open);
         StateHasChanged();
     }
 
@@ -252,6 +281,14 @@
                 dotNetRef,
                 CurrentDisabled);
 
+            // Seed the JS open state so native-menu suppression is correct when the menu
+            // is rendered already open (DefaultOpen) before the first open-state change.
+            if (state.Open)
+            {
+                previousOpen = true;
+                await module.InvokeVoidAsync("setContextMenuOpen", ContextMenuContext.RootId, true);
+            }
+
             ContextMenuContext.RegisterBackdropElement = async (element) =>
             {
                 try
@@ -300,6 +337,24 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setContextMenuDisabled", ContextMenuContext.RootId, disabled);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateJsOpenAsync(bool open)
+    {
+        if (ContextMenuContext is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setContextMenuOpen", ContextMenuContext.RootId, open);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

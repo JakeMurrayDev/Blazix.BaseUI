@@ -272,6 +272,14 @@
                 await UpdatePositionAsync();
             }
         }
+
+        // Allow an open context menu to recompute its position when the trigger is
+        // right-clicked again (the virtual anchor is moved by JS first). Mirrors React,
+        // where a second right-click inside the trigger re-anchors the open menu.
+        if (ContextMenuContext is not null)
+        {
+            ContextMenuContext.RequestReposition = UpdatePositionAsync;
+        }
     }
 
     /// <inheritdoc />
