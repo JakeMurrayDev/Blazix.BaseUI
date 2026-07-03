@@ -1,0 +1,51 @@
+<AutocompleteRoot TValue="AutocompleteDemoTag"
+                  Grid="true"
+                  OpenOnInputClick="true"
+                  ItemToStringValue="AutocompleteDemoData.GetTagValue">
+    <div class="blx-autocomplete-grid-container">
+        <AutocompleteInputGroup class="blx-autocomplete-grid-input-group">
+            <AutocompleteInput class="blx-autocomplete-grid-input" placeholder="Search components" />
+            <AutocompleteTrigger class="blx-autocomplete-grid-trigger" aria-label="Open suggestions">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+            </AutocompleteTrigger>
+        </AutocompleteInputGroup>
+    </div>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup blx-autocomplete-grid-popup">
+                <AutocompleteEmpty>
+                    <div class="blx-autocomplete-empty">No components found.</div>
+                </AutocompleteEmpty>
+                <AutocompleteList class="blx-autocomplete-grid-list">
+                    @foreach (var row in GridRows)
+                    {
+                        <AutocompleteRow class="blx-autocomplete-grid-row">
+                            @foreach (var entry in row)
+                            {
+                                <AutocompleteItem TValue="AutocompleteDemoTag"
+                                                  class="blx-autocomplete-grid-item"
+                                                  Value="@entry.Item"
+                                                  Label="@entry.Item.Value"
+                                                  Index="@entry.Index">
+                                    @entry.Item.Value.Replace("component: ", string.Empty)
+                                </AutocompleteItem>
+                            }
+                        </AutocompleteRow>
+                    }
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private static readonly IReadOnlyList<IReadOnlyList<(AutocompleteDemoTag Item, int Index)>> GridRows =
+        AutocompleteDemoData.Tags
+            .Where(tag => tag.Group == "Component")
+            .Take(12)
+            .Select((item, index) => (item, index))
+            .Chunk(3)
+            .Select(row => row.ToList())
+            .ToList();
+}

@@ -360,7 +360,8 @@
             SetInputValueAsyncFunc = SetInputValueInternalAsync,
             HighlightIndexAsyncFunc = HighlightIndexInternalAsync,
             CommitItemAsyncFunc = CommitItemInternalAsync,
-            ClearAsyncFunc = ClearInternalAsync
+            ClearAsyncFunc = ClearInternalAsync,
+            FocusInputAsyncFunc = FocusInputAsync
         };
         context = typedContext;
 
@@ -423,7 +424,7 @@
             try
             {
                 var module = await ModuleTask;
-                await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen);
+                await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen, activeIndex);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

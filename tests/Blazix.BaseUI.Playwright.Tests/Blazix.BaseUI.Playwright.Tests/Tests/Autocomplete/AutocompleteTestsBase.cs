@@ -73,6 +73,46 @@ public abstract class AutocompleteTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task EnterWithOpenPopupAndNoActiveItemSubmitsForm()
+    {
+        await NavigateAsync(CreateUrl("/tests/autocomplete").WithDefaultOpen(true));
+        await WaitForAutocompleteOpenAsync();
+
+        var input = GetByTestId("autocomplete-input");
+        await input.FocusAsync();
+        await Assertions.Expect(input).Not.ToHaveAttributeAsync(
+            "aria-activedescendant",
+            new System.Text.RegularExpressions.Regex(".+"));
+
+        await Page.Keyboard.PressAsync("Enter");
+
+        await Assertions.Expect(GetByTestId("submit-count")).ToHaveTextAsync("1",
+            new LocatorAssertionsToHaveTextOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    [Fact]
+    public virtual async Task ClearPressClearsValueWithoutMovingFocusFromInput()
+    {
+        await NavigateAsync(CreateUrl("/tests/autocomplete")
+            .WithAutocompleteDefaultValue("Apple")
+            .WithDefaultOpen(true));
+        await WaitForAutocompleteOpenAsync();
+
+        var input = GetByTestId("autocomplete-input");
+        await input.FocusAsync();
+
+        var clear = GetByTestId("autocomplete-clear");
+        await Assertions.Expect(clear).ToHaveAttributeAsync("data-popup-open", "");
+        await Assertions.Expect(clear).ToHaveAttributeAsync("data-visible", "");
+        await clear.ClickAsync();
+
+        await Assertions.Expect(input).ToBeFocusedAsync(
+            new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(input).ToHaveValueAsync("");
+        await Assertions.Expect(GetByTestId("input-value")).ToHaveTextAsync("");
+    }
+
+    [Fact]
     public virtual async Task BothModeInlineCompletionUsesTypedQueryForFiltering()
     {
         await NavigateAsync(CreateUrl("/tests/autocomplete")

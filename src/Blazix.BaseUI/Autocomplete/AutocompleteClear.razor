@@ -1,6 +1,8 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
 
-@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <RenderElement TState="AutocompleteClearState"
                Tag="@(NativeButton ? "button" : "div")"
@@ -11,14 +13,23 @@
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
                ChildContent="@(ChildContent ?? DefaultChildContent)"
-               @attributes="AdditionalAttributes" />
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
 
 @code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-autocomplete.min.js";
+
     private AutocompleteClearState state;
+    private RenderElement<AutocompleteClearState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private ElementReference? previousElement;
     private bool subscribed;
 
     private static RenderFragment DefaultChildContent => builder => builder.AddContent(0, "x");
+
+    private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
 
     [CascadingParameter]
     private IAutocompleteRootContext? RootContext { get; set; }
@@ -71,6 +82,11 @@
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
     /// <inheritdoc />
     protected override void OnInitialized()
     {
@@ -90,11 +106,51 @@
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Element;
+        if (RootContext is null || Nullable.Equals(previousElement, current))
+        {
+            return;
+        }
+
+        previousElement = current;
+        if (!current.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask;
+            await module.InvokeVoidAsync("setClearElement", RootContext.RootId, current.Value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
     {
         if (subscribed && RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        if (moduleTask?.IsValueCreated == true && RootContext is not null)
+        {
+            try
+            {
+                var module = await ModuleTask;
+                await module.InvokeVoidAsync("setClearElement", RootContext.RootId, null);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
         }
     }
 
@@ -117,10 +173,13 @@
         var attrs = new Dictionary<string, object>
         {
             ["tabindex"] = -1,
-            ["data-open"] = RootContext?.Mounted == true,
-            ["data-closed"] = RootContext?.Mounted != true,
             ["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync)
         };
+
+        if (RootContext?.Mounted == true)
+        {
+            attrs["data-popup-open"] = true;
+        }
 
         if (NativeButton)
         {
@@ -161,6 +220,7 @@
         }
 
         await RootContext.ClearAsync(AutocompleteChangeReason.ClearPress);
+        await RootContext.FocusInputAsync();
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 }

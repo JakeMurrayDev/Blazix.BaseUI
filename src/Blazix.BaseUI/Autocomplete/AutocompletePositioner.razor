@@ -260,7 +260,9 @@
     private void BuildStateAndAttributes()
     {
         var open = RootContext?.Mounted == true || RootContext?.Inline == true;
-        state = new AutocompletePositionerState(open, Side, Align, false);
+        var anchorHidden = RootContext?.AnchorHidden == true;
+        var empty = RootContext?.ListEmpty == true;
+        state = new AutocompletePositionerState(open, Side, Align, anchorHidden);
 
         var attrs = new Dictionary<string, object>
         {
@@ -271,6 +273,16 @@
             ["data-open"] = open,
             ["data-closed"] = !open
         };
+
+        if (anchorHidden)
+        {
+            attrs["data-anchor-hidden"] = true;
+        }
+
+        if (empty)
+        {
+            attrs["data-empty"] = true;
+        }
 
         if (!open)
         {

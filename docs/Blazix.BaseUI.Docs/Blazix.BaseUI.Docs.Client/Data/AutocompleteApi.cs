@@ -139,8 +139,7 @@ public static class AutocompleteApi
                 new ApiRow("StyleValue", "Func<AutocompleteClearState, string?>?", "null", "Returns a CSS style based on the component's state."),
             ],
             [
-                new ApiRow("data-open", "", "", "Present when the popup is open."),
-                new ApiRow("data-closed", "", "", "Present when the popup is closed."),
+                new ApiRow("data-popup-open", "", "", "Present when the corresponding popup is open."),
                 new ApiRow("data-disabled", "", "", "Present when the button is disabled."),
                 new ApiRow("data-visible", "", "", "Present when a value is present."),
             ],
@@ -169,7 +168,7 @@ public static class AutocompleteApi
             [
                 new ApiRow("data-open", "", "", "Present when the popup is open."),
                 new ApiRow("data-closed", "", "", "Present when the popup is closed."),
-                new ApiRow("data-starting-style", "", "", "Present when the popup is animating in."),
+                new ApiRow("data-starting-style", "", "", "Present when the popup begins animating in."),
                 new ApiRow("data-ending-style", "", "", "Present when the popup is animating out."),
             ],
             []),
@@ -197,6 +196,8 @@ public static class AutocompleteApi
                 new ApiRow("data-align", "", "", "The alignment of the popup relative to the anchor."),
                 new ApiRow("data-open", "", "", "Present when the popup is open."),
                 new ApiRow("data-closed", "", "", "Present when the popup is closed."),
+                new ApiRow("data-empty", "", "", "Present when the filtered list is empty."),
+                new ApiRow("data-anchor-hidden", "", "", "Present when the anchor is hidden by collision detection."),
             ],
             [
                 new ApiRow("--anchor-width", "", "", "The width of the anchor element."),
@@ -218,7 +219,7 @@ public static class AutocompleteApi
                 new ApiRow("data-open", "", "", "Present when the popup is open."),
                 new ApiRow("data-closed", "", "", "Present when the popup is closed."),
                 new ApiRow("data-empty", "", "", "Present when the filtered list is empty."),
-                new ApiRow("data-starting-style", "", "", "Present when the popup is animating in."),
+                new ApiRow("data-starting-style", "", "", "Present when the popup begins animating in."),
                 new ApiRow("data-ending-style", "", "", "Present when the popup is animating out."),
             ],
             []),

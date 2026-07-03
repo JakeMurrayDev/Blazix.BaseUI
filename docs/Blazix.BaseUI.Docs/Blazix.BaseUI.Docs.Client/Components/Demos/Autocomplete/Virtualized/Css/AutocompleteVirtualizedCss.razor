@@ -1,0 +1,55 @@
+<AutocompleteRoot TValue="AutocompleteDemoVirtualItem"
+                  Virtualized="true"
+                  OpenOnInputClick="true"
+                  FilteredItems="@filteredItems"
+                  FilterDisabled="true"
+                  Value="@query"
+                  ValueChanged="HandleValueChanged"
+                  ItemToStringValue="AutocompleteDemoData.GetVirtualItemValue">
+    <label class="blx-autocomplete-label">
+        Search 10,000 items
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. 0420" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup">
+                <AutocompleteEmpty>
+                    <div class="blx-autocomplete-empty">No items found.</div>
+                </AutocompleteEmpty>
+                <AutocompleteList class="blx-autocomplete-virtual-list" style="@VirtualizedListStyle">
+                    <Virtualize Items="@filteredItems" Context="item" ItemSize="32">
+                        <AutocompleteItem TValue="AutocompleteDemoVirtualItem"
+                                          class="blx-autocomplete-item blx-autocomplete-virtual-item"
+                                          Value="@item"
+                                          Index="@filteredItems.IndexOf(item)"
+                                          aria-setsize="@filteredItems.Count"
+                                          aria-posinset="@(filteredItems.IndexOf(item) + 1)">
+                            @item.Name
+                        </AutocompleteItem>
+                    </Virtualize>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private const int VirtualizedItemSize = 32;
+
+    private List<AutocompleteDemoVirtualItem> filteredItems = AutocompleteDemoData.VirtualizedItems.ToList();
+    private string query = string.Empty;
+
+    private string VirtualizedListStyle => $"--total-size: {filteredItems.Count * VirtualizedItemSize}px";
+
+    private void HandleValueChanged(string value)
+    {
+        query = value;
+        var trimmed = value.Trim();
+        filteredItems = trimmed.Length == 0
+            ? AutocompleteDemoData.VirtualizedItems.ToList()
+            : AutocompleteDemoData.VirtualizedItems
+                .Where(item => AutocompleteDemoData.Contains(item.Name, trimmed))
+                .ToList();
+    }
+}

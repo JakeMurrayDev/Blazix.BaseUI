@@ -28,14 +28,17 @@ function createRootState(rootId, dotNetRef = null) {
     rootId,
     dotNetRef,
     isOpen: false,
+    activeIndex: -1,
     inputElement: null,
     triggerElement: null,
+    clearElement: null,
     listElement: null,
     popupElement: null,
     positionerElement: null,
     inputInsidePopup: false,
     inputCleanup: null,
     triggerCleanup: null,
+    clearCleanup: null,
     listCleanup: null,
     popupCleanup: null,
   };
@@ -54,6 +57,7 @@ function isInsideRoot(root, target) {
   return (
     contains(root.inputElement, target) ||
     contains(root.triggerElement, target) ||
+    contains(root.clearElement, target) ||
     contains(root.positionerElement, target) ||
     contains(root.popupElement, target) ||
     contains(root.listElement, target)
@@ -192,7 +196,7 @@ function attachKeyboardHandlers(root, element, key) {
       return;
     }
 
-    if (event.key === 'Enter' && root.isOpen) {
+    if (event.key === 'Enter' && root.isOpen && root.activeIndex >= 0) {
       event.preventDefault();
       event.stopPropagation();
       root.dotNetRef.invokeMethodAsync('OnCommitActive').catch(() => {});
@@ -327,6 +331,28 @@ function attachTriggerHandlers(root, element) {
   };
 }
 
+function attachClearHandlers(root, element) {
+  cleanupElement(root, 'clear');
+  if (!element) {
+    return;
+  }
+
+  const onPointerDown = (event) => {
+    preventInputBlur(root, event);
+    if (root.inputElement && event.pointerType !== 'touch') {
+      root.inputElement.focus({ preventScroll: true });
+    }
+  };
+
+  element.addEventListener('pointerdown', onPointerDown);
+  element.addEventListener('mousedown', onPointerDown);
+
+  root.clearCleanup = () => {
+    element.removeEventListener('pointerdown', onPointerDown);
+    element.removeEventListener('mousedown', onPointerDown);
+  };
+}
+
 function attachListHandlers(root, element) {
   attachKeyboardHandlers(root, element, 'list');
   if (!element) {
@@ -385,14 +411,16 @@ export function disposeRoot(rootId) {
 
   cleanupElement(root, 'input');
   cleanupElement(root, 'trigger');
+  cleanupElement(root, 'clear');
   cleanupElement(root, 'list');
   cleanupElement(root, 'popup');
   state.roots.delete(rootId);
 }
 
-export function setRootOpen(rootId, open) {
+export function setRootOpen(rootId, open, activeIndex = -1) {
   const root = ensureRoot(rootId);
   root.isOpen = open;
+  root.activeIndex = activeIndex;
   focusInputIfNeeded(root);
 }
 
@@ -447,6 +475,12 @@ export function setTriggerElement(rootId, element) {
   const root = ensureRoot(rootId);
   root.triggerElement = element;
   attachTriggerHandlers(root, element);
+}
+
+export function setClearElement(rootId, element) {
+  const root = ensureRoot(rootId);
+  root.clearElement = element;
+  attachClearHandlers(root, element);
 }
 
 export function setListElement(rootId, element) {

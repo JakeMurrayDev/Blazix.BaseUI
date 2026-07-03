@@ -1,18 +1,22 @@
-<AutocompleteRoot TValue="string" Items="@Tags">
+<AutocompleteRoot TValue="AutocompleteDemoTag"
+                  Items="@AutocompleteDemoData.Tags"
+                  AutoHighlight="AutocompleteAutoHighlight.True"
+                  ItemToStringValue="AutocompleteDemoData.GetTagValue">
     <label class="blx-autocomplete-label">
-        Search tags
+        Auto highlight on type
         <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. feature" />
     </label>
+
     <AutocompletePortal>
-        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="6">
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
             <AutocompletePopup class="blx-autocomplete-popup">
                 <AutocompleteEmpty>
                     <div class="blx-autocomplete-empty">No tags found.</div>
                 </AutocompleteEmpty>
                 <AutocompleteList class="blx-autocomplete-list">
-                    <AutocompleteCollection TValue="string" Context="entry">
-                        <AutocompleteItem TValue="string" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
-                            @entry.Item
+                    <AutocompleteCollection TValue="AutocompleteDemoTag" Context="entry">
+                        <AutocompleteItem TValue="AutocompleteDemoTag" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
                         </AutocompleteItem>
                     </AutocompleteCollection>
                 </AutocompleteList>
@@ -20,8 +24,3 @@
         </AutocompletePositioner>
     </AutocompletePortal>
 </AutocompleteRoot>
-
-@code {
-    private static readonly IReadOnlyList<string> Tags =
-        AutocompleteDemoData.Tags.Select(AutocompleteDemoData.GetTagValue).ToList();
-}

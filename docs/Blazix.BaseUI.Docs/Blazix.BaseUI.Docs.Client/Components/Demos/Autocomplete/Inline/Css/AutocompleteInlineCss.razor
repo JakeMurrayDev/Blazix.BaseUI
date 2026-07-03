@@ -1,0 +1,23 @@
+<AutocompleteRoot TValue="AutocompleteDemoTag"
+                  Items="@AutocompleteDemoData.Tags"
+                  Mode="AutocompleteMode.Both"
+                  ItemToStringValue="AutocompleteDemoData.GetTagValue">
+    <label class="blx-autocomplete-label">
+        Search tags
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. feature" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup">
+                <AutocompleteList class="blx-autocomplete-list">
+                    <AutocompleteCollection TValue="AutocompleteDemoTag" Context="entry">
+                        <AutocompleteItem TValue="AutocompleteDemoTag" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>

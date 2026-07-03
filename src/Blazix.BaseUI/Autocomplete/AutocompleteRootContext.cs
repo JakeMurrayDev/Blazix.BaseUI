@@ -64,6 +64,7 @@ internal sealed class AutocompleteRootContext<TValue> : IAutocompleteRootContext
     public Func<int, AutocompleteHighlightReason, Task> HighlightIndexAsyncFunc { get; set; } = (_, _) => Task.CompletedTask;
     public Func<object?, AutocompleteChangeReason, Task> CommitItemAsyncFunc { get; set; } = (_, _) => Task.CompletedTask;
     public Func<AutocompleteChangeReason, Task> ClearAsyncFunc { get; set; } = _ => Task.CompletedTask;
+    public Func<ValueTask> FocusInputAsyncFunc { get; set; } = () => ValueTask.CompletedTask;
 
     public bool ListEmpty => GetVisibleItemCount() == 0;
 
@@ -223,6 +224,8 @@ internal sealed class AutocompleteRootContext<TValue> : IAutocompleteRootContext
     public Task CommitItemAsync(object? value, AutocompleteChangeReason reason) => CommitItemAsyncFunc(value, reason);
 
     public Task ClearAsync(AutocompleteChangeReason reason) => ClearAsyncFunc(reason);
+
+    public ValueTask FocusInputAsync() => FocusInputAsyncFunc();
 
     public void NotifyStateChanged()
     {
