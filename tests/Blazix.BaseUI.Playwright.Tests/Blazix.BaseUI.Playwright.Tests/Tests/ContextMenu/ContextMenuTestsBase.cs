@@ -450,4 +450,354 @@ public abstract class ContextMenuTestsBase : TestBase
     }
 
     #endregion
+
+    #region Native Context Menu Suppression Tests
+
+    /// <summary>
+    /// Waits until the context-menu JS module reflects an open menu with a registered,
+    /// connected positioner. The open-state and positioner registration are two independent
+    /// async interops; under WASM either can lag the open render, so the suppression tests
+    /// wait for both before asserting (in real usage a second right-click occurs long after).
+    /// </summary>
+    private async Task WaitForContextMenuJsSyncedOpenAsync()
+    {
+        await Page.WaitForFunctionAsync("""
+            () => {
+                const state = window[Symbol.for('Blazix.BaseUI.ContextMenu.State')];
+                if (!state) { return false; }
+                for (const root of state.roots.values()) {
+                    if (root.isOpen && root.positionerElement && root.positionerElement.isConnected) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            """, new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    /// <summary>
+    /// While a modal context menu is open, the native browser context menu must be
+    /// suppressed everywhere except over the popup — replicating React's no-cutout modal
+    /// internal backdrop (ContextMenuRoot.internalBackdropRef).
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeContextMenuSuppressed_OverModalRegion_WhileOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu").WithDefaultOpen(true));
+
+        var item1 = GetByTestId("menu-item-1");
+        await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "", new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await WaitForContextMenuJsSyncedOpenAsync();
+
+        // Dispatch a contextmenu on an element outside the popup. The component's document
+        // handler must cancel it (suppressing the native menu over the modal region). Driving
+        // the handler directly removes the real-right-click layout/coverage non-determinism.
+        var prevented = await Page.EvaluateAsync<bool>("""
+            () => {
+                const outside = document.querySelector('[data-testid="outside-button"]');
+                const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+                outside.dispatchEvent(ev);
+                return ev.defaultPrevented;
+            }
+            """);
+        Assert.True(prevented);
+    }
+
+    /// <summary>
+    /// The native browser context menu must NOT be suppressed when right-clicking the popup
+    /// itself (React leaves the popup region outside the internal backdrop).
+    /// </summary>
+    [Fact]
+    public virtual async Task NativeContextMenuNotSuppressed_OverPopup_WhileOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu").WithDefaultOpen(true));
+
+        var item1 = GetByTestId("menu-item-1");
+        await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "", new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await WaitForContextMenuJsSyncedOpenAsync();
+
+        // Dispatch a contextmenu on the popup itself. The component's document handler must
+        // NOT cancel it (React leaves the popup region outside the modal internal backdrop).
+        var prevented = await Page.EvaluateAsync<bool>("""
+            () => {
+                const item = document.querySelector('[data-testid="menu-item-1"]');
+                const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+                item.dispatchEvent(ev);
+                return ev.defaultPrevented;
+            }
+            """);
+        Assert.False(prevented);
+    }
+
+    /// <summary>
+    /// If the app cancels a context-menu open, the JS-side open mirror must be reset to
+    /// false. The trigger marks it open synchronously to suppress Server outside-press
+    /// races, but a canceled open has no normal Blazor open-state echo to clear it.
+    /// </summary>
+    [Fact]
+    public virtual async Task CanceledOpen_ClearsContextMenuJsOpenMirror()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu").WithContextMenuCancelOpen(true));
+
+        var trigger = GetByTestId("context-menu-trigger");
+        await trigger.ClickAsync(new LocatorClickOptions { Button = MouseButton.Right });
+
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        var jsOpen = await Page.EvaluateAsync<bool>("""
+            () => {
+                const state = window[Symbol.for('Blazix.BaseUI.ContextMenu.State')];
+                return Array.from(state?.roots.values() ?? []).some(root => root.isOpen);
+            }
+            """);
+        Assert.False(jsOpen);
+    }
+
+    /// <summary>
+    /// Click-drag-release item activation must require a right-button (button 2) release,
+    /// matching React's useMenuItemCommonProps gate: macOS activates on button 2 only; a
+    /// left-button release must never activate via the positioner mouseup path on any platform.
+    /// </summary>
+    [Fact]
+    public virtual async Task ClickDragRelease_RequiresRightButton_ForActivation()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var result = await Page.EvaluateAsync<string>("""
+            async () => {
+                const module = await import('/_content/Blazix.BaseUI/blazix-baseui-context-menu.js');
+                const rootId = `btn-gate-${Date.now()}`;
+                const isMac = /mac/i.test(navigator.userAgent);
+
+                const trigger = document.createElement('div');
+                const anchor = document.createElement('div');
+                const positioner = document.createElement('div');
+                const item = document.createElement('div');
+                item.setAttribute('role', 'menuitem');
+                positioner.appendChild(item);
+                document.body.append(trigger, anchor, positioner);
+
+                let clicks = 0;
+                item.addEventListener('click', () => { clicks += 1; });
+
+                module.initializeContextMenu(rootId, trigger, anchor, { invokeMethodAsync: () => Promise.resolve() }, false);
+                module.setPositionerElement(rootId, positioner);
+
+                async function gesture(button) {
+                    clicks = 0;
+                    // Right-click opens: arms allowMouseUp after the 500ms long-press delay.
+                    trigger.dispatchEvent(new MouseEvent('contextmenu', {
+                        bubbles: true, cancelable: true, clientX: 10, clientY: 10, button: 2
+                    }));
+                    await new Promise(r => setTimeout(r, 600));
+                    // Release over the item, moved >1px from the initial point, with the given button.
+                    item.dispatchEvent(new MouseEvent('mouseup', {
+                        bubbles: true, cancelable: true, clientX: 200, clientY: 200, button
+                    }));
+                    await new Promise(r => setTimeout(r, 0));
+                    return clicks;
+                }
+
+                const rightClicks = await gesture(2);
+                const leftClicks = await gesture(0);
+
+                module.disposeContextMenu(rootId);
+                trigger.remove(); anchor.remove(); positioner.remove();
+
+                return JSON.stringify({ isMac, rightClicks, leftClicks });
+            }
+            """);
+
+        var data = System.Text.Json.JsonDocument.Parse(result).RootElement;
+        var isMac = data.GetProperty("isMac").GetBoolean();
+        var rightClicks = data.GetProperty("rightClicks").GetInt32();
+        var leftClicks = data.GetProperty("leftClicks").GetInt32();
+
+        // A left-button release must NEVER activate the item (the positive button===2 gate).
+        Assert.Equal(0, leftClicks);
+
+        if (isMac)
+        {
+            // On macOS, a right-button drag-release activates the item.
+            Assert.Equal(1, rightClicks);
+        }
+        else
+        {
+            // On non-macOS, the right-button release belongs to the opening gesture and must not activate.
+            Assert.Equal(0, rightClicks);
+        }
+    }
+
+    #endregion
+
+    #region Reposition Tests
+
+    /// <summary>
+    /// A second right-click inside the trigger (clear of the popup) must reposition the open
+    /// menu to the new cursor and keep it open — matching React Base UI, where the menu
+    /// follows the cursor rather than dismissing.
+    /// </summary>
+    [Fact]
+    public virtual async Task SecondRightClickInTrigger_RepositionsMenuAndStaysOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var trigger = GetByTestId("context-menu-trigger");
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        // Open at point A (upper-left region of the trigger).
+        var ax = box.X + box.Width * 0.3f;
+        var ay = box.Y + box.Height * 0.3f;
+        await Page.Mouse.ClickAsync(ax, ay, new MouseClickOptions { Button = MouseButton.Right });
+        await WaitForContextMenuOpenAsync();
+
+        var popup = GetByTestId("context-menu-popup");
+        var rect1 = await popup.BoundingBoxAsync();
+        Assert.NotNull(rect1);
+
+        // Past the 500ms grace, right-click point B in the trigger's top-right (clear of the
+        // down-right-opening popup).
+        await WaitForDelayAsync(600);
+        var bx = box.X + box.Width - 12;
+        var by = box.Y + 10;
+        await Page.Mouse.ClickAsync(bx, by, new MouseClickOptions { Button = MouseButton.Right });
+
+        // Menu must stay open (React parity — no dismiss).
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("true", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        // ... and the popup must move toward B.
+        await WaitForDelayAsync(200);
+        var rect2 = await popup.BoundingBoxAsync();
+        Assert.NotNull(rect2);
+        Assert.True(
+            Math.Abs(rect2.X - rect1.X) > 20 || Math.Abs(rect2.Y - rect1.Y) > 20,
+            $"Expected popup to reposition; was ({rect1.X},{rect1.Y}), now ({rect2.X},{rect2.Y}).");
+    }
+
+    /// <summary>
+    /// An immediate second right-click (no delay after opening) must NOT close the menu.
+    /// Exercises the synchronous open-state guard: a fast double right-click must not outrun
+    /// the dismiss-suppression (which previously depended on an async open-state push).
+    /// </summary>
+    [Fact]
+    public virtual async Task ImmediateSecondRightClickInTrigger_DoesNotCloseMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var trigger = GetByTestId("context-menu-trigger");
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        // Open at A, then immediately (no wait) right-click B in the trigger's top-right.
+        await Page.Mouse.ClickAsync(box.X + box.Width * 0.3f, box.Y + box.Height * 0.3f, new MouseClickOptions { Button = MouseButton.Right });
+        await Page.Mouse.ClickAsync(box.X + box.Width - 12, box.Y + 10, new MouseClickOptions { Button = MouseButton.Right });
+
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("true", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// A second right-click on the trigger that is HELD past the long-press delay (&gt;500ms)
+    /// must not dismiss the menu. Regression for a Server-only close: the held release fired
+    /// the click-drag-release cancel, whose dismiss round-trip beat the reposition over SignalR.
+    /// </summary>
+    [Fact]
+    public virtual async Task HeldSecondRightClickInTrigger_DoesNotCloseMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var trigger = GetByTestId("context-menu-trigger");
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var x = box.X + box.Width * 0.4f;
+        var y = box.Y + box.Height * 0.4f;
+
+        await Page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = MouseButton.Right });
+        await WaitForContextMenuOpenAsync();
+
+        // Second right-click at the same spot, held past the 500ms long-press delay.
+        await Page.Mouse.MoveAsync(x, y);
+        await Page.Mouse.DownAsync(new MouseDownOptions { Button = MouseButton.Right });
+        await WaitForDelayAsync(700);
+        await Page.Mouse.UpAsync(new MouseUpOptions { Button = MouseButton.Right });
+
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("true", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+    }
+
+    /// <summary>
+    /// Repeated right-clicks at the exact same trigger coordinate must keep the context
+    /// menu open every time. Regression for the Server race where a visible-trigger
+    /// right-click was first treated as a shared Menu outside press, so the close from
+    /// pointerdown could win over the contextmenu reopen on alternating clicks.
+    /// </summary>
+    [Fact]
+    public virtual async Task RepeatedRightClicksAtSameTriggerPoint_AlwaysLeaveMenuOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var trigger = GetByTestId("context-menu-trigger");
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var x = box.X + box.Width * 0.35f;
+        var y = box.Y + box.Height * 0.35f;
+        var openState = GetByTestId("open-state");
+
+        for (var i = 0; i < 4; i++)
+        {
+            await Page.Mouse.ClickAsync(x, y, new MouseClickOptions { Button = MouseButton.Right });
+            await Assertions.Expect(openState).ToHaveTextAsync("true", new LocatorAssertionsToHaveTextOptions
+            {
+                Timeout = 5000 * TimeoutMultiplier
+            });
+            await WaitForDelayAsync(150);
+        }
+    }
+
+    /// <summary>
+    /// A right-click OUTSIDE the trigger while open must dismiss the menu (React parity).
+    /// </summary>
+    [Fact]
+    public virtual async Task RightClickOutsideTrigger_ClosesMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu").WithDefaultOpen(true));
+
+        var item1 = GetByTestId("menu-item-1");
+        await Assertions.Expect(item1).ToHaveAttributeAsync("data-highlighted", "", new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        var outsideButton = GetByTestId("outside-button");
+        await outsideButton.ClickAsync(new LocatorClickOptions { Button = MouseButton.Right });
+
+        await WaitForContextMenuClosedAsync();
+    }
+
+    #endregion
 }

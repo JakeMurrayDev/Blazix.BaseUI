@@ -1122,6 +1122,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithContextMenuCancelOpen(bool value)
+    {
+        queryParams["cancelOpen"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     // Navigation Menu
 
     public TestPageUrlBuilder WithNavDefaultValue(string value)

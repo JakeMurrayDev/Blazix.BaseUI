@@ -35,6 +35,13 @@ internal sealed class ContextMenuRootContext
     public Func<ElementReference, Task>? RegisterPositionerElement { get; set; }
 
     /// <summary>
+    /// Gets or sets the callback that recomputes the popup position against the current virtual
+    /// anchor. Invoked when an already-open context menu receives a second right-click so the
+    /// popup follows the cursor (the anchor is moved by JS before the callback runs).
+    /// </summary>
+    public Func<Task>? RequestReposition { get; set; }
+
+    /// <summary>
     /// Stores and forwards the current positioner element.
     /// </summary>
     /// <param name="element">The current positioner element.</param>
