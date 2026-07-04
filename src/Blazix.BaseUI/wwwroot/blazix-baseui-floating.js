@@ -106,6 +106,8 @@ async function ensureFloatingUI() {
 const TYPEABLE_SELECTOR = 'input:not([type="hidden"]):not([disabled]),' +
     '[contenteditable]:not([contenteditable="false"]),' +
     'textarea:not([disabled])';
+const AVAILABLE_WIDTH_VAR = '--available-width';
+const AVAILABLE_HEIGHT_VAR = '--available-height';
 
 // ============================================================================
 // Event Emitter
@@ -729,6 +731,12 @@ async function updatePositionInternal(positionerState) {
         // causes offsetParent to be null, breaking absolute strategy calculations.
         // Using setProperty with 'important' overrides the stylesheet !important rule.
         const strategy = positionMethod === 'absolute' ? 'absolute' : 'fixed';
+        if (!positionerElement.style.getPropertyValue(AVAILABLE_WIDTH_VAR)) {
+            positionerElement.style.setProperty(AVAILABLE_WIDTH_VAR, '100vw');
+        }
+        if (!positionerElement.style.getPropertyValue(AVAILABLE_HEIGHT_VAR)) {
+            positionerElement.style.setProperty(AVAILABLE_HEIGHT_VAR, '100vh');
+        }
 
         const placement = toFloatingPlacement(side, align);
         const ca = normalizeCollisionAvoidance(collisionAvoidance);
@@ -820,8 +828,8 @@ async function updatePositionInternal(positionerState) {
         middleware.push(FloatingUI.size({
             padding: collisionPadding,
             apply({ availableWidth, availableHeight, rects }) {
-                positionerElement.style.setProperty('--available-width', `${availableWidth}px`);
-                positionerElement.style.setProperty('--available-height', `${availableHeight}px`);
+                positionerElement.style.setProperty(AVAILABLE_WIDTH_VAR, `${availableWidth}px`);
+                positionerElement.style.setProperty(AVAILABLE_HEIGHT_VAR, `${availableHeight}px`);
 
                 // Snap anchor dimensions to device pixels to ensure the popup's visual
                 // width matches the anchor's, avoiding sub-pixel misalignment.

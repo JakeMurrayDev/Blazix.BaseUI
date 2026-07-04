@@ -79,6 +79,306 @@ A minimal autocomplete only needs the root, an input, and a popup containing the
 
 ## Examples
 
+### Async search
+
+Load items asynchronously while typing and render custom status content.
+
+```razor
+<AutocompleteRoot TValue="Movie"
+                  Items="@searchResults"
+                  Value="@searchValue"
+                  ValueChanged="HandleValueChanged"
+                  ItemToStringValue="GetMovieTitle"
+                  FilterDisabled="true">
+    <label>
+        Search movies by name or year
+        <AutocompleteInput placeholder="e.g. Pulp Fiction or 1994" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4" Align="Align.Start">
+            <AutocompletePopup aria-busy="@isPending">
+                <AutocompleteStatus>@status</AutocompleteStatus>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="Movie" Context="entry">
+                        <AutocompleteItem TValue="Movie" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Title
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Inline autocomplete
+
+Autofill the input with the highlighted item while navigating with arrow keys using `Mode`.
+
+```razor
+<AutocompleteRoot TValue="Tag"
+                  Items="@tags"
+                  Mode="AutocompleteMode.Both"
+                  ItemToStringValue="GetTagValue">
+    <label>
+        Search tags
+        <AutocompleteInput placeholder="e.g. feature" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="Tag" Context="entry">
+                        <AutocompleteItem TValue="Tag" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Grouped
+
+Organize related options with `AutocompleteGroup` and `AutocompleteGroupLabel` to add section headings inside the popup.
+
+```razor
+<AutocompleteRoot TValue="Tag"
+                  ItemGroups="@groupedTags"
+                  ItemToStringValue="GetTagValue">
+    <label>
+        Search grouped tags
+        <AutocompleteInput placeholder="e.g. component" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteEmpty>
+                    <div>No tags found.</div>
+                </AutocompleteEmpty>
+                <AutocompleteList>
+                    @foreach (var group in groupedTags)
+                    {
+                        <AutocompleteGroup>
+                            <AutocompleteGroupLabel>@group.Label</AutocompleteGroupLabel>
+                            @foreach (var tag in group.Items)
+                            {
+                                <AutocompleteItem TValue="Tag" Value="@tag" Label="@tag.Value">
+                                    @tag.Value
+                                </AutocompleteItem>
+                            }
+                        </AutocompleteGroup>
+                    }
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Fuzzy matching
+
+Use a custom `Filter` to find relevant results even when the query does not exactly match the item text.
+
+```razor
+<AutocompleteRoot TValue="DocItem"
+                  Items="@items"
+                  Filter="FuzzyFilter"
+                  ItemToStringValue="GetItemTitle">
+    <label>
+        Fuzzy search documentation
+        <AutocompleteInput placeholder="e.g. React" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteEmpty>
+                    <div>No results found.</div>
+                </AutocompleteEmpty>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="DocItem" Context="entry">
+                        <AutocompleteItem TValue="DocItem" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Title
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Limit results
+
+Limit the number of visible items using `Limit` and guide users to refine their query using `AutocompleteStatus`.
+
+```razor
+<AutocompleteRoot TValue="Tag"
+                  Items="@tags"
+                  Limit="8"
+                  ItemToStringValue="GetTagValue">
+    <label>
+        Limit results to 8
+        <AutocompleteInput placeholder="e.g. component" />
+    </label>
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="Tag" Context="entry">
+                        <AutocompleteItem TValue="Tag" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+                <AutocompleteStatus>Type a more specific query to narrow results.</AutocompleteStatus>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Auto highlight
+
+The first matching item can be automatically highlighted as the user types by setting `AutoHighlight`.
+
+```razor
+<AutocompleteRoot TValue="Tag"
+                  Items="@tags"
+                  AutoHighlight="AutocompleteAutoHighlight.True"
+                  ItemToStringValue="GetTagValue">
+    <AutocompleteInput placeholder="e.g. feature" />
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="Tag" Context="entry">
+                        <AutocompleteItem TValue="Tag" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Command palette
+
+Use the autocomplete input to filter a list of command items that perform an action when clicked.
+
+```razor
+<DialogRoot @bind-Open="open">
+    <DialogTrigger>Open command palette</DialogTrigger>
+    <DialogPortal>
+        <DialogBackdrop />
+        <DialogPopup aria-label="Command palette">
+            <AutocompleteRoot TValue="CommandItem"
+                              Open="true"
+                              Inline="true"
+                              ItemGroups="@groupedCommands"
+                              AutoHighlight="AutocompleteAutoHighlight.Always"
+                              KeepHighlight="true"
+                              ItemToStringValue="GetCommandLabel">
+                <AutocompleteInput aria-label="Search commands" />
+                <AutocompleteList>
+                    @foreach (var group in groupedCommands)
+                    {
+                        <AutocompleteGroup>
+                            <AutocompleteGroupLabel>@group.Label</AutocompleteGroupLabel>
+                            @foreach (var item in group.Items)
+                            {
+                                <AutocompleteItem TValue="CommandItem" Value="@item" Label="@item.Label">
+                                    @item.Label
+                                </AutocompleteItem>
+                            }
+                        </AutocompleteGroup>
+                    }
+                </AutocompleteList>
+            </AutocompleteRoot>
+        </DialogPopup>
+    </DialogPortal>
+</DialogRoot>
+```
+
+### Grid layout
+
+Display items in a grid layout, wrapping each row in `AutocompleteRow` components.
+
+```razor
+<AutocompleteRoot TValue="Tag" Grid="true" OpenOnInputClick="true">
+    <AutocompleteInput placeholder="Search components" />
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteList>
+                    @foreach (var row in rows)
+                    {
+                        <AutocompleteRow>
+                            @foreach (var entry in row)
+                            {
+                                <AutocompleteItem TValue="Tag" Value="@entry.Item" Index="@entry.Index">
+                                    @entry.Item.Value
+                                </AutocompleteItem>
+                            }
+                        </AutocompleteRow>
+                    }
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+```
+
+### Virtualized
+
+Efficiently handle large datasets using Blazor's built-in `Virtualize` component with externally filtered items.
+
+```razor
+<AutocompleteRoot TValue="VirtualItem"
+                  Virtualized="true"
+                  FilteredItems="@filteredItems"
+                  FilterDisabled="true"
+                  Value="@query"
+                  ValueChanged="HandleValueChanged"
+                  ItemToStringValue="GetItemName">
+    <AutocompleteInput placeholder="e.g. 0420" />
+    <AutocompletePortal>
+        <AutocompletePositioner SideOffset="4">
+            <AutocompletePopup>
+                <AutocompleteList>
+                    <Virtualize Items="@virtualizedEntries" Context="entry" ItemSize="@VirtualizedItemSize">
+                        <AutocompleteItem TValue="VirtualItem"
+                                          Value="@entry.Item"
+                                          Index="@entry.Index"
+                                          aria-setsize="@filteredItems.Count"
+                                          aria-posinset="@(entry.Index + 1)">
+                            @entry.Item.Name
+                        </AutocompleteItem>
+                    </Virtualize>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private const int VirtualizedItemSize = 32;
+
+    private List<VirtualEntry> virtualizedEntries = BuildVirtualizedEntries(filteredItems);
+
+    private static List<VirtualEntry> BuildVirtualizedEntries(IEnumerable<VirtualItem> items)
+    {
+        return items.Select((item, index) => new VirtualEntry(item, index)).ToList();
+    }
+
+    private sealed record VirtualEntry(VirtualItem Item, int Index);
+}
+```
+
 ### Add a trigger and clear button
 
 Wrap the input in an `AutocompleteInputGroup` to place adornments alongside it. `AutocompleteClear` appears once there is a value to clear, and `AutocompleteTrigger` opens the popup.
@@ -203,7 +503,7 @@ A button that clears the value. Renders a `<button>` element by default (a `<div
 | `ClassValue` | `Func<AutocompleteClearState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<AutocompleteClearState, string?>?` | `null` | Returns a CSS style based on state. |
 
-Data attributes: `data-open`, `data-closed`, `data-disabled`, `data-visible`.
+Data attributes: `data-popup-open`, `data-disabled`, `data-visible`.
 
 ### Value
 
@@ -255,7 +555,7 @@ Positions the popup relative to the input or trigger. Renders a `<div>` element 
 | `ClassValue` | `Func<AutocompletePositionerState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<AutocompletePositionerState, string?>?` | `null` | Returns a CSS style based on state. |
 
-Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`.
+Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`, `data-empty`, `data-anchor-hidden`.
 
 CSS variables: `--anchor-width`, `--anchor-height`, `--available-width`, `--available-height`, `--transform-origin`.
 
@@ -269,7 +569,7 @@ A container for the list and related content. Renders a `<div>` element by defau
 | `ClassValue` | `Func<AutocompletePopupState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<AutocompletePopupState, string?>?` | `null` | Returns a CSS style based on state. |
 
-Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`, `data-empty`, `data-starting-style`, `data-ending-style`.
+Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`, `data-empty`, `data-anchor-hidden`, `data-starting-style`, `data-ending-style`.
 
 ### Arrow
 

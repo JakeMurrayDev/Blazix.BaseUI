@@ -1,0 +1,133 @@
+@implements IDisposable
+
+<AutocompleteRoot TValue="AutocompleteDemoMovie"
+                  Items="@searchResults"
+                  Value="@searchValue"
+                  ValueChanged="HandleValueChanged"
+                  ItemToStringValue="AutocompleteDemoData.GetMovieValue"
+                  FilterDisabled="true">
+    <label class="blx-autocomplete-label">
+        Search movies by name or year
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. Pulp Fiction or 1994" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4" Align="Align.Start">
+            <AutocompletePopup class="blx-autocomplete-popup" aria-busy="@(isPending ? "true" : null)">
+                <div class="blx-autocomplete-viewport">
+                    <AutocompleteStatus>
+                        @if (StatusText is not null)
+                        {
+                            <div class="blx-autocomplete-status">
+                                @if (isPending)
+                                {
+                                    <span class="blx-autocomplete-spinner" aria-hidden="true"></span>
+                                }
+                                @StatusText
+                            </div>
+                        }
+                    </AutocompleteStatus>
+                    <AutocompleteList class="blx-autocomplete-list blx-autocomplete-list--flush">
+                        <AutocompleteCollection TValue="AutocompleteDemoMovie" Context="entry">
+                            <AutocompleteItem TValue="AutocompleteDemoMovie" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
+                                <span class="blx-autocomplete-movie">
+                                    <span class="blx-autocomplete-movie-title">@entry.Item.Title</span>
+                                    <span class="blx-autocomplete-movie-year">@entry.Item.Year</span>
+                                </span>
+                            </AutocompleteItem>
+                        </AutocompleteCollection>
+                    </AutocompleteList>
+                </div>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private CancellationTokenSource? searchCancellationTokenSource;
+    private IReadOnlyList<AutocompleteDemoMovie> searchResults = [];
+    private string searchValue = string.Empty;
+    private string? error;
+    private bool isPending;
+
+    private string? StatusText
+    {
+        get
+        {
+            if (isPending)
+            {
+                return "Searching...";
+            }
+
+            if (error is not null)
+            {
+                return error;
+            }
+
+            if (searchValue.Length == 0)
+            {
+                return null;
+            }
+
+            if (searchResults.Count == 0)
+            {
+                return $"Movie or year \"{searchValue}\" does not exist in the sample list";
+            }
+
+            return $"{searchResults.Count} result{(searchResults.Count == 1 ? string.Empty : "s")} found";
+        }
+    }
+
+    public void Dispose()
+    {
+        searchCancellationTokenSource?.Cancel();
+        searchCancellationTokenSource?.Dispose();
+    }
+
+    private async Task HandleValueChanged(string value)
+    {
+        searchValue = value;
+
+        searchCancellationTokenSource?.Cancel();
+        searchCancellationTokenSource?.Dispose();
+        searchCancellationTokenSource = new CancellationTokenSource();
+        var token = searchCancellationTokenSource.Token;
+
+        if (value.Length == 0)
+        {
+            searchResults = [];
+            error = null;
+            isPending = false;
+            return;
+        }
+
+        isPending = true;
+        error = null;
+
+        try
+        {
+            await Task.Delay(250, token);
+            if (value == "will_error")
+            {
+                searchResults = [];
+                error = "Failed to fetch movies. Please try again.";
+                return;
+            }
+
+            searchResults = AutocompleteDemoData.Movies
+                .Where(movie => AutocompleteDemoData.Contains(movie.Title, value) ||
+                    AutocompleteDemoData.Contains(movie.Year.ToString(), value))
+                .ToList();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                isPending = false;
+            }
+        }
+    }
+}

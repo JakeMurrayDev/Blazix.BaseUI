@@ -1,0 +1,66 @@
+<AutocompleteRoot TValue="AutocompleteDemoDocItem"
+                  Items="@AutocompleteDemoData.FuzzyItems"
+                  Value="@query"
+                  ValueChanged="HandleValueChanged"
+                  Filter="FuzzyFilter"
+                  ItemToStringValue="AutocompleteDemoData.GetDocItemValue">
+    <label class="blx-autocomplete-label">
+        Fuzzy search documentation
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. React" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup">
+                <AutocompleteEmpty>
+                    <div class="blx-autocomplete-empty">No results found for "@query"</div>
+                </AutocompleteEmpty>
+                <AutocompleteList class="blx-autocomplete-list blx-autocomplete-list--stack">
+                    <AutocompleteCollection TValue="AutocompleteDemoDocItem" Context="entry">
+                        <AutocompleteItem TValue="AutocompleteDemoDocItem" class="blx-autocomplete-item blx-autocomplete-item--rich" Value="@entry.Item" Index="@entry.Index">
+                            <span class="blx-autocomplete-item-content">
+                                <span class="blx-autocomplete-item-title">@HighlightText(entry.Item.Title)</span>
+                                <span class="blx-autocomplete-item-description">@HighlightText(entry.Item.Description)</span>
+                            </span>
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private string query = string.Empty;
+
+    private void HandleValueChanged(string value) => query = value;
+
+    private bool FuzzyFilter(AutocompleteDemoDocItem item, string value, Func<AutocompleteDemoDocItem, string?>? stringify)
+    {
+        return AutocompleteDemoData.FuzzyMatch(item.Title, value) ||
+            AutocompleteDemoData.FuzzyMatch(item.Description, value);
+    }
+
+    private RenderFragment HighlightText(string text) => builder =>
+    {
+        var trimmed = query.Trim();
+        if (trimmed.Length == 0)
+        {
+            builder.AddContent(0, text);
+            return;
+        }
+
+        var index = text.IndexOf(trimmed, StringComparison.CurrentCultureIgnoreCase);
+        if (index < 0)
+        {
+            builder.AddContent(1, text);
+            return;
+        }
+
+        builder.AddContent(2, text[..index]);
+        builder.OpenElement(3, "mark");
+        builder.AddContent(4, text.Substring(index, trimmed.Length));
+        builder.CloseElement();
+        builder.AddContent(5, text[(index + trimmed.Length)..]);
+    };
+}

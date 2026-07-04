@@ -20,6 +20,97 @@
 <CodeBlock Code="@AnatomyCode" />
 
 <DocsHeading Title="Examples" />
+<DocsHeading Level="3" Title="Async search" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Load items asynchronously while typing and render custom status content.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AsyncVariants">
+        <AutocompleteAsyncCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Inline autocomplete" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Autofill the input with the highlighted item while navigating with arrow keys using <code class="@LiquidGlassClasses.CodeInline">Mode</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@InlineVariants">
+        <AutocompleteInlineCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Grouped" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Organize related options with <code class="@LiquidGlassClasses.CodeInline">AutocompleteGroup</code> and <code class="@LiquidGlassClasses.CodeInline">AutocompleteGroupLabel</code>.
+</p>
+<CodeBlock Code="@GroupedItemsCode" Language="csharp" />
+<div class="mb-8 mt-4">
+    <Demo Variants="@GroupedVariants">
+        <AutocompleteGroupedCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Fuzzy matching" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use a custom filter to find relevant results even when the query does not exactly match the item text.
+</p>
+<div class="mb-8">
+    <Demo Variants="@FuzzyMatchingVariants">
+        <AutocompleteFuzzyMatchingCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Limit results" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Limit the number of visible items using <code class="@LiquidGlassClasses.CodeInline">Limit</code> and guide users to refine their query using <code class="@LiquidGlassClasses.CodeInline">AutocompleteStatus</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@LimitVariants">
+        <AutocompleteLimitCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Auto highlight" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Automatically highlight the first matching item as the user types.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AutoHighlightVariants">
+        <AutocompleteAutoHighlightCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Command palette" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Use the autocomplete input to filter command items that perform an action when clicked.
+</p>
+<div class="mb-8">
+    <Demo Variants="@CommandPaletteVariants">
+        <AutocompleteCommandPaletteCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Grid layout" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Display items in a grid layout, wrapping each row in <code class="@LiquidGlassClasses.CodeInline">AutocompleteRow</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@GridVariants">
+        <AutocompleteGridCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Virtualized" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Efficiently handle large datasets using Blazor's built-in <code class="@LiquidGlassClasses.CodeInline">Virtualize</code> component with externally filtered items.
+</p>
+<div class="mb-8">
+    <Demo Variants="@VirtualizedVariants">
+        <AutocompleteVirtualizedCss />
+    </Demo>
+</div>
+
 <DocsHeading Level="3" Title="Add a trigger and clear button" />
 <p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
     Wrap the input in an <code class="@LiquidGlassClasses.CodeInline">AutocompleteInputGroup</code> to place adornments alongside it. <code class="@LiquidGlassClasses.CodeInline">AutocompleteClear</code> appears once there is a value to clear, and <code class="@LiquidGlassClasses.CodeInline">AutocompleteTrigger</code> opens the popup.
@@ -78,6 +169,17 @@
         </AutocompleteRoot>
         """;
 
+    private const string GroupedItemsCode =
+        """
+        public sealed record ProduceGroupItem(string Value, IReadOnlyList<string> Items);
+
+        private static readonly IReadOnlyList<ProduceGroupItem> Groups =
+        [
+            new("Fruits", ["Apple", "Banana", "Orange"]),
+            new("Vegetables", ["Carrot", "Lettuce", "Spinach"]),
+        ];
+        """;
+
     private static readonly IReadOnlyList<DemoVariant> HeroVariants =
     [
         new("CSS",
@@ -103,4 +205,43 @@
             new DemoFile("Autocomplete.razor", "xml", "Components.Demos.Autocomplete.InputGroup.Tailwind.AutocompleteInputGroupTailwind.razor"),
         ]),
     ];
+
+    private static readonly IReadOnlyList<DemoVariant> AsyncVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Async.Css.AutocompleteAsyncCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> InlineVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Inline.Css.AutocompleteInlineCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> GroupedVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Grouped.Css.AutocompleteGroupedCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> FuzzyMatchingVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.FuzzyMatching.Css.AutocompleteFuzzyMatchingCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> LimitVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Limit.Css.AutocompleteLimitCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> AutoHighlightVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.AutoHighlight.Css.AutocompleteAutoHighlightCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> CommandPaletteVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.CommandPalette.Css.AutocompleteCommandPaletteCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> GridVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Grid.Css.AutocompleteGridCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> VirtualizedVariants =
+        CreateCssOnlyVariants("Components.Demos.Autocomplete.Virtualized.Css.AutocompleteVirtualizedCss.razor");
+
+    private static IReadOnlyList<DemoVariant> CreateCssOnlyVariants(string componentResource)
+    {
+        return
+        [
+            new("CSS",
+            [
+                new DemoFile("Autocomplete.razor", "xml", componentResource),
+                new DemoFile("autocomplete.css", "css", "wwwroot.demos.autocomplete.css"),
+            ]),
+        ];
+    }
 }

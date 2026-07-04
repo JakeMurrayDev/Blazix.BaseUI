@@ -130,7 +130,7 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         var cut = Render(CreateAutocomplete(defaultValue: "Ap", defaultOpen: true, name: "fruit"));
 
         var input = cut.Find("input[role='combobox']");
-        input.GetAttribute("type").ShouldBe("text");
+        input.HasAttribute("type").ShouldBeFalse();
         input.GetAttribute("value").ShouldBe("Ap");
         input.GetAttribute("aria-expanded").ShouldBe("true");
         input.GetAttribute("aria-haspopup").ShouldBe("listbox");
@@ -160,6 +160,194 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
         var popup = cut.Find("[data-testid='autocomplete-popup']");
         popup.HasAttribute("data-empty").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Positioner_ShouldExposeEmptyStateAttribute()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AutocompleteRoot<string>>(0);
+            builder.AddAttribute(1, nameof(AutocompleteRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(AutocompleteRoot<string>.DefaultValue), "zz");
+            builder.AddAttribute(3, nameof(AutocompleteRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(4, nameof(AutocompleteRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AutocompleteInput>(0);
+                childBuilder.CloseComponent();
+
+                childBuilder.OpenComponent<AutocompletePositioner>(10);
+                childBuilder.AddAttribute(11, "data-testid", "autocomplete-positioner");
+                childBuilder.AddAttribute(12, nameof(AutocompletePositioner.ChildContent), (RenderFragment)(positionerBuilder =>
+                {
+                    positionerBuilder.OpenComponent<AutocompletePopup>(0);
+                    positionerBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var positioner = cut.Find("[data-testid='autocomplete-positioner']");
+        positioner.HasAttribute("data-empty").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task PositionerAndPopup_ShouldExposeAnchorHiddenFromPositionCallback()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AutocompleteRoot<string>>(0);
+            builder.AddAttribute(1, nameof(AutocompleteRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(AutocompleteRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(3, nameof(AutocompleteRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AutocompleteInput>(0);
+                childBuilder.CloseComponent();
+
+                childBuilder.OpenComponent<AutocompletePositioner>(10);
+                childBuilder.AddAttribute(11, "data-testid", "autocomplete-positioner");
+                childBuilder.AddAttribute(12, nameof(AutocompletePositioner.ChildContent), (RenderFragment)(positionerBuilder =>
+                {
+                    positionerBuilder.OpenComponent<AutocompletePopup>(0);
+                    positionerBuilder.AddAttribute(1, "data-testid", "autocomplete-popup");
+                    positionerBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var positionerComponent = cut.FindComponent<AutocompletePositioner>();
+        positionerComponent.Instance.OnPositionUpdated("top", "end", true, true);
+
+        cut.WaitForAssertion(() =>
+        {
+            var positioner = cut.Find("[data-testid='autocomplete-positioner']");
+            positioner.GetAttribute("data-side").ShouldBe("top");
+            positioner.GetAttribute("data-align").ShouldBe("end");
+            positioner.HasAttribute("data-anchor-hidden").ShouldBeTrue();
+
+            var popup = cut.Find("[data-testid='autocomplete-popup']");
+            popup.GetAttribute("data-side").ShouldBe("top");
+            popup.GetAttribute("data-align").ShouldBe("end");
+            popup.HasAttribute("data-anchor-hidden").ShouldBeTrue();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Clear_ShouldExposePopupOpenVisibleAndTransitionAttributesOnly()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AutocompleteRoot<string>>(0);
+            builder.AddAttribute(1, nameof(AutocompleteRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(AutocompleteRoot<string>.DefaultValue), "Apple");
+            builder.AddAttribute(3, nameof(AutocompleteRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(4, nameof(AutocompleteRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AutocompleteClear>(0);
+                childBuilder.AddAttribute(1, nameof(AutocompleteClear.ChildContent), (RenderFragment)(b => b.AddContent(0, "Clear")));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var clear = cut.Find("button");
+        clear.HasAttribute("data-popup-open").ShouldBeTrue();
+        clear.HasAttribute("data-visible").ShouldBeTrue();
+        clear.HasAttribute("data-open").ShouldBeFalse();
+        clear.HasAttribute("data-closed").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public void Clear_ShouldClearJsElementWhenValueHidesButton()
+    {
+        var module = JSInterop.SetupModule(AutocompleteModule);
+        static RenderFragment ClearChildren() => childBuilder =>
+        {
+            childBuilder.OpenComponent<AutocompleteClear>(0);
+            childBuilder.AddAttribute(1, nameof(AutocompleteClear.ChildContent), (RenderFragment)(b => b.AddContent(0, "Clear")));
+            childBuilder.CloseComponent();
+        };
+
+        var cut = Render<AutocompleteRoot<string>>(parameters => parameters
+            .Add(p => p.Items, Fruits)
+            .Add(p => p.Value, "Apple")
+            .Add(p => p.ChildContent, ClearChildren()));
+
+        module.Invocations.Any(invocation =>
+            invocation.Identifier == "setClearElement" && invocation.Arguments.Count == 2 &&
+            invocation.Arguments[1] is not null).ShouldBeTrue();
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Items, Fruits)
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.ChildContent, ClearChildren()));
+
+        module.Invocations.Any(invocation =>
+            invocation.Identifier == "setClearElement" && invocation.Arguments.Count == 2 &&
+            invocation.Arguments[1] is null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task CompositionInput_ShouldDeferValueChangeUntilCompositionEnds()
+    {
+        var cut = Render(CreateAutocomplete(defaultValue: "Ap", defaultOpen: true));
+
+        var input = cut.Find("input[role='combobox']");
+        await input.TriggerEventAsync("oncompositionstart", EventArgs.Empty);
+        await input.TriggerEventAsync("oninput", new ChangeEventArgs { Value = "あ" });
+
+        input = cut.Find("input[role='combobox']");
+        input.GetAttribute("value").ShouldBe("Ap");
+
+        await input.TriggerEventAsync("oncompositionend", EventArgs.Empty);
+
+        input = cut.Find("input[role='combobox']");
+        input.GetAttribute("value").ShouldBe("あ");
+    }
+
+    [Fact]
+    public Task InputRenderAsTextarea_ShouldNotEmitTypeAttribute()
+    {
+        RenderFragment<RenderProps<AutocompleteInputState>> renderAsTextarea = props => builder =>
+        {
+            builder.OpenElement(0, "textarea");
+            builder.AddMultipleAttributes(1, props.Attributes);
+            if (props.ElementReferenceCallback is not null)
+            {
+                builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
+            }
+
+            builder.CloseElement();
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AutocompleteRoot<string>>(0);
+            builder.AddAttribute(1, nameof(AutocompleteRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(AutocompleteRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(3, nameof(AutocompleteRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AutocompleteInput>(0);
+                childBuilder.AddAttribute(1, nameof(AutocompleteInput.Render), renderAsTextarea);
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var textarea = cut.Find("textarea");
+        textarea.HasAttribute("type").ShouldBeFalse();
+        textarea.GetAttribute("role").ShouldBe("combobox");
 
         return Task.CompletedTask;
     }
@@ -207,6 +395,17 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
         trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task Navigate_ShouldReturnActiveIndexForSynchronousJsKeyboardState()
+    {
+        var cut = Render(CreateAutocomplete(defaultOpen: true));
+        var root = cut.FindComponent<AutocompleteRoot<string>>();
+
+        var activeIndex = await cut.InvokeAsync(() => root.Instance.OnNavigate(1));
+
+        activeIndex.ShouldBe(0);
     }
 
     [Fact]

@@ -79,6 +79,7 @@ internal interface IAutocompleteRootContext
     Task CommitActiveItemAsync();
     Task CommitItemAsync(object? value, AutocompleteChangeReason reason);
     Task ClearAsync(AutocompleteChangeReason reason);
+    ValueTask FocusInputAsync();
     void NotifyStateChanged();
     void NotifyItemMapChanged();
 }

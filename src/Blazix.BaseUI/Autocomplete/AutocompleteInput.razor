@@ -27,6 +27,8 @@
     private ElementReference? previousElement;
     private bool? previousIsInsidePopup;
     private bool subscribed;
+    private bool isComposing;
+    private string? pendingCompositionValue;
 
     private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
@@ -217,7 +219,6 @@
 
         var attrs = new Dictionary<string, object>
         {
-            ["type"] = "text",
             ["value"] = RootContext?.GetInputValue() ?? string.Empty,
             ["autocomplete"] = "off",
             ["spellcheck"] = "false",
@@ -293,6 +294,8 @@
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
         attrs["onmousedown"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseDownAsync);
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["oncompositionstart"] = EventCallback.Factory.Create<EventArgs>(this, HandleCompositionStartAsync);
+        attrs["oncompositionend"] = EventCallback.Factory.Create<EventArgs>(this, HandleCompositionEndAsync);
 
         componentAttributes = attrs;
     }
@@ -304,7 +307,14 @@
             return;
         }
 
-        await RootContext.SetInputValueAsync(Convert.ToString(e.Value) ?? string.Empty, AutocompleteChangeReason.InputChange);
+        var value = Convert.ToString(e.Value) ?? string.Empty;
+        if (isComposing)
+        {
+            pendingCompositionValue = value;
+            return;
+        }
+
+        await RootContext.SetInputValueAsync(value, AutocompleteChangeReason.InputChange);
     }
 
     private async Task HandleFocusAsync(FocusEventArgs e)
@@ -333,6 +343,31 @@
     private Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
         return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleCompositionStartAsync(EventArgs e)
+    {
+        isComposing = true;
+        pendingCompositionValue = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleCompositionEndAsync(EventArgs e)
+    {
+        if (RootContext is null || state.Disabled || RootContext.ReadOnly)
+        {
+            isComposing = false;
+            pendingCompositionValue = null;
+            return;
+        }
+
+        var value = pendingCompositionValue;
+        isComposing = false;
+        pendingCompositionValue = null;
+        if (value is not null)
+        {
+            await RootContext.SetInputValueAsync(value, AutocompleteChangeReason.InputChange);
+        }
     }
 
     private void ApplyPopupDataAttributes(Dictionary<string, object> attrs)

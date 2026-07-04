@@ -1,0 +1,60 @@
+<AutocompleteRoot TValue="AutocompleteDemoTag"
+                  Items="@AutocompleteDemoData.LimitTags"
+                  Value="@value"
+                  ValueChanged="HandleValueChanged"
+                  Limit="@Limit"
+                  ItemToStringValue="AutocompleteDemoData.GetTagValue">
+    <label class="blx-autocomplete-label">
+        Limit results to 8
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. component" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup blx-autocomplete-popup--scrolling">
+                <AutocompleteEmpty>
+                    <div class="blx-autocomplete-empty">No results found for "@value"</div>
+                </AutocompleteEmpty>
+                <AutocompleteList>
+                    <AutocompleteCollection TValue="AutocompleteDemoTag" Context="entry">
+                        <AutocompleteItem TValue="AutocompleteDemoTag" class="blx-autocomplete-item" Value="@entry.Item" Index="@entry.Index">
+                            @entry.Item.Value
+                        </AutocompleteItem>
+                    </AutocompleteCollection>
+                </AutocompleteList>
+                <AutocompleteStatus>
+                    @if (MoreCount > 0)
+                    {
+                        <div class="blx-autocomplete-status">
+                            Hiding @MoreCount results (type a more specific query to narrow results)
+                        </div>
+                    }
+                </AutocompleteStatus>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
+
+@code {
+    private const int Limit = 8;
+
+    private string value = string.Empty;
+
+    private int TotalMatches
+    {
+        get
+        {
+            var trimmed = value.Trim();
+            if (trimmed.Length == 0)
+            {
+                return AutocompleteDemoData.LimitTags.Count;
+            }
+
+            return AutocompleteDemoData.LimitTags.Count(tag => AutocompleteDemoData.Contains(tag.Value, trimmed));
+        }
+    }
+
+    private int MoreCount => Math.Max(0, TotalMatches - Limit);
+
+    private void HandleValueChanged(string nextValue) => value = nextValue;
+}

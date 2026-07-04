@@ -1,0 +1,56 @@
+<DialogRoot @bind-Open="open">
+    <DialogTrigger class="blx-autocomplete-command-button">Open command palette</DialogTrigger>
+    <DialogPortal>
+        <DialogBackdrop class="blx-autocomplete-command-backdrop" />
+        <DialogPopup class="blx-autocomplete-command-popup" aria-label="Command palette">
+            <AutocompleteRoot TValue="AutocompleteDemoCommandItem"
+                              Open="true"
+                              Inline="true"
+                              ItemGroups="@AutocompleteDemoData.GroupedCommandItems"
+                              AutoHighlight="AutocompleteAutoHighlight.Always"
+                              KeepHighlight="true"
+                              ItemToStringValue="AutocompleteDemoData.GetCommandValue">
+                <AutocompleteInput class="blx-autocomplete-command-input"
+                                   aria-label="Search commands"
+                                   placeholder="Search for apps and commands..." />
+                <DialogClose class="blx-autocomplete-visually-hidden">Close command palette</DialogClose>
+
+                <div class="blx-autocomplete-command-list-area">
+                    <AutocompleteEmpty>
+                        <div class="blx-autocomplete-empty">No results found.</div>
+                    </AutocompleteEmpty>
+                    <AutocompleteList class="blx-autocomplete-command-list">
+                        @foreach (var group in AutocompleteDemoData.GroupedCommandItems)
+                        {
+                            <AutocompleteGroup class="blx-autocomplete-command-group">
+                                <AutocompleteGroupLabel class="blx-autocomplete-command-group-label">@group.Label</AutocompleteGroupLabel>
+                                @foreach (var item in group.Items)
+                                {
+                                    <AutocompleteItem TValue="AutocompleteDemoCommandItem"
+                                                      class="blx-autocomplete-command-item"
+                                                      Value="@item"
+                                                      Label="@item.Label"
+                                                      @onclick="Close">
+                                        <span class="blx-autocomplete-command-item-label">@item.Label</span>
+                                        <span class="blx-autocomplete-command-item-kind">@item.Kind</span>
+                                    </AutocompleteItem>
+                                }
+                            </AutocompleteGroup>
+                        }
+                    </AutocompleteList>
+                </div>
+
+                <div class="blx-autocomplete-command-footer">
+                    <span>Activate</span>
+                    <kbd class="blx-autocomplete-kbd">Enter</kbd>
+                </div>
+            </AutocompleteRoot>
+        </DialogPopup>
+    </DialogPortal>
+</DialogRoot>
+
+@code {
+    private bool open;
+
+    private void Close() => open = false;
+}

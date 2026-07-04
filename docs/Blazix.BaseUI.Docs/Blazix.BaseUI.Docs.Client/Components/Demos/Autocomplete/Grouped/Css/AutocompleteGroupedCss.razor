@@ -1,0 +1,32 @@
+<AutocompleteRoot TValue="AutocompleteDemoTag"
+                  ItemGroups="@AutocompleteDemoData.GroupedTags"
+                  ItemToStringValue="AutocompleteDemoData.GetTagValue">
+    <label class="blx-autocomplete-label">
+        Search grouped tags
+        <AutocompleteInput class="blx-autocomplete-input" placeholder="e.g. component" />
+    </label>
+
+    <AutocompletePortal>
+        <AutocompletePositioner class="blx-autocomplete-positioner" SideOffset="4">
+            <AutocompletePopup class="blx-autocomplete-popup">
+                <AutocompleteEmpty>
+                    <div class="blx-autocomplete-empty">No tags found.</div>
+                </AutocompleteEmpty>
+                <AutocompleteList class="blx-autocomplete-list">
+                    @foreach (var group in AutocompleteDemoData.GroupedTags)
+                    {
+                        <AutocompleteGroup class="blx-autocomplete-group">
+                            <AutocompleteGroupLabel class="blx-autocomplete-group-label">@group.Label</AutocompleteGroupLabel>
+                            @foreach (var tag in group.Items)
+                            {
+                                <AutocompleteItem TValue="AutocompleteDemoTag" class="blx-autocomplete-item" Value="@tag" Label="@tag.Value">
+                                    @tag.Value
+                                </AutocompleteItem>
+                            }
+                        </AutocompleteGroup>
+                    }
+                </AutocompleteList>
+            </AutocompletePopup>
+        </AutocompletePositioner>
+    </AutocompletePortal>
+</AutocompleteRoot>
