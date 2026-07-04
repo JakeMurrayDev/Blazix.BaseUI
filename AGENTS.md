@@ -35,8 +35,9 @@ Blazix.BaseUI/
 
 ### Tool Preferences
 
-- Use Serena for searching files; if it does not work, use default searching
-- Forget everything you know and use context7 to check for documentation and best practices
+- Use relevant Codex skills when their trigger applies.
+- Use `rg` for repository file and text search unless a relevant skill provides a better workflow.
+- For current library, framework, SDK, API, CLI, or cloud-service documentation, use the Context7 CLI workflow (`npx ctx7@latest library ...`, then `npx ctx7@latest docs ...`).
 - Use `/dev/null` in Git Bash, not `nul`
 - Put all `tmpclaude-*-cwd` files in `/.claude/tmp-files`
 - **`gh api` on Windows**: Omit the leading `/` from endpoint paths. Windows shells rewrite `/repos/...` as filesystem paths (e.g., `F:/Git/repos/...`). Use `gh api repos/owner/repo/...` instead of `gh api /repos/owner/repo/...`

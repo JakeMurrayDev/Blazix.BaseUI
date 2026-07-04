@@ -569,7 +569,7 @@ A container for the list and related content. Renders a `<div>` element by defau
 | `ClassValue` | `Func<AutocompletePopupState, string?>?` | `null` | Returns a CSS class based on state. |
 | `StyleValue` | `Func<AutocompletePopupState, string?>?` | `null` | Returns a CSS style based on state. |
 
-Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`, `data-empty`, `data-starting-style`, `data-ending-style`.
+Data attributes: `data-side`, `data-align`, `data-open`, `data-closed`, `data-empty`, `data-anchor-hidden`, `data-starting-style`, `data-ending-style`.
 
 ### Arrow
 

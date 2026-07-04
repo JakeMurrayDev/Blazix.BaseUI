@@ -2,6 +2,8 @@ namespace Blazix.BaseUI.Tests.Docs;
 
 public class DocsAutocompleteDemoTests
 {
+    private const string AutocompleteDemoDirectory = "docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/Autocomplete";
+
     [Fact]
     public void AutocompletePage_IncludesEverySourceExample()
     {
@@ -21,16 +23,28 @@ public class DocsAutocompleteDemoTests
     [Fact]
     public void AutocompleteDemos_ApplyEmptyVisualSpacingToChildrenOnly()
     {
-        var root = FindRepoRoot();
-        var demoDirectory = Path.Combine(
-            root,
-            "docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/Autocomplete");
+        var demoDirectory = Path.Combine(FindRepoRoot(), AutocompleteDemoDirectory);
 
         foreach (var file in Directory.EnumerateFiles(demoDirectory, "*.razor", SearchOption.AllDirectories))
         {
             var contents = File.ReadAllText(file);
             contents.ShouldNotContain("<AutocompleteEmpty class=");
+
+            foreach (var emptyBlock in GetAutocompleteEmptyBlocks(contents))
+            {
+                emptyBlock.ShouldContain("<div class=");
+            }
         }
+    }
+
+    [Fact]
+    public void AutocompleteDocs_PopupListsAnchorHiddenDataAttribute()
+    {
+        var docs = ReadRepoFile("docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs/Content/Components/autocomplete.md");
+        var popupSection = docs[
+            docs.IndexOf("### Popup", StringComparison.Ordinal)..docs.IndexOf("### Arrow", StringComparison.Ordinal)];
+
+        popupSection.ShouldContain("data-anchor-hidden");
     }
 
     [Fact]
@@ -78,6 +92,27 @@ public class DocsAutocompleteDemoTests
     private static string ReadRepoFile(string relativePath)
     {
         return File.ReadAllText(Path.Combine(FindRepoRoot(), relativePath));
+    }
+
+    private static IEnumerable<string> GetAutocompleteEmptyBlocks(string contents)
+    {
+        var searchIndex = 0;
+
+        while (true)
+        {
+            var start = contents.IndexOf("<AutocompleteEmpty", searchIndex, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                yield break;
+            }
+
+            var end = contents.IndexOf("</AutocompleteEmpty>", start, StringComparison.Ordinal);
+            end.ShouldBeGreaterThanOrEqualTo(0);
+
+            yield return contents[start..end];
+
+            searchIndex = end + "</AutocompleteEmpty>".Length;
+        }
     }
 
     private static string FindRepoRoot()
