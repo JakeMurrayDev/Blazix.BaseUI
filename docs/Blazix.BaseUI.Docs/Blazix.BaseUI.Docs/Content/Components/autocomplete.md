@@ -350,13 +350,13 @@ Efficiently handle large datasets using Blazor's built-in `Virtualize` component
         <AutocompletePositioner SideOffset="4">
             <AutocompletePopup>
                 <AutocompleteList>
-                    <Virtualize Items="@filteredItems" Context="item" ItemSize="32">
+                    <Virtualize Items="@virtualizedEntries" Context="entry" ItemSize="@VirtualizedItemSize">
                         <AutocompleteItem TValue="VirtualItem"
-                                          Value="@item"
-                                          Index="@filteredItems.IndexOf(item)"
+                                          Value="@entry.Item"
+                                          Index="@entry.Index"
                                           aria-setsize="@filteredItems.Count"
-                                          aria-posinset="@(filteredItems.IndexOf(item) + 1)">
-                            @item.Name
+                                          aria-posinset="@(entry.Index + 1)">
+                            @entry.Item.Name
                         </AutocompleteItem>
                     </Virtualize>
                 </AutocompleteList>
@@ -364,6 +364,19 @@ Efficiently handle large datasets using Blazor's built-in `Virtualize` component
         </AutocompletePositioner>
     </AutocompletePortal>
 </AutocompleteRoot>
+
+@code {
+    private const int VirtualizedItemSize = 32;
+
+    private List<VirtualEntry> virtualizedEntries = BuildVirtualizedEntries(filteredItems);
+
+    private static List<VirtualEntry> BuildVirtualizedEntries(IEnumerable<VirtualItem> items)
+    {
+        return items.Select((item, index) => new VirtualEntry(item, index)).ToList();
+    }
+
+    private sealed record VirtualEntry(VirtualItem Item, int Index);
+}
 ```
 
 ### Add a trigger and clear button

@@ -39,6 +39,35 @@ public class JavaScriptModuleExportTests
         source.ShouldContain("dotNetRef.invokeMethodAsync('OnAnimationTypeDetected', animationType).catch(() => { });");
     }
 
+    [Fact]
+    public async Task AutocompleteModule_TracksPendingKeyboardNavigationBeforeAsyncInteropCompletes()
+    {
+        var source = await File.ReadAllTextAsync(GetRepositoryFile(
+            "src",
+            "Blazix.BaseUI",
+            "wwwroot",
+            "blazix-baseui-autocomplete.js"));
+
+        source.ShouldContain("pendingActiveIndex");
+        source.ShouldContain("getEffectiveActiveIndex(root)");
+        source.ShouldContain("invokeMethodAsync('OnNavigate', event.key === 'ArrowDown' ? 1 : -1).then((activeIndex)");
+        source.ShouldContain("if (event.key === 'Enter' && root.isOpen && getEffectiveActiveIndex(root) >= 0)");
+    }
+
+    [Fact]
+    public async Task AutocompleteModule_ForwardsPositionUpdatesToDotNet()
+    {
+        var source = await File.ReadAllTextAsync(GetRepositoryFile(
+            "src",
+            "Blazix.BaseUI",
+            "wwwroot",
+            "blazix-baseui-autocomplete.js"));
+
+        source.ShouldContain("dotNetRef");
+        source.ShouldContain("onPositionUpdated:");
+        source.ShouldContain("dotNetRef.invokeMethodAsync('OnPositionUpdated', side, align, anchorHidden, arrowUncentered)");
+    }
+
     private static string GetRepositoryFile(params string[] pathSegments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

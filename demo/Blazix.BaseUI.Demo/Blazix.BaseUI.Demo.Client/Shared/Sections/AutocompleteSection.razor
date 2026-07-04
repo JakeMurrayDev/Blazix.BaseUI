@@ -636,7 +636,7 @@
                                                   StyleValue="@VirtualizedListStyleValue(virtualizedRenderItems.Length)">
                                     <Virtualize Items="@virtualizedRenderItems"
                                                 Context="entry"
-                                                ItemSize="32"
+                                                ItemSize="@VirtualizedItemSize"
                                                 OverscanCount="20">
                                         <AutocompleteItem TValue="VirtualizedItem"
                                                           Value="@entry.Item"

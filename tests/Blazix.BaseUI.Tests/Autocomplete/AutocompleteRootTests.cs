@@ -197,6 +197,51 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
     }
 
     [Fact]
+    public Task PositionerAndPopup_ShouldExposeAnchorHiddenFromPositionCallback()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AutocompleteRoot<string>>(0);
+            builder.AddAttribute(1, nameof(AutocompleteRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(AutocompleteRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(3, nameof(AutocompleteRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<AutocompleteInput>(0);
+                childBuilder.CloseComponent();
+
+                childBuilder.OpenComponent<AutocompletePositioner>(10);
+                childBuilder.AddAttribute(11, "data-testid", "autocomplete-positioner");
+                childBuilder.AddAttribute(12, nameof(AutocompletePositioner.ChildContent), (RenderFragment)(positionerBuilder =>
+                {
+                    positionerBuilder.OpenComponent<AutocompletePopup>(0);
+                    positionerBuilder.AddAttribute(1, "data-testid", "autocomplete-popup");
+                    positionerBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var positionerComponent = cut.FindComponent<AutocompletePositioner>();
+        positionerComponent.Instance.OnPositionUpdated("top", "end", true, true);
+
+        cut.WaitForAssertion(() =>
+        {
+            var positioner = cut.Find("[data-testid='autocomplete-positioner']");
+            positioner.GetAttribute("data-side").ShouldBe("top");
+            positioner.GetAttribute("data-align").ShouldBe("end");
+            positioner.HasAttribute("data-anchor-hidden").ShouldBeTrue();
+
+            var popup = cut.Find("[data-testid='autocomplete-popup']");
+            popup.GetAttribute("data-side").ShouldBe("top");
+            popup.GetAttribute("data-align").ShouldBe("end");
+            popup.HasAttribute("data-anchor-hidden").ShouldBeTrue();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task Clear_ShouldExposePopupOpenVisibleAndTransitionAttributesOnly()
     {
         var cut = Render(builder =>
@@ -221,6 +266,36 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         clear.HasAttribute("data-closed").ShouldBeFalse();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public void Clear_ShouldClearJsElementWhenValueHidesButton()
+    {
+        var module = JSInterop.SetupModule(AutocompleteModule);
+        static RenderFragment ClearChildren() => childBuilder =>
+        {
+            childBuilder.OpenComponent<AutocompleteClear>(0);
+            childBuilder.AddAttribute(1, nameof(AutocompleteClear.ChildContent), (RenderFragment)(b => b.AddContent(0, "Clear")));
+            childBuilder.CloseComponent();
+        };
+
+        var cut = Render<AutocompleteRoot<string>>(parameters => parameters
+            .Add(p => p.Items, Fruits)
+            .Add(p => p.Value, "Apple")
+            .Add(p => p.ChildContent, ClearChildren()));
+
+        module.Invocations.Any(invocation =>
+            invocation.Identifier == "setClearElement" && invocation.Arguments.Count == 2 &&
+            invocation.Arguments[1] is not null).ShouldBeTrue();
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Items, Fruits)
+            .Add(p => p.Value, string.Empty)
+            .Add(p => p.ChildContent, ClearChildren()));
+
+        module.Invocations.Any(invocation =>
+            invocation.Identifier == "setClearElement" && invocation.Arguments.Count == 2 &&
+            invocation.Arguments[1] is null).ShouldBeTrue();
     }
 
     [Fact]
@@ -320,6 +395,17 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
         trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task Navigate_ShouldReturnActiveIndexForSynchronousJsKeyboardState()
+    {
+        var cut = Render(CreateAutocomplete(defaultOpen: true));
+        var root = cut.FindComponent<AutocompleteRoot<string>>();
+
+        var activeIndex = await cut.InvokeAsync(() => root.Instance.OnNavigate(1));
+
+        activeIndex.ShouldBe(0);
     }
 
     [Fact]

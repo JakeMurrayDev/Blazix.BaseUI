@@ -40,6 +40,10 @@ public class DocsAutocompleteDemoTests
         var css = ReadRepoFile("docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/wwwroot/demos/autocomplete.css");
 
         demo.ShouldContain("style=\"@VirtualizedListStyle\"");
+        demo.ShouldContain("ItemSize=\"@VirtualizedItemSize\"");
+        demo.ShouldContain("Index=\"@entry.Index\"");
+        demo.ShouldContain("aria-posinset=\"@(entry.Index + 1)\"");
+        demo.ShouldNotContain("IndexOf(item)");
         css.ShouldContain("height: min(22.5rem, var(--total-size));");
         css.ShouldContain("max-height: var(--available-height, 22.5rem);");
         css.ShouldNotContain("height: min(22.5rem, var(--available-height));");

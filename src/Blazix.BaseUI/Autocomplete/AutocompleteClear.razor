@@ -108,22 +108,23 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var current = Element;
-        if (RootContext is null || Nullable.Equals(previousElement, current))
+        if (RootContext is null)
+        {
+            return;
+        }
+
+        var current = KeepMounted || state.Visible ? Element : null;
+        if (Nullable.Equals(previousElement, current))
         {
             return;
         }
 
         previousElement = current;
-        if (!current.HasValue)
-        {
-            return;
-        }
 
         try
         {
             var module = await ModuleTask;
-            await module.InvokeVoidAsync("setClearElement", RootContext.RootId, current.Value);
+            await module.InvokeVoidAsync("setClearElement", RootContext.RootId, current.HasValue ? current.Value : null);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -139,12 +140,16 @@
             RootContext.StateChanged -= OnRootStateChanged;
         }
 
-        if (moduleTask?.IsValueCreated == true && RootContext is not null)
+        if (moduleTask?.IsValueCreated == true)
         {
             try
             {
                 var module = await ModuleTask;
-                await module.InvokeVoidAsync("setClearElement", RootContext.RootId, null);
+                if (RootContext is not null)
+                {
+                    await module.InvokeVoidAsync("setClearElement", RootContext.RootId, null);
+                }
+
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

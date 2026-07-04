@@ -19,6 +19,11 @@
 @code {
     private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
+    private DotNetObjectReference<AutocompletePositioner>? positionerDotNetRef;
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
     private AutocompletePositionerContext positionerContext = null!;
     private AutocompletePositionerState state;
     private RenderElement<AutocompletePositionerState>? renderElementReference;
@@ -140,10 +145,15 @@
     protected override void OnInitialized()
     {
         positionerInterop = new PositionerInterop(JSRuntime, "./_content/Blazix.BaseUI/blazix-baseui-autocomplete.min.js");
+        positionerDotNetRef = DotNetObjectReference.Create(this);
+        computedSide = Side;
+        computedAlign = Align;
         positionerContext = new AutocompletePositionerContext
         {
-            Side = Side,
-            Align = Align,
+            Side = computedSide,
+            Align = computedAlign,
+            AnchorHidden = computedAnchorHidden,
+            ArrowUncentered = computedArrowUncentered,
             GetArrowElement = () => arrowElement,
             SetArrowElement = element => arrowElement = element
         };
@@ -160,13 +170,18 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var placementChanged = positionerContext.Side != Side || positionerContext.Align != Align;
-        positionerContext.Side = Side;
-        positionerContext.Align = Align;
+        var placementChanged = computedSide != Side || computedAlign != Align;
+        computedSide = Side;
+        computedAlign = Align;
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
         if (RootContext is not null)
         {
-            RootContext.PopupSide = Side;
-            RootContext.PopupAlign = Align;
+            RootContext.PopupSide = computedSide;
+            RootContext.PopupAlign = computedAlign;
+            RootContext.AnchorHidden = computedAnchorHidden;
         }
 
         BuildStateAndAttributes();
@@ -219,7 +234,7 @@
 
         if (!positionerInterop.IsInitialized)
         {
-            await positionerInterop.InitializeAsync(Element.Value, anchor.Value, config, arrowElement);
+            await positionerInterop.InitializeAsync(Element.Value, anchor.Value, config, arrowElement, positionerDotNetRef);
         }
         else
         {
@@ -237,6 +252,46 @@
 
         RootContext?.SetPositionerElement(null);
         await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var newSide = Extensions.ParseSide(side);
+        var newAlign = Extensions.ParseAlign(align);
+
+        if (newSide == computedSide && newAlign == computedAlign &&
+            anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            return;
+        }
+
+        computedSide = newSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+
+        if (RootContext is not null)
+        {
+            RootContext.PopupSide = computedSide;
+            RootContext.PopupAlign = computedAlign;
+            RootContext.AnchorHidden = computedAnchorHidden;
+        }
+
+        BuildStateAndAttributes();
+        positionerContext.NotifyStateChanged();
+
+        _ = InvokeAsync(() =>
+        {
+            StateHasChanged();
+            RootContext?.NotifyStateChanged();
+        });
     }
 
     private void OnRootStateChanged()
@@ -260,21 +315,20 @@
     private void BuildStateAndAttributes()
     {
         var open = RootContext?.Mounted == true || RootContext?.Inline == true;
-        var anchorHidden = RootContext?.AnchorHidden == true;
         var empty = RootContext?.ListEmpty == true;
-        state = new AutocompletePositionerState(open, Side, Align, anchorHidden);
+        state = new AutocompletePositionerState(open, computedSide, computedAlign, computedAnchorHidden);
 
         var attrs = new Dictionary<string, object>
         {
             ["role"] = "presentation",
             ["data-blazix-base-ui-positioner"] = true,
-            ["data-side"] = Side.ToDataAttributeString()!,
-            ["data-align"] = Align.ToDataAttributeString()!,
+            ["data-side"] = computedSide.ToDataAttributeString()!,
+            ["data-align"] = computedAlign.ToDataAttributeString()!,
             ["data-open"] = open,
             ["data-closed"] = !open
         };
 
-        if (anchorHidden)
+        if (computedAnchorHidden)
         {
             attrs["data-anchor-hidden"] = true;
         }

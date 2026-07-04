@@ -146,13 +146,14 @@
         var open = RootContext?.Mounted == true || RootContext?.Inline == true;
         var side = PositionerContext?.Side ?? RootContext?.PopupSide ?? Side.Bottom;
         var align = PositionerContext?.Align ?? RootContext?.PopupAlign ?? Align.Center;
+        var anchorHidden = PositionerContext?.AnchorHidden ?? RootContext?.AnchorHidden ?? false;
         var empty = RootContext?.ListEmpty == true;
 
         state = new AutocompletePopupState(
             open,
             side,
             align,
-            PositionerContext?.AnchorHidden ?? RootContext?.AnchorHidden ?? false,
+            anchorHidden,
             RootContext?.TransitionStatus ?? TransitionStatus.Undefined,
             empty);
 
@@ -172,6 +173,11 @@
             var popupId = $"{RootContext.RootId}-popup";
             attrs["id"] = popupId;
             RootContext.PopupId = popupId;
+        }
+
+        if (anchorHidden)
+        {
+            attrs["data-anchor-hidden"] = true;
         }
 
         TransitionAttributeHelper.ApplyTransitionStyleAttributes(

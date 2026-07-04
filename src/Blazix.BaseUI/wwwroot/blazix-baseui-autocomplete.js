@@ -29,6 +29,11 @@ function createRootState(rootId, dotNetRef = null) {
     dotNetRef,
     isOpen: false,
     activeIndex: -1,
+    itemCount: 0,
+    loopFocus: true,
+    pendingActiveIndex: null,
+    pendingNavigation: null,
+    navigationVersion: 0,
     inputElement: null,
     triggerElement: null,
     clearElement: null,
@@ -83,6 +88,30 @@ function scheduleFocusOutClose(root) {
 
 function canInvokeRoot(root) {
   return root?.dotNetRef && typeof root.dotNetRef.invokeMethodAsync === 'function';
+}
+
+function getEffectiveActiveIndex(root) {
+  return root.pendingActiveIndex ?? root.activeIndex;
+}
+
+function getNavigationTarget(root, delta) {
+  const count = Math.max(0, Number(root.itemCount) || 0);
+  if (count === 0) {
+    return -1;
+  }
+
+  let nextIndex = getEffectiveActiveIndex(root) + delta;
+  if (nextIndex < 0) {
+    nextIndex = root.loopFocus ? count - 1 : 0;
+  } else if (nextIndex >= count) {
+    nextIndex = root.loopFocus ? 0 : count - 1;
+  }
+
+  return nextIndex;
+}
+
+function commitActiveItem(root) {
+  root.dotNetRef.invokeMethodAsync('OnCommitActive').catch(() => {});
 }
 
 function initializeDocumentListeners() {
@@ -192,14 +221,36 @@ function attachKeyboardHandlers(root, element, key) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       event.stopPropagation();
-      root.dotNetRef.invokeMethodAsync('OnNavigate', event.key === 'ArrowDown' ? 1 : -1).catch(() => {});
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      const navigationVersion = root.navigationVersion + 1;
+      root.navigationVersion = navigationVersion;
+      root.pendingActiveIndex = getNavigationTarget(root, delta);
+      root.pendingNavigation = root.dotNetRef
+        .invokeMethodAsync('OnNavigate', event.key === 'ArrowDown' ? 1 : -1).then((activeIndex) => {
+          if (root.navigationVersion !== navigationVersion) {
+            return;
+          }
+          root.activeIndex = typeof activeIndex === 'number' ? activeIndex : root.pendingActiveIndex;
+          root.pendingActiveIndex = null;
+          root.pendingNavigation = null;
+        }).catch(() => {
+          if (root.navigationVersion !== navigationVersion) {
+            return;
+          }
+          root.pendingActiveIndex = null;
+          root.pendingNavigation = null;
+        });
       return;
     }
 
-    if (event.key === 'Enter' && root.isOpen && root.activeIndex >= 0) {
+    if (event.key === 'Enter' && root.isOpen && getEffectiveActiveIndex(root) >= 0) {
       event.preventDefault();
       event.stopPropagation();
-      root.dotNetRef.invokeMethodAsync('OnCommitActive').catch(() => {});
+      if (root.pendingNavigation) {
+        root.pendingNavigation.then(() => commitActiveItem(root), () => commitActiveItem(root));
+      } else {
+        commitActiveItem(root);
+      }
       return;
     }
 
@@ -417,10 +468,19 @@ export function disposeRoot(rootId) {
   state.roots.delete(rootId);
 }
 
-export function setRootOpen(rootId, open, activeIndex = -1) {
+export function setRootOpen(rootId, open, activeIndex = -1, itemCount = 0, loopFocus = true) {
   const root = ensureRoot(rootId);
   root.isOpen = open;
   root.activeIndex = activeIndex;
+  root.itemCount = Math.max(0, Number(itemCount) || 0);
+  root.loopFocus = !!loopFocus;
+  if (!open) {
+    root.navigationVersion += 1;
+    root.pendingActiveIndex = null;
+    root.pendingNavigation = null;
+  } else if (root.pendingActiveIndex !== null && root.pendingActiveIndex >= root.itemCount) {
+    root.pendingActiveIndex = root.itemCount > 0 ? root.itemCount - 1 : -1;
+  }
   focusInputIfNeeded(root);
 }
 
@@ -525,6 +585,7 @@ export async function initializePositioner(
   collisionSide,
   collisionAlign,
   collisionFallbackAxisSide,
+  dotNetRef = null,
 ) {
   const id = await initializeFloatingPositioner({
     positionerElement,
@@ -541,6 +602,11 @@ export async function initializePositioner(
     positionMethod: positionMethod || 'absolute',
     disableAnchorTracking: disableAnchorTracking || false,
     collisionAvoidance: collisionAvoidance(collisionSide, collisionAlign, collisionFallbackAxisSide),
+    onPositionUpdated: dotNetRef
+      ? (side, align, anchorHidden, arrowUncentered) => {
+          dotNetRef.invokeMethodAsync('OnPositionUpdated', side, align, anchorHidden, arrowUncentered).catch(() => {});
+        }
+      : null,
   });
 
   if (id) {
