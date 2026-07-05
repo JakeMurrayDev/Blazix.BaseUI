@@ -1,0 +1,406 @@
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="ComboboxInputState"
+               Tag="input"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-combobox.min.js";
+
+    private ComboboxInputState state;
+    private RenderElement<ComboboxInputState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private ElementReference? previousElement;
+    private bool? previousIsInsidePopup;
+    private bool subscribed;
+    private bool isComposing;
+    private string? pendingCompositionValue;
+
+    private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
+
+    private bool IsInsidePopup => PositionerContext is not null || RootContext?.Inline == true;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxPositionerContext? PositionerContext { get; set; }
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the component should ignore user interaction.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets the input id.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxInputState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxInputState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxInputState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.InputInsidePopup = IsInsidePopup;
+            RootContext.InputOwnsFormValue = false;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Element;
+        var isInsidePopup = IsInsidePopup;
+        if (RootContext is not null && (!Nullable.Equals(previousElement, current) || previousIsInsidePopup != isInsidePopup))
+        {
+            previousElement = current;
+            previousIsInsidePopup = isInsidePopup;
+            RootContext.SetInputElement(current);
+
+            if (current.HasValue)
+            {
+                try
+                {
+                    var module = await ModuleTask;
+                    await module.InvokeVoidAsync("setInputElement", RootContext.RootId, current.Value, isInsidePopup);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
+        }
+
+        await SyncInlineSelectionAsync(current);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        RootContext?.SetInputElement(null);
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await ModuleTask;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncInlineSelectionAsync(ElementReference? current)
+    {
+        if (RootContext is null ||
+            !current.HasValue ||
+            RootContext.Mode is not (ComboboxMode.Inline or ComboboxMode.Both))
+        {
+            return;
+        }
+
+        var typedValue = RootContext.GetTypedInputValue();
+        var inputValue = RootContext.GetInputValue();
+        if (inputValue.Length <= typedValue.Length ||
+            !inputValue.StartsWith(typedValue, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask;
+            await module.InvokeVoidAsync("syncInputSelection", current.Value, typedValue, inputValue);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var open = RootContext?.Mounted == true && RootContext.OpenChangeReason != ComboboxChangeReason.ClosePress
+            ? RootContext.Mounted && (RootContext.PopupElement.HasValue || RootContext.Inline || RootContext.OpenChangeReason != ComboboxChangeReason.None)
+            : RootContext?.Mounted == true;
+        open = RootContext?.OpenChangeReason == ComboboxChangeReason.None
+            ? RootContext?.Mounted == true
+            : open;
+
+        var disabled = Disabled || (RootContext?.Disabled ?? false) || (FieldContext?.Disabled ?? false);
+        var fieldState = IsInsidePopup ? FieldRootState.Default : RootContext?.FieldState ?? FieldRootState.Default;
+        state = ComboboxInputState.FromFieldState(
+            fieldState,
+            open,
+            disabled,
+            RootContext?.ReadOnly == true,
+            RootContext?.PopupSide,
+            RootContext?.ListEmpty == true);
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["value"] = RootContext?.GetInputValue() ?? string.Empty,
+            ["autocomplete"] = "off",
+            ["spellcheck"] = "false",
+            ["autocorrect"] = "off",
+            ["autocapitalize"] = "none",
+            ["role"] = "combobox",
+            ["aria-autocomplete"] = ToComboboxAttribute(RootContext?.Mode ?? ComboboxMode.List)
+        };
+
+        if (RootContext?.Inline != true)
+        {
+            attrs["aria-expanded"] = open ? "true" : "false";
+            attrs["aria-haspopup"] = RootContext?.Grid == true ? "grid" : "listbox";
+
+            if (open && RootContext?.ListId is not null)
+            {
+                attrs["aria-controls"] = RootContext.ListId;
+            }
+        }
+
+        if (RootContext?.ActiveIndex >= 0 && RootContext.ListId is not null)
+        {
+            attrs["aria-activedescendant"] = $"{RootContext.RootId}-{RootContext.ActiveIndex}";
+        }
+
+        if (RootContext?.ReadOnly == true)
+        {
+            attrs["aria-readonly"] = "true";
+            attrs["readonly"] = "readonly";
+            attrs["data-readonly"] = "true";
+        }
+
+        if (RootContext?.Required == true)
+        {
+            attrs["aria-required"] = "true";
+            attrs["required"] = "required";
+        }
+
+        if (disabled)
+        {
+            attrs["disabled"] = "disabled";
+            attrs["data-disabled"] = "true";
+        }
+
+        var id = Id ?? (!IsInsidePopup ? RootContext?.RootId : null);
+        if (!string.IsNullOrEmpty(id))
+        {
+            attrs["id"] = id;
+            LabelableContext?.SetControlId(id);
+        }
+
+        if (!string.IsNullOrEmpty(RootContext?.Form))
+        {
+            attrs["form"] = RootContext.Form;
+        }
+
+        var labelledBy = AccessibilityUtilities.ResolveAriaLabelledBy(LabelableContext?.LabelId, RootContext?.LabelId);
+        if (!string.IsNullOrEmpty(labelledBy))
+        {
+            attrs["aria-labelledby"] = labelledBy;
+        }
+
+        ApplyFieldDataAttributes(attrs, fieldState);
+        ApplyPopupDataAttributes(attrs);
+
+        attrs["oninput"] = EventCallback.Factory.Create<ChangeEventArgs>(this, HandleInputAsync);
+        attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+        attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
+        attrs["onmousedown"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseDownAsync);
+        attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        attrs["oncompositionstart"] = EventCallback.Factory.Create<EventArgs>(this, HandleCompositionStartAsync);
+        attrs["oncompositionend"] = EventCallback.Factory.Create<EventArgs>(this, HandleCompositionEndAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleInputAsync(ChangeEventArgs e)
+    {
+        if (RootContext is null || state.Disabled || RootContext.ReadOnly)
+        {
+            return;
+        }
+
+        var value = Convert.ToString(e.Value) ?? string.Empty;
+        if (isComposing)
+        {
+            pendingCompositionValue = value;
+            return;
+        }
+
+        await RootContext.SetInputValueAsync(value, ComboboxChangeReason.InputChange);
+    }
+
+    private async Task HandleFocusAsync(FocusEventArgs e)
+    {
+        FieldContext?.SetFocused(true);
+        await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleBlurAsync(FocusEventArgs e)
+    {
+        FieldContext?.SetTouched(true);
+        FieldContext?.SetFocused(false);
+        await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleMouseDownAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || state.Disabled || RootContext.ReadOnly || !RootContext.OpenOnInputClick)
+        {
+            return;
+        }
+
+        await RootContext.SetOpenAsync(true, ComboboxChangeReason.InputChange);
+    }
+
+    private Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private Task HandleCompositionStartAsync(EventArgs e)
+    {
+        isComposing = true;
+        pendingCompositionValue = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleCompositionEndAsync(EventArgs e)
+    {
+        if (RootContext is null || state.Disabled || RootContext.ReadOnly)
+        {
+            isComposing = false;
+            pendingCompositionValue = null;
+            return;
+        }
+
+        var value = pendingCompositionValue;
+        isComposing = false;
+        pendingCompositionValue = null;
+        if (value is not null)
+        {
+            await RootContext.SetInputValueAsync(value, ComboboxChangeReason.InputChange);
+        }
+    }
+
+    private void ApplyPopupDataAttributes(Dictionary<string, object> attrs)
+    {
+        if (RootContext?.Mounted == true)
+        {
+            attrs["data-popup-open"] = true;
+        }
+
+        if (RootContext?.PopupSide is { } side)
+        {
+            attrs["data-popup-side"] = side.ToDataAttributeString()!;
+        }
+
+        if (RootContext?.ListEmpty == true)
+        {
+            attrs["data-list-empty"] = true;
+        }
+    }
+
+    private static void ApplyFieldDataAttributes(Dictionary<string, object> attrs, FieldRootState fieldState)
+    {
+        attrs["data-valid"] = fieldState.Valid == true;
+        attrs["data-invalid"] = fieldState.Valid == false;
+        attrs["data-touched"] = fieldState.Touched;
+        attrs["data-dirty"] = fieldState.Dirty;
+        attrs["data-filled"] = fieldState.Filled;
+        attrs["data-focused"] = fieldState.Focused;
+    }
+
+    private static string ToComboboxAttribute(ComboboxMode mode)
+    {
+        return mode switch
+        {
+            ComboboxMode.Both => "both",
+            ComboboxMode.Inline => "inline",
+            ComboboxMode.None => "none",
+            _ => "list"
+        };
+    }
+}

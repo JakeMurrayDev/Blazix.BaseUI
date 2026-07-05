@@ -1,0 +1,189 @@
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="ComboboxPopupState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null && (RootContext.Mounted || RootContext.Inline)"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-combobox.min.js";
+
+    private ComboboxPopupState state;
+    private RenderElement<ComboboxPopupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private ElementReference? previousElement;
+    private bool subscribed;
+
+    private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxPositionerContext? PositionerContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxPopupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxPopupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxPopupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var current = Element;
+        if (RootContext is not null && !Nullable.Equals(previousElement, current))
+        {
+            previousElement = current;
+            RootContext.SetPopupElement(current);
+
+            if (current.HasValue)
+            {
+                try
+                {
+                    var module = await ModuleTask;
+                    await module.InvokeVoidAsync("setPopupElement", RootContext.RootId, current.Value);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        RootContext?.SetPopupElement(null);
+
+        if (moduleTask?.IsValueCreated == true)
+        {
+            try
+            {
+                var module = await ModuleTask;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var open = RootContext?.Mounted == true || RootContext?.Inline == true;
+        var side = PositionerContext?.Side ?? RootContext?.PopupSide ?? Side.Bottom;
+        var align = PositionerContext?.Align ?? RootContext?.PopupAlign ?? Align.Center;
+        var anchorHidden = PositionerContext?.AnchorHidden ?? RootContext?.AnchorHidden ?? false;
+        var empty = RootContext?.ListEmpty == true;
+
+        state = new ComboboxPopupState(
+            open,
+            side,
+            align,
+            anchorHidden,
+            RootContext?.TransitionStatus ?? TransitionStatus.Undefined,
+            empty);
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = RootContext?.InputInsidePopup == true ? "dialog" : "presentation",
+            ["tabindex"] = -1,
+            ["data-side"] = side.ToDataAttributeString()!,
+            ["data-align"] = align.ToDataAttributeString()!,
+            ["data-open"] = open,
+            ["data-closed"] = !open,
+            ["data-empty"] = empty
+        };
+
+        if (RootContext is not null)
+        {
+            var popupId = $"{RootContext.RootId}-popup";
+            attrs["id"] = popupId;
+            RootContext.PopupId = popupId;
+        }
+
+        if (anchorHidden)
+        {
+            attrs["data-anchor-hidden"] = true;
+        }
+
+        TransitionAttributeHelper.ApplyTransitionStyleAttributes(
+            attrs,
+            RootContext?.TransitionStatus ?? TransitionStatus.Undefined);
+
+        componentAttributes = attrs;
+    }
+}

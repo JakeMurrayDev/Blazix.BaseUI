@@ -1,0 +1,348 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<CascadingValue TValue="ComboboxPositionerContext" Value="positionerContext" IsFixed="true">
+    <RenderElement TState="ComboboxPositionerState"
+                   Tag="div"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private PositionerInterop positionerInterop = null!;
+    private ElementReference? arrowElement;
+    private DotNetObjectReference<ComboboxPositioner>? positionerDotNetRef;
+    private Side computedSide;
+    private Align computedAlign;
+    private bool computedAnchorHidden;
+    private bool computedArrowUncentered;
+    private ComboboxPositionerContext positionerContext = null!;
+    private ComboboxPositionerState state;
+    private RenderElement<ComboboxPositionerState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets which side of the anchor to place the popup on.
+    /// </summary>
+    [Parameter]
+    public Side Side { get; set; } = Side.Bottom;
+
+    /// <summary>
+    /// Gets or sets how to align the popup relative to the anchor.
+    /// </summary>
+    [Parameter]
+    public Align Align { get; set; } = Align.Center;
+
+    /// <summary>
+    /// Gets or sets the distance between anchor and popup.
+    /// </summary>
+    [Parameter]
+    public int SideOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets the offset along the alignment axis.
+    /// </summary>
+    [Parameter]
+    public int AlignOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets collision padding.
+    /// </summary>
+    [Parameter]
+    public int CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets the collision boundary.
+    /// </summary>
+    [Parameter]
+    public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets arrow padding.
+    /// </summary>
+    [Parameter]
+    public int ArrowPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Determines whether the popup remains in view when the anchor scrolls.
+    /// </summary>
+    [Parameter]
+    public bool Sticky { get; set; }
+
+    /// <summary>
+    /// Determines whether anchor tracking is disabled.
+    /// </summary>
+    [Parameter]
+    public bool DisableAnchorTracking { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS positioning method.
+    /// </summary>
+    [Parameter]
+    public PositionMethod PositionMethod { get; set; } = PositionMethod.Absolute;
+
+    /// <summary>
+    /// Gets or sets collision avoidance behavior.
+    /// </summary>
+    [Parameter]
+    public CollisionAvoidance? CollisionAvoidance { get; set; }
+
+    /// <summary>
+    /// Gets or sets an explicit anchor element.
+    /// </summary>
+    [Parameter]
+    public ElementReference? Anchor { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxPositionerState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxPositionerState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxPositionerState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        positionerInterop = new PositionerInterop(JSRuntime, "./_content/Blazix.BaseUI/blazix-baseui-combobox.min.js");
+        positionerDotNetRef = DotNetObjectReference.Create(this);
+        computedSide = Side;
+        computedAlign = Align;
+        positionerContext = new ComboboxPositionerContext
+        {
+            Side = computedSide,
+            Align = computedAlign,
+            AnchorHidden = computedAnchorHidden,
+            ArrowUncentered = computedArrowUncentered,
+            GetArrowElement = () => arrowElement,
+            SetArrowElement = element => arrowElement = element
+        };
+
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var placementChanged = computedSide != Side || computedAlign != Align;
+        computedSide = Side;
+        computedAlign = Align;
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+        if (RootContext is not null)
+        {
+            RootContext.PopupSide = computedSide;
+            RootContext.PopupAlign = computedAlign;
+            RootContext.AnchorHidden = computedAnchorHidden;
+        }
+
+        BuildStateAndAttributes();
+        if (placementChanged)
+        {
+            positionerContext.NotifyStateChanged();
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            positionerInterop.MarkRendered();
+        }
+
+        var current = Element;
+        if (RootContext is not null && !Nullable.Equals(previousElement, current))
+        {
+            previousElement = current;
+            RootContext.SetPositionerElement(current);
+        }
+
+        if (RootContext is null || !RootContext.Mounted || !Element.HasValue)
+        {
+            return;
+        }
+
+        var anchor = Anchor ?? ResolveAnchorElement();
+        if (!anchor.HasValue)
+        {
+            return;
+        }
+
+        var config = new PositionerConfig
+        {
+            Side = Side,
+            Align = Align,
+            SideOffset = SideOffset,
+            AlignOffset = AlignOffset,
+            CollisionPadding = CollisionPadding,
+            CollisionBoundary = CollisionBoundary,
+            ArrowPadding = ArrowPadding,
+            Sticky = Sticky,
+            DisableAnchorTracking = DisableAnchorTracking,
+            PositionMethod = PositionMethod,
+            CollisionAvoidance = CollisionAvoidance
+        };
+
+        if (!positionerInterop.IsInitialized)
+        {
+            await positionerInterop.InitializeAsync(Element.Value, anchor.Value, config, arrowElement, positionerDotNetRef);
+        }
+        else
+        {
+            await positionerInterop.UpdateAsync(anchor.Value, config, arrowElement);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+
+        RootContext?.SetPositionerElement(null);
+        await positionerInterop.DisposeAsync();
+        positionerDotNetRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    {
+        var newSide = Extensions.ParseSide(side);
+        var newAlign = Extensions.ParseAlign(align);
+
+        if (newSide == computedSide && newAlign == computedAlign &&
+            anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        {
+            return;
+        }
+
+        computedSide = newSide;
+        computedAlign = newAlign;
+        computedAnchorHidden = anchorHidden;
+        computedArrowUncentered = arrowUncentered;
+
+        positionerContext.Side = computedSide;
+        positionerContext.Align = computedAlign;
+        positionerContext.AnchorHidden = computedAnchorHidden;
+        positionerContext.ArrowUncentered = computedArrowUncentered;
+
+        if (RootContext is not null)
+        {
+            RootContext.PopupSide = computedSide;
+            RootContext.PopupAlign = computedAlign;
+            RootContext.AnchorHidden = computedAnchorHidden;
+        }
+
+        BuildStateAndAttributes();
+        positionerContext.NotifyStateChanged();
+
+        _ = InvokeAsync(() =>
+        {
+            StateHasChanged();
+            RootContext?.NotifyStateChanged();
+        });
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private ElementReference? ResolveAnchorElement()
+    {
+        if (RootContext is null)
+        {
+            return null;
+        }
+
+        return RootContext.InputInsidePopup
+            ? RootContext.TriggerElement ?? RootContext.InputElement
+            : RootContext.InputElement ?? RootContext.TriggerElement;
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var open = RootContext?.Mounted == true || RootContext?.Inline == true;
+        var empty = RootContext?.ListEmpty == true;
+        state = new ComboboxPositionerState(open, computedSide, computedAlign, computedAnchorHidden);
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "presentation",
+            ["data-blazix-base-ui-positioner"] = true,
+            ["data-side"] = computedSide.ToDataAttributeString()!,
+            ["data-align"] = computedAlign.ToDataAttributeString()!,
+            ["data-open"] = open,
+            ["data-closed"] = !open
+        };
+
+        if (computedAnchorHidden)
+        {
+            attrs["data-anchor-hidden"] = true;
+        }
+
+        if (empty)
+        {
+            attrs["data-empty"] = true;
+        }
+
+        if (!open)
+        {
+            attrs["hidden"] = true;
+        }
+
+        componentAttributes = attrs;
+    }
+}

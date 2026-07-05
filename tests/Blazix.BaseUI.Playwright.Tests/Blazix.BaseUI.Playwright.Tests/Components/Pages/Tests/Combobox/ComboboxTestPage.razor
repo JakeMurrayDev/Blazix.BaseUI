@@ -1,0 +1,184 @@
+@page "/tests/combobox/server"
+@using Blazix.BaseUI.Combobox
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Combobox Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <form data-testid="combobox-form" @onsubmit="HandleSubmit" @onsubmit:preventDefault="true">
+        <ComboboxRoot TValue="string"
+                      Items="fruits"
+                      DefaultValue="@DefaultValue"
+                      DefaultValues="@ResolvedDefaultValues"
+                      Multiple="@Multiple"
+                      DefaultInputValue="@DefaultInputValue"
+                      @bind-Value="selectedValue"
+                      @bind-Values="selectedValues"
+                      DefaultOpen="@DefaultOpen"
+                      @bind-Open="isOpen"
+                      Mode="@ResolvedMode"
+                      AutoHighlight="@ResolvedAutoHighlight"
+                      Disabled="@Disabled"
+                      ReadOnly="@ReadOnly"
+                      Required="@Required"
+                      FilterDisabled="@FilterDisabled"
+                      Name="fruit"
+                      OnValueChange="HandleValueChange"
+                      OnInputValueChange="HandleInputValueChange"
+                      OnItemHighlighted="HandleItemHighlighted">
+            @if (!InputInsidePopup)
+            {
+                <ComboboxInput data-testid="combobox-input" placeholder="Search fruit" />
+            }
+            <ComboboxValue Placeholder="Pick a fruit" />
+            @if (Multiple)
+            {
+                <ComboboxChips data-testid="combobox-chips">
+                    @foreach (var value in selectedValues)
+                    {
+                        <ComboboxChip data-testid="@($"combobox-chip-{value.ToLowerInvariant()}")">
+                            @value
+                            <ComboboxChipRemove data-testid="@($"combobox-chip-remove-{value.ToLowerInvariant()}")">Remove</ComboboxChipRemove>
+                        </ComboboxChip>
+                    }
+                </ComboboxChips>
+            }
+            <ComboboxClear data-testid="combobox-clear">Clear</ComboboxClear>
+            <ComboboxTrigger data-testid="combobox-trigger">Toggle</ComboboxTrigger>
+            <ComboboxPositioner data-testid="combobox-positioner">
+                <ComboboxPopup data-testid="combobox-popup">
+                    @if (InputInsidePopup)
+                    {
+                        <ComboboxInput data-testid="combobox-input" placeholder="Search fruit" />
+                        <div data-testid="combobox-panel-padding" style="height: 12px;"></div>
+                    }
+                    <ComboboxEmpty data-testid="combobox-empty">No matches</ComboboxEmpty>
+                    <ComboboxList data-testid="combobox-list">
+                        <ComboboxCollection TValue="string" Context="entry">
+                            <ComboboxItem TValue="string"
+                                              Value="@entry.Item"
+                                              Index="@entry.Index"
+                                              data-testid="@($"combobox-item-{entry.Item.ToLowerInvariant()}")">
+                                <ComboboxItemIndicator data-testid="@($"combobox-item-indicator-{entry.Item.ToLowerInvariant()}")">Selected</ComboboxItemIndicator>
+                                @entry.Item
+                            </ComboboxItem>
+                        </ComboboxCollection>
+                    </ComboboxList>
+                </ComboboxPopup>
+            </ComboboxPositioner>
+        </ComboboxRoot>
+
+        <button data-testid="submit-button" type="submit" tabindex="-1">Submit</button>
+    </form>
+
+    <div data-testid="state-display">
+        <div>Open: <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span></div>
+        <div>Selected: <span data-testid="selected-value">@selectedValue</span></div>
+        <div>Selected Values: <span data-testid="selected-values">@string.Join(",", selectedValues)</span></div>
+        <div>Input: <span data-testid="input-value">@inputValue</span></div>
+        <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
+        <div>Highlight: <span data-testid="highlighted-value">@highlightedValue</span></div>
+        <div>Highlight Reason: <span data-testid="highlight-reason">@highlightReason</span></div>
+        <div>Submits: <span data-testid="submit-count">@submitCount</span></div>
+    </div>
+
+    <button data-testid="outside-button">Outside Button</button>
+</div>
+
+@code {
+    private readonly IReadOnlyList<string> fruits = ["Apple", "Apricot", "Banana", "Cherry"];
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValue")]
+    public string? DefaultValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultValues")]
+    public string? DefaultValues { get; set; }
+
+    [SupplyParameterFromQuery(Name = "defaultInputValue")]
+    public string? DefaultInputValue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "multiple")]
+    public bool Multiple { get; set; }
+
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? Mode { get; set; }
+
+    [SupplyParameterFromQuery(Name = "autoHighlight")]
+    public string? AutoHighlight { get; set; }
+
+    [SupplyParameterFromQuery(Name = "disabled")]
+    public bool Disabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "readOnly")]
+    public bool ReadOnly { get; set; }
+
+    [SupplyParameterFromQuery(Name = "required")]
+    public bool Required { get; set; }
+
+    [SupplyParameterFromQuery(Name = "filterDisabled")]
+    public bool FilterDisabled { get; set; }
+
+    [SupplyParameterFromQuery(Name = "inputInsidePopup")]
+    public bool InputInsidePopup { get; set; }
+
+    private string? selectedValue;
+    private IReadOnlyList<string> selectedValues = [];
+    private string inputValue = "";
+    private bool isOpen;
+    private string lastReason = "";
+    private string highlightedValue = "";
+    private string highlightReason = "";
+    private int submitCount;
+
+    private ComboboxMode ResolvedMode => Mode?.ToLowerInvariant() switch
+    {
+        "both" => ComboboxMode.Both,
+        "inline" => ComboboxMode.Inline,
+        "none" => ComboboxMode.None,
+        _ => ComboboxMode.List
+    };
+
+    private ComboboxAutoHighlight ResolvedAutoHighlight => AutoHighlight?.ToLowerInvariant() switch
+    {
+        "always" => ComboboxAutoHighlight.Always,
+        "true" => ComboboxAutoHighlight.True,
+        _ => ComboboxAutoHighlight.False
+    };
+
+    protected override void OnInitialized()
+    {
+        selectedValue = DefaultValue;
+        selectedValues = ResolvedDefaultValues ?? [];
+        inputValue = DefaultInputValue ?? DefaultValue ?? "";
+        isOpen = DefaultOpen;
+    }
+
+    private IReadOnlyList<string>? ResolvedDefaultValues => string.IsNullOrWhiteSpace(DefaultValues)
+        ? null
+        : DefaultValues.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private void HandleValueChange(ComboboxValueChangeEventArgs<string> args)
+    {
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleInputValueChange(ComboboxInputValueChangeEventArgs args)
+    {
+        inputValue = args.Value;
+        lastReason = args.Reason.ToString();
+    }
+
+    private void HandleItemHighlighted(ComboboxHighlightEventArgs<string> args)
+    {
+        highlightedValue = args.Value ?? "";
+        highlightReason = args.Reason.ToString();
+    }
+
+    private void HandleSubmit()
+    {
+        submitCount++;
+    }
+}

@@ -1,0 +1,49 @@
+<RenderElement TState="ComboboxStatusState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private static readonly ComboboxStatusState state = new();
+    private static readonly Dictionary<string, object> componentAttributes = new()
+    {
+        ["role"] = "status",
+        ["aria-live"] = "polite",
+        ["aria-atomic"] = "true"
+    };
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxStatusState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxStatusState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxStatusState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+}

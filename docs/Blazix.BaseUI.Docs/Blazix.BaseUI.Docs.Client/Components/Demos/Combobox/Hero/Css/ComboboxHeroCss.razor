@@ -1,0 +1,40 @@
+<ComboboxRoot TValue="ComboboxDemoFruit"
+              Items="@ComboboxDemoData.Fruits"
+              ItemToStringLabel="ComboboxDemoData.GetFruitLabel"
+              ItemToStringValue="ComboboxDemoData.GetFruitValue"
+              IsItemEqualToValue="ComboboxDemoData.EqualFruit">
+    <div class="blx-combobox-label">
+        <label for="combobox-hero-fruit">Choose a fruit</label>
+        <ComboboxInputGroup class="blx-combobox-input-group">
+            <ComboboxInput id="combobox-hero-fruit" class="blx-combobox-input" placeholder="e.g. Apple" />
+            <div class="blx-combobox-action-buttons">
+                <ComboboxClear class="blx-combobox-clear" aria-label="Clear selection">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+                </ComboboxClear>
+                <ComboboxTrigger class="blx-combobox-trigger" aria-label="Open popup">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+                </ComboboxTrigger>
+            </div>
+        </ComboboxInputGroup>
+    </div>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
+            <ComboboxPopup class="blx-combobox-popup">
+                <ComboboxEmpty>
+                    <div class="blx-combobox-empty">No fruits found.</div>
+                </ComboboxEmpty>
+                <ComboboxList class="blx-combobox-list">
+                    <ComboboxCollection TValue="ComboboxDemoFruit" Context="entry">
+                        <ComboboxItem TValue="ComboboxDemoFruit" class="blx-combobox-item" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Label">
+                            <ComboboxItemIndicator class="blx-combobox-item-indicator">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </ComboboxItemIndicator>
+                            <span class="blx-combobox-item-text">@entry.Item.Label</span>
+                        </ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>

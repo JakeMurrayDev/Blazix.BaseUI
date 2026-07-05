@@ -1,0 +1,100 @@
+@implements IDisposable
+
+@{
+    chipsContext.BeginRender();
+}
+
+<CascadingValue TValue="ComboboxChipsContext" Value="chipsContext" IsFixed="false">
+    <RenderElement TState="ComboboxChipsState"
+                   Tag="div"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes" />
+</CascadingValue>
+
+@code {
+    private ComboboxChipsState state;
+    private Dictionary<string, object> componentAttributes = new();
+    private ComboboxChipsContext chipsContext = new();
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxChipsState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipsState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipsState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var hasChips = RootContext?.HasSelectedValue == true;
+        state = new ComboboxChipsState(hasChips);
+        componentAttributes = hasChips
+            ? new Dictionary<string, object> { ["role"] = "toolbar" }
+            : new Dictionary<string, object>();
+    }
+}

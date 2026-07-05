@@ -1,0 +1,99 @@
+@implements IDisposable
+
+@{
+    var chipIndex = ResolveIndex();
+}
+
+<CascadingValue TValue="ComboboxChipContext" Value="new ComboboxChipContext { Index = chipIndex }" IsFixed="true">
+    <RenderElement TState="ComboboxChipState"
+                   Tag="div"
+                   State="state"
+                   Enabled="RootContext is not null"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes" />
+</CascadingValue>
+
+@code {
+    private ComboboxChipState state;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxChipsContext? ChipsContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxChipState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var disabled = RootContext?.Disabled == true;
+        var readOnly = RootContext?.ReadOnly == true;
+        state = new ComboboxChipState(disabled, readOnly);
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["tabindex"] = -1
+        };
+
+        if (disabled)
+        {
+            componentAttributes["aria-disabled"] = "true";
+            componentAttributes["data-disabled"] = true;
+        }
+
+        if (readOnly)
+        {
+            componentAttributes["aria-readonly"] = "true";
+            componentAttributes["data-readonly"] = true;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        ChipsContext?.Unregister(this);
+    }
+
+    private int ResolveIndex()
+    {
+        if (ChipsContext is null)
+        {
+            return -1;
+        }
+
+        return ChipsContext.ResolveIndex(this);
+    }
+}

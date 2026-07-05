@@ -1,0 +1,49 @@
+<ComboboxRoot TValue="ComboboxDemoLanguage"
+              Items="@ComboboxDemoData.Languages"
+              Multiple="true"
+              ItemToStringLabel="ComboboxDemoData.GetLanguageValue"
+              ItemToStringValue="ComboboxDemoData.GetLanguageValue"
+              IsItemEqualToValue="ComboboxDemoData.EqualLanguage">
+    <div class="blx-combobox-container">
+        <label class="blx-combobox-label" for="combobox-multiple-language">Programming languages</label>
+        <ComboboxInputGroup class="blx-combobox-input-group blx-combobox-input-group--chips">
+            <ComboboxChips class="blx-combobox-chips">
+                <ComboboxValue Context="values">
+                    @{
+                        var selectedLanguages = values.OfType<ComboboxDemoLanguage>().ToList();
+                    }
+                    @foreach (var language in selectedLanguages)
+                    {
+                        <ComboboxChip class="blx-combobox-chip" aria-label="@language.Value">
+                            @language.Value
+                            <ComboboxChipRemove class="blx-combobox-chip-remove" aria-label="@($"Remove {language.Value}")">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+                            </ComboboxChipRemove>
+                        </ComboboxChip>
+                    }
+                    <ComboboxInput id="combobox-multiple-language" class="blx-combobox-chip-input" placeholder="@(selectedLanguages.Count > 0 ? null : "e.g. TypeScript")" />
+                </ComboboxValue>
+            </ComboboxChips>
+        </ComboboxInputGroup>
+    </div>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
+            <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--scroll">
+                <ComboboxEmpty>
+                    <div class="blx-combobox-empty">No languages found.</div>
+                </ComboboxEmpty>
+                <ComboboxList>
+                    <ComboboxCollection TValue="ComboboxDemoLanguage" Context="entry">
+                        <ComboboxItem TValue="ComboboxDemoLanguage" class="blx-combobox-item" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Value">
+                            <ComboboxItemIndicator class="blx-combobox-item-indicator">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </ComboboxItemIndicator>
+                            <span class="blx-combobox-item-text">@entry.Item.Value</span>
+                        </ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>

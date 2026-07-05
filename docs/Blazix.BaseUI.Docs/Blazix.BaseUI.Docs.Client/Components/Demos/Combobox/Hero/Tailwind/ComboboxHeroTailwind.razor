@@ -1,0 +1,40 @@
+<ComboboxRoot TValue="ComboboxDemoFruit"
+              Items="@ComboboxDemoData.Fruits"
+              ItemToStringLabel="ComboboxDemoData.GetFruitLabel"
+              ItemToStringValue="ComboboxDemoData.GetFruitValue"
+              IsItemEqualToValue="ComboboxDemoData.EqualFruit">
+    <div class="relative flex flex-col gap-1 text-sm font-bold leading-5 text-neutral-900 dark:text-white">
+        <label for="combobox-tailwind-fruit">Choose a fruit</label>
+        <ComboboxInputGroup class="relative box-border h-8 w-56 border border-neutral-900 bg-white focus-within:outline focus-within:outline-2 focus-within:-outline-offset-1 focus-within:outline-neutral-900 dark:border-white dark:bg-neutral-900 dark:focus-within:outline-white">
+            <ComboboxInput id="combobox-tailwind-fruit" class="box-border size-full border-0 bg-white py-0 pl-2 pr-14 text-sm font-normal leading-5 text-neutral-900 outline-none placeholder:text-neutral-500 dark:bg-neutral-900 dark:text-white dark:placeholder:text-neutral-400" placeholder="e.g. Apple" />
+            <div class="absolute bottom-0 right-0 box-border flex h-full items-center justify-center border-0 p-0 text-neutral-500 dark:text-neutral-400">
+                <ComboboxClear class="box-border flex h-full w-6 items-center justify-center border-0 bg-transparent p-0 text-neutral-900 dark:text-white" aria-label="Clear selection">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+                </ComboboxClear>
+                <ComboboxTrigger class="box-border flex h-full w-6 items-center justify-center border-0 bg-transparent p-0 text-neutral-900 dark:text-white" aria-label="Open popup">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12 6H4l4 4.5z" /></svg>
+                </ComboboxTrigger>
+            </div>
+        </ComboboxInputGroup>
+    </div>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="outline-0" SideOffset="4">
+            <ComboboxPopup class="box-border w-[var(--anchor-width)] max-w-[var(--available-width)] border border-neutral-900 bg-white text-neutral-900 shadow-[0.25rem_0.25rem_0_rgb(0_0_0_/_12%)] transition-[opacity,transform] duration-100 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 dark:border-white dark:bg-neutral-900 dark:text-white dark:shadow-none">
+                <ComboboxEmpty>
+                    <div class="box-border px-2 py-4 text-sm leading-4 text-neutral-500 dark:text-neutral-400">No fruits found.</div>
+                </ComboboxEmpty>
+                <ComboboxList class="box-border max-h-[min(22.5rem,var(--available-height))] overflow-y-auto overscroll-contain py-1 outline-0 data-[empty]:p-0">
+                    <ComboboxCollection TValue="ComboboxDemoFruit" Context="entry">
+                        <ComboboxItem TValue="ComboboxDemoFruit" class="relative box-border grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 px-2 py-2 text-sm leading-4 outline-0 data-[highlighted]:z-0 data-[highlighted]:text-white data-[highlighted]:before:absolute data-[highlighted]:before:inset-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-neutral-900 dark:data-[highlighted]:text-neutral-900 dark:data-[highlighted]:before:bg-white" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Label">
+                            <ComboboxItemIndicator class="col-start-1">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </ComboboxItemIndicator>
+                            <span class="col-start-2">@entry.Item.Label</span>
+                        </ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>

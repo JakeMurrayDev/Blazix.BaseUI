@@ -1,0 +1,90 @@
+@implements IDisposable
+
+<RenderElement TState="ComboboxGroupLabelState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private static readonly ComboboxGroupLabelState state = new();
+    private string labelId = null!;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private ComboboxGroupContext? GroupContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the label id.
+    /// </summary>
+    [Parameter]
+    public string? Id { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxGroupLabelState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxGroupLabelState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxGroupLabelState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        labelId = Id ?? Guid.NewGuid().ToIdString();
+        GroupContext?.SetLabelId(labelId);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Id is not null && Id != labelId)
+        {
+            labelId = Id;
+            GroupContext?.SetLabelId(labelId);
+        }
+
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        GroupContext?.SetLabelId(null);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["id"] = labelId
+        };
+    }
+}

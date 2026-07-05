@@ -1,0 +1,199 @@
+<ComboboxRoot TValue="ComboboxDemoLabel"
+              Items="@Items"
+              Values="@selectedLabels"
+              InputValue="@query"
+              Multiple="true"
+              OnValueChange="HandleValueChange"
+              OnInputValueChange="HandleInputValueChanged"
+              ItemToStringLabel="ComboboxDemoData.GetLabelValue"
+              ItemToStringValue="ComboboxDemoData.GetLabelValue"
+              IsItemEqualToValue="ComboboxDemoData.EqualLabel">
+    <div class="blx-combobox-container">
+        <label class="blx-combobox-label" for="combobox-creatable-labels">Labels</label>
+        <ComboboxInputGroup class="blx-combobox-input-group blx-combobox-input-group--chips">
+            <ComboboxChips class="blx-combobox-chips">
+                <ComboboxValue Context="values">
+                    @{
+                        var selected = values.OfType<ComboboxDemoLabel>().ToList();
+                    }
+                    @foreach (var label in selected)
+                    {
+                        <ComboboxChip class="blx-combobox-chip" aria-label="@label.Value">
+                            @label.Value
+                            <ComboboxChipRemove class="blx-combobox-chip-remove" aria-label="@($"Remove {label.Value}")">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+                            </ComboboxChipRemove>
+                        </ComboboxChip>
+                    }
+                    <ComboboxInput id="combobox-creatable-labels"
+                                   class="blx-combobox-chip-input"
+                                   placeholder="@(selected.Count > 0 ? null : "e.g. bug")"
+                                   @onkeydown="HandleInputKeyDown" />
+                </ComboboxValue>
+            </ComboboxChips>
+        </ComboboxInputGroup>
+    </div>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
+            <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--scroll">
+                <ComboboxEmpty>
+                    <div class="blx-combobox-empty">No labels found.</div>
+                </ComboboxEmpty>
+                <ComboboxList>
+                    <ComboboxCollection TValue="ComboboxDemoLabel" Context="entry">
+                        <ComboboxItem TValue="ComboboxDemoLabel" class="blx-combobox-item" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Value">
+                            @if (entry.Item.Creatable)
+                            {
+                                <span class="blx-combobox-item-indicator">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8h13M8 14.5v-13" /></svg>
+                                </span>
+                                <span class="blx-combobox-item-text">@entry.Item.Value</span>
+                            }
+                            else
+                            {
+                                <ComboboxItemIndicator class="blx-combobox-item-indicator">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                                </ComboboxItemIndicator>
+                                <span class="blx-combobox-item-text">@entry.Item.Value</span>
+                            }
+                        </ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>
+
+<DialogRoot Open="@openDialog" OpenChanged="HandleDialogOpenChanged">
+    <DialogPortal>
+        <DialogBackdrop class="blx-combobox-dialog-backdrop" />
+        <DialogPopup class="blx-combobox-dialog-popup">
+            <DialogTitle class="blx-combobox-dialog-title">Create new label</DialogTitle>
+            <DialogDescription class="blx-combobox-dialog-description">
+                Add a new label to select.
+            </DialogDescription>
+            <form @onsubmit="HandleCreateSubmit">
+                <input class="blx-combobox-text-field" placeholder="Label name" @bind="pendingLabel" />
+                <div class="blx-combobox-dialog-actions">
+                    <DialogClose class="blx-combobox-button">Cancel</DialogClose>
+                    <button type="submit" class="blx-combobox-button">Create</button>
+                </div>
+            </form>
+        </DialogPopup>
+    </DialogPortal>
+</DialogRoot>
+
+@code {
+    private List<ComboboxDemoLabel> labels = ComboboxDemoData.Labels.ToList();
+    private IReadOnlyList<ComboboxDemoLabel> selectedLabels = [];
+    private string query = string.Empty;
+    private string pendingLabel = string.Empty;
+    private bool openDialog;
+
+    private IReadOnlyList<ComboboxDemoLabel> Items
+    {
+        get
+        {
+            var trimmed = query.Trim();
+            if (trimmed.Length == 0 || labels.Any(label => IsSameLabel(label.Value, trimmed)))
+            {
+                return labels;
+            }
+
+            return [.. labels, new ComboboxDemoLabel($"create:{trimmed.ToLowerInvariant()}", $"Create \"{trimmed}\"", Creatable: true)];
+        }
+    }
+
+    private void HandleInputValueChanged(ComboboxInputValueChangeEventArgs args)
+    {
+        if (args.Reason != ComboboxChangeReason.ItemPress)
+        {
+            query = args.Value;
+        }
+    }
+
+    private void HandleValueChange(ComboboxValueChangeEventArgs<ComboboxDemoLabel> args)
+    {
+        var next = args.Values ?? [];
+        var creatable = next.FirstOrDefault(label => label.Creatable);
+        if (creatable is not null)
+        {
+            args.Cancel();
+            pendingLabel = query.Trim();
+            openDialog = true;
+            return;
+        }
+
+        selectedLabels = next;
+        query = string.Empty;
+    }
+
+    private void HandleInputKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter")
+        {
+            return;
+        }
+
+        var trimmed = query.Trim();
+        if (trimmed.Length == 0)
+        {
+            return;
+        }
+
+        var existing = labels.FirstOrDefault(label => IsSameLabel(label.Value, trimmed));
+        if (existing is not null)
+        {
+            selectedLabels = selectedLabels.Any(label => label.Id == existing.Id)
+                ? selectedLabels
+                : [.. selectedLabels, existing];
+            query = string.Empty;
+            return;
+        }
+
+        pendingLabel = trimmed;
+        openDialog = true;
+    }
+
+    private void HandleDialogOpenChanged(bool open) => openDialog = open;
+
+    private void HandleCreateSubmit()
+    {
+        var trimmed = pendingLabel.Trim();
+        if (trimmed.Length == 0)
+        {
+            return;
+        }
+
+        var existing = labels.FirstOrDefault(label => IsSameLabel(label.Value, trimmed));
+        if (existing is not null)
+        {
+            selectedLabels = selectedLabels.Any(label => label.Id == existing.Id)
+                ? selectedLabels
+                : [.. selectedLabels, existing];
+            openDialog = false;
+            query = string.Empty;
+            return;
+        }
+
+        var created = new ComboboxDemoLabel(CreateLabelId(trimmed), trimmed);
+        labels.Add(created);
+        selectedLabels = [.. selectedLabels, created];
+        openDialog = false;
+        query = string.Empty;
+    }
+
+    private static bool IsSameLabel(string left, string right) =>
+        string.Equals(left.Trim(), right.Trim(), StringComparison.CurrentCultureIgnoreCase);
+
+    private static string CreateLabelId(string value)
+    {
+        var normalized = new string(value
+            .Trim()
+            .ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '-')
+            .ToArray());
+        return normalized.Trim('-');
+    }
+}
