@@ -72,7 +72,7 @@
 | Chips | `role=toolbar` when chips are present | Implemented |
 | Chip | `tabindex=-1`, disabled/readonly state | Implemented |
 | ChipRemove | native button default, `tabindex=-1`, disabled state | Implemented |
-| Hidden input | `aria-hidden`, `name`, `form`, `autocomplete`, `value`, disabled, readonly, required | Implemented |
+| Hidden input | `aria-hidden`, `tabindex="-1"`, `aria-invalid`, `aria-describedby`, `name`, `form`, `autocomplete`, `value`, disabled, readonly, required | Implemented |
 
 ## Upstream Fix Mapping
 
