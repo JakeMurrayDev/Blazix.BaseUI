@@ -1234,6 +1234,55 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    // Combobox-specific parameters
+    public TestPageUrlBuilder WithComboboxDefaultValue(string value)
+    {
+        queryParams["defaultValue"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxDefaultValues(params string[] values)
+    {
+        queryParams["defaultValues"] = string.Join(",", values);
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxDefaultInputValue(string value)
+    {
+        queryParams["defaultInputValue"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxMultiple(bool value)
+    {
+        queryParams["multiple"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxMode(string value)
+    {
+        queryParams["mode"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxAutoHighlight(string value)
+    {
+        queryParams["autoHighlight"] = value;
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxFilterDisabled(bool value)
+    {
+        queryParams["filterDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithComboboxInputInsidePopup(bool value)
+    {
+        queryParams["inputInsidePopup"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithScrollAreaKeepMounted(bool value)
     {
         queryParams["keepMounted"] = value.ToString().ToLowerInvariant();
