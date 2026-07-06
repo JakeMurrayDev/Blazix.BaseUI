@@ -22,6 +22,8 @@
     private DotNetObjectReference<ComboboxPositioner>? positionerDotNetRef;
     private Side computedSide;
     private Align computedAlign;
+    private Side requestedSide;
+    private Align requestedAlign;
     private bool computedAnchorHidden;
     private bool computedArrowUncentered;
     private ComboboxPositionerContext positionerContext = null!;
@@ -30,9 +32,13 @@
     private Dictionary<string, object> componentAttributes = new();
     private ElementReference? previousElement;
     private bool subscribed;
+    private bool disposed;
 
     [CascadingParameter]
     private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxPortalContext? PortalContext { get; set; }
 
     /// <summary>
     /// Gets or sets which side of the anchor to place the popup on.
@@ -148,6 +154,8 @@
         positionerDotNetRef = DotNetObjectReference.Create(this);
         computedSide = Side;
         computedAlign = Align;
+        requestedSide = Side;
+        requestedAlign = Align;
         positionerContext = new ComboboxPositionerContext
         {
             Side = computedSide,
@@ -170,9 +178,15 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var placementChanged = computedSide != Side || computedAlign != Align;
-        computedSide = Side;
-        computedAlign = Align;
+        var placementChanged = requestedSide != Side || requestedAlign != Align;
+        if (placementChanged)
+        {
+            requestedSide = Side;
+            requestedAlign = Align;
+            computedSide = Side;
+            computedAlign = Align;
+        }
+
         positionerContext.Side = computedSide;
         positionerContext.Align = computedAlign;
         positionerContext.AnchorHidden = computedAnchorHidden;
@@ -206,7 +220,7 @@
             RootContext.SetPositionerElement(current);
         }
 
-        if (RootContext is null || !RootContext.Mounted || !Element.HasValue)
+        if (RootContext is null || (!RootContext.Mounted && PortalContext?.KeepMounted != true) || !Element.HasValue)
         {
             return;
         }
@@ -245,6 +259,8 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
+
         if (subscribed && RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
@@ -256,39 +272,39 @@
     }
 
     [JSInvokable]
-    public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
+    public Task OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
     {
         var newSide = Extensions.ParseSide(side);
         var newAlign = Extensions.ParseAlign(align);
 
-        if (newSide == computedSide && newAlign == computedAlign &&
-            anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered)
+        return InvokeAsync(() =>
         {
-            return;
-        }
+            if (disposed ||
+                (newSide == computedSide && newAlign == computedAlign &&
+                 anchorHidden == computedAnchorHidden && arrowUncentered == computedArrowUncentered))
+            {
+                return;
+            }
 
-        computedSide = newSide;
-        computedAlign = newAlign;
-        computedAnchorHidden = anchorHidden;
-        computedArrowUncentered = arrowUncentered;
+            computedSide = newSide;
+            computedAlign = newAlign;
+            computedAnchorHidden = anchorHidden;
+            computedArrowUncentered = arrowUncentered;
 
-        positionerContext.Side = computedSide;
-        positionerContext.Align = computedAlign;
-        positionerContext.AnchorHidden = computedAnchorHidden;
-        positionerContext.ArrowUncentered = computedArrowUncentered;
+            positionerContext.Side = computedSide;
+            positionerContext.Align = computedAlign;
+            positionerContext.AnchorHidden = computedAnchorHidden;
+            positionerContext.ArrowUncentered = computedArrowUncentered;
 
-        if (RootContext is not null)
-        {
-            RootContext.PopupSide = computedSide;
-            RootContext.PopupAlign = computedAlign;
-            RootContext.AnchorHidden = computedAnchorHidden;
-        }
+            if (RootContext is not null)
+            {
+                RootContext.PopupSide = computedSide;
+                RootContext.PopupAlign = computedAlign;
+                RootContext.AnchorHidden = computedAnchorHidden;
+            }
 
-        BuildStateAndAttributes();
-        positionerContext.NotifyStateChanged();
-
-        _ = InvokeAsync(() =>
-        {
+            BuildStateAndAttributes();
+            positionerContext.NotifyStateChanged();
             StateHasChanged();
             RootContext?.NotifyStateChanged();
         });

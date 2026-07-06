@@ -25,7 +25,7 @@
 
     <ComboboxPortal>
         <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
-            <ComboboxPopup class="blx-combobox-popup" aria-busy="@isPending">
+            <ComboboxPopup class="blx-combobox-popup" aria-busy="@(isPending ? "true" : "false")">
                 <div class="blx-combobox-viewport">
                     <ComboboxStatus>
                         @if (isPending)

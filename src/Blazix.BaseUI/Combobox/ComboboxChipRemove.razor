@@ -81,6 +81,7 @@
         else
         {
             componentAttributes["role"] = "button";
+            componentAttributes["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
         }
 
         if (disabled)
@@ -105,8 +106,33 @@
             return;
         }
 
+        await RemoveAsync();
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is not null && ChipContext is not null && !state.Disabled && IsActivationKey(e.Key))
+        {
+            await RemoveAsync();
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (RootContext is null || ChipContext is null)
+        {
+            return;
+        }
+
         await RootContext.RemoveSelectedValueAtAsync(ChipContext.Index, ComboboxChangeReason.ChipRemovePress);
         await RootContext.FocusInputAsync();
-        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private static bool IsActivationKey(string key)
+    {
+        return key is "Enter" or " " or "Spacebar";
     }
 }

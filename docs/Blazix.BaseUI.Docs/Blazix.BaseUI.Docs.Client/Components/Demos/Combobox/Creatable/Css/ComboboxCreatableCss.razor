@@ -142,13 +142,8 @@
             return;
         }
 
-        var existing = labels.FirstOrDefault(label => IsSameLabel(label.Value, trimmed));
-        if (existing is not null)
+        if (TryAddExistingLabel(trimmed))
         {
-            selectedLabels = selectedLabels.Any(label => label.Id == existing.Id)
-                ? selectedLabels
-                : [.. selectedLabels, existing];
-            query = string.Empty;
             return;
         }
 
@@ -166,14 +161,9 @@
             return;
         }
 
-        var existing = labels.FirstOrDefault(label => IsSameLabel(label.Value, trimmed));
-        if (existing is not null)
+        if (TryAddExistingLabel(trimmed))
         {
-            selectedLabels = selectedLabels.Any(label => label.Id == existing.Id)
-                ? selectedLabels
-                : [.. selectedLabels, existing];
             openDialog = false;
-            query = string.Empty;
             return;
         }
 
@@ -184,8 +174,23 @@
         query = string.Empty;
     }
 
+    private bool TryAddExistingLabel(string trimmed)
+    {
+        var existing = labels.FirstOrDefault(label => IsSameLabel(label.Value, trimmed));
+        if (existing is null)
+        {
+            return false;
+        }
+
+        selectedLabels = selectedLabels.Any(label => label.Id == existing.Id)
+            ? selectedLabels
+            : [.. selectedLabels, existing];
+        query = string.Empty;
+        return true;
+    }
+
     private static bool IsSameLabel(string left, string right) =>
-        string.Equals(left.Trim(), right.Trim(), StringComparison.CurrentCultureIgnoreCase);
+        string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
 
     private static string CreateLabelId(string value)
     {

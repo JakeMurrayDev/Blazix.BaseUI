@@ -200,13 +200,7 @@
 
     private void BuildStateAndAttributes()
     {
-        var open = RootContext?.Mounted == true && RootContext.OpenChangeReason != ComboboxChangeReason.ClosePress
-            ? RootContext.Mounted && (RootContext.PopupElement.HasValue || RootContext.Inline || RootContext.OpenChangeReason != ComboboxChangeReason.None)
-            : RootContext?.Mounted == true;
-        open = RootContext?.OpenChangeReason == ComboboxChangeReason.None
-            ? RootContext?.Mounted == true
-            : open;
-
+        var open = RootContext?.Mounted == true;
         var disabled = Disabled || (RootContext?.Disabled ?? false) || (FieldContext?.Disabled ?? false);
         var fieldState = IsInsidePopup ? FieldRootState.Default : RootContext?.FieldState ?? FieldRootState.Default;
         state = ComboboxInputState.FromFieldState(
@@ -248,7 +242,7 @@
         {
             attrs["aria-readonly"] = "true";
             attrs["readonly"] = "readonly";
-            attrs["data-readonly"] = "true";
+            attrs["data-readonly"] = true;
         }
 
         if (RootContext?.Required == true)
@@ -260,7 +254,7 @@
         if (disabled)
         {
             attrs["disabled"] = "disabled";
-            attrs["data-disabled"] = "true";
+            attrs["data-disabled"] = true;
         }
 
         var id = Id ?? (!IsInsidePopup ? RootContext?.RootId : null);
@@ -329,10 +323,12 @@
     {
         if (RootContext is null || state.Disabled || RootContext.ReadOnly || !RootContext.OpenOnInputClick)
         {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
             return;
         }
 
         await RootContext.SetOpenAsync(true, ComboboxChangeReason.InputChange);
+        await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
     }
 
     private Task HandleKeyDownAsync(KeyboardEventArgs e)

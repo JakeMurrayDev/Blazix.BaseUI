@@ -167,13 +167,13 @@
 
     private void BuildStateAndAttributes()
     {
-        var disabled = Disabled || RootContext?.Disabled == true;
+        var disabled = Disabled || RootContext?.Disabled == true || RootContext?.ReadOnly == true;
         var visible = RootContext?.HasSelectedValue == true || !string.IsNullOrEmpty(RootContext?.GetTypedInputValue());
         state = new ComboboxClearState(
             RootContext?.Mounted == true,
             disabled,
             visible,
-            TransitionStatus.Undefined);
+            RootContext?.TransitionStatus ?? TransitionStatus.Undefined);
 
         var attrs = new Dictionary<string, object>
         {

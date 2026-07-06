@@ -244,6 +244,48 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
     }
 
     [Fact]
+    public async Task NonNativeChipRemove_ShouldRemoveValueOnKeyboardActivation()
+    {
+        ComboboxValueChangeEventArgs<string>? received = null;
+        var callback = EventCallback.Factory.Create<ComboboxValueChangeEventArgs<string>>(this, args => received = args);
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<ComboboxRoot<string>>(0);
+            builder.AddAttribute(1, nameof(ComboboxRoot<string>.DefaultValues), new[] { "Apple", "Banana" });
+            builder.AddAttribute(2, nameof(ComboboxRoot<string>.Multiple), true);
+            builder.AddAttribute(3, nameof(ComboboxRoot<string>.Name), "fruit");
+            builder.AddAttribute(4, nameof(ComboboxRoot<string>.OnValueChange), callback);
+            builder.AddAttribute(5, nameof(ComboboxRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<ComboboxChips>(0);
+                childBuilder.AddAttribute(1, nameof(ComboboxChips.ChildContent), (RenderFragment)(chipsBuilder =>
+                {
+                    chipsBuilder.OpenComponent<ComboboxChip>(0);
+                    chipsBuilder.AddAttribute(1, nameof(ComboboxChip.ChildContent), (RenderFragment)(chipBuilder =>
+                    {
+                        chipBuilder.AddContent(0, "Apple chip");
+                        chipBuilder.OpenComponent<ComboboxChipRemove>(1);
+                        chipBuilder.AddAttribute(2, nameof(ComboboxChipRemove.NativeButton), false);
+                        chipBuilder.AddAttribute(3, nameof(ComboboxChipRemove.ChildContent), (RenderFragment)(removeBuilder => removeBuilder.AddContent(0, "Remove")));
+                        chipBuilder.CloseComponent();
+                    }));
+                    chipsBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var remove = cut.Find("[role='button']");
+        await remove.KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
+
+        cut.FindAll("input[type='hidden'][name='fruit']").Select(input => input.GetAttribute("value")).ShouldBe(["Banana"]);
+        received.ShouldNotBeNull();
+        received.Values.ShouldBe(["Banana"]);
+        received.Reason.ShouldBe(ComboboxChangeReason.ChipRemovePress);
+    }
+
+    [Fact]
     public async Task Clear_ShouldClearSelectedValueAndInputValue()
     {
         ComboboxValueChangeEventArgs<string>? valueChange = null;
@@ -271,6 +313,30 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
     }
 
     [Fact]
+    public Task Clear_ShouldBeDisabledWhenRootIsReadOnly()
+    {
+        var cut = Render(CreateCombobox(defaultValue: "Apple", defaultInputValue: "App", readOnly: true));
+
+        var clear = cut.Find("button");
+        clear.GetAttribute("disabled").ShouldBe(string.Empty);
+        clear.HasAttribute("data-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task MultipleHiddenInputs_ShouldBeDisabledWhenRootIsDisabled()
+    {
+        var cut = Render(CreateCombobox(defaultValues: ["Apple", "Banana"], multiple: true, disabled: true, name: "fruit"));
+
+        var hiddenInputs = cut.FindAll("input[type='hidden'][name='fruit']");
+        hiddenInputs.Count.ShouldBe(2);
+        hiddenInputs.ShouldAllBe(input => input.HasAttribute("disabled"));
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task Value_ShouldRenderSelectedLabelsAndPlaceholder()
     {
         var empty = Render(CreateCombobox());
@@ -281,6 +347,31 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
 
         var multiple = Render(CreateCombobox(defaultValues: ["Apple", "Banana"], multiple: true));
         multiple.Markup.ShouldContain("Apple, Banana");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Portal_ShouldNotRenderPopupContentWhenClosedWithoutKeepMounted()
+    {
+        var cut = Render(CreateComboboxWithPortal(keepMounted: false));
+
+        cut.FindAll("[data-testid='combobox-positioner']").ShouldBeEmpty();
+        cut.FindAll("[data-testid='combobox-popup']").ShouldBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Portal_ShouldKeepPopupContentMountedWhenKeepMounted()
+    {
+        var cut = Render(CreateComboboxWithPortal(keepMounted: true));
+
+        var positioner = cut.Find("[data-testid='combobox-positioner']");
+        positioner.HasAttribute("hidden").ShouldBeTrue();
+
+        var popup = cut.Find("[data-testid='combobox-popup']");
+        popup.HasAttribute("data-closed").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -309,6 +400,75 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe("Apple");
         cut.Find("input[aria-hidden='true']").GetAttribute("value").ShouldBe("apple-id");
         cut.Markup.ShouldContain("Apple");
+
+        return Task.CompletedTask;
+    }
+
+    private static RenderFragment CreateComboboxWithPortal(bool keepMounted)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<ComboboxRoot<string>>(0);
+            builder.AddAttribute(1, nameof(ComboboxRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(ComboboxRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<ComboboxPortal>(0);
+                childBuilder.AddAttribute(1, nameof(ComboboxPortal.KeepMounted), keepMounted);
+                childBuilder.AddAttribute(2, nameof(ComboboxPortal.ChildContent), (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<ComboboxPositioner>(0);
+                    portalBuilder.AddAttribute(1, "data-testid", "combobox-positioner");
+                    portalBuilder.AddAttribute(2, nameof(ComboboxPositioner.ChildContent), (RenderFragment)(positionerBuilder =>
+                    {
+                        positionerBuilder.OpenComponent<ComboboxPopup>(0);
+                        positionerBuilder.AddAttribute(1, "data-testid", "combobox-popup");
+                        positionerBuilder.AddAttribute(2, nameof(ComboboxPopup.ChildContent), (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<ComboboxList>(0);
+                            popupBuilder.AddAttribute(1, nameof(ComboboxList.ChildContent), CreateListItems());
+                            popupBuilder.CloseComponent();
+                        }));
+                        positionerBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    [Fact]
+    public Task StaticItems_ShouldUseCustomFilterForListEmptyState()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<ComboboxRoot<string>>(0);
+            builder.AddAttribute(1, nameof(ComboboxRoot<string>.DefaultInputValue), "ap");
+            builder.AddAttribute(2, nameof(ComboboxRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(3, nameof(ComboboxRoot<string>.Filter), (Func<string, string, Func<string, string?>?, bool>)((_, _, _) => false));
+            builder.AddAttribute(4, nameof(ComboboxRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<ComboboxList>(0);
+                childBuilder.AddAttribute(1, nameof(ComboboxList.ChildContent), (RenderFragment)(listBuilder =>
+                {
+                    listBuilder.OpenComponent<ComboboxItem<string>>(0);
+                    listBuilder.AddAttribute(1, nameof(ComboboxItem<string>.Value), "Apple");
+                    listBuilder.AddAttribute(2, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(itemBuilder => itemBuilder.AddContent(0, "Apple")));
+                    listBuilder.CloseComponent();
+
+                    listBuilder.OpenComponent<ComboboxItem<string>>(10);
+                    listBuilder.AddAttribute(11, nameof(ComboboxItem<string>.Value), "Banana");
+                    listBuilder.AddAttribute(12, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(itemBuilder => itemBuilder.AddContent(0, "Banana")));
+                    listBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.FindAll("[role='option']").ShouldBeEmpty();
+        cut.Find("[role='listbox']").HasAttribute("data-empty").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

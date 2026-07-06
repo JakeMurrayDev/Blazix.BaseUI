@@ -34,7 +34,7 @@
 
     <ComboboxPortal>
         <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
-            <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--scroll" aria-busy="@isPending">
+            <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--scroll" aria-busy="@(isPending ? "true" : "false")">
                 <ComboboxStatus>
                     @if (isPending)
                     {

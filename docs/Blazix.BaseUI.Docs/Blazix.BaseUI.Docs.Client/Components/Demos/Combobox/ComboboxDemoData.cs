@@ -190,7 +190,7 @@ internal static class ComboboxDemoData
     public static bool EqualLabel(ComboboxDemoLabel left, ComboboxDemoLabel right) => left.Id == right.Id;
 
     public static bool Contains(string text, string query) =>
-        text.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+        text.Contains(query, StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<ComboboxDemoUser> SearchUsers(string query)
     {

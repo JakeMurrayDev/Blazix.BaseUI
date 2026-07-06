@@ -45,7 +45,7 @@
 {
     foreach (var selectedValue in selectedValues)
     {
-        <input type="hidden" name="@ResolvedName" form="@Form" value="@StringifyFormValue(selectedValue)" />
+        <input type="hidden" name="@ResolvedName" form="@Form" value="@StringifyFormValue(selectedValue)" disabled="@ResolvedDisabled" />
     }
 }
 

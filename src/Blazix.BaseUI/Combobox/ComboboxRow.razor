@@ -11,8 +11,8 @@
 </CascadingValue>
 
 @code {
-    private static readonly ComboboxRowState state = new();
-    private static readonly ComboboxRowContext rowContext = new();
+    private readonly ComboboxRowState state = new();
+    private readonly ComboboxRowContext rowContext = new();
     private static readonly Dictionary<string, object> componentAttributes = new()
     {
         ["role"] = "row"

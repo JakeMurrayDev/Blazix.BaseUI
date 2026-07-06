@@ -6,7 +6,7 @@
 <RenderElement TState="ComboboxPopupState"
                Tag="div"
                State="state"
-               Enabled="RootContext is not null && (RootContext.Mounted || RootContext.Inline)"
+               Enabled="RootContext is not null && (RootContext.Mounted || RootContext.Inline || PortalContext?.KeepMounted == true)"
                Render="Render"
                ClassValue="ClassValue"
                StyleValue="StyleValue"
@@ -33,6 +33,9 @@
 
     [CascadingParameter]
     private ComboboxPositionerContext? PositionerContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxPortalContext? PortalContext { get; set; }
 
     /// <summary>
     /// Allows replacing or composing the rendered element.
@@ -126,6 +129,11 @@
             try
             {
                 var module = await ModuleTask;
+                if (RootContext is not null)
+                {
+                    await module.InvokeVoidAsync("setPopupElement", RootContext.RootId, null);
+                }
+
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

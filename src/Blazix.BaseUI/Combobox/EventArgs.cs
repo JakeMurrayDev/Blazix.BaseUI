@@ -86,7 +86,7 @@ public sealed class ComboboxInputValueChangeEventArgs : EventArgs
 }
 
 /// <summary>
-/// Provides details for an combobox popup open state change.
+/// Provides details for a combobox popup open state change.
 /// </summary>
 public sealed class ComboboxOpenChangeEventArgs : EventArgs
 {
@@ -123,7 +123,7 @@ public sealed class ComboboxOpenChangeEventArgs : EventArgs
 }
 
 /// <summary>
-/// Provides details for an combobox item highlight change.
+/// Provides details for a combobox item highlight change.
 /// </summary>
 /// <typeparam name="TValue">The combobox item value type.</typeparam>
 /// <param name="Value">The highlighted item value, or <see langword="default"/> when no item is highlighted.</param>

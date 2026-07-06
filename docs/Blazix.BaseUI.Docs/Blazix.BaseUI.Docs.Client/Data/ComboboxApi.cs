@@ -196,8 +196,11 @@ public static class ComboboxApi
             ],
             []),
         new("Portal",
-            "A portal boundary for popup content. It does not render its own element.",
+            "A portal boundary that moves popup content into a container element.",
             [
+                new ApiRow("KeepMounted", "bool", "false", "Keeps the portal contents mounted while the popup is closed."),
+                new ApiRow("Container", "string", "\"body\"", "CSS selector for the element that receives the portal content."),
+                new ApiRow("Render", "RenderFragment<RenderProps<object>>?", "null", "Replaces the rendered portal element with a different tag or composes it with another component."),
                 new ApiRow("ChildContent", "RenderFragment?", "null", "The portaled content."),
             ],
             [],

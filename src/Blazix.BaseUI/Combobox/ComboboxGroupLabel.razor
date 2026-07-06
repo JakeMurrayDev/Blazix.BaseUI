@@ -77,7 +77,10 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        GroupContext?.SetLabelId(null);
+        if (GroupContext?.LabelId == labelId)
+        {
+            GroupContext.SetLabelId(null);
+        }
     }
 
     private void BuildComponentAttributes()

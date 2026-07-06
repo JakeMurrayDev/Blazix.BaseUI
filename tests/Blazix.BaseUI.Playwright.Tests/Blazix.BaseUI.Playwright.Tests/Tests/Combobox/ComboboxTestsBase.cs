@@ -15,6 +15,18 @@ public abstract class ComboboxTestsBase : TestBase
     {
     }
 
+    private LocatorAssertionsToHaveTextOptions TextTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
+    private LocatorAssertionsToHaveValueOptions ValueTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
+    private LocatorAssertionsToHaveAttributeOptions AttributeTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
+    private LocatorAssertionsToHaveCSSOptions CssTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
+    private LocatorAssertionsToBeDisabledOptions DisabledTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
+    private LocatorAssertionsToBeVisibleOptions VisibleTimeout => new() { Timeout = 5000 * TimeoutMultiplier };
+
     protected async Task WaitForComboboxOpenAsync()
     {
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true",
@@ -43,9 +55,9 @@ public abstract class ComboboxTestsBase : TestBase
             new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
         await Assertions.Expect(GetByTestId("selected-value")).ToHaveTextAsync("Banana",
             new LocatorAssertionsToHaveTextOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(GetByTestId("selected-values")).ToHaveTextAsync("");
-        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ItemPress");
-        await Assertions.Expect(Page.Locator("input[aria-hidden='true'][name='fruit']")).ToHaveValueAsync("Banana");
+        await Assertions.Expect(GetByTestId("selected-values")).ToHaveTextAsync("", TextTimeout);
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ItemPress", TextTimeout);
+        await Assertions.Expect(Page.Locator("input[aria-hidden='true'][name='fruit']")).ToHaveValueAsync("Banana", ValueTimeout);
         await WaitForComboboxClosedAsync();
     }
 
@@ -59,8 +71,8 @@ public abstract class ComboboxTestsBase : TestBase
         await WaitForComboboxOpenAsync();
 
         var apple = GetByTestId("combobox-item-apple");
-        await Assertions.Expect(apple).ToHaveAttributeAsync("aria-selected", "true");
-        await Assertions.Expect(apple).ToHaveAttributeAsync("data-selected", "");
+        await Assertions.Expect(apple).ToHaveAttributeAsync("aria-selected", "true", AttributeTimeout);
+        await Assertions.Expect(apple).ToHaveAttributeAsync("data-selected", "", AttributeTimeout);
         await Assertions.Expect(GetByTestId("combobox-item-indicator-apple")).ToBeVisibleAsync(
             new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
 
@@ -72,7 +84,7 @@ public abstract class ComboboxTestsBase : TestBase
             new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
         await Assertions.Expect(GetByTestId("combobox-chip-banana")).ToBeVisibleAsync(
             new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(GetByTestId("combobox-item-banana")).ToHaveAttributeAsync("aria-selected", "true");
+        await Assertions.Expect(GetByTestId("combobox-item-banana")).ToHaveAttributeAsync("aria-selected", "true", AttributeTimeout);
         await Assertions.Expect(GetByTestId("combobox-item-indicator-banana")).ToBeVisibleAsync(
             new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
         await ExpectHiddenInputValuesAsync("Apple", "Banana");
@@ -85,7 +97,7 @@ public abstract class ComboboxTestsBase : TestBase
 
         await Assertions.Expect(GetByTestId("selected-values")).ToHaveTextAsync("Banana",
             new LocatorAssertionsToHaveTextOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ChipRemovePress");
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ChipRemovePress", TextTimeout);
         await ExpectHiddenInputValuesAsync("Banana");
     }
 
@@ -104,11 +116,11 @@ public abstract class ComboboxTestsBase : TestBase
 
         await Assertions.Expect(input).ToBeFocusedAsync(
             new LocatorAssertionsToBeFocusedOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(input).ToHaveValueAsync("");
-        await Assertions.Expect(GetByTestId("selected-value")).ToHaveTextAsync("");
-        await Assertions.Expect(GetByTestId("input-value")).ToHaveTextAsync("");
-        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ClearPress");
-        await Assertions.Expect(Page.Locator("input[aria-hidden='true'][name='fruit']")).ToHaveValueAsync("");
+        await Assertions.Expect(input).ToHaveValueAsync("", ValueTimeout);
+        await Assertions.Expect(GetByTestId("selected-value")).ToHaveTextAsync("", TextTimeout);
+        await Assertions.Expect(GetByTestId("input-value")).ToHaveTextAsync("", TextTimeout);
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ClearPress", TextTimeout);
+        await Assertions.Expect(Page.Locator("input[aria-hidden='true'][name='fruit']")).ToHaveValueAsync("", ValueTimeout);
     }
 
     [Fact]
@@ -132,8 +144,8 @@ public abstract class ComboboxTestsBase : TestBase
         await WaitForComboboxOpenAsync();
 
         var popup = GetByTestId("combobox-popup");
-        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-starting-style", "");
-        await Assertions.Expect(popup).ToHaveCSSAsync("opacity", "1");
+        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-starting-style", "", AttributeTimeout);
+        await Assertions.Expect(popup).ToHaveCSSAsync("opacity", "1", CssTimeout);
     }
 
     [Fact]
@@ -150,14 +162,15 @@ public abstract class ComboboxTestsBase : TestBase
         await Assertions.Expect(apple).ToHaveAttributeAsync("data-highlighted", "",
             new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
         await Assertions.Expect(input).ToHaveAttributeAsync("aria-activedescendant",
-            await apple.GetAttributeAsync("id") ?? "");
+            await apple.GetAttributeAsync("id") ?? "",
+            AttributeTimeout);
 
         await Page.Keyboard.PressAsync("Enter");
 
         await Assertions.Expect(input).ToHaveValueAsync("Apple",
             new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(GetByTestId("selected-value")).ToHaveTextAsync("Apple");
-        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ItemPress");
+        await Assertions.Expect(GetByTestId("selected-value")).ToHaveTextAsync("Apple", TextTimeout);
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("ItemPress", TextTimeout);
         await WaitForComboboxClosedAsync();
     }
 
@@ -171,7 +184,8 @@ public abstract class ComboboxTestsBase : TestBase
         await input.FocusAsync();
         await Assertions.Expect(input).Not.ToHaveAttributeAsync(
             "aria-activedescendant",
-            new System.Text.RegularExpressions.Regex(".+"));
+            new System.Text.RegularExpressions.Regex(".+"),
+            AttributeTimeout);
 
         await Page.Keyboard.PressAsync("Enter");
 
@@ -190,28 +204,28 @@ public abstract class ComboboxTestsBase : TestBase
             .WithComboboxDefaultValue("Apple"));
 
         var input = GetByTestId("combobox-input");
-        await Assertions.Expect(input).ToBeDisabledAsync();
-        await Assertions.Expect(input).ToHaveAttributeAsync("readonly", "readonly");
-        await Assertions.Expect(input).ToHaveAttributeAsync("required", "required");
-        await Assertions.Expect(input).ToHaveAttributeAsync("disabled", "disabled");
-        await Assertions.Expect(input).ToHaveAttributeAsync("aria-readonly", "true");
-        await Assertions.Expect(input).ToHaveAttributeAsync("aria-required", "true");
-        await Assertions.Expect(input).ToHaveAttributeAsync("data-disabled", "true");
-        await Assertions.Expect(input).ToHaveAttributeAsync("data-readonly", "true");
+        await Assertions.Expect(input).ToBeDisabledAsync(DisabledTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("readonly", "readonly", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("required", "required", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("disabled", "disabled", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("aria-readonly", "true", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("aria-required", "true", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("data-disabled", "", AttributeTimeout);
+        await Assertions.Expect(input).ToHaveAttributeAsync("data-readonly", "", AttributeTimeout);
 
         var trigger = GetByTestId("combobox-trigger");
-        await Assertions.Expect(trigger).ToBeDisabledAsync();
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-haspopup", "listbox");
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-required", "true");
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-disabled", "");
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-readonly", "");
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-required", "");
+        await Assertions.Expect(trigger).ToBeDisabledAsync(DisabledTimeout);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-haspopup", "listbox", AttributeTimeout);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-required", "true", AttributeTimeout);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-disabled", "", AttributeTimeout);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-readonly", "", AttributeTimeout);
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("data-required", "", AttributeTimeout);
 
         var hidden = Page.Locator("input[aria-hidden='true'][name='fruit']");
-        await Assertions.Expect(hidden).ToHaveAttributeAsync("disabled", "");
-        await Assertions.Expect(hidden).ToHaveAttributeAsync("readonly", "");
-        await Assertions.Expect(hidden).ToHaveAttributeAsync("required", "");
-        await Assertions.Expect(hidden).ToHaveValueAsync("Apple");
+        await Assertions.Expect(hidden).ToHaveAttributeAsync("disabled", "", AttributeTimeout);
+        await Assertions.Expect(hidden).ToHaveAttributeAsync("readonly", "", AttributeTimeout);
+        await Assertions.Expect(hidden).ToHaveAttributeAsync("required", "", AttributeTimeout);
+        await Assertions.Expect(hidden).ToHaveValueAsync("Apple", ValueTimeout);
     }
 
     [Fact]
@@ -232,7 +246,7 @@ public abstract class ComboboxTestsBase : TestBase
 
         await Assertions.Expect(input).ToHaveValueAsync("Che",
             new LocatorAssertionsToHaveValueOptions { Timeout = 5000 * TimeoutMultiplier });
-        await Assertions.Expect(GetByTestId("combobox-item-cherry")).ToBeVisibleAsync();
+        await Assertions.Expect(GetByTestId("combobox-item-cherry")).ToBeVisibleAsync(VisibleTimeout);
 
         await GetByTestId("combobox-panel-padding").ClickAsync();
 
