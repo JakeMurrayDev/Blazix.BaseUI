@@ -1,0 +1,143 @@
+<ComboboxRoot TValue="ComboboxDemoUser"
+              Items="@Items"
+              Values="@selectedUsers"
+              InputValue="@searchValue"
+              Multiple="true"
+              OnValueChange="HandleValueChange"
+              OnInputValueChange="HandleInputValueChanged"
+              ItemToStringLabel="ComboboxDemoData.GetUserLabel"
+              ItemToStringValue="ComboboxDemoData.GetUserValue"
+              IsItemEqualToValue="ComboboxDemoData.EqualUser"
+              FilterDisabled="true">
+    <div class="blx-combobox-container">
+        <label class="blx-combobox-label" for="combobox-async-multiple-user">Assign reviewers</label>
+        <ComboboxInputGroup class="blx-combobox-input-group blx-combobox-input-group--chips">
+            <ComboboxChips class="blx-combobox-chips">
+                <ComboboxValue Context="values">
+                    @{
+                        var selected = values.OfType<ComboboxDemoUser>().ToList();
+                    }
+                    @foreach (var user in selected)
+                    {
+                        <ComboboxChip class="blx-combobox-chip" aria-label="@user.Name">
+                            @user.Name
+                            <ComboboxChipRemove class="blx-combobox-chip-remove" aria-label="@($"Remove {user.Name}")">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round" aria-hidden="true"><path d="m4.5 4.5 7 7m-7 0 7-7" /></svg>
+                            </ComboboxChipRemove>
+                        </ComboboxChip>
+                    }
+                    <ComboboxInput id="combobox-async-multiple-user" class="blx-combobox-chip-input" placeholder="@(selected.Count > 0 ? null : "e.g. Michael")" />
+                </ComboboxValue>
+            </ComboboxChips>
+        </ComboboxInputGroup>
+    </div>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
+            <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--scroll" aria-busy="@(isPending ? "true" : "false")">
+                <ComboboxStatus>
+                    @if (isPending)
+                    {
+                        <div class="blx-combobox-status"><span class="blx-combobox-spinner" aria-hidden="true"></span>Searching...</div>
+                    }
+                    else if (searchValue.Trim().Length == 0 && selectedUsers.Count == 0)
+                    {
+                        <div class="blx-combobox-status">Start typing to search people...</div>
+                    }
+                    else if (searchValue.Trim().Length > 0 && searchResults.Count == 0)
+                    {
+                        <div class="blx-combobox-status">@($"No matches for \"{searchValue.Trim()}\".")</div>
+                    }
+                </ComboboxStatus>
+                <ComboboxEmpty>
+                    <div class="blx-combobox-empty">Try a different search term.</div>
+                </ComboboxEmpty>
+                <ComboboxList>
+                    <ComboboxCollection TValue="ComboboxDemoUser" Context="entry">
+                        <ComboboxItem TValue="ComboboxDemoUser" class="blx-combobox-item blx-combobox-item--rich" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Name">
+                            <ComboboxItemIndicator class="blx-combobox-item-indicator blx-combobox-item-indicator--rich">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </ComboboxItemIndicator>
+                            <span class="blx-combobox-user">
+                                <span class="blx-combobox-user-name">@entry.Item.Name</span>
+                                <span class="blx-combobox-user-email">@entry.Item.Email</span>
+                                <span class="blx-combobox-user-meta">
+                                    <span>@@@entry.Item.Username</span>
+                                    <span>@entry.Item.Title</span>
+                                </span>
+                            </span>
+                        </ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>
+
+@code {
+    private IReadOnlyList<ComboboxDemoUser> selectedUsers = [];
+    private IReadOnlyList<ComboboxDemoUser> searchResults = [];
+    private string searchValue = string.Empty;
+    private bool isPending;
+    private int requestVersion;
+
+    private IReadOnlyList<ComboboxDemoUser> Items
+    {
+        get
+        {
+            if (selectedUsers.Count == 0)
+            {
+                return searchResults;
+            }
+
+            var merged = searchResults.ToList();
+            foreach (var user in selectedUsers)
+            {
+                if (!merged.Any(result => result.Id == user.Id))
+                {
+                    merged.Add(user);
+                }
+            }
+
+            return merged;
+        }
+    }
+
+    private void HandleValueChange(ComboboxValueChangeEventArgs<ComboboxDemoUser> args)
+    {
+        selectedUsers = args.Values ?? [];
+        searchValue = string.Empty;
+        searchResults = selectedUsers;
+        isPending = false;
+    }
+
+    private async Task HandleInputValueChanged(ComboboxInputValueChangeEventArgs args)
+    {
+        searchValue = args.Value;
+
+        if (args.Reason == ComboboxChangeReason.ItemPress)
+        {
+            return;
+        }
+
+        var currentVersion = ++requestVersion;
+        var trimmed = args.Value.Trim();
+        if (trimmed.Length == 0)
+        {
+            searchResults = selectedUsers;
+            isPending = false;
+            return;
+        }
+
+        isPending = true;
+        await Task.Delay(180);
+
+        if (currentVersion != requestVersion)
+        {
+            return;
+        }
+
+        searchResults = ComboboxDemoData.SearchUsers(trimmed);
+        isPending = false;
+    }
+}

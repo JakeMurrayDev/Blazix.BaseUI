@@ -1,0 +1,72 @@
+@using Blazix.BaseUI.Portal
+
+@if (ShouldRenderPortal)
+{
+    <CascadingValue TValue="ComboboxPortalContext" Value="portalContext" IsFixed="true">
+        <Portal Target="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalRef">
+            @ChildContent
+        </Portal>
+    </CascadingValue>
+}
+
+@code {
+    private ComboboxPortalContext portalContext = null!;
+    private Portal? portalRef;
+
+    private bool ShouldRenderPortal => RootContext is not null && (RootContext.Mounted || RootContext.ForceMounted || KeepMounted);
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the portal content remains mounted when the combobox is closed.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Gets or sets a CSS selector for the container to render portal content into.
+    /// </summary>
+    [Parameter]
+    public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets a custom render fragment that replaces the default portal element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<object>>? Render { get; set; }
+
+    /// <summary>
+    /// Defines the portal content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional attributes applied to the portal element.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference of the portal root element.
+    /// </summary>
+    public ElementReference? Element => portalRef?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException("ComboboxPortal must be used within a ComboboxRoot.");
+        }
+
+        portalContext = new ComboboxPortalContext { KeepMounted = KeepMounted };
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        portalContext.KeepMounted = KeepMounted;
+    }
+}

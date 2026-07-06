@@ -1,0 +1,81 @@
+@implements IDisposable
+
+<CascadingValue TValue="ComboboxGroupContext" Value="groupContext" IsFixed="true">
+    <RenderElement TState="ComboboxGroupState"
+                   Tag="div"
+                   State="state"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes" />
+</CascadingValue>
+
+@code {
+    private static readonly ComboboxGroupState state = new();
+    private readonly ComboboxGroupContext groupContext = new();
+    private Dictionary<string, object> componentAttributes = new();
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxGroupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxGroupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxGroupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        groupContext.StateChanged = OnGroupChanged;
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        groupContext.StateChanged = null;
+    }
+
+    private void OnGroupChanged()
+    {
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildComponentAttributes()
+    {
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["role"] = "group"
+        };
+
+        if (!string.IsNullOrEmpty(groupContext.LabelId))
+        {
+            componentAttributes["aria-labelledby"] = groupContext.LabelId;
+        }
+    }
+}

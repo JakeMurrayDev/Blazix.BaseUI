@@ -1,0 +1,296 @@
+@page "/components/combobox"
+
+<PageTitle>Combobox · Blazix.BaseUI</PageTitle>
+
+<DocsPageIntro Eyebrow="Components"
+               Title="Combobox"
+               Subtitle="An input combined with a list of predefined items to select."
+               MarkdownHref="/components/combobox.md" />
+
+<div class="mt-8">
+    <Demo Variants="@HeroVariants">
+        <ComboboxHeroCss />
+    </Demo>
+</div>
+
+<DocsHeading Title="Usage guidelines" />
+<ul class="mb-6 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
+    <li>Use Combobox when the input is restricted to predefined selectable items and the item set is large enough to need filtering.</li>
+    <li>Use Autocomplete for search widgets and free-form text. Combobox commits one of the provided items.</li>
+    <li>Use Select when no input is rendered. Select has listbox-only accessibility behavior for non-filterable lists.</li>
+    <li>Give the form control an accessible name. When the input is outside the popup, label the input. When the input is inside the popup, use <code class="@LiquidGlassClasses.CodeInline">ComboboxLabel</code> to label the trigger.</li>
+</ul>
+
+<DocsHeading Title="Anatomy" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Import the component namespace and assemble its parts. The generic parts (<code class="@LiquidGlassClasses.CodeInline">Root</code>, <code class="@LiquidGlassClasses.CodeInline">Item</code>, <code class="@LiquidGlassClasses.CodeInline">Collection</code>) take a <code class="@LiquidGlassClasses.CodeInline">TValue</code> type parameter.
+</p>
+<CodeBlock Code="@AnatomyCode" />
+
+<DocsHeading Title="Examples" />
+
+<DocsHeading Level="3" Title="Typed wrapper component" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Wrap the generic root with a typed component when you want a reusable combobox with strong value inference.
+</p>
+<CodeBlock Code="@TypedWrapperCode" />
+
+<DocsHeading Level="3" Title="Multiple select" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Enable <code class="@LiquidGlassClasses.CodeInline">Multiple</code> and render selected values as removable chips inside <code class="@LiquidGlassClasses.CodeInline">ComboboxChips</code>.
+</p>
+<div class="mb-8">
+    <Demo Variants="@MultipleVariants">
+        <ComboboxMultipleCss />
+    </Demo>
+</div>
+
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Limit visible chips by slicing the values supplied to <code class="@LiquidGlassClasses.CodeInline">ComboboxValue</code>.
+</p>
+<CodeBlock Code="@LimitChipsCode" />
+
+<DocsHeading Level="3" Title="Input inside popup" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Render <code class="@LiquidGlassClasses.CodeInline">ComboboxInput</code> inside <code class="@LiquidGlassClasses.CodeInline">ComboboxPopup</code> to build a searchable select popup.
+</p>
+<div class="mb-8">
+    <Demo Variants="@InputInsidePopupVariants">
+        <ComboboxInputInsidePopupCss />
+    </Demo>
+</div>
+<CodeBlock Code="@LabelingCode" />
+
+<DocsHeading Level="3" Title="Grouped" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Organize related options with <code class="@LiquidGlassClasses.CodeInline">ComboboxGroup</code> and <code class="@LiquidGlassClasses.CodeInline">ComboboxGroupLabel</code>.
+</p>
+<CodeBlock Code="@GroupedItemsCode" Language="csharp" />
+<div class="mb-8 mt-4">
+    <Demo Variants="@GroupedVariants">
+        <ComboboxGroupedCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Async search (single)" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Load items from a remote source as input changes. Keep the selected item in the item list so it remains available while new results stream in.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AsyncSingleVariants">
+        <ComboboxAsyncSingleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Async search (multiple)" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Load remote matches while supporting multiple selection. Merge selected items into the result list so chips can remain selected even when the current query excludes them.
+</p>
+<div class="mb-8">
+    <Demo Variants="@AsyncMultipleVariants">
+        <ComboboxAsyncMultipleCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Creatable" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Add a synthetic create item when no exact label exists, then confirm creation in a dialog before committing the new selected value.
+</p>
+<div class="mb-8">
+    <Demo Variants="@CreatableVariants">
+        <ComboboxCreatableCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="3" Title="Virtualized" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Efficiently handle large datasets using Blazor's built-in <code class="@LiquidGlassClasses.CodeInline">Virtualize</code> component with externally filtered items.
+</p>
+<div class="mb-8">
+    <Demo Variants="@VirtualizedVariants">
+        <ComboboxVirtualizedCss />
+    </Demo>
+</div>
+
+<DocsHeading Level="4" Title="Memoizing items" />
+<p class="mb-3 max-w-3xl text-sm leading-6 text-slate-700 dark:text-slate-200">
+    Memoization is a React-specific optimization. In Blazor, keep each item component small and stable, pass the item as a parameter, and use virtualization once the mount cost of the full list becomes visible.
+</p>
+<CodeBlock Code="@MemoizedItemCode" />
+
+<DocsHeading Title="API reference" />
+@foreach (var part in ComboboxApi.Parts)
+{
+    <ApiPartReference Part="part" />
+}
+
+@code {
+    private const string AnatomyCode =
+        """
+        @using Blazix.BaseUI.Combobox
+
+        <ComboboxRoot TValue="string">
+            <ComboboxLabel />
+
+            <ComboboxInputGroup>
+                <ComboboxInput />
+                <ComboboxTrigger />
+                <ComboboxIcon />
+                <ComboboxClear />
+                <ComboboxValue />
+
+                <ComboboxChips>
+                    <ComboboxChip>
+                        <ComboboxChipRemove />
+                    </ComboboxChip>
+                </ComboboxChips>
+            </ComboboxInputGroup>
+
+            <ComboboxPortal>
+                <ComboboxBackdrop />
+                <ComboboxPositioner>
+                    <ComboboxPopup>
+                        <ComboboxArrow />
+
+                        <ComboboxStatus />
+                        <ComboboxEmpty />
+
+                        <ComboboxList>
+                            <ComboboxRow>
+                                <ComboboxItem TValue="string">
+                                    <ComboboxItemIndicator />
+                                </ComboboxItem>
+                            </ComboboxRow>
+
+                            <ComboboxSeparator />
+
+                            <ComboboxGroup>
+                                <ComboboxGroupLabel />
+                            </ComboboxGroup>
+
+                            <ComboboxCollection TValue="string" />
+                        </ComboboxList>
+                    </ComboboxPopup>
+                </ComboboxPositioner>
+            </ComboboxPortal>
+        </ComboboxRoot>
+        """;
+
+    private const string TypedWrapperCode =
+        """
+        @typeparam TValue
+
+        <ComboboxRoot TValue="TValue" @attributes="AdditionalAttributes">
+            @ChildContent
+        </ComboboxRoot>
+
+        @code {
+            [Parameter(CaptureUnmatchedValues = true)]
+            public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+            [Parameter]
+            public RenderFragment? ChildContent { get; set; }
+        }
+        """;
+
+    private const string LimitChipsCode =
+        """
+        private const int ChipLimit = 3;
+
+        <ComboboxValue Context="values">
+            @{
+                var visibleValues = values.Take(ChipLimit).ToList();
+                var hiddenCount = values.Count - visibleValues.Count;
+            }
+            @foreach (var item in visibleValues)
+            {
+                <ComboboxChip>
+                    @item
+                    <ComboboxChipRemove aria-label="@($"Remove {item}")" />
+                </ComboboxChip>
+            }
+            @if (hiddenCount > 0)
+            {
+                <span>@($"+{hiddenCount} more")</span>
+            }
+            <ComboboxInput />
+        </ComboboxValue>
+        """;
+
+    private const string LabelingCode =
+        """
+        <ComboboxRoot TValue="Country">
+            <ComboboxLabel>Favorite country</ComboboxLabel>
+            <ComboboxTrigger>
+                <ComboboxValue Placeholder="Select country" />
+            </ComboboxTrigger>
+            ...
+        </ComboboxRoot>
+        """;
+
+    private const string GroupedItemsCode =
+        """
+        private static readonly IReadOnlyList<ComboboxOptionGroup<Produce>> Groups =
+        [
+            new(Fruits, "Fruits"),
+            new(Vegetables, "Vegetables"),
+        ];
+        """;
+
+    private const string MemoizedItemCode =
+        """
+        <Virtualize Items="@entries" Context="entry" ItemSize="32">
+            <FruitItem Item="@entry.Item" Index="@entry.Index" />
+        </Virtualize>
+
+        @code {
+            private sealed record FruitEntry(Fruit Item, int Index);
+        }
+        """;
+
+    private static readonly IReadOnlyList<DemoVariant> HeroVariants =
+    [
+        new("CSS",
+        [
+            new DemoFile("Combobox.razor", "xml", "Components.Demos.Combobox.Hero.Css.ComboboxHeroCss.razor"),
+            new DemoFile("combobox.css", "css", "wwwroot.demos.combobox.css"),
+        ]),
+        new("Tailwind",
+        [
+            new DemoFile("Combobox.razor", "xml", "Components.Demos.Combobox.Hero.Tailwind.ComboboxHeroTailwind.razor"),
+        ]),
+    ];
+
+    private static readonly IReadOnlyList<DemoVariant> MultipleVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.Multiple.Css.ComboboxMultipleCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> InputInsidePopupVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.InputInsidePopup.Css.ComboboxInputInsidePopupCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> GroupedVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.Grouped.Css.ComboboxGroupedCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> AsyncSingleVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.AsyncSingle.Css.ComboboxAsyncSingleCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> AsyncMultipleVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.AsyncMultiple.Css.ComboboxAsyncMultipleCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> CreatableVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.Creatable.Css.ComboboxCreatableCss.razor");
+
+    private static readonly IReadOnlyList<DemoVariant> VirtualizedVariants =
+        CreateCssOnlyVariants("Components.Demos.Combobox.Virtualized.Css.ComboboxVirtualizedCss.razor");
+
+    private static IReadOnlyList<DemoVariant> CreateCssOnlyVariants(string componentResource)
+    {
+        return
+        [
+            new("CSS",
+            [
+                new DemoFile("Combobox.razor", "xml", componentResource),
+                new DemoFile("combobox.css", "css", "wwwroot.demos.combobox.css"),
+            ]),
+        ];
+    }
+}

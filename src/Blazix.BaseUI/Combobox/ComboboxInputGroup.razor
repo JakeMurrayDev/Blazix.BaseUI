@@ -1,0 +1,158 @@
+@using Blazix.BaseUI.Field
+@using Microsoft.AspNetCore.Components.Web
+
+@implements IDisposable
+
+<RenderElement TState="ComboboxInputGroupState"
+               Tag="div"
+               State="state"
+               Enabled="RootContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private ComboboxInputGroupState state;
+    private RenderElement<ComboboxInputGroupState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxInputGroupState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxInputGroupState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxInputGroupState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        BuildStateAndAttributes();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        BuildStateAndAttributes();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void BuildStateAndAttributes()
+    {
+        var fieldState = RootContext?.FieldState ?? FieldRootState.Default;
+        state = ComboboxInputGroupState.FromFieldState(
+            fieldState,
+            RootContext?.Mounted == true,
+            RootContext?.Disabled == true,
+            RootContext?.ReadOnly == true,
+            RootContext?.PopupSide,
+            RootContext?.ListEmpty == true);
+
+        var attrs = new Dictionary<string, object>
+        {
+            ["role"] = "group",
+            ["onmousedown"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseDownAsync)
+        };
+
+        if (RootContext?.Mounted == true)
+        {
+            attrs["data-popup-open"] = true;
+        }
+
+        if (RootContext?.PopupSide is { } side)
+        {
+            attrs["data-popup-side"] = side.ToDataAttributeString()!;
+        }
+
+        if (RootContext?.ListEmpty == true)
+        {
+            attrs["data-list-empty"] = true;
+        }
+
+        if (RootContext?.Disabled == true)
+        {
+            attrs["data-disabled"] = true;
+        }
+
+        if (RootContext?.ReadOnly == true)
+        {
+            attrs["data-readonly"] = true;
+        }
+
+        attrs["data-valid"] = fieldState.Valid == true;
+        attrs["data-invalid"] = fieldState.Valid == false;
+        attrs["data-touched"] = fieldState.Touched;
+        attrs["data-dirty"] = fieldState.Dirty;
+        attrs["data-filled"] = fieldState.Filled;
+        attrs["data-focused"] = fieldState.Focused;
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleMouseDownAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || RootContext.Disabled || RootContext.ReadOnly || !RootContext.OpenOnInputClick)
+        {
+            await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
+            return;
+        }
+
+        await RootContext.SetOpenAsync(true, ComboboxChangeReason.InputChange);
+        await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
+    }
+}

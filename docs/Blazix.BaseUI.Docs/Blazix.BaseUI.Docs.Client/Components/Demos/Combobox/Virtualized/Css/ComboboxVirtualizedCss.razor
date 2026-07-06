@@ -1,0 +1,69 @@
+<ComboboxRoot TValue="ComboboxDemoVirtualItem"
+              Virtualized="true"
+              OpenOnInputClick="true"
+              FilteredItems="@filteredItems"
+              FilterDisabled="true"
+              InputValue="@query"
+              OnInputValueChange="HandleInputValueChanged"
+              ItemToStringLabel="ComboboxDemoData.GetVirtualItemValue"
+              ItemToStringValue="ComboboxDemoData.GetVirtualItemValue">
+    <label class="blx-combobox-label">
+        Search 10,000 items
+        <ComboboxInput class="blx-combobox-plain-input" placeholder="e.g. 0420" />
+    </label>
+
+    <ComboboxPortal>
+        <ComboboxPositioner class="blx-combobox-positioner" SideOffset="4">
+            <ComboboxPopup class="blx-combobox-popup">
+                <ComboboxEmpty>
+                    <div class="blx-combobox-empty">No items found.</div>
+                </ComboboxEmpty>
+                <ComboboxList class="blx-combobox-virtual-list" style="@VirtualizedListStyle">
+                    <Virtualize Items="@virtualizedEntries" Context="entry" ItemSize="@VirtualizedItemSize">
+                        <ComboboxItem TValue="ComboboxDemoVirtualItem"
+                                      class="blx-combobox-item blx-combobox-virtual-item"
+                                      Value="@entry.Item"
+                                      Index="@entry.Index"
+                                      Label="@entry.Item.Name"
+                                      aria-setsize="@filteredItems.Count"
+                                      aria-posinset="@(entry.Index + 1)">
+                            <ComboboxItemIndicator class="blx-combobox-item-indicator">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                            </ComboboxItemIndicator>
+                            <span class="blx-combobox-item-text">@entry.Item.Name</span>
+                        </ComboboxItem>
+                    </Virtualize>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxPortal>
+</ComboboxRoot>
+
+@code {
+    private const int VirtualizedItemSize = 32;
+
+    private IReadOnlyList<ComboboxDemoVirtualItem> filteredItems = ComboboxDemoData.VirtualizedItems;
+    private List<ComboboxDemoVirtualEntry> virtualizedEntries = BuildVirtualizedEntries(ComboboxDemoData.VirtualizedItems);
+    private string query = string.Empty;
+
+    private string VirtualizedListStyle => $"--total-size: {filteredItems.Count * VirtualizedItemSize}px";
+
+    private void HandleInputValueChanged(ComboboxInputValueChangeEventArgs args)
+    {
+        query = args.Value;
+        var trimmed = args.Value.Trim();
+        filteredItems = trimmed.Length == 0
+            ? ComboboxDemoData.VirtualizedItems
+            : ComboboxDemoData.VirtualizedItems
+                .Where(item => ComboboxDemoData.Contains(item.Name, trimmed))
+                .ToList();
+        virtualizedEntries = BuildVirtualizedEntries(filteredItems);
+    }
+
+    private static List<ComboboxDemoVirtualEntry> BuildVirtualizedEntries(IEnumerable<ComboboxDemoVirtualItem> items)
+    {
+        return items.Select((item, index) => new ComboboxDemoVirtualEntry(item, index)).ToList();
+    }
+
+    private sealed record ComboboxDemoVirtualEntry(ComboboxDemoVirtualItem Item, int Index);
+}

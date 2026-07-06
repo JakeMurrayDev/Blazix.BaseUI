@@ -1,0 +1,68 @@
+@implements IDisposable
+
+@if (ChildContent is not null)
+{
+    @ChildContent(SelectedValues)
+}
+else
+{
+    @RenderedValue
+}
+
+@code {
+    private bool subscribed;
+
+    private IReadOnlyList<object?> SelectedValues => RootContext?.GetSelectedValuesBoxed() ?? [];
+
+    private string RenderedValue
+    {
+        get
+        {
+            if (RootContext?.HasSelectedValue != true)
+            {
+                return Placeholder ?? string.Empty;
+            }
+
+            return string.Join(", ", SelectedValues.Select(value => RootContext.GetItemLabel(value, null)).Where(label => !string.IsNullOrEmpty(label)));
+        }
+    }
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Defines content rendered with the current selected values.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<IReadOnlyList<object?>>? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets the placeholder rendered when no value is selected.
+    /// </summary>
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            subscribed = true;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+        }
+    }
+
+    private void OnRootStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+}

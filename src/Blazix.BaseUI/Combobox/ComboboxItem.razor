@@ -1,0 +1,268 @@
+@typeparam TValue
+@using Microsoft.AspNetCore.Components.Web
+
+@implements IComboboxItemRegistration
+@implements IDisposable
+
+<CascadingValue TValue="ComboboxItemContext" Value="itemContext" IsFixed="false">
+    <RenderElement TState="ComboboxItemState"
+                   Tag="@(NativeButton ? "button" : "div")"
+                   State="state"
+                   Enabled="RootContext is not null && visible"
+                   Render="Render"
+                   ClassValue="ClassValue"
+                   StyleValue="StyleValue"
+                   ComponentAttributes="componentAttributes"
+                   ChildContent="ChildContent"
+                   @attributes="AdditionalAttributes"
+                   @ref="renderElementReference" />
+</CascadingValue>
+
+@code {
+    private bool highlighted;
+    private bool selected;
+    private bool visible = true;
+    private int itemIndex = -1;
+    private ComboboxItemState state;
+    private RenderElement<ComboboxItemState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private ComboboxItemContext itemContext = new();
+    private bool subscribed;
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxRootContext<TValue>? TypedRootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxRowContext? RowContext { get; set; }
+
+    /// <summary>
+    /// Gets or sets the item value.
+    /// </summary>
+    [Parameter]
+    public TValue? Value { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this item is disabled.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Gets or sets a text label used for filtering and typeahead.
+    /// </summary>
+    [Parameter]
+    public string? Label { get; set; }
+
+    /// <summary>
+    /// Gets or sets the explicit index of this item.
+    /// </summary>
+    [Parameter]
+    public int? Index { get; set; }
+
+    /// <summary>
+    /// Determines whether the rendered element is a native button.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxItemState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxItemState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxItemState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    object? IComboboxItemRegistration.ValueBoxed => Value;
+
+    string? IComboboxItemRegistration.Label => Label;
+
+    bool IComboboxItemRegistration.Disabled => Disabled;
+
+    int? IComboboxItemRegistration.Index => Index;
+
+    ElementReference? IComboboxItemRegistration.Element => Element;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is not null)
+        {
+            RootContext.StateChanged += OnRootStateChanged;
+            RootContext.ItemMapChanged += OnItemMapChanged;
+            subscribed = true;
+            itemIndex = RootContext.RegisterItem(this);
+        }
+
+        RefreshFromRoot();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        RefreshFromRoot();
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (subscribed && RootContext is not null)
+        {
+            RootContext.StateChanged -= OnRootStateChanged;
+            RootContext.ItemMapChanged -= OnItemMapChanged;
+            RootContext.UnregisterItem(this);
+        }
+    }
+
+    void IComboboxItemRegistration.RefreshFromRoot()
+    {
+        RefreshFromRoot();
+    }
+
+    private void OnRootStateChanged()
+    {
+        RefreshFromRoot();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnItemMapChanged()
+    {
+        RefreshFromRoot();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void RefreshFromRoot()
+    {
+        visible = RootContext?.IsItemVisible(this) ?? true;
+        itemIndex = RootContext?.GetItemIndex(this) ?? -1;
+        highlighted = RootContext?.IsItemHighlighted(this) ?? false;
+        selected = RootContext?.IsItemSelected(this) ?? false;
+        itemContext.Selected = selected;
+        state = new ComboboxItemState(Disabled, highlighted, selected);
+        BuildComponentAttributes();
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>();
+
+        if (RootContext is not null && itemIndex >= 0)
+        {
+            attrs["id"] = $"{RootContext.RootId}-{itemIndex}";
+        }
+
+        attrs["role"] = RowContext is not null ? "gridcell" : "option";
+        attrs["tabindex"] = -1;
+        attrs["data-combobox-item"] = true;
+
+        if (NativeButton)
+        {
+            attrs["type"] = "button";
+        }
+
+        if (highlighted)
+        {
+            attrs["data-highlighted"] = true;
+        }
+
+        attrs["aria-selected"] = selected ? "true" : "false";
+        if (selected)
+        {
+            attrs["data-selected"] = true;
+        }
+
+        if (Disabled)
+        {
+            attrs["aria-disabled"] = "true";
+            attrs["data-disabled"] = true;
+            if (NativeButton)
+            {
+                attrs["disabled"] = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(Label))
+        {
+            attrs["data-blazix-base-ui-label"] = Label;
+        }
+
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
+        attrs["onpointerenter"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEnterAsync);
+        attrs["onpointermove"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerMoveAsync);
+        attrs["onpointerleave"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerLeaveAsync);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || Disabled)
+        {
+            return;
+        }
+
+        await RootContext.CommitItemAsync(Value, ComboboxChangeReason.ItemPress);
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerEnterAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null && !Disabled && RootContext.HighlightItemOnHover)
+        {
+            RootContext.KeyboardActive = false;
+            await RootContext.HighlightIndexAsync(itemIndex, ComboboxHighlightReason.Pointer);
+        }
+
+        await EventUtilities.InvokeOnPointerEnterAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerMoveAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null)
+        {
+            RootContext.KeyboardActive = false;
+        }
+
+        await EventUtilities.InvokeOnPointerMoveAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerLeaveAsync(PointerEventArgs e)
+    {
+        if (RootContext is not null && !RootContext.KeepHighlight && RootContext.HighlightItemOnHover)
+        {
+            await RootContext.HighlightIndexAsync(-1, ComboboxHighlightReason.Pointer);
+        }
+
+        await EventUtilities.InvokeOnPointerLeaveAsync(AdditionalAttributes, e);
+    }
+}

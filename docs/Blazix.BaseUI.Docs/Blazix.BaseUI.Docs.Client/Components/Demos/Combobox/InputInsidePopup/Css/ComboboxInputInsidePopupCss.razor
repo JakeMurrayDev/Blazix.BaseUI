@@ -1,0 +1,38 @@
+<div class="blx-combobox-field">
+    <ComboboxRoot TValue="ComboboxDemoCountry"
+                  Items="@ComboboxDemoData.Countries"
+                  ItemToStringLabel="ComboboxDemoData.GetCountryLabel"
+                  ItemToStringValue="ComboboxDemoData.GetCountryValue"
+                  IsItemEqualToValue="ComboboxDemoData.EqualCountry">
+        <ComboboxLabel class="blx-combobox-label">Country</ComboboxLabel>
+        <ComboboxTrigger class="blx-combobox-select-trigger">
+            <ComboboxValue Placeholder="Select country" />
+            <ComboboxIcon class="blx-combobox-trigger-icon">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M11 10H5l3 3.5zm0-4H5l3-3.5z" /></svg>
+            </ComboboxIcon>
+        </ComboboxTrigger>
+
+        <ComboboxPortal>
+            <ComboboxPositioner class="blx-combobox-positioner" Align="Align.Start" SideOffset="4">
+                <ComboboxPopup class="blx-combobox-popup blx-combobox-popup--inside-input" aria-label="Select country">
+                    <ComboboxInput class="blx-combobox-popup-input" placeholder="e.g. United Kingdom" />
+                    <div class="blx-combobox-viewport">
+                        <ComboboxEmpty>
+                            <div class="blx-combobox-empty">No countries found.</div>
+                        </ComboboxEmpty>
+                        <ComboboxList class="blx-combobox-list blx-combobox-list--inside-input">
+                            <ComboboxCollection TValue="ComboboxDemoCountry" Context="entry">
+                                <ComboboxItem TValue="ComboboxDemoCountry" class="blx-combobox-item blx-combobox-item--wide" Value="@entry.Item" Index="@entry.Index" Label="@entry.Item.Label">
+                                    <ComboboxItemIndicator class="blx-combobox-item-indicator">
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true"><path d="m2.5 8.5 4 4 7-9" /></svg>
+                                    </ComboboxItemIndicator>
+                                    <span class="blx-combobox-item-text">@entry.Item.Label</span>
+                                </ComboboxItem>
+                            </ComboboxCollection>
+                        </ComboboxList>
+                    </div>
+                </ComboboxPopup>
+            </ComboboxPositioner>
+        </ComboboxPortal>
+    </ComboboxRoot>
+</div>

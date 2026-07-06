@@ -1,0 +1,237 @@
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Utilities.LabelableProvider
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+
+@implements IFieldStateSubscriber
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
+
+<RenderElement TState="FieldRootState"
+               Tag="div"
+               State="state"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="filteredAttributes"
+               @ref="renderElementReference" />
+
+@code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-label.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
+
+    private string labelId = null!;
+    private FieldRootState state;
+    private RenderElement<FieldRootState>? renderElementReference;
+    private Dictionary<string, object> componentAttributes = new();
+    private IReadOnlyDictionary<string, object>? filteredAttributes;
+
+    private FieldRootState State => FieldContext?.State ?? FieldRootState.Default;
+
+    [CascadingParameter]
+    private FieldRootContext? FieldContext { get; set; }
+
+    [CascadingParameter]
+    private LabelableContext? LabelableContext { get; set; }
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<FieldRootState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on field state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on field state.
+    /// </summary>
+    [Parameter]
+    public Func<FieldRootState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes. Any <c>id</c> entry is stripped
+    /// because Combobox labels derive their id from the root.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <summary>
+    /// Gets the associated element reference.
+    /// </summary>
+    public ElementReference? Element => renderElementReference?.Element;
+
+    public ComboboxLabel()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (RootContext is null)
+        {
+            throw new InvalidOperationException(
+                "ComboboxLabel must be used inside a ComboboxRoot component.");
+        }
+
+        labelId = $"{RootContext.RootId}-label";
+        LabelableContext?.SetLabelId(labelId);
+        RootContext.LabelId = labelId;
+        RootContext.NotifyStateChanged();
+        FieldContext?.Subscribe(this);
+
+        state = State;
+        filteredAttributes = FilterAttributes(AdditionalAttributes);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (RootContext is not null)
+        {
+            var newId = $"{RootContext.RootId}-label";
+            if (newId != labelId)
+            {
+                labelId = newId;
+                LabelableContext?.SetLabelId(labelId);
+                RootContext.LabelId = labelId;
+                RootContext.NotifyStateChanged();
+            }
+        }
+
+        state = State;
+        filteredAttributes = FilterAttributes(AdditionalAttributes);
+        BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+
+            if (renderElementReference?.Element is { } element)
+            {
+                await module.InvokeVoidAsync("addLabelMouseDownListener", element, true);
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        LabelableContext?.SetLabelId(null);
+
+        if (RootContext is not null && RootContext.LabelId == labelId)
+        {
+            RootContext.LabelId = null;
+            RootContext.NotifyStateChanged();
+        }
+
+        FieldContext?.Unsubscribe(this);
+
+        if (moduleTask.IsValueCreated && renderElementReference?.Element is { } element)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("removeLabelMouseDownListener", element);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    void IFieldStateSubscriber.NotifyStateChanged()
+    {
+        state = State;
+        BuildComponentAttributes();
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static IReadOnlyDictionary<string, object>? FilterAttributes(
+        IReadOnlyDictionary<string, object>? source)
+    {
+        if (source is null || !source.ContainsKey("id"))
+        {
+            return source;
+        }
+
+        var filtered = new Dictionary<string, object>(source.Count);
+        foreach (var kvp in source)
+        {
+            if (kvp.Key == "id")
+            {
+                continue;
+            }
+
+            filtered[kvp.Key] = kvp.Value;
+        }
+
+        return filtered;
+    }
+
+    private void BuildComponentAttributes()
+    {
+        var attrs = new Dictionary<string, object>
+        {
+            ["id"] = labelId,
+            ["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync)
+        };
+
+        FieldAttributeUtilities.AddFieldStateAttributes(attrs, state);
+
+        componentAttributes = attrs;
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(LabelableContext?.ControlId))
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("focusControlById", LabelableContext.ControlId);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+}

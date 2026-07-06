@@ -1,0 +1,138 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<RenderElement TState="ComboboxChipRemoveState"
+               Tag="@(NativeButton ? "button" : "div")"
+               State="state"
+               Enabled="RootContext is not null && ChipContext is not null"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="ChildContent"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private ComboboxChipRemoveState state;
+    private Dictionary<string, object> componentAttributes = new();
+
+    [CascadingParameter]
+    private IComboboxRootContext? RootContext { get; set; }
+
+    [CascadingParameter]
+    private ComboboxChipContext? ChipContext { get; set; }
+
+    /// <summary>
+    /// Determines whether this remove button is disabled.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// Determines whether the rendered element is a native button.
+    /// </summary>
+    [Parameter]
+    public bool NativeButton { get; set; } = true;
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxChipRemoveState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipRemoveState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxChipRemoveState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var disabled = Disabled || RootContext?.Disabled == true || RootContext?.ReadOnly == true;
+        state = new ComboboxChipRemoveState(disabled);
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["tabindex"] = -1,
+            ["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync)
+        };
+
+        if (NativeButton)
+        {
+            componentAttributes["type"] = "button";
+        }
+        else
+        {
+            componentAttributes["role"] = "button";
+            componentAttributes["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
+        }
+
+        if (disabled)
+        {
+            if (NativeButton)
+            {
+                componentAttributes["disabled"] = true;
+            }
+            else
+            {
+                componentAttributes["aria-disabled"] = "true";
+            }
+
+            componentAttributes["data-disabled"] = true;
+        }
+    }
+
+    private async Task HandleClickAsync(MouseEventArgs e)
+    {
+        if (RootContext is null || ChipContext is null || state.Disabled)
+        {
+            return;
+        }
+
+        await RemoveAsync();
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (RootContext is not null && ChipContext is not null && !state.Disabled && IsActivationKey(e.Key))
+        {
+            await RemoveAsync();
+        }
+
+        await EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
+    }
+
+    private async Task RemoveAsync()
+    {
+        if (RootContext is null || ChipContext is null)
+        {
+            return;
+        }
+
+        await RootContext.RemoveSelectedValueAtAsync(ChipContext.Index, ComboboxChangeReason.ChipRemovePress);
+        await RootContext.FocusInputAsync();
+    }
+
+    private static bool IsActivationKey(string key)
+    {
+        return key is "Enter" or " " or "Spacebar";
+    }
+}

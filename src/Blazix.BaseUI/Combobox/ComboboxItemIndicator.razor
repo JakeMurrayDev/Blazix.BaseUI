@@ -1,0 +1,72 @@
+<RenderElement TState="ComboboxItemIndicatorState"
+               Tag="span"
+               State="state"
+               Enabled="ItemContext is not null && (KeepMounted || state.Selected)"
+               Render="Render"
+               ClassValue="ClassValue"
+               StyleValue="StyleValue"
+               ComponentAttributes="componentAttributes"
+               ChildContent="@(ChildContent ?? DefaultChildContent)"
+               @attributes="AdditionalAttributes" />
+
+@code {
+    private ComboboxItemIndicatorState state;
+    private Dictionary<string, object> componentAttributes = new();
+
+    private static RenderFragment DefaultChildContent => builder => builder.AddContent(0, "Selected");
+
+    [CascadingParameter]
+    private ComboboxItemContext? ItemContext { get; set; }
+
+    /// <summary>
+    /// Determines whether the indicator remains mounted when the item is not selected.
+    /// </summary>
+    [Parameter]
+    public bool KeepMounted { get; set; }
+
+    /// <summary>
+    /// Allows replacing or composing the rendered element.
+    /// </summary>
+    [Parameter]
+    public RenderFragment<RenderProps<ComboboxItemIndicatorState>>? Render { get; set; }
+
+    /// <summary>
+    /// Gets or sets the CSS class function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxItemIndicatorState, string?>? ClassValue { get; set; }
+
+    /// <summary>
+    /// Gets or sets the inline style function based on component state.
+    /// </summary>
+    [Parameter]
+    public Func<ComboboxItemIndicatorState, string?>? StyleValue { get; set; }
+
+    /// <summary>
+    /// Defines the child content.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Gets or sets additional element attributes.
+    /// </summary>
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var selected = ItemContext?.Selected == true;
+        state = new ComboboxItemIndicatorState(selected, TransitionStatus.Undefined);
+        componentAttributes = new Dictionary<string, object>
+        {
+            ["aria-hidden"] = "true"
+        };
+
+        if (selected)
+        {
+            componentAttributes["data-selected"] = true;
+        }
+    }
+}
