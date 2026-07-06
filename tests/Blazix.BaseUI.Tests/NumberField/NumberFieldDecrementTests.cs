@@ -221,7 +221,7 @@ public class NumberFieldDecrementTests : BunitContext, INumberFieldDecrementCont
         var btn = cut.Find("[aria-label='Decrease']");
         btn.Click(new MouseEventArgs { Detail = 0 });
         var hiddenInput = cut.Find("input[type='number']");
-        hiddenInput.GetAttribute("value").ShouldBe("-1");
+        hiddenInput.GetAttribute("value").ShouldBe("0");
         return Task.CompletedTask;
     }
 
@@ -424,7 +424,9 @@ public class NumberFieldDecrementTests : BunitContext, INumberFieldDecrementCont
     {
         var cut = Render(CreateNumberField(defaultValue: 0, decrementDisabled: true));
         var btn = cut.Find("[aria-label='Decrease']");
-        btn.GetAttribute("disabled").ShouldNotBeNull();
+        btn.HasAttribute("data-disabled").ShouldBeTrue();
+        btn.GetAttribute("aria-disabled").ShouldBe("true");
+        btn.HasAttribute("disabled").ShouldBeFalse();
         return Task.CompletedTask;
     }
 
@@ -435,7 +437,9 @@ public class NumberFieldDecrementTests : BunitContext, INumberFieldDecrementCont
     {
         var cut = Render(CreateNumberField(defaultValue: 0, min: 0));
         var btn = cut.Find("[aria-label='Decrease']");
-        btn.GetAttribute("disabled").ShouldNotBeNull();
+        btn.HasAttribute("data-disabled").ShouldBeTrue();
+        btn.GetAttribute("aria-disabled").ShouldBe("true");
+        btn.HasAttribute("disabled").ShouldBeFalse();
         return Task.CompletedTask;
     }
 
@@ -456,6 +460,9 @@ public class NumberFieldDecrementTests : BunitContext, INumberFieldDecrementCont
         var cut = Render(CreateNumberField(defaultValue: 0, readOnly: true));
         var btn = cut.Find("[aria-label='Decrease']");
         btn.HasAttribute("data-readonly").ShouldBeTrue();
+        btn.GetAttribute("aria-disabled").ShouldBe("true");
+        btn.HasAttribute("aria-readonly").ShouldBeFalse();
+        btn.HasAttribute("disabled").ShouldBeFalse();
         return Task.CompletedTask;
     }
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using Blazix.BaseUI.Field;
 
 namespace Blazix.BaseUI.Tests.NumberField;
 
@@ -86,6 +87,27 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
                 inner.CloseComponent();
             }));
 
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreateReadOnlyNumberFieldInFieldRoot()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<NumberFieldRoot>(0);
+                fieldBuilder.AddAttribute(1, "ReadOnly", true);
+                fieldBuilder.AddAttribute(2, "DefaultValue", (double?)5);
+                fieldBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(numberBuilder =>
+                {
+                    numberBuilder.OpenComponent<NumberFieldInput>(0);
+                    numberBuilder.CloseComponent();
+                }));
+                fieldBuilder.CloseComponent();
+            }));
             builder.CloseComponent();
         };
     }
@@ -510,13 +532,18 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
     [Fact]
     public Task RoundsToStepPrecisionOnBlurWhenStepImpliesPrecision()
     {
-        var cut = Render(CreateNumberField(defaultValue: 0, step: 0.01));
+        NumberFieldValueCommittedEventArgs? receivedArgs = null;
+        var onValueCommitted = EventCallback.Factory.Create<NumberFieldValueCommittedEventArgs>(
+            this, args => receivedArgs = args);
+
+        var cut = Render(CreateNumberField(defaultValue: 0, step: 0.01, onValueCommitted: onValueCommitted));
         var input = cut.Find("input[type='text']");
         input.Input(new ChangeEventArgs { Value = "1.23456" });
         input.Blur();
-        // Base UI removes floating-point noise through Intl's default maximum precision.
         var hiddenInput = cut.Find("input[type='number']");
-        hiddenInput.GetAttribute("value").ShouldBe("1.235");
+        hiddenInput.GetAttribute("value").ShouldBe("1.23456");
+        receivedArgs.ShouldNotBeNull();
+        receivedArgs!.Value.ShouldBe(1.23456);
         return Task.CompletedTask;
     }
 
@@ -619,6 +646,20 @@ public class NumberFieldInputTests : BunitContext, INumberFieldInputContract
         var cut = Render(CreateNumberField(defaultValue: 0));
         var input = cut.Find("input[type='text']");
         input.GetAttribute("autocomplete").ShouldBe("off");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ReadOnly_FocusStateTracksFocusAndBlur()
+    {
+        var cut = Render(CreateReadOnlyNumberFieldInFieldRoot());
+        var input = cut.Find("input[type='text']");
+
+        input.Focus();
+        input.HasAttribute("data-focused").ShouldBeTrue();
+
+        input.Blur();
+        input.HasAttribute("data-focused").ShouldBeFalse();
         return Task.CompletedTask;
     }
 

@@ -105,8 +105,20 @@
         attrs["aria-roledescription"] = AriaRoledescription;
         if (RootContext?.Invalid == true)
             attrs["aria-invalid"] = "true";
-        if (!string.IsNullOrEmpty(LabelableContext?.LabelId))
+        if (!string.IsNullOrEmpty(LabelableContext?.LabelId) &&
+            !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby"))
+        {
             attrs["aria-labelledby"] = LabelableContext!.LabelId!;
+        }
+
+        var ariaDescribedBy = AttributeUtilities.CombineIdRefs(
+            AttributeUtilities.GetAttributeStringValueIgnoreCase(AdditionalAttributes, "aria-describedby"),
+            LabelableContext?.GetAriaDescribedBy());
+        if (!string.IsNullOrEmpty(ariaDescribedBy))
+        {
+            attrs["aria-describedby"] = ariaDescribedBy;
+        }
+
         attrs["value"] = RootContext?.InputValue ?? string.Empty;
         attrs["disabled"] = RootContext?.Disabled ?? false;
         attrs["readonly"] = RootContext?.ReadOnly ?? false;
@@ -133,22 +145,24 @@
 
     private Task HandleFocus(FocusEventArgs e)
     {
-        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+        if (RootContext?.Disabled == true)
             return Task.CompletedTask;
 
         if (!hasTouchedInput)
         {
             hasTouchedInput = true;
+            var length = (RootContext?.InputValue ?? string.Empty).Length;
+            RootContext?.SetSelectionRange(length, length);
         }
 
         FieldContext?.SetFocused(true);
         return EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
     }
 
-    private Task HandleBlur(FocusEventArgs e)
+    private async Task HandleBlur(FocusEventArgs e)
     {
-        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
-            return Task.CompletedTask;
+        if (RootContext?.Disabled == true)
+            return;
 
         FieldContext?.SetTouched(true);
         FieldContext?.SetFocused(false);
@@ -156,50 +170,66 @@
         var inputValue = RootContext?.InputValue ?? string.Empty;
         var hadManualInput = RootContext?.AllowInputSync == false;
         var hadPendingProgrammaticChange = RootContext?.HasPendingCommit == true;
+        var currentValue = RootContext?.Value;
         RootContext?.SetAllowInputSync(true);
+
+        if (RootContext?.ReadOnly == true)
+        {
+            await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(inputValue))
         {
-            RootContext?.SetValue(null, NumberFieldChangeReason.InputClear, null);
-            RootContext?.OnValueCommitted(null, NumberFieldChangeReason.InputClear);
-            return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+            var changed = RootContext is not null &&
+                await RootContext.SetValue(null, NumberFieldChangeReason.InputClear, null);
+            if (changed || hadPendingProgrammaticChange)
+            {
+                RootContext?.OnValueCommitted(null, NumberFieldChangeReason.InputClear);
+            }
+
+            await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+            return;
         }
 
         var parsedValue = ParseNumber(inputValue);
         if (parsedValue.HasValue)
         {
             var format = RootContext?.FormatOptions;
-            var hasExplicitPrecision =
-                format?.MaximumFractionDigits is not null ||
-                format?.MinimumFractionDigits is not null;
-            var maxFrac = format?.MaximumFractionDigits;
-
-            var committed = hasExplicitPrecision && maxFrac.HasValue
-                ? Math.Round(parsedValue.Value, maxFrac.Value, MidpointRounding.AwayFromZero)
-                : parsedValue.Value;
+            var hasRoundingOptions = NumberFieldUtilities.HasNumberFormatRoundingOptions(format);
+            var committed = !hadManualInput && !hasRoundingOptions
+                ? currentValue
+                : hasRoundingOptions
+                    ? NumberFieldUtilities.RemoveFloatingPointErrors(parsedValue.Value, format)
+                    : parsedValue.Value;
 
             var validatedValue = RootContext?.GetValidatedValue(committed, NumberFieldChangeReason.InputBlur, null) ?? committed;
-            var currentValue = RootContext?.Value;
             if (currentValue != committed)
             {
-                RootContext?.SetValue(committed, NumberFieldChangeReason.InputBlur, null);
+                var changed = RootContext is not null &&
+                    await RootContext.SetValue(committed, NumberFieldChangeReason.InputBlur, null);
+                if (!changed && currentValue != validatedValue)
+                {
+                    await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+                    return;
+                }
             }
             if (hadManualInput || currentValue != committed || hadPendingProgrammaticChange)
             {
                 RootContext?.OnValueCommitted(validatedValue, NumberFieldChangeReason.InputBlur);
             }
 
-            var formattedValue = FormatNumber(validatedValue);
+            var formattedValue = validatedValue.HasValue ? FormatNumber(validatedValue.Value) : string.Empty;
             if (inputValue != formattedValue)
             {
                 RootContext?.SetInputValue(formattedValue);
             }
         }
 
-        return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+        await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
     }
 
-    private void HandleInput(ChangeEventArgs e)
+    private async Task HandleInput(ChangeEventArgs e)
     {
         var newValue = e.Value?.ToString() ?? string.Empty;
 
@@ -207,7 +237,10 @@
         {
             RootContext?.SetAllowInputSync(false);
             RootContext?.SetInputValue(newValue);
-            RootContext?.SetValue(null, NumberFieldChangeReason.InputClear, null);
+            if (RootContext is not null)
+            {
+                await RootContext.SetValue(null, NumberFieldChangeReason.InputClear, null);
+            }
             return;
         }
 
@@ -218,45 +251,59 @@
         RootContext?.SetInputValue(newValue);
 
         var parsedValue = ParseNumber(newValue);
-        if (parsedValue.HasValue)
+        if (parsedValue.HasValue && RootContext is not null)
         {
-            RootContext?.SetValue(parsedValue.Value, NumberFieldChangeReason.InputChange, null);
+            await RootContext.SetValue(parsedValue.Value, NumberFieldChangeReason.InputChange, null);
         }
     }
 
-    private void HandleKeyDown(KeyboardEventArgs e)
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (RootContext?.ReadOnly == true || RootContext?.Disabled == true)
+        var rootContext = RootContext;
+        if (rootContext is null || rootContext.ReadOnly || rootContext.Disabled)
             return;
 
-        RootContext?.SetAllowInputSync(true);
-        var amount = RootContext?.GetStepAmount(e.AltKey, e.ShiftKey) ?? 1;
+        var hadManualInput = rootContext.AllowInputSync == false;
+        var currentValue = hadManualInput
+            ? ParseNumber(rootContext.InputValue)
+            : null;
+
+        rootContext.SetAllowInputSync(true);
+        var amount = rootContext.GetStepAmount(e.AltKey, e.ShiftKey);
 
         switch (e.Key)
         {
             case "ArrowUp":
-                RootContext?.IncrementValue(amount, 1, NumberFieldChangeReason.Keyboard);
-                RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Keyboard);
+                if (await rootContext.IncrementValue(amount, 1, NumberFieldChangeReason.Keyboard, currentValue))
+                {
+                    rootContext.OnValueCommitted(rootContext.GetCommitValue(), NumberFieldChangeReason.Keyboard);
+                }
                 break;
 
             case "ArrowDown":
-                RootContext?.IncrementValue(amount, -1, NumberFieldChangeReason.Keyboard);
-                RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Keyboard);
+                if (await rootContext.IncrementValue(amount, -1, NumberFieldChangeReason.Keyboard, currentValue))
+                {
+                    rootContext.OnValueCommitted(rootContext.GetCommitValue(), NumberFieldChangeReason.Keyboard);
+                }
                 break;
 
             case "Home":
-                if (RootContext?.Min.HasValue == true)
+                if (rootContext.Min.HasValue)
                 {
-                    RootContext?.SetValue(RootContext.Min.Value, NumberFieldChangeReason.Keyboard, null);
-                    RootContext?.OnValueCommitted(RootContext.Min.Value, NumberFieldChangeReason.Keyboard);
+                    if (await rootContext.SetValue(rootContext.Min.Value, NumberFieldChangeReason.Keyboard, null))
+                    {
+                        rootContext.OnValueCommitted(rootContext.GetCommitValue(), NumberFieldChangeReason.Keyboard);
+                    }
                 }
                 break;
 
             case "End":
-                if (RootContext?.Max.HasValue == true)
+                if (rootContext.Max.HasValue)
                 {
-                    RootContext?.SetValue(RootContext.Max.Value, NumberFieldChangeReason.Keyboard, null);
-                    RootContext?.OnValueCommitted(RootContext.Max.Value, NumberFieldChangeReason.Keyboard);
+                    if (await rootContext.SetValue(rootContext.Max.Value, NumberFieldChangeReason.Keyboard, null))
+                    {
+                        rootContext.OnValueCommitted(rootContext.GetCommitValue(), NumberFieldChangeReason.Keyboard);
+                    }
                 }
                 break;
         }
@@ -274,7 +321,8 @@
             input,
             RootContext?.Locale,
             RootContext?.FormatOptions,
-            RootContext?.MinWithDefault ?? double.MinValue);
+            RootContext?.MinWithDefault ?? NumberFieldUtilities.DefaultMin,
+            RootContext?.AllowOutOfRange ?? false);
     }
 
     private double? ParseNumber(string input)

@@ -1,124 +1,61 @@
-# NumberField Functional Audit Verification Report
+# NumberField Functional Audit
 
-Date: 2026-05-31
+Date: 2026-07-05
 
 ## Scope
 
-Audited the BlazorBaseUI NumberField port against the React Base UI source under `.base-ui/packages/react/src/number-field`.
+Audited the Blazor NumberField port against React Base UI source at `.base-ui` HEAD `95cf9e0339567518ccdf82628c8ef4f3d67cad07` and fetched upstream `origin/master` at `ca246a6068d98f8fa27fa1c382743184550a0360`.
 
-Primary React sources checked:
+React source files reviewed:
 
 - `root/NumberFieldRoot.tsx`
-- `input/NumberFieldInput.tsx`
 - `root/useNumberFieldButton.ts`
-- `scrub-area/NumberFieldScrubArea.tsx`
-- `scrub-area-cursor/NumberFieldScrubAreaCursor.tsx`
+- `root/useNumberFieldStepperButton.ts`
+- `input/NumberFieldInput.tsx`
 - `increment/NumberFieldIncrement.tsx`
 - `decrement/NumberFieldDecrement.tsx`
 - `group/NumberFieldGroup.tsx`
+- `scrub-area/NumberFieldScrubArea.tsx`
+- `scrub-area-cursor/NumberFieldScrubAreaCursor.tsx`
 - `utils/parse.ts`
 - `utils/validate.ts`
-- `utils/constants.ts`
-- `utils/stateAttributesMapping.ts`
+- React NumberField tests under `.base-ui/packages/react/src/number-field`
+
+## Upstream Delta And Impact Report
+
+No NumberField source files changed between local `.base-ui` HEAD and fetched `origin/master`. The audit therefore focused on already-present upstream fixes that were not fully reflected in the Blazor port.
+
+| Upstream fix | Impact | Blazor repair |
+| --- | --- | --- |
+| Safe integer defaults and empty-step seeding | Empty steppers seed `0`; fully negative ranges clamp to the in-range value nearest zero. | `DefaultMin`/`DefaultMax`; empty `IncrementValueInternalAsync` calls validation with `0` and no direction. |
+| Precision preservation | Direct input and no-edit blur must not collapse values through displayed rounded text. | Blur path preserves authoritative numeric value unless manual input or explicit rounding options exist; hidden value uses shortest invariant numeric text. |
+| Canceled change commit gating | Vetoed changes must not fire `OnValueCommitted` or leak stale `lastChangedValue`. | `SetValueInternalAsync` returns `false` on cancellation before updating `lastChangedValue`; keyboard/button/wheel/scrub commits are gated on accepted changes. |
+| Focusable disabled steppers | Buttons use unavailable semantics without invalid `aria-readonly`. | Increment/decrement render `aria-disabled="true"` and `data-disabled`; no native `disabled` or `aria-readonly` for the focusable-disabled path. |
+| Read-only focus state | Read-only input remains focusable and updates focused/touched state. | Focus/blur handlers now block only disabled state before field focus bookkeeping. |
+| Hidden input parity | Hidden input must be read-only when root is read-only and handle focus/autofill. | Hidden input renders `readonly`, redirects focus, and processes change/autofill unless disabled/read-only. |
+| Paste semantics | Paste inserts into current selection and restores caret. | JS paste handler splices clipboard text into the current value and restores the selection after render. |
+| Home/End key handling | Home/End prevent defaults only when min/max exists. | JS keydown filter allows native caret movement when the relevant bound is absent. |
+| Allowed input symbols | Allowed symbols come from `Intl.NumberFormat.formatToParts`; format controls are valid. | JS key filter derives non-digit formatter parts; C# validation allows Unicode format controls and out-of-range minus entry. |
+| Scrub cleanup | Scrub movement is async, pointer-lock aware, and commit-safe. | Scrub move awaits accepted increments; scrub end commits only after a changed value. |
 
 ## Repairs Applied
 
-- Added `NumberFieldUtilities` for React-equivalent parsing, formatting, validation, step snapping, default precision cleanup, hidden input serialization, and allowed-character checks.
-- Added missing `AllowOutOfRange`, `Form`, and `Step="any"` support.
-- Preserved raw user input during typing and deferred visible formatting to blur or step interactions.
-- Fixed controlled-value detection so explicit `Value=null` is controlled while omitted `Value` remains uncontrolled.
-- Added hidden input `form`, `step`, `min`, `max`, required/disabled, and canonical value behavior.
-- Moved DOM-only preventDefault and paste handling into the NumberField JS module.
-- Added synchronous browser key filtering for invalid characters, percent/permille symbols, duplicate signs, duplicate decimal/currency/percent symbols, and navigation/action keys.
-- Fixed paste to use clipboard text and emit `InputPaste`.
-- Fixed scrub behavior to use pointer movement magnitude, not only direction.
-- Fixed scrub viewport teleport bounds and async pointer-lock handling.
-- Added input render update tracking with `UpdatesAttributeName="value"` and `UpdatesAttributeEventName="oninput"`.
-- Removed non-stub logic from `NumberFieldInput.cs`.
-- Updated Server/WASM Playwright host pages so uncontrolled cases omit `Value` instead of passing `Value=null`.
-- Added bUnit contracts and tests for raw-input preservation, form association, `allowOutOfRange`, `step="any"`, Unicode/permille parsing, and React inputMode behavior.
-- Added browser tests for paste reason, key filtering, hidden native validity, `step="any"`, and scrub movement magnitude.
+- Reworked NumberField root context step APIs to return accepted-change status and carry commit values.
+- Added JavaScript-safe default bounds, shortest hidden-input serialization, read-only hidden input, hidden focus redirect, and hidden autofill/change handling.
+- Preserved direct-input precision while keeping formatter-backed explicit rounding.
+- Synchronized dirty visible input before button stepping and stepped keyboard interactions from dirty text when needed.
+- Updated increment/decrement state attributes and ARIA semantics to match React focusable-disabled behavior.
+- Updated JS key filtering for `formatToParts`, `allowOutOfRange`, Home/End, Unicode format controls, and paste splicing.
+- Added unit and Playwright coverage for canceled commits, empty blur, read-only focus state, hidden `readonly`, allow-out-of-range underflow, paste caret behavior, Home/End caret behavior, and focusable disabled buttons.
+- Updated `../base-ui-specs/number-field/SPEC.md` and `pitfalls.md` with the repaired behavior.
 
-## Command Log
+## Source Testing
 
-Final verification commands:
-
-```bash
-dotnet build BlazorBaseUI.slnx -v minimal
-```
-
-Result: Build succeeded, 0 warnings, 0 errors.
-
-```bash
-bash scripts/lint-rules.sh
-```
-
-Result: 0 textual lint violations. Analyzer-enforced structural rules were covered by the solution build.
-
-```bash
-git diff --check
-```
-
-Result: No whitespace errors.
-
-```bash
-dotnet test tests/BlazorBaseUI.Tests/BlazorBaseUI.Tests.csproj --filter "FullyQualifiedName~NumberField" --logger "console;verbosity=detailed"
-```
-
-Result: Passed 249/249.
-
-```bash
-dotnet build tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj -v minimal
-```
-
-Result: Build succeeded, 0 warnings, 0 errors.
-
-```bash
-dotnet test tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests/BlazorBaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~NumberField" --logger "console;verbosity=detailed"
-```
-
-Result: Passed 64/64. Full log: `docs/audits/logs/number-field-playwright.log`.
-
-```bash
-npx --yes terser src/BlazorBaseUI/wwwroot/blazor-baseui-number-field.js -o src/BlazorBaseUI/wwwroot/blazor-baseui-number-field.min.js -c -m
-```
-
-Result: Minified bundle regenerated successfully.
-
-In-app browser manual checks on `http://127.0.0.1:5261/tests/numberfield/server`:
-
-- Filled `6` with `max=5` and `allowOutOfRange=true`: display value `6`.
-- Hidden native number input validity: `rangeOverflow=true`, `stepMismatch=false` with `stepAny=true`.
-- Increment button disabled while value was out of range.
-- Percent key blocked when percent formatting was absent.
-- Percent input accepted when `formatStyle=percent`, with display value `0.12`.
-- Form submission emitted `quantity=4`.
-
-## Automated Log Artifact
-
-The final Playwright execution log is stored at:
-
-```text
-docs/audits/logs/number-field-playwright.log
-```
-
-Summary from the log:
-
-```text
-Test Run Successful.
-Total tests: 64
-     Passed: 64
-```
-
-## Manual Source Checks
-
-- Confirmed React input default `inputMode` starts as `numeric`.
-- Confirmed `allowOutOfRange` only bypasses clamp for direct input reasons.
-- Confirmed React `removeFloatingPointErrors` rounds through Intl default maximum fraction digits when no explicit format precision is supplied.
-- Confirmed React keydown prevention is synchronous and cannot be implemented safely in Blazor event callbacks alone.
-- Confirmed React scrub increments by `movement * stepAmount`; Blazor now passes movement magnitude through JS interop.
-- Confirmed React paste reads `clipboardData.getData("text/plain")`, prevents the default input event, and emits `inputPaste`.
+- React jsdom source tests: `docs/audits/logs/number-field-source-react-jsdom.txt`
+- React Chromium source tests: `docs/audits/logs/number-field-source-react-chromium.txt`
+- React docs validation: `docs/audits/logs/number-field-source-docs-validate.txt`
+- In-app browser docs comparison: `docs/audits/logs/number-field-in-app-browser-docs-comparison.json`
 
 ## Result
 
-No known functional gaps remain in the audited NumberField surface.
+All audited React hooks, utilities, attributes, state branches, and upstream fixes have a Blazor implementation or verified equivalent in `docs/audits/number-field-parity-matrix.md`.
