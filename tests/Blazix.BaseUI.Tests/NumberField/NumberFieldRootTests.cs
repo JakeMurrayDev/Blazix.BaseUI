@@ -571,6 +571,45 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
     }
 
     [Fact]
+    public Task OnValueCommitted_DoesNotFireForCanceledKeyboardInteraction()
+    {
+        var committedCount = 0;
+        var onValueChange = EventCallback.Factory.Create<NumberFieldValueChangeEventArgs>(
+            this, args => args.Cancel());
+        var onValueCommitted = EventCallback.Factory.Create<NumberFieldValueCommittedEventArgs>(
+            this, _ => committedCount++);
+
+        var cut = Render(CreateNumberField(
+            defaultValue: 5,
+            onValueChange: onValueChange,
+            onValueCommitted: onValueCommitted));
+        var input = cut.Find("input[type='text']");
+
+        input.KeyDown(new KeyboardEventArgs { Key = "ArrowUp" });
+
+        committedCount.ShouldBe(0);
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("5");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task OnValueCommitted_DoesNotFireOnBlurWhenAlreadyEmptyAndUnchanged()
+    {
+        var committedCount = 0;
+        var onValueCommitted = EventCallback.Factory.Create<NumberFieldValueCommittedEventArgs>(
+            this, _ => committedCount++);
+
+        var cut = Render(CreateNumberField(onValueCommitted: onValueCommitted));
+        var input = cut.Find("input[type='text']");
+
+        input.Blur();
+
+        committedCount.ShouldBe(0);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task OnValueCommitted_FiresOnIncrementDecrementButtons()
     {
         NumberFieldValueCommittedEventArgs? receivedArgs = null;
@@ -604,6 +643,15 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
         var cut = Render(CreateNumberField(defaultValue: 0, readOnly: true));
         var input = cut.Find("input[type='text']");
         input.GetAttribute("readonly").ShouldNotBeNull();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ReadOnly_MarksHiddenInputAsReadOnly()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0, readOnly: true));
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("readonly").ShouldNotBeNull();
         return Task.CompletedTask;
     }
 
@@ -708,6 +756,20 @@ public class NumberFieldRootTests : BunitContext, INumberFieldRootContract
         var hiddenInput = cut.Find("input[type='number']");
         hiddenInput.GetAttribute("value").ShouldBe("6");
         input.GetAttribute("value").ShouldBe("6");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task AllowOutOfRange_AllowsUnderflowForDirectInput()
+    {
+        var cut = Render(CreateNumberField(defaultValue: 0, min: 0, allowOutOfRange: true));
+        var input = cut.Find("input[type='text']");
+
+        input.Input(new ChangeEventArgs { Value = "-1" });
+
+        var hiddenInput = cut.Find("input[type='number']");
+        hiddenInput.GetAttribute("value").ShouldBe("-1");
+        input.GetAttribute("value").ShouldBe("-1");
         return Task.CompletedTask;
     }
 

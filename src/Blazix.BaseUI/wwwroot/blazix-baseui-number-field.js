@@ -24,6 +24,7 @@ const PERSIAN_DETECT_RE = /[۰۱۲۳۴۵۶۷۸۹]/u;
 const HAN_DETECT_RE = /[零〇一二三四五六七八九]/u;
 const FULLWIDTH_DETECT_RE = /[０１２３４５６７８９]/u;
 const SPACE_SEPARATOR_RE = /\p{Zs}/u;
+const FORMAT_CONTROL_DETECT_RE = /\p{Cf}/u;
 
 export function initialize(inputElement, dotNetRef, config) {
     if (!inputElement) return;
@@ -115,7 +116,7 @@ function getFormatter(locale, format) {
 function getNumberLocaleDetails(locale, format) {
     const result = {};
 
-    getFormatter(locale, format).formatToParts(11111.1).forEach((part) => {
+    getFormatParts(locale, format).forEach((part) => {
         result[part.type] = part.value;
     });
 
@@ -128,22 +129,37 @@ function getNumberLocaleDetails(locale, format) {
     return result;
 }
 
+function getFormatParts(locale, format) {
+    return getFormatter(locale, format).formatToParts(11111.1);
+}
+
 function getAllowedNonNumericKeys(config) {
     const format = config.format;
     const style = format?.style;
-    const { decimal, group, currency, literal } = getNumberLocaleDetails(config.locale, format);
+    const parts = getFormatParts(config.locale, format);
+    const details = getNumberLocaleDetails(config.locale, format);
+    const decimal = parts.find((part) => part.type === 'decimal')?.value ?? details.decimal;
     const keys = new Set(BASE_NON_NUMERIC_SYMBOLS);
 
     if (decimal) {
         keys.add(decimal);
     }
 
-    if (group) {
-        keys.add(group);
-        if (SPACE_SEPARATOR_RE.test(group)) {
+    parts.forEach((part) => {
+        if (
+            part.type === 'integer' ||
+            part.type === 'fraction' ||
+            part.type === 'exponentInteger' ||
+            part.type === 'compact'
+        ) {
+            return;
+        }
+
+        Array.from(part.value).forEach((char) => keys.add(char));
+        if (SPACE_SEPARATOR_RE.test(part.value)) {
             keys.add(' ');
         }
-    }
+    });
 
     const allowPercentSymbols = style === 'percent' || (style === 'unit' && format?.unit === 'percent');
     const allowPermilleSymbols = style === 'percent' || (style === 'unit' && format?.unit === 'permille');
@@ -156,19 +172,8 @@ function getAllowedNonNumericKeys(config) {
         PERMILLE.forEach((key) => keys.add(key));
     }
 
-    if (style === 'currency' && currency) {
-        keys.add(currency);
-    }
-
-    if (literal) {
-        Array.from(literal).forEach((char) => keys.add(char));
-        if (SPACE_SEPARATOR_RE.test(literal)) {
-            keys.add(' ');
-        }
-    }
-
     PLUS_SIGNS_WITH_ASCII.forEach((key) => keys.add(key));
-    if ((config.minWithDefault ?? Number.MIN_VALUE) < 0) {
+    if ((config.minWithDefault ?? Number.MIN_SAFE_INTEGER) < 0 || config.allowOutOfRange) {
         MINUS_SIGNS_WITH_ASCII.forEach((key) => keys.add(key));
     }
 
@@ -186,12 +191,20 @@ function handleInputKeyDown(inputElement, event) {
         return;
     }
 
-    if (ACTION_KEYS.has(event.key)) {
+    const isStepKey = event.key === 'ArrowUp' || event.key === 'ArrowDown';
+    const willSetHome = event.key === 'Home' && config.min != null;
+    const willSetEnd = event.key === 'End' && config.max != null;
+
+    if (isStepKey || willSetHome || willSetEnd) {
         event.preventDefault();
         return;
     }
 
-    if (event.altKey || NAVIGATE_KEYS.has(event.key) || event.key.length !== 1) {
+    if (event.altKey || NAVIGATE_KEYS.has(event.key)) {
+        return;
+    }
+
+    if (event.key.length > 1) {
         return;
     }
 
@@ -248,7 +261,8 @@ function isAllowedInputKey(inputElement, event, config) {
         ARABIC_DETECT_RE.test(key) ||
         PERSIAN_DETECT_RE.test(key) ||
         HAN_DETECT_RE.test(key) ||
-        FULLWIDTH_DETECT_RE.test(key);
+        FULLWIDTH_DETECT_RE.test(key) ||
+        FORMAT_CONTROL_DETECT_RE.test(key);
 }
 
 function handleInputPaste(inputElement, event) {
@@ -265,8 +279,17 @@ function handleInputPaste(inputElement, event) {
         return;
     }
 
+    const inputValue = inputElement.value || '';
+    const selectionStart = inputElement.selectionStart ?? inputValue.length;
+    const selectionEnd = inputElement.selectionEnd ?? inputValue.length;
+    const nextText = inputValue.slice(0, selectionStart) + pastedData + inputValue.slice(selectionEnd);
+    const caret = selectionStart + pastedData.length;
+
     event.preventDefault();
-    elementState.dotNetRef.invokeMethodAsync('OnPasteText', pastedData);
+    elementState.dotNetRef
+        .invokeMethodAsync('OnPasteText', nextText)
+        .then(() => requestAnimationFrame(() => setSelectionRange(inputElement, caret, caret)))
+        .catch(() => { });
 }
 
 export function registerWheelListener(inputElement, dotNetRef, disabled, readOnly) {

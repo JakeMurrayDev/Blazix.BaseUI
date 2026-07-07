@@ -1,27 +1,34 @@
 # NumberField React-to-Blazor Parity Matrix
 
-| React source surface | Required behavior | Blazor equivalent | Verification |
+Date: 2026-07-05
+
+| React surface | Required behavior | Blazor equivalent | Verification |
 | --- | --- | --- | --- |
-| `NumberFieldRoot` controlled/uncontrolled state | `value` prop controls including `null`; omitted value uses `defaultValue` | `SetParametersAsync` detects supplied `Value`; Playwright host omits `Value` for uncontrolled | bUnit `Value_AcceptsNullValue`, Playwright 64/64 |
-| `inputValue` and `allowInputSyncRef` | Preserve raw typed text until blur; sync on controlled changes and step actions | `allowInputSync`, `SetAllowInputSync`, `HasPendingCommit`, raw `InputValue` context | bUnit `PreservesRawInputUntilBlur` |
-| `lastChangedValueRef` | Commit latest changed value after buttons, wheel, scrub, keyboard | `lastChangedValue` and `HandleValueCommitted` | bUnit commit reason tests; Playwright button/wheel/scrub tests |
-| Hidden native input | Submit canonical value with `type=number`, `name`, `form`, `min`, `max`, `step`, `required`, disabled, hidden from AT | Root hidden input renders all required attrs and serializes with invariant value; `step="any"` preserved | bUnit `Form_SetsFormOnHiddenInput`, `HiddenInput_AllowsStepAny`; Playwright form validity |
-| `allowOutOfRange` | Direct input may exceed min/max; step interactions still clamp | `ValidateNumber` clamps by reason; input reasons bypass clamp only when enabled | bUnit allow-out-of-range tests; Playwright native overflow |
-| `toValidatedNumber` | Clamp, optional snap, directional/nearest step, remove floating point errors | `NumberFieldUtilities.ToValidatedNumber`, `RemoveFloatingPointErrors` | bUnit step and precision tests |
-| `parseNumber` | Locale separators, Arabic/Persian/fullwidth/Han digits, Unicode signs, percent/permille, currency/unit, control chars, Infinity rejection | `NumberFieldUtilities.ParseNumber` | bUnit exotic parse tests |
-| `formatNumber` / max precision | Locale/format-aware display and controlled max-precision fallback | `NumberFieldUtilities.FormatNumber` | bUnit format/control tests |
-| `getAllowedNonNumericKeys` | Locale decimal/group/literal/currency, percent/permille gating, signs by min | C# allowed-string checks and JS keydown filter config | bUnit invalid input; Playwright percent blocked/allowed |
-| `NumberFieldInput.onInput` | Immediate raw text update, parseable value changes only | `HandleInput` updates raw `InputValue`, parses through utility | bUnit input-change reason tests |
-| `NumberFieldInput.onBlur` | Commit parsed/validated value; format display; mark touched/focused | `HandleBlur` validates, commits, formats, field state update | bUnit blur validation; Playwright blur tests |
-| `NumberFieldInput.onKeyDown` | Synchronous preventDefault for invalid keys and action keys | JS `keydown` listener prevents DOM defaults; Blazor handles value changes | Playwright keyboard tests |
-| `NumberFieldInput.onPaste` | Read clipboard plain text, prevent default, parse, emit `inputPaste` | JS paste listener invokes `OnPasteText`; root sets raw input and value | Playwright `Paste_EventUsesClipboardTextAndReason` |
-| `useNumberFieldButton` | Native button attrs, disabled/read-only guards, click/pointer press, auto-repeat | Increment/decrement components plus JS `startAutoChange` | bUnit button tests; Playwright press-and-hold |
-| Wheel scrub | Focused input wheel changes value unless disabled/read-only/Ctrl | JS wheel listener calls `OnWheelChange` | Playwright wheel tests |
-| Scrub area | Pointer-drag movement changes by `movement * stepAmount`, commits on pointerup | JS sends movement magnitude; `OnScrubMove(double movement, ...)` | Playwright `ScrubArea_UsesPointerMovementMagnitude` |
-| Scrub pointer lock | Await pointer lock; record denied state; skip WebKit/touch | JS `startScrub` awaits `requestPointerLock` and returns denial | Source review; scrub Playwright |
-| Scrub viewport teleport | Teleport rect based on element rect plus half teleport distance, visual viewport fallback | JS `getViewportRect` matches React utility | Source review; scrub Playwright |
-| Scrub cursor scale | Track visual viewport scale and invert cursor scale | JS visual viewport resize subscription updates `visualScaleRef` | Source review |
-| State attributes mapping | `data-scrubbing`, disabled, readonly, required, validity, touched, dirty, filled, focused | Root/input/group/buttons/scrub/cursor component attrs | Existing and added bUnit state tests |
-| `useRenderElement` | Custom render receives state and merged attrs | `RenderElement<TState>` with state, class/style functions, component attrs | Existing render override tests |
-| Field/form/label contexts | Field focus/touched/dirty/filled, validation, label association, form error clearing | Field/Form/Labelable contexts retained and updated | bUnit field integration tests |
-| React source spec scar tissue | Missing spec must be filled for future ports | Added `../base-ui-specs/number-field/SPEC.md` and `pitfalls.md` | Manual check |
+| `NumberFieldRoot` controlled state | Explicit `value={null}` is controlled empty; omitted value uses `defaultValue`. | `SetParametersAsync` detects supplied `Value`; hosts omit `Value` for uncontrolled cases. | `Value_AcceptsNullValue`; Playwright dynamic update tests. |
+| `minWithDefault` / `maxWithDefault` | Defaults are JS safe integer bounds. | `NumberFieldUtilities.DefaultMin/DefaultMax`. | Unit min/max and empty seed tests. |
+| Empty `incrementValue` | Seed `0` with no direction and clamp nearest zero. | Empty `IncrementValueInternalAsync` calls validation with `0`, no direction. | Increment/decrement empty click tests. |
+| `setValue` | Validate by reason, support cancellation, return accepted-change status. | `SetValueInternalAsync` returns `Task<bool>` and preserves stale commit guards. | Canceled keyboard and blur tests. |
+| `lastChangedValueRef` | Commit only the latest accepted value. | `lastChangedValue` plus `GetCommitValue`. | Keyboard/button/wheel/scrub commit tests. |
+| `allowInputSyncRef` | Preserve raw text while typing; sync on blur/programmatic changes. | `allowInputSync`, `SetInputValueDirect`, `HasPendingCommit`. | Raw input and precision tests. |
+| Hidden native input | `type=number`, canonical value, name/form/min/max/step, disabled, readOnly, required, hidden from AT. | Root hidden input renders all attrs, `readonly`, focus redirect, change handler. | Hidden input unit tests; form Playwright tests. |
+| `allowOutOfRange` | Only direct input bypasses clamping; step interactions clamp. | `ValidateNumber` gates clamp by reason. | Unit overflow/underflow/clamp tests; native validity Playwright. |
+| Input focus/blur | Disabled blocks focus; read-only still tracks focus/touched. | `HandleFocus`/`HandleBlur` update field state before read-only value guard. | `ReadOnly_FocusStateTracksFocusAndBlur`. |
+| Input blur precision | No-edit blur keeps authoritative value; explicit rounding options round. | Blur path distinguishes manual input and rounding options. | Precision preservation tests. |
+| Input clear | Empty blur commits only when something changed or pending. | Empty blur checks accepted change and pending commit. | Empty unchanged blur test. |
+| Keydown filter | Invalid text blocked synchronously in the DOM. | NumberField JS `keydown` listener. | Playwright percent and minus tests. |
+| Home/End | Native caret movement unless min/max exists. | JS only prevents Home/End with relevant bound. | `HomeEndWithoutBoundsUseNativeCaretMovement`. |
+| Allowed symbols | Derived from `Intl.NumberFormat.formatToParts`; compact excluded. | JS `getFormatParts`; C# allows supported digits and format controls. | Source tests; Playwright character tests. |
+| `parseNumber` | Locale separators, signs, percent/permille, currency/unit, format controls, numeral systems, Infinity rejection. | `NumberFieldUtilities.ParseNumber`. | Exotic parse unit tests. |
+| `toValidatedNumber` | Snap before clamp, clamp before/after rounding, preserve non-step values. | `NumberFieldUtilities.ToValidatedNumber`. | Step, snap, precision tests. |
+| Floating point cleanup | Delta-bounded cleanup unless explicit rounding options exist. | `RemoveFloatingPointErrors`. | Fractional step tests. |
+| Paste | Prevent default, splice into selection, parse full text, restore caret. | JS paste handler calls `OnPasteText(nextText)` and restores selection. | `Paste_InsertsAtCaretAndRestoresSelection`. |
+| Increment/decrement buttons | Focusable-disabled semantics; no `aria-readonly` on buttons. | `aria-disabled`, `data-disabled`, no native disabled in focusable path. | Unit button attr tests; Playwright disabled button checks. |
+| Dirty step from buttons | Sync dirty input before button stepping. | `SyncDirtyInputAsync` in increment/decrement. | Dirty click/pointer tests. |
+| Keyboard stepping | Step from dirty text when unsynced; otherwise numeric state. | `HandleKeyDown` passes parsed current override. | Dirty keyboard/precision tests. |
+| Wheel scrub | Focused wheel changes only when enabled, not Ctrl, not disabled/read-only. | JS non-passive wheel listener and `OnWheelChange`. | Wheel Playwright tests. |
+| Press and hold | Start delay and repeat tick; no commit after canceled/no accepted change. | JS auto-change plus accepted-change tracking. | Unit hold tests; Playwright hold test. |
+| Scrub area | Movement magnitude times step amount; pointer lock and viewport handling. | JS scrub module plus async `OnScrubMove`. | Scrub Playwright and source review. |
+| Scrub commit | Commit on end only after an accepted scrub value change. | `hasScrubValueChanged`. | Scrub commit tests. |
+| State attributes | Root, input, group, steppers, scrub parts expose state data attrs. | `NumberFieldRootState` propagated through `RenderElement`. | Unit state attribute tests. |
+| Field/label/description | Label targets visible input; descriptions merge into `aria-describedby`. | `LabelableContext.SetControlId`, `aria-labelledby`, combined `aria-describedby`. | Field integration unit checks; in-app docs comparison. |
+| Docs/source parity | React docs anatomy/API shape present in Blazor docs. | Blazor docs page exposes same headings and controls. | `number-field-in-app-browser-docs-comparison.json`. |

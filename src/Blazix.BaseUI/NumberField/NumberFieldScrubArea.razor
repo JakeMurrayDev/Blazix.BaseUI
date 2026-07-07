@@ -28,6 +28,7 @@
     private bool isScrubbing;
     private bool isTouchInput;
     private bool isPointerLockDenied;
+    private bool hasScrubValueChanged;
     private ElementReference? scrubAreaElement;
     private ElementReference? cursorElement;
     private DotNetObjectReference<NumberFieldScrubArea>? dotNetRef;
@@ -195,14 +196,18 @@
     /// Handles scrub movement from JavaScript interop to adjust the field value.
     /// </summary>
     [JSInvokable]
-    public void OnScrubMove(double movement, int direction, bool altKey, bool shiftKey)
+    public async Task OnScrubMove(double movement, int direction, bool altKey, bool shiftKey)
     {
         if (RootContext?.Disabled == true || RootContext?.ReadOnly == true)
             return;
 
         var stepAmount = RootContext?.GetStepAmount(altKey, shiftKey) ?? 1;
         var amount = Math.Abs(movement) * stepAmount;
-        RootContext?.IncrementValue(amount, direction, NumberFieldChangeReason.Scrub);
+        if (RootContext is not null &&
+            await RootContext.IncrementValue(amount, direction, NumberFieldChangeReason.Scrub, null))
+        {
+            hasScrubValueChanged = true;
+        }
     }
 
     /// <summary>
@@ -213,7 +218,12 @@
     {
         isScrubbing = false;
         RootContext?.SetIsScrubbing(false);
-        RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.Scrub);
+        if (hasScrubValueChanged)
+        {
+            RootContext?.OnValueCommitted(RootContext.GetCommitValue(), NumberFieldChangeReason.Scrub);
+        }
+
+        hasScrubValueChanged = false;
         UpdateScrubContext();
         StateHasChanged();
     }
@@ -248,6 +258,7 @@
 
         var isTouch = e.PointerType == "touch";
         isTouchInput = isTouch;
+        hasScrubValueChanged = false;
 
         if (e.PointerType == "mouse")
         {

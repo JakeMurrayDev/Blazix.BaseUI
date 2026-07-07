@@ -11,8 +11,11 @@ internal static partial class NumberFieldUtilities
     public const double DefaultStep = 1;
     public const double SmallStep = 0.1;
     public const double LargeStep = 10;
+    public const double DefaultMin = -9007199254740991d;
+    public const double DefaultMax = 9007199254740991d;
 
     private const double StepEpsilonFactor = 1e-10;
+    private const double MaxFloatingPointCleanupDelta = 1e-10;
 
     private static readonly ConcurrentDictionary<string, string> CurrencySymbolCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly char[] PercentSymbols = ['%', '\u066A', '\uFF05', '\uFE6A'];
@@ -72,7 +75,7 @@ internal static partial class NumberFieldUtilities
         if (!value.HasValue)
             return string.Empty;
 
-        return value.Value.ToString("G15", CultureInfo.InvariantCulture);
+        return value.Value.ToString("G", CultureInfo.InvariantCulture);
     }
 
     public static double? ParseNumber(string? formattedNumber, string? locale, NumberFormatOptions? options)
@@ -179,14 +182,19 @@ internal static partial class NumberFieldUtilities
         string input,
         string? locale,
         NumberFormatOptions? options,
-        double minWithDefault)
+        double minWithDefault,
+        bool allowOutOfRange)
     {
-        var allowed = GetAllowedNonNumericCharacters(locale, options, minWithDefault);
+        var allowed = GetAllowedNonNumericCharacters(locale, options, minWithDefault, allowOutOfRange);
 
         foreach (var ch in input)
         {
-            if (IsSupportedDigit(ch) || allowed.Contains(ch))
+            if (IsSupportedDigit(ch) ||
+                allowed.Contains(ch) ||
+                CharUnicodeInfo.GetUnicodeCategory(ch) == UnicodeCategory.Format)
+            {
                 continue;
+            }
 
             return false;
         }
@@ -218,20 +226,41 @@ internal static partial class NumberFieldUtilities
                 return RemoveFloatingPointErrors(clampedValue, format);
 
             var baseValue = minWithZeroDefault;
-            if (!small && minWithDefault != double.MinValue)
+            if (!small && minWithDefault != DefaultMin)
                 baseValue = minWithDefault;
 
             var snappedValue = SnapToStep(clampedValue, baseValue, step.Value, small);
-            return RemoveFloatingPointErrors(snappedValue, format);
+            var roundedSnappedValue = RemoveFloatingPointErrors(snappedValue, format);
+            return clamp ? Math.Max(minWithDefault, Math.Min(maxWithDefault, roundedSnappedValue)) : roundedSnappedValue;
         }
 
-        return RemoveFloatingPointErrors(clampedValue, format);
+        if (!step.HasValue && !HasNumberFormatRoundingOptions(format))
+            return clampedValue;
+
+        var roundedValue = RemoveFloatingPointErrors(clampedValue, format);
+        return clamp ? Math.Max(minWithDefault, Math.Min(maxWithDefault, roundedValue)) : roundedValue;
+    }
+
+    public static bool HasNumberFormatRoundingOptions(NumberFormatOptions? format)
+    {
+        return format?.MaximumFractionDigits is not null ||
+            format?.MinimumFractionDigits is not null ||
+            format?.MaximumSignificantDigits is not null ||
+            format?.MinimumSignificantDigits is not null;
     }
 
     public static double RemoveFloatingPointErrors(double value, NumberFormatOptions? format = null)
     {
         if (!double.IsFinite(value))
             return value;
+
+        if (!HasNumberFormatRoundingOptions(format))
+        {
+            var roundedValue = double.Parse(value.ToString("G15", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+            var cleanupDelta = Math.Abs(roundedValue - value);
+            var cleanupTolerance = Math.Min(Math.Pow(2, -52) * Math.Max(1, Math.Abs(value)), MaxFloatingPointCleanupDelta);
+            return cleanupDelta <= cleanupTolerance ? roundedValue : value;
+        }
 
         var maximumFractionDigits = GetMaximumFractionDigits(format);
         var digits = Math.Clamp(maximumFractionDigits, 0, 20);
@@ -252,7 +281,8 @@ internal static partial class NumberFieldUtilities
     private static HashSet<char> GetAllowedNonNumericCharacters(
         string? locale,
         NumberFormatOptions? options,
-        double minWithDefault)
+        double minWithDefault,
+        bool allowOutOfRange)
     {
         var culture = CreateCulture(locale);
         var numberFormat = culture.NumberFormat;
@@ -292,7 +322,7 @@ internal static partial class NumberFieldUtilities
         foreach (var plus in UnicodePlusSigns)
             keys.Add(plus);
 
-        if (minWithDefault < 0)
+        if (minWithDefault < 0 || allowOutOfRange)
         {
             keys.Add('-');
             foreach (var minus in UnicodeMinusSigns)

@@ -117,6 +117,34 @@ public abstract class NumberFieldTestsBase : TestBase
         await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("100");
     }
 
+    [Fact]
+    public virtual async Task HomeEndWithoutBoundsUseNativeCaretMovement()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(123));
+
+        var input = GetInput();
+        await input.FocusAsync();
+        await Page.EvaluateAsync(@"() => {
+            const input = document.querySelector('input[type=""text""]');
+            input.setSelectionRange(input.value.length, input.value.length);
+        }");
+
+        await Page.Keyboard.PressAsync("Home");
+        await WaitForDelayAsync(100);
+
+        var homeSelection = await input.EvaluateAsync<int>("input => input.selectionStart");
+        Assert.Equal(0, homeSelection);
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("123");
+
+        await Page.Keyboard.PressAsync("End");
+        await WaitForDelayAsync(100);
+
+        var endSelection = await input.EvaluateAsync<int>("input => input.selectionStart");
+        Assert.Equal(3, endSelection);
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("123");
+    }
+
     /// <summary>
     /// Tests that Shift+ArrowUp increments by the large step (default 10).
     /// Requires real browser modifier key handling.
@@ -304,6 +332,31 @@ public abstract class NumberFieldTestsBase : TestBase
         await Assertions.Expect(GetLastReason()).ToHaveTextAsync("InputPaste");
     }
 
+    [Fact]
+    public virtual async Task Paste_InsertsAtCaretAndRestoresSelection()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(123));
+
+        var input = GetInput();
+        await input.FocusAsync();
+        await Page.EvaluateAsync(@"() => {
+            const input = document.querySelector('input[type=""text""]');
+            input.setSelectionRange(1, 1);
+            const event = new Event('paste', { bubbles: true, cancelable: true });
+            Object.defineProperty(event, 'clipboardData', {
+                value: { getData: (type) => type === 'text/plain' ? '45' : '' }
+            });
+            input.dispatchEvent(event);
+        }");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(input).ToHaveValueAsync("14523");
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("14523");
+        var selectionStart = await input.EvaluateAsync<int>("input => input.selectionStart");
+        Assert.Equal(3, selectionStart);
+    }
+
     #endregion
 
     #region Character Filtering
@@ -339,6 +392,26 @@ public abstract class NumberFieldTestsBase : TestBase
 
         await Assertions.Expect(input).ToHaveValueAsync("12%");
         await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("0.12");
+    }
+
+    [Fact]
+    public virtual async Task Keyboard_AllowOutOfRangeAllowsMinusWithNonNegativeMin()
+    {
+        await NavigateAsync(CreateUrl("/tests/numberfield")
+            .WithNumberFieldDefaultValue(0)
+            .WithMin(0)
+            .WithNumberFieldAllowOutOfRange(true));
+
+        var input = GetInput();
+        await input.FocusAsync();
+        await input.FillAsync("");
+        await Page.Keyboard.TypeAsync("-1");
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(input).ToHaveValueAsync("-1");
+        await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("-1");
+        var underflow = await GetHiddenInput().EvaluateAsync<bool>("input => input.validity.rangeUnderflow");
+        Assert.True(underflow);
     }
 
     #endregion
@@ -443,7 +516,8 @@ public abstract class NumberFieldTestsBase : TestBase
             .WithMax(10));
 
         var btn = GetIncrementButton();
-        await Assertions.Expect(btn).ToBeDisabledAsync();
+        Assert.Equal("true", await btn.GetAttributeAsync("aria-disabled"));
+        Assert.Null(await btn.GetAttributeAsync("disabled"));
         await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("10");
     }
 
@@ -458,7 +532,8 @@ public abstract class NumberFieldTestsBase : TestBase
             .WithMin(0));
 
         var btn = GetDecrementButton();
-        await Assertions.Expect(btn).ToBeDisabledAsync();
+        Assert.Equal("true", await btn.GetAttributeAsync("aria-disabled"));
+        Assert.Null(await btn.GetAttributeAsync("disabled"));
         await Assertions.Expect(GetValueDisplay()).ToHaveTextAsync("0");
     }
 

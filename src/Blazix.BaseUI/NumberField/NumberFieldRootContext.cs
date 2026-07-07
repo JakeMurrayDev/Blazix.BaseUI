@@ -20,14 +20,14 @@ internal sealed class NumberFieldRootContext
     public double? Value { get; set; }
 
     /// <summary>
-    /// Gets or sets the resolved minimum value, falling back to <see cref="double.MinValue"/> when unset.
+    /// Gets or sets the resolved minimum value, falling back to the JavaScript safe integer minimum when unset.
     /// </summary>
-    public double MinWithDefault { get; set; } = double.MinValue;
+    public double MinWithDefault { get; set; } = NumberFieldUtilities.DefaultMin;
 
     /// <summary>
-    /// Gets or sets the resolved maximum value, falling back to <see cref="double.MaxValue"/> when unset.
+    /// Gets or sets the resolved maximum value, falling back to the JavaScript safe integer maximum when unset.
     /// </summary>
-    public double MaxWithDefault { get; set; } = double.MaxValue;
+    public double MaxWithDefault { get; set; } = NumberFieldUtilities.DefaultMax;
 
     /// <summary>
     /// Gets or sets the minimum value of the field.
@@ -117,7 +117,7 @@ internal sealed class NumberFieldRootContext
     /// <summary>
     /// Sets the numeric value with a reason and optional direction.
     /// </summary>
-    public Action<double?, NumberFieldChangeReason, int?> SetValue { get; set; } = null!;
+    public Func<double?, NumberFieldChangeReason, int?, Task<bool>> SetValue { get; set; } = null!;
 
     /// <summary>
     /// Returns the validated numeric value for the specified reason and optional direction.
@@ -127,7 +127,12 @@ internal sealed class NumberFieldRootContext
     /// <summary>
     /// Increments the value by the specified amount in the given direction.
     /// </summary>
-    public Action<double, int, NumberFieldChangeReason> IncrementValue { get; set; } = null!;
+    public Func<double, int, NumberFieldChangeReason, double?, Task<bool>> IncrementValue { get; set; } = null!;
+
+    /// <summary>
+    /// Returns the last accepted value for a step-based commit.
+    /// </summary>
+    public Func<double?> GetCommitValue { get; set; } = null!;
 
     /// <summary>
     /// Returns the step amount based on the current modifier keys.
@@ -173,4 +178,9 @@ internal sealed class NumberFieldRootContext
     /// Programmatically focuses the input element.
     /// </summary>
     public Action FocusInput { get; set; } = null!;
+
+    /// <summary>
+    /// Sets the selection range of the input element.
+    /// </summary>
+    public Action<int, int> SetSelectionRange { get; set; } = null!;
 }

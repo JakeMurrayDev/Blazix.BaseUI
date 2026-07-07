@@ -28,6 +28,8 @@
 
     private bool ResolvedDisabled => IsDisabled || IsAtMin;
 
+    private bool IsUnavailable => ResolvedDisabled || RootContext?.ReadOnly == true;
+
     [CascadingParameter]
     private NumberFieldRootContext? RootContext { get; set; }
 
@@ -97,7 +99,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        state = RootContext?.State ?? NumberFieldRootState.Default;
+        state = (RootContext?.State ?? NumberFieldRootState.Default) with { Disabled = IsUnavailable };
         BuildComponentAttributes();
     }
 
@@ -106,13 +108,12 @@
         var attrs = new Dictionary<string, object>();
         if (NativeButton)
             attrs["type"] = "button";
-        attrs["disabled"] = ResolvedDisabled;
+        if (IsUnavailable)
+            attrs["aria-disabled"] = "true";
         attrs["tabindex"] = -1;
         attrs["aria-label"] = "Decrease";
         if (!string.IsNullOrEmpty(RootContext?.Id))
             attrs["aria-controls"] = RootContext!.Id!;
-        if (RootContext?.ReadOnly == true)
-            attrs["aria-readonly"] = "true";
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDown);
         attrs["onpointerup"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerUp);
@@ -138,7 +139,7 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (ResolvedDisabled || RootContext?.ReadOnly == true)
+        if (IsUnavailable || RootContext is null)
             return;
 
         if (pointerType == "touch")
@@ -147,15 +148,19 @@
         if (e.Detail != 0)
             return;
 
-        var amount = RootContext?.GetStepAmount(e.AltKey, e.ShiftKey) ?? 1;
-        RootContext?.IncrementValue(amount, -1, NumberFieldChangeReason.DecrementPress);
-        RootContext?.OnValueCommitted(RootContext?.Value, NumberFieldChangeReason.DecrementPress);
+        var currentValue = await SyncDirtyInputAsync(NumberFieldChangeReason.DecrementPress);
+        var amount = RootContext.GetStepAmount(e.AltKey, e.ShiftKey);
+        var changed = await RootContext.IncrementValue(amount, -1, NumberFieldChangeReason.DecrementPress, currentValue);
+        if (changed)
+        {
+            RootContext.OnValueCommitted(RootContext.GetCommitValue(), NumberFieldChangeReason.DecrementPress);
+        }
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private void HandlePointerDown(PointerEventArgs e)
+    private async Task HandlePointerDown(PointerEventArgs e)
     {
-        if (ResolvedDisabled || RootContext?.ReadOnly == true)
+        if (IsUnavailable)
             return;
 
         if (e.Button != 0)
@@ -163,6 +168,7 @@
 
         pointerType = e.PointerType;
         isPressed = true;
+        await SyncDirtyInputAsync(NumberFieldChangeReason.DecrementPress);
 
         if (e.PointerType != "touch")
         {
@@ -181,7 +187,7 @@
 
     private Task HandleMouseEnter(MouseEventArgs e)
     {
-        if (ResolvedDisabled || RootContext?.ReadOnly == true || !isPressed || isTouchingButton || pointerType == "touch")
+        if (IsUnavailable || !isPressed || isTouchingButton || pointerType == "touch")
             return Task.CompletedTask;
 
         RootContext?.StartAutoChange(false);
@@ -214,5 +220,19 @@
     private void HandleTouchEnd(TouchEventArgs e)
     {
         isTouchingButton = false;
+    }
+
+    private async Task<double?> SyncDirtyInputAsync(NumberFieldChangeReason reason)
+    {
+        if (RootContext is null || RootContext.AllowInputSync)
+            return null;
+
+        RootContext.SetAllowInputSync(true);
+        var parsedValue = NumberFieldUtilities.ParseNumber(RootContext.InputValue, RootContext.Locale, RootContext.FormatOptions);
+        if (!parsedValue.HasValue)
+            return null;
+
+        var changed = await RootContext.SetValue(parsedValue.Value, reason, null);
+        return changed ? parsedValue.Value : null;
     }
 }

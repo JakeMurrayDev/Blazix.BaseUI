@@ -36,6 +36,7 @@
     private bool isValueParameterSupplied;
     private bool allowInputSync = true;
     private bool hasPendingCommit;
+    private bool hasAutoChangeValueChanged;
     private string? defaultId;
     private double? currentValue;
     private double? lastChangedValue;
@@ -56,9 +57,9 @@
 
     private string ResolvedId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
 
-    private double MinWithDefault => Min ?? double.MinValue;
+    private double MinWithDefault => Min ?? NumberFieldUtilities.DefaultMin;
 
-    private double MaxWithDefault => Max ?? double.MaxValue;
+    private double MaxWithDefault => Max ?? NumberFieldUtilities.DefaultMax;
 
     private double MinWithZeroDefault => Min ?? 0;
 
@@ -73,17 +74,20 @@
         builder.AddContent(0, ChildContent);
         builder.OpenElement(1, "input");
         builder.AddAttribute(2, "type", "number");
-        builder.AddAttribute(3, "name", ResolvedName);
-        builder.AddAttribute(4, "value", NumberFieldUtilities.ToHiddenInputValue(currentValue));
-        builder.AddAttribute(5, "min", Min);
-        builder.AddAttribute(6, "max", Max);
-        builder.AddAttribute(7, "step", HiddenStepValue);
-        builder.AddAttribute(8, "disabled", ResolvedDisabled);
-        builder.AddAttribute(9, "required", Required);
-        builder.AddAttribute(10, "aria-hidden", "true");
-        builder.AddAttribute(11, "tabindex", -1);
-        builder.AddAttribute(12, "style", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0");
-        builder.AddAttribute(13, "form", Form);
+        builder.AddAttribute(3, "form", Form);
+        builder.AddAttribute(4, "name", ResolvedName);
+        builder.AddAttribute(5, "value", NumberFieldUtilities.ToHiddenInputValue(currentValue));
+        builder.AddAttribute(6, "min", Min);
+        builder.AddAttribute(7, "max", Max);
+        builder.AddAttribute(8, "step", HiddenStepValue);
+        builder.AddAttribute(9, "disabled", ResolvedDisabled);
+        builder.AddAttribute(10, "readonly", ReadOnly);
+        builder.AddAttribute(11, "required", Required);
+        builder.AddAttribute(12, "aria-hidden", "true");
+        builder.AddAttribute(13, "tabindex", -1);
+        builder.AddAttribute(14, "style", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0");
+        builder.AddAttribute(15, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleHiddenInputFocusAsync));
+        builder.AddAttribute(16, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleHiddenInputChange));
         builder.CloseElement();
     };
 
@@ -305,9 +309,10 @@
 
         context = new NumberFieldRootContext
         {
-            SetValue = SetValueInternal,
+            SetValue = SetValueInternalAsync,
             GetValidatedValue = GetValidatedValue,
-            IncrementValue = IncrementValueInternal,
+            IncrementValue = IncrementValueInternalAsync,
+            GetCommitValue = () => lastChangedValue ?? currentValue,
             GetStepAmount = GetStepAmount,
             StartAutoChange = StartAutoChangeInternal,
             StopAutoChange = StopAutoChangeInternal,
@@ -316,11 +321,13 @@
             SetIsScrubbing = SetIsScrubbingInternal,
             OnValueCommitted = HandleValueCommitted,
             SetInputElement = SetInputElementInternal,
-            FocusInput = () => _ = FocusInputAsync()
+            FocusInput = () => _ = FocusInputAsync(),
+            SetSelectionRange = (start, end) => _ = SetSelectionRangeAsync(start, end)
         };
 
         UpdateState();
         UpdateContext();
+        LabelableContext?.SetControlId(ResolvedId);
         BuildComponentAttributes();
 
         if (hasRendered)
@@ -345,6 +352,7 @@
 
         UpdateState();
         UpdateContext();
+        LabelableContext?.SetControlId(ResolvedId);
         BuildComponentAttributes();
     }
 
@@ -404,27 +412,31 @@
     /// Handles mouse wheel changes from JavaScript interop to adjust the field value.
     /// </summary>
     [JSInvokable]
-    public void OnWheelChange(int direction, bool altKey, bool shiftKey)
+    public async Task OnWheelChange(int direction, bool altKey, bool shiftKey)
     {
         if (ResolvedDisabled || ReadOnly) return;
 
         var amount = GetStepAmount(altKey, shiftKey);
         allowInputSync = true;
-        IncrementValueInternal(amount, direction, NumberFieldChangeReason.Wheel);
-        HandleValueCommitted(lastChangedValue ?? currentValue, NumberFieldChangeReason.Wheel);
+        var changed = await IncrementValueInternalAsync(amount, direction, NumberFieldChangeReason.Wheel, null);
+        if (changed)
+        {
+            HandleValueCommitted(lastChangedValue ?? currentValue, NumberFieldChangeReason.Wheel);
+        }
     }
 
     /// <summary>
     /// Handles an auto-change tick from JavaScript interop during press-and-hold interactions.
     /// </summary>
     [JSInvokable]
-    public void OnAutoChangeTick(bool isIncrement)
+    public async Task OnAutoChangeTick(bool isIncrement)
     {
         if (ResolvedDisabled || ReadOnly) return;
 
         var amount = StepValue;
         allowInputSync = true;
-        IncrementValueInternal(amount, isIncrement ? 1 : -1, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+        var changed = await IncrementValueInternalAsync(amount, isIncrement ? 1 : -1, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress, null);
+        hasAutoChangeValueChanged |= changed;
     }
 
     /// <summary>
@@ -433,14 +445,19 @@
     [JSInvokable]
     public void OnAutoChangeEnd(bool isIncrement)
     {
-        HandleValueCommitted(lastChangedValue ?? currentValue, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+        if (hasAutoChangeValueChanged)
+        {
+            HandleValueCommitted(lastChangedValue ?? currentValue, isIncrement ? NumberFieldChangeReason.IncrementPress : NumberFieldChangeReason.DecrementPress);
+        }
+
+        hasAutoChangeValueChanged = false;
     }
 
     /// <summary>
     /// Handles validated clipboard text from JavaScript paste handling.
     /// </summary>
     [JSInvokable]
-    public void OnPasteText(string pastedText)
+    public async Task OnPasteText(string pastedText)
     {
         if (ResolvedDisabled || ReadOnly) return;
 
@@ -448,7 +465,7 @@
         if (!parsedValue.HasValue) return;
 
         allowInputSync = false;
-        SetValueInternal(parsedValue.Value, NumberFieldChangeReason.InputPaste, null);
+        await SetValueInternalAsync(parsedValue.Value, NumberFieldChangeReason.InputPaste, null);
         SetInputValueDirect(pastedText);
     }
 
@@ -488,9 +505,9 @@
         inputValue = FormatNumber(currentValue, maximumPrecision: IsControlled && Format is null);
     }
 
-    private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
+    private Task<bool> SetValueInternalAsync(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
     {
-        SetValueInternal(unvalidatedValue, reason, direction, null);
+        return SetValueInternalAsync(unvalidatedValue, reason, direction, null);
     }
 
     private double? GetValidatedValue(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction)
@@ -498,31 +515,47 @@
         return ValidateNumber(unvalidatedValue, reason, direction, null);
     }
 
-    private void SetValueInternal(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction, double? stepAmount)
+    private async Task<bool> SetValueInternalAsync(double? unvalidatedValue, NumberFieldChangeReason reason, int? direction, double? stepAmount)
     {
         var validatedValue = ValidateNumber(unvalidatedValue, reason, direction, stepAmount);
         var isInputReason = IsInputReason(reason);
+        var shouldFireChange =
+            validatedValue != currentValue ||
+            (isInputReason && (unvalidatedValue != currentValue || allowInputSync == false));
 
-        if (validatedValue != currentValue || (isInputReason && unvalidatedValue != currentValue))
+        if (shouldFireChange)
         {
             var eventArgs = new NumberFieldValueChangeEventArgs(validatedValue, reason, direction);
-            lastChangedValue = validatedValue;
 
             if (OnValueChange.HasDelegate)
             {
-                _ = InvokeAsync(async () =>
+                await OnValueChange.InvokeAsync(eventArgs);
+                if (eventArgs.IsCanceled)
                 {
-                    await OnValueChange.InvokeAsync(eventArgs);
-                    if (!eventArgs.IsCanceled)
-                    {
-                        ApplyValueChange(validatedValue, reason);
-                    }
-                });
-                return;
+                    return false;
+                }
+
+                lastChangedValue = validatedValue;
+                ApplyValueChange(validatedValue, reason);
+                return true;
             }
 
+            lastChangedValue = validatedValue;
             ApplyValueChange(validatedValue, reason);
+            return true;
         }
+
+        lastChangedValue = validatedValue;
+        if (allowInputSync)
+        {
+            var formattedValue = FormatNumber(validatedValue);
+            if (inputValue != formattedValue)
+            {
+                SetInputValueDirect(formattedValue);
+            }
+        }
+
+        return false;
     }
 
     private void ApplyValueChange(double? newValue, NumberFieldChangeReason reason)
@@ -550,11 +583,16 @@
         StateHasChanged();
     }
 
-    private void IncrementValueInternal(double amount, int direction, NumberFieldChangeReason reason)
+    private Task<bool> IncrementValueInternalAsync(double amount, int direction, NumberFieldChangeReason reason, double? currentValueOverride)
     {
-        var prevValue = currentValue ?? Math.Max(0, Min ?? 0);
+        if (!currentValueOverride.HasValue && !currentValue.HasValue)
+        {
+            return SetValueInternalAsync(0, reason, null, null);
+        }
+
+        var prevValue = currentValueOverride ?? currentValue!.Value;
         var nextValue = prevValue + amount * direction;
-        SetValueInternal(nextValue, reason, direction, amount);
+        return SetValueInternalAsync(nextValue, reason, direction, amount);
     }
 
     private double GetStepAmount(bool altKey, bool shiftKey)
@@ -566,12 +604,14 @@
     {
         if (!hasRendered || !inputElement.HasValue || dotNetRef is null) return;
 
+        hasAutoChangeValueChanged = false;
+
         _ = InvokeAsync(async () =>
         {
             try
             {
                 var module = await moduleTask.Value;
-                await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, StepValue, Min ?? double.MinValue, Max ?? double.MaxValue);
+                await module.InvokeVoidAsync("startAutoChange", inputElement.Value, dotNetRef, isIncrement, StepValue, Min ?? NumberFieldUtilities.DefaultMin, Max ?? NumberFieldUtilities.DefaultMax);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
@@ -605,6 +645,24 @@
         UpdateContext();
         BuildComponentAttributes();
         StateHasChanged();
+    }
+
+    private async Task HandleHiddenInputFocusAsync(FocusEventArgs e)
+    {
+        await FocusInputAsync();
+    }
+
+    private async Task HandleHiddenInputChange(ChangeEventArgs e)
+    {
+        if (ResolvedDisabled || ReadOnly)
+            return;
+
+        var rawValue = e.Value?.ToString();
+        var parsedValue = double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : (double?)null;
+
+        await SetValueInternalAsync(parsedValue, NumberFieldChangeReason.None, null);
     }
 
     private void SetAllowInputSyncInternal(bool value)
@@ -728,6 +786,8 @@
         {
             disabled = ResolvedDisabled,
             readOnly = ReadOnly,
+            min = Min,
+            max = Max,
             minWithDefault = MinWithDefault,
             locale = Locale,
             format = Format is null
@@ -743,7 +803,8 @@
                     minimumSignificantDigits = Format.MinimumSignificantDigits,
                     maximumSignificantDigits = Format.MaximumSignificantDigits,
                     useGrouping = Format.UseGrouping
-                }
+                },
+            allowOutOfRange = AllowOutOfRange
         };
     }
 
@@ -755,6 +816,21 @@
         {
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("focusInput", inputElement.Value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async ValueTask SetSelectionRangeAsync(int start, int end)
+    {
+        if (!inputElement.HasValue) return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("setSelectionRange", inputElement.Value, start, end);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

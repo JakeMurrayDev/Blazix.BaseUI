@@ -473,8 +473,12 @@ public static class JsInteropSetup
     public static void SetupNumberFieldModule(BunitJSInterop jsInterop)
     {
         var module = jsInterop.SetupModule(NumberFieldModule);
+        module.SetupVoid("initialize", _ => true).SetVoidResult();
+        module.SetupVoid("updateConfig", _ => true).SetVoidResult();
         module.SetupVoid("registerWheelListener", _ => true).SetVoidResult();
+        module.SetupVoid("unregisterWheelListener", _ => true).SetVoidResult();
         module.SetupVoid("focusInput", _ => true).SetVoidResult();
+        module.SetupVoid("setSelectionRange", _ => true).SetVoidResult();
         module.SetupVoid("startAutoChange", _ => true).SetVoidResult();
         module.SetupVoid("stopAutoChange", _ => true).SetVoidResult();
         module.SetupVoid("dispose", _ => true).SetVoidResult();
