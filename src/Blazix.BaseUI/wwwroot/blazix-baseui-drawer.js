@@ -1873,7 +1873,7 @@ function setupSwipeArea(root, area) {
             }
             if (!area.openedBySwipe) {
                 area.openedBySwipe = true;
-                invoke(area.dotNetRef, 'OnSwipeOpen').then((accepted) => {
+                area.openPromise = invoke(area.dotNetRef, 'OnSwipeOpen').then((accepted) => {
                     area.openAccepted = accepted !== false;
                     reapplyActiveSwipeArea(root);
                 });
@@ -1902,7 +1902,11 @@ function setupSwipeArea(root, area) {
                     invoke(area.dotNetRef, 'OnSwipeOpen');
                 }
             } else if (area.openedBySwipe) {
-                invoke(area.dotNetRef, 'OnSwipeClose');
+                // Serialize behind the pending OnSwipeOpen so an async controlled
+                // handler cannot complete the open after this rollback.
+                (area.openPromise ?? Promise.resolve()).then(() =>
+                    invoke(area.dotNetRef, 'OnSwipeClose')
+                );
             }
             finishSwipeArea(root, area);
             return false;
@@ -1990,6 +1994,7 @@ function finishSwipeArea(root, area) {
     area.startEvent = null;
     area.openedBySwipe = false;
     area.openAccepted = false;
+    area.openPromise = null;
     area.closedOffset = null;
     area.swipeActive = false;
     root.swipeAreaActive = false;
