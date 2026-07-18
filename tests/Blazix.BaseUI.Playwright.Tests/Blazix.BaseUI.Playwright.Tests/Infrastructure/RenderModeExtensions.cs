@@ -827,6 +827,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithRejectSwipeDismiss(bool value)
+    {
+        queryParams["rejectSwipeDismiss"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     // RadioGroup-specific parameters
     public TestPageUrlBuilder WithRadioDefaultValue(string value)
     {

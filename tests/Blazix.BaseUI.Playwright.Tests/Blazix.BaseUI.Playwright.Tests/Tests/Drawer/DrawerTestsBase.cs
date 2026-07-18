@@ -138,6 +138,95 @@ public abstract class DrawerTestsBase : TestBase
     }
 
     [Fact]
+    public async Task SwipeBelowThresholdDoesNotDismissDrawer()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var box = await popup.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var startX = box!.X + box.Width / 2;
+        var startY = box.Y + 40;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY + 60, new MouseMoveOptions { Steps = 6 });
+        await Page.WaitForTimeoutAsync(200);
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-swipe-dismiss", string.Empty);
+    }
+
+    [Fact]
+    public async Task FastShortSwipeDismissesDrawerByVelocity()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var box = await popup.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var startX = box!.X + box.Width / 2;
+        var startY = box.Y + 40;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY + 1);
+        await Page.Mouse.MoveAsync(startX, startY + 120);
+        await Page.Mouse.UpAsync();
+
+        await WaitForDrawerClosedAsync();
+    }
+
+    [Fact]
+    public async Task ReverseSwipeCancelsDismissal()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var box = await popup.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var startX = box!.X + box.Width / 2;
+        var startY = box.Y + 40;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY + 240, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.MoveAsync(startX, startY + 4, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-swipe-dismiss", string.Empty);
+    }
+
+    [Fact]
+    public async Task ControlledSwipeDismissRejectionRestoresPopup()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer")
+            .WithDefaultOpen(true)
+            .WithRejectSwipeDismiss(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var box = await popup.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var startX = box!.X + box.Width / 2;
+        var startY = box.Y + 40;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY + 260, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-swipe-dismiss", string.Empty);
+        await Assertions.Expect(popup).Not.ToHaveAttributeAsync("data-ending-style", string.Empty);
+    }
+
+    [Fact]
     public async Task SnapPointDragUpdatesActiveSnapPoint()
     {
         await NavigateAsync(CreateUrl("/tests/drawer")
@@ -157,6 +246,10 @@ public abstract class DrawerTestsBase : TestBase
         await Page.Mouse.MoveAsync(startX, startY);
         await Page.Mouse.DownAsync();
         await Page.Mouse.MoveAsync(startX, startY - 220, new MouseMoveOptions { Steps = 10 });
+        await Assertions.Expect(popup).ToHaveAttributeAsync("data-swiping", string.Empty, new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
         await Page.Mouse.UpAsync();
 
         await Assertions.Expect(GetByTestId("snap-point")).ToHaveTextAsync("0.75", new LocatorAssertionsToHaveTextOptions
@@ -164,6 +257,92 @@ public abstract class DrawerTestsBase : TestBase
             Timeout = 5000 * TimeoutMultiplier
         });
         await Assertions.Expect(GetByTestId("snap-change-count")).Not.ToHaveTextAsync("0");
+    }
+
+    [Fact]
+    public async Task SnapPointOvershootUsesSquareRootDamping()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer")
+            .WithDefaultOpen(true)
+            .WithSnapPoints(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var box = await popup.BoundingBoxAsync();
+        Assert.NotNull(box);
+        var snapPointOffset = await popup.EvaluateAsync<double>(
+            "element => parseFloat(getComputedStyle(element).getPropertyValue('--drawer-snap-point-offset'))");
+        var titleBox = await GetByTestId("drawer-title").BoundingBoxAsync();
+        Assert.NotNull(titleBox);
+
+        var startX = titleBox!.X + titleBox.Width / 2;
+        var startY = titleBox.Y + titleBox.Height / 2;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY - 500, new MouseMoveOptions { Steps = 10 });
+
+        var movement = await popup.EvaluateAsync<string>(
+            "element => element.style.getPropertyValue('--drawer-swipe-movement-y')");
+        await Page.Mouse.UpAsync();
+
+        Assert.EndsWith("px", movement);
+        var movementValue = double.Parse(movement[..^2], System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(movementValue < -snapPointOffset);
+        Assert.True(movementValue > -500);
+    }
+
+    [Fact]
+    public async Task SwipeAreaCanRegrabDuringDismissTransition()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+        var popupBox = await popup.BoundingBoxAsync();
+        Assert.NotNull(popupBox);
+        var popupX = popupBox!.X + popupBox.Width / 2;
+        var popupY = popupBox.Y + 40;
+        await Page.Mouse.MoveAsync(popupX, popupY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(popupX, popupY + 260, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.UpAsync();
+        await WaitForDrawerClosedAsync();
+
+        var swipeArea = GetByTestId("drawer-swipe-area");
+        var areaBox = await swipeArea.BoundingBoxAsync();
+        Assert.NotNull(areaBox);
+        var areaX = areaBox!.X + areaBox.Width / 2;
+        var areaY = areaBox.Y + areaBox.Height / 2;
+        await Page.Mouse.MoveAsync(areaX, areaY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(areaX, areaY - 180, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.UpAsync();
+
+        await WaitForDrawerOpenAsync();
+    }
+
+    [Fact]
+    public async Task VirtualKeyboardProviderSetsViewportInsetVariable()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        await GetByTestId("drawer-input").FocusAsync();
+        var viewport = GetByTestId("drawer-viewport");
+
+        await Assertions.Expect(viewport).ToHaveCSSAsync("--drawer-keyboard-inset", "0px");
+    }
+
+    [Fact]
+    public async Task CompositeKeysDoNotBubblePastPopup()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));
+        await WaitForDrawerOpenAsync();
+
+        await GetByTestId("drawer-popup").FocusAsync();
+        await Page.Keyboard.PressAsync("ArrowDown");
+
+        await Assertions.Expect(GetByTestId("composite-key-count")).ToHaveTextAsync("0");
     }
 
     [Fact]

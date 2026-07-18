@@ -192,7 +192,7 @@
                     await module.DisposeAsync();
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -205,27 +205,46 @@
     /// Opens the drawer from a swipe gesture.
     /// </summary>
     [JSInvokable]
-    public async Task OnSwipeOpen()
+    public async Task<bool> OnSwipeOpen()
     {
         if (Disabled || Context is null)
         {
-            return;
+            return false;
         }
 
         await Context.SetOpenWithTriggerIdAsync(swipeAreaId, null, DialogOpenChangeReason.Swipe);
+        return Context.Open;
+    }
+
+    /// <summary>
+    /// Closes a drawer that was tentatively opened by an uncommitted swipe.
+    /// </summary>
+    [JSInvokable]
+    public async Task<bool> OnSwipeClose()
+    {
+        if (Context is null)
+        {
+            return false;
+        }
+
+        await Context.SetOpenAsync(false, DialogOpenChangeReason.Swipe);
+        return !Context.Open;
     }
 
     /// <summary>
     /// Updates swiping state from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public void OnSwipingChanged(bool swiping)
+    public async Task OnSwipingChanged(bool swiping)
     {
-        swipeActive = swiping;
-        state = new DrawerSwipeAreaState(Context?.Open ?? false, swipeActive, ResolvedSwipeDirection, Disabled);
-        BuildComponentAttributes();
-        UpdateComputedStyleValue();
-        _ = InvokeAsync(StateHasChanged);
+        await InvokeAsync(() =>
+        {
+            swipeActive = swiping;
+            state = new DrawerSwipeAreaState(Context?.Open ?? false, swipeActive, ResolvedSwipeDirection, Disabled);
+            BuildComponentAttributes();
+            UpdateComputedStyleValue();
+            StateHasChanged();
+        });
     }
 
     private void BuildComponentAttributes()
@@ -291,7 +310,7 @@
                 ResolvedSwipeDirection.ToDataAttributeString(),
                 Disabled);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -315,7 +334,7 @@
                 Disabled,
                 Enabled);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -333,7 +352,7 @@
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("disposeSwipeArea", Context.RootId, areaId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }

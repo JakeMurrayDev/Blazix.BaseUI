@@ -58,6 +58,7 @@ export function initializeRoot(rootId, dotNetRef, modal, disablePointerDismissal
         fallbackTimeoutId: null,
         pendingOpen: false,
         releaseScrollLock: null,
+        outsidePressEnabled: true,
         outsideClickCleanup: null,
         backdropClickCleanup: null
     });
@@ -297,41 +298,51 @@ function setupOutsideClickListener(rootState) {
 
     cleanupOutsideClick(rootState);
 
-    const handleOutsideClick = (e) => {
-        // Primary button only (left-click)
-        if (e.button !== 0) return;
-
-        // Only the topmost dialog responds to outside press
-        if (!isTopmostDialog(rootState.rootId)) return;
+    const dismissOutside = (e, target) => {
+        if (!rootState.outsidePressEnabled) return;
 
         const popupElement = rootState.popupElement;
         const triggerElement = rootState.triggerElement;
+        if (!popupElement || !rootState.isOpen) return;
 
-        if (!popupElement) return;
-        if (!rootState.isOpen) return;
-
-        const target = e.composedPath ? e.composedPath()[0] : e.target;
         const clickedInsidePopup = popupElement.contains(target);
         const clickedOnTrigger = triggerElement && triggerElement.contains(target);
-
         if (!clickedInsidePopup && !clickedOnTrigger && rootState.dotNetRef) {
-            if (consumeDrawerOutsidePressSuppression(rootState, target)) {
-                return;
-            }
-
             suppressNextFocusOut(rootState);
             rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
         }
     };
 
+    const handleOutsideClick = (e) => {
+        // Primary button only (left-click)
+        if (e.button !== 0) return;
+        if (e.pointerType === 'touch') return;
+
+        // Only the topmost dialog responds to outside press
+        if (!isTopmostDialog(rootState.rootId)) return;
+
+        const target = e.composedPath ? e.composedPath()[0] : e.target;
+        dismissOutside(e, target);
+    };
+
+    const handleOutsideTouchEnd = (e) => {
+        if (e.changedTouches.length !== 1 || e.touches.length !== 0) return;
+        if (!isTopmostDialog(rootState.rootId)) return;
+
+        const target = e.composedPath ? e.composedPath()[0] : e.target;
+        dismissOutside(e, target);
+    };
+
     // Use a small delay to avoid catching the click that opened the dialog
     const timeoutId = setTimeout(() => {
         document.addEventListener('pointerdown', handleOutsideClick, true);
+        document.addEventListener('touchend', handleOutsideTouchEnd, { capture: true, passive: true });
     }, 0);
 
     rootState.outsideClickCleanup = () => {
         clearTimeout(timeoutId);
         document.removeEventListener('pointerdown', handleOutsideClick, true);
+        document.removeEventListener('touchend', handleOutsideTouchEnd, true);
     };
 }
 
@@ -374,14 +385,11 @@ function setupBackdropClickListener(rootState) {
         if (e.button !== 0) return;
         if (!rootState.isOpen) return;
         if (!isTopmostDialog(rootState.rootId)) return;
+        if (!rootState.outsidePressEnabled) return;
 
         const target = e.composedPath ? e.composedPath()[0] : e.target;
 
         if (isOutsideDialog(rootState, target) && rootState.dotNetRef) {
-            if (consumeDrawerOutsidePressSuppression(rootState, target)) {
-                return;
-            }
-
             e.preventDefault();
             e.stopPropagation();
             if (typeof e.stopImmediatePropagation === 'function') {
@@ -402,37 +410,19 @@ function setupBackdropClickListener(rootState) {
     };
 }
 
+export function setOutsidePressEnabled(rootId, enabled) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.outsidePressEnabled = !!enabled;
+    }
+}
+
 function cleanupBackdropClick(rootState) {
     if (rootState.backdropClickCleanup) {
         rootState.backdropClickCleanup();
         rootState.backdropClickCleanup = null;
     }
 }
-
-function consumeDrawerOutsidePressSuppression(rootState, target) {
-    const now = performance.now();
-    const popupUntil = rootState.popupElement?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
-    const backdropUntil = rootState.backdropElement?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
-    const targetUntil = target?.__blazixBaseUIDrawerSuppressOutsidePressUntil;
-    const until = Math.max(popupUntil || 0, backdropUntil || 0, targetUntil || 0);
-
-    if (until <= now) {
-        return false;
-    }
-
-    if (rootState.popupElement) {
-        rootState.popupElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
-    }
-    if (rootState.backdropElement) {
-        rootState.backdropElement.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
-    }
-    if (target) {
-        target.__blazixBaseUIDrawerSuppressOutsidePressUntil = 0;
-    }
-
-    return true;
-}
-
 
 export function setTriggerElement(rootId, element) {
     const rootState = state.roots.get(rootId);

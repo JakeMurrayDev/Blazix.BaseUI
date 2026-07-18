@@ -1,5 +1,20 @@
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Button.State');
 
+function dispatchClickWithModifiers(element, event) {
+    const win = element.ownerDocument?.defaultView || window;
+    const ClickEvent = win.PointerEvent || win.MouseEvent;
+    element.dispatchEvent(new ClickEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        detail: 0,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        metaKey: event.metaKey
+    }));
+}
+
 export function sync(element, disabled, focusableWhenDisabled, nativeButton, dispose) {
     if (!element) {
         return;
@@ -84,7 +99,7 @@ export function sync(element, disabled, focusableWhenDisabled, nativeButton, dis
         if (isSpaceKey || isEnterKey) {
             event.preventDefault();
             if (isEnterKey) {
-                element.click();
+                dispatchClickWithModifiers(element, event);
             }
         }
     };
@@ -108,7 +123,10 @@ export function sync(element, disabled, focusableWhenDisabled, nativeButton, dis
         }
 
         if (event.key === ' ') {
-            element.click();
+            if (event.defaultPrevented) {
+                return;
+            }
+            dispatchClickWithModifiers(element, event);
         }
     };
 

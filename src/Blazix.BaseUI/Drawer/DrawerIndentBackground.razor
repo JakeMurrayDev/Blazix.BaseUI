@@ -1,4 +1,8 @@
-@implements IDisposable
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
 
 <RenderElement TState="DrawerIndentBackgroundState"
                Tag="div"
@@ -12,9 +16,19 @@
                @ref="renderElementReference" />
 
 @code {
+    private const string ModulePath = "./_content/Blazix.BaseUI/blazix-baseui-drawer.min.js";
+
+    private readonly string indentId = Guid.NewGuid().ToIdString();
+
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
     private DrawerIndentBackgroundState state;
     private RenderElement<DrawerIndentBackgroundState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private ElementReference? previousElement;
+    private ElementReference? elementForDisposal;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
 
     [CascadingParameter]
     private DrawerProviderContext? ProviderContext { get; set; }
@@ -74,11 +88,55 @@
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var currentElement = Element;
+        if (!Nullable.Equals(previousElement, currentElement))
+        {
+            previousElement = currentElement;
+            if (currentElement.HasValue)
+            {
+                elementForDisposal = currentElement;
+                await RegisterIndentAsync(currentElement.Value);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
     {
         if (ProviderContext is not null)
         {
             ProviderContext.StateChanged -= OnProviderStateChanged;
+        }
+
+        if (moduleTask?.IsValueCreated != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            try
+            {
+                if (elementForDisposal.HasValue)
+                {
+                    await module.InvokeVoidAsync(
+                        "unregisterIndent",
+                        ProviderContext?.ProviderId,
+                        indentId,
+                        elementForDisposal.Value);
+                }
+            }
+            finally
+            {
+                await module.DisposeAsync();
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex;
         }
     }
 
@@ -106,5 +164,18 @@
             BuildComponentAttributes();
             StateHasChanged();
         });
+    }
+
+    private async Task RegisterIndentAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("registerIndent", ProviderContext?.ProviderId, indentId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex;
+        }
     }
 }

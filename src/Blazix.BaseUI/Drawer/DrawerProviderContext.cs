@@ -4,6 +4,8 @@ internal sealed class DrawerProviderContext
 {
     private readonly Dictionary<string, bool> openById = new();
 
+    public string ProviderId { get; } = Guid.NewGuid().ToIdString();
+
     public bool Active { get; private set; }
 
     public double SwipeProgress { get; private set; }

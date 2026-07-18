@@ -195,3 +195,7 @@ Result:
 ## Final Status
 
 All audited Drawer functional gaps have been repaired. Build, bUnit, Playwright, and lint verification passed. The implementation is staged for review and not committed.
+
+## Addendum — Upstream-Delta Re-Audit, July 18, 2026
+
+The Drawer was re-audited against `.base-ui @ bdcb685fa` (origin/master, 2026-07-18), covering the 47 dependency-graph commits that landed upstream after this audit's baseline (`7c25be77`, 2026-05-27). Eight upstream changes were ported (headlined by the rewritten swipe engine #4867/#4980/#5105/#5112/#5057/#5181, the new `Drawer.VirtualKeyboardProvider` #4353, and the CloseWatcher topmost gate #4920), fourteen current-state parity gaps were repaired (including the elimination of per-frame JS→.NET swipe interop), shared dialog/button fixes #5096 and #4838 were landed, and every remaining in-window commit was verified as already present or React-only. An independent adversarial review found and fixed 1 blocker, 5 major, and 6 minor integration defects. Full disposition: `drawer-upstream-delta-2026-07.md`; verification evidence: `drawer-verification-report.md`; refreshed parity rows: `drawer-parity-matrix.md`.
