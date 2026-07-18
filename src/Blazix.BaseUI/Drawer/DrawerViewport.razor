@@ -50,6 +50,9 @@
     [CascadingParameter]
     private DrawerProviderContext? ProviderContext { get; set; }
 
+    [CascadingParameter]
+    private DrawerVirtualKeyboardContext? VirtualKeyboardContext { get; set; }
+
     /// <summary>
     /// Gets or sets a custom render fragment that replaces the default element.
     /// </summary>
@@ -159,7 +162,7 @@
                 await module.InvokeVoidAsync("disposeViewport", Context.RootId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -185,23 +188,65 @@
     /// Handles swipe active state from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public void OnSwipingChanged(bool swiping)
+    public async Task OnSwipingChanged(bool swiping)
     {
-        viewportContext.Swiping = swiping;
-        viewportContext.NotifyStateChanged();
-        DrawerContext?.NotifyParentSwipingChange?.Invoke(swiping);
+        await InvokeAsync(() =>
+        {
+            viewportContext.Swiping = swiping;
+            viewportContext.NotifyStateChanged();
+        });
+    }
+
+    /// <summary>
+    /// Handles nested swipe active state from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnNestedSwipingChanged(bool swiping)
+    {
+        await InvokeAsync(() => DrawerContext?.NotifyParentSwipingChange?.Invoke(swiping));
+    }
+
+    /// <summary>
+    /// Handles swipe release strength from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSwipeRelease(double? strength)
+    {
+        await InvokeAsync(() =>
+        {
+            viewportContext.SwipeStrength = strength is > 0 && double.IsFinite(strength.Value)
+                ? strength
+                : null;
+            viewportContext.NotifyStateChanged();
+        });
+    }
+
+    /// <summary>
+    /// Handles snap point offset changes from JavaScript interop.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnSnapPointOffsetChanged(double offset)
+    {
+        await InvokeAsync(() =>
+        {
+            viewportContext.SnapPointOffset = double.IsFinite(offset) ? offset : 0;
+            viewportContext.NotifyStateChanged();
+        });
     }
 
     /// <summary>
     /// Handles a swipe dismiss request from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public async Task OnSwipeDismiss()
+    public async Task<bool> OnSwipeDismiss()
     {
-        if (Context is not null)
+        if (Context is null)
         {
-            await Context.SetOpenAsync(false, DialogOpenChangeReason.Swipe);
+            return false;
         }
+
+        await Context.SetOpenAsync(false, DialogOpenChangeReason.Swipe);
+        return !Context.Open;
     }
 
     /// <summary>
@@ -287,10 +332,11 @@
                 element,
                 dotNetRef,
                 DrawerContext.SwipeDirection.ToDataAttributeString(),
-                DrawerContext.SnapToSequentialPoints);
+                DrawerContext.SnapToSequentialPoints,
+                VirtualKeyboardContext is not null);
             await UpdateViewportJsAsync();
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -316,7 +362,7 @@
                 DrawerContext.SnapPoints?.Select(static point => point.ToString()).ToArray(),
                 DrawerContext.ActiveSnapPoint?.ToString());
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }

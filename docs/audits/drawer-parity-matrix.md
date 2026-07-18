@@ -1,6 +1,23 @@
 # Drawer Parity Matrix
 
-Date: May 27, 2026
+Date: May 27, 2026 (original) · July 18, 2026 (upstream-delta refresh, `.base-ui @ bdcb685fa`)
+
+## Upstream-Delta Refresh — July 18, 2026
+
+Rows added or superseded by the upstream-delta audit (`drawer-upstream-delta-2026-07.md`):
+
+| React source | Required behavior | Blazor equivalent | Status |
+| --- | --- | --- | --- |
+| `utils/useSwipeDismiss.ts` | Full swipe engine: direction locking (≥1 px), directional sqrt damping, reverse-cancel (10 px), pending-swipe activation with per-move `canStart`, scroll-edge activation with displacement preservation, interactive-element ignore selector, text-selection guards, primary-button release-through-move (#5057), sampled release velocity (≤80 ms window, ≥16 ms min), transition-freeze `translate3d` drag styles with snapshot/restore | `createSwipeDismiss` closure in `blazix-baseui-drawer.js`; constants and formulas 1:1 | Verified |
+| `viewport/DrawerViewport.tsx` (rewritten upstream) | Native capture-phase `touchmove` pipeline; cross-axis scroll preservation; range-input/pinch/text-selection exemptions; snap/sequential/velocity release decision tree with touch-reversal guard; swipe-release strength scalar; controlled-dismiss revert; settled/programmatic snap-point re-application; 10 px nested-swipe intent gate | Viewport orchestration in `blazix-baseui-drawer.js`; `OnSwipeRelease`/`OnSwipeDismiss` edge interop in `DrawerViewport.razor`; per-frame .NET interop eliminated (#4980 analog) | Verified |
+| `root/useDrawerSnapPoints.ts` (updated upstream) | `closestSnapPointIndex` fallback for non-matching active snap point; first-segment progress denominator; sqrt overshoot damping (`getSnapPointSwipeMovement`) | Ported into drawer JS snap math | Verified |
+| `swipe-area/DrawerSwipeArea.tsx` (rewritten upstream) | Deterministic outside-press guard (no timers), drag-open following the pointer, mid-close re-grab from live transform, ≥50 % or ≥0.1 velocity open commit, `swipeAreaActive` anti-flash coordination (#5112) | Drawer JS + `setOutsidePressEnabled` export in `blazix-baseui-dialog.js`; window-capture restore listener | Verified |
+| `virtual-keyboard-provider/DrawerVirtualKeyboardProvider.tsx` (#4353) | visualViewport keyboard inset (`--drawer-keyboard-inset`), focused-field scroll alignment with slack, synchronous tap-to-focus in `touchend`, hit-slop probing, blocked-tap sentinel, off-screen focus trick, untrusted click redispatch, pinch-zoom/already-focused guards | New `DrawerVirtualKeyboardProvider.razor`/`.cs` + `DrawerVirtualKeyboardContext.cs`; behavior 100 % in `blazix-baseui-drawer.js` | Verified |
+| `handle.ts` (#5109) | `DrawerHandle extends DialogHandle` with factory | `Drawer/DrawerHandle.cs` (pre-existing) | Verified |
+| `utils/platform` (#4920) | CloseWatcher only for the topmost open drawer on Android | Topmost gate + UA fallback regex in drawer JS | Verified |
+| Dialog `touchend` outside press (#5096) | Touch dismissal without a backdrop: one changed touch, zero remaining, event-target resolution | `blazix-baseui-dialog.js` | Verified |
+| `useButton` modifier clicks (#4838) | Keyboard clicks on non-button tags carry modifier keys | `dispatchClickWithModifiers` in `blazix-baseui-button.js` | Verified |
+| Automated coverage (refresh) | All swipe/snap/keyboard-provider states validated in a real browser | 24 bUnit tests; 33 Playwright tests (Server + WASM); Dialog/Popover sibling regression 274/274 total | Verified |
 
 | React source | Required behavior | Blazor equivalent | Status |
 | --- | --- | --- | --- |

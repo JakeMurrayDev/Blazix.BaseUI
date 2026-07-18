@@ -392,6 +392,10 @@ public static class JsInteropSetup
             module.SetupVoid("disposeSwipeArea", _ => true).SetVoidResult();
             module.SetupVoid("initializeIndent", _ => true).SetVoidResult();
             module.SetupVoid("disposeIndent", _ => true).SetVoidResult();
+            module.SetupVoid("registerIndent", _ => true).SetVoidResult();
+            module.SetupVoid("unregisterIndent", _ => true).SetVoidResult();
+            module.SetupVoid("initializeVirtualKeyboardProvider", _ => true).SetVoidResult();
+            module.SetupVoid("disposeVirtualKeyboardProvider", _ => true).SetVoidResult();
         }
     }
 

@@ -6,6 +6,8 @@ internal sealed class DrawerViewportContext
 
     public double? SwipeStrength { get; set; }
 
+    public double SnapPointOffset { get; set; }
+
     public Func<string> GetDragStyles { get; set; } = () => string.Empty;
 
     public Action<bool> SetSwipeDismissed { get; set; } = _ => { };

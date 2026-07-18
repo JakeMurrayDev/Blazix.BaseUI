@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Drawer;
+using Blazix.BaseUI.Tests.Contracts.Drawer;
 using Blazix.BaseUI.Tests.Infrastructure;
 using Bunit;
 using Microsoft.AspNetCore.Components;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Components.Rendering;
 
 namespace Blazix.BaseUI.Tests.Drawer;
 
-public class DrawerTests : BunitContext
+public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawerVirtualKeyboardProviderContract
 {
     private const string ButtonMinModule = "./_content/Blazix.BaseUI/blazix-baseui-button.min.js";
 
@@ -452,6 +453,77 @@ public class DrawerTests : BunitContext
     }
 
     [Fact]
+    public async Task VirtualKeyboardProviderInitializesAndDisposesInterop()
+    {
+        var cut = Render(CreateVirtualKeyboardDrawer());
+        var provider = cut.FindComponent<DrawerVirtualKeyboardProvider>();
+
+        cut.WaitForAssertion(() =>
+        {
+            JSInterop.Invocations.Any(invocation =>
+                invocation.Identifier == "initializeVirtualKeyboardProvider").ShouldBeTrue();
+        });
+
+        await provider.InvokeAsync(async () => await provider.Instance.DisposeAsync());
+
+        JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "disposeVirtualKeyboardProvider").ShouldBeTrue();
+    }
+
+    [Fact]
+    public Task VirtualKeyboardProviderMarksViewportInitialization()
+    {
+        var cut = Render(CreateVirtualKeyboardDrawer());
+
+        cut.WaitForAssertion(() =>
+        {
+            var invocation = JSInterop.Invocations.Last(invocation =>
+                invocation.Identifier == "initializeViewport");
+            invocation.Arguments[5].ShouldBe(true);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task IndentBackgroundRegistersAndUnregistersForNativeVisualUpdates()
+    {
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<DrawerProvider>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(providerBuilder =>
+            {
+                providerBuilder.OpenComponent<DrawerIndentBackground>(0);
+                providerBuilder.AddAttribute(1, "data-testid", "background");
+                providerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+        var background = cut.FindComponent<DrawerIndentBackground>();
+
+        cut.WaitForAssertion(() =>
+        {
+            var invocation = JSInterop.Invocations.Last(invocation =>
+                invocation.Identifier == "registerIndent");
+            invocation.Arguments[0].ShouldNotBeNull();
+            invocation.Arguments[1].ShouldNotBeNull();
+            invocation.Arguments[2].ShouldNotBeNull();
+        });
+        var registerInvocation = JSInterop.Invocations.Last(invocation =>
+            invocation.Identifier == "registerIndent");
+
+        await background.InvokeAsync(async () => await background.Instance.DisposeAsync());
+
+        var unregisterInvocation = JSInterop.Invocations.Last(invocation =>
+            invocation.Identifier == "unregisterIndent");
+        unregisterInvocation.Arguments[0].ShouldBe(registerInvocation.Arguments[0]);
+        unregisterInvocation.Arguments[1].ShouldBe(registerInvocation.Arguments[1]);
+        unregisterInvocation.Arguments[2].ShouldBe(registerInvocation.Arguments[2]);
+    }
+
+    [Fact]
     public Task DetachedHandleOpensDrawerWithPayload()
     {
         var handle = DrawerHandleFactory.CreateHandle<string>();
@@ -550,7 +622,7 @@ public class DrawerTests : BunitContext
         var indent = cut.FindComponent<DrawerIndent>();
         cut.WaitForAssertion(() =>
         {
-            JSInterop.Invocations.Any(invocation => invocation.Identifier == "initializeIndent").ShouldBeTrue();
+            JSInterop.Invocations.Any(invocation => invocation.Identifier == "registerIndent").ShouldBeTrue();
         });
 
         ClearRenderElementReference(indent.Instance);
@@ -558,7 +630,7 @@ public class DrawerTests : BunitContext
 
         await indent.InvokeAsync(async () => await indent.Instance.DisposeAsync());
 
-        JSInterop.Invocations.Any(invocation => invocation.Identifier == "disposeIndent").ShouldBeTrue();
+        JSInterop.Invocations.Any(invocation => invocation.Identifier == "unregisterIndent").ShouldBeTrue();
     }
 
     [Fact]
@@ -603,6 +675,44 @@ public class DrawerTests : BunitContext
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
         field.ShouldNotBeNull();
         field.SetValue(component, null);
+    }
+
+    private static RenderFragment CreateVirtualKeyboardDrawer()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<DrawerRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment<DrawerRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<DrawerPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<DrawerVirtualKeyboardProvider>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(providerBuilder =>
+                    {
+                        providerBuilder.OpenComponent<DrawerViewport>(0);
+                        providerBuilder.AddAttribute(1, "data-testid", "viewport");
+                        providerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(viewportBuilder =>
+                        {
+                            viewportBuilder.OpenComponent<DrawerPopup>(0);
+                            viewportBuilder.AddAttribute(1, "data-testid", "popup");
+                            viewportBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(popupBuilder =>
+                            {
+                                popupBuilder.OpenComponent<DrawerTitle>(0);
+                                popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Title")));
+                                popupBuilder.CloseComponent();
+                            }));
+                            viewportBuilder.CloseComponent();
+                        }));
+                        providerBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
     }
 
     private static void RenderPopup(

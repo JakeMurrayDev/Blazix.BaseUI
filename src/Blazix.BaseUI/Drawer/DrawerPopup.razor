@@ -1,10 +1,12 @@
 @using Microsoft.JSInterop
+@using Microsoft.Extensions.Logging
 @using Blazix.BaseUI.Dialog
 @using Blazix.BaseUI.Utilities.FloatingFocusManager
 
 @implements IAsyncDisposable
 
 @inject IJSRuntime JSRuntime
+@inject ILogger<DrawerPopup> Logger
 
 <RenderElement TState="DrawerPopupState"
                Tag="div"
@@ -38,6 +40,7 @@
     private bool hasRendered;
     private bool shouldRender;
     private bool popupInitialized;
+    private bool missingViewportWarningLogged;
     private DrawerPopupState state;
     private RenderElement<DrawerPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -176,6 +179,15 @@
             dotNetRef = DotNetObjectReference.Create(this);
         }
 
+#if DEBUG
+        if (!missingViewportWarningLogged && ViewportContext is null)
+        {
+            missingViewportWarningLogged = true;
+            Logger.LogWarning(
+                "DrawerPopup expected to be rendered within DrawerViewport. Omitting the viewport disables drawer swipe handling and touch scroll locking.");
+        }
+#endif
+
         var currentElement = Element;
         var elementChanged = !Nullable.Equals(previousElement, currentElement);
         if (elementChanged)
@@ -242,7 +254,7 @@
                 finalMode,
                 finalElement);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -278,7 +290,7 @@
                     }
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -301,7 +313,7 @@
                     }
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -327,7 +339,8 @@
         computedStyleValue = s =>
         {
             var nestedDrawers = DrawerContext?.NestedDrawerCount ?? 0;
-            var height = DrawerContext?.PopupHeight > 0 && DrawerContext.HasNestedDrawer
+            var height = DrawerContext?.PopupHeight > 0 &&
+                (DrawerContext.HasNestedDrawer || Context?.TransitionStatus == TransitionStatus.Ending)
                 ? $" --drawer-height: {DrawerContext.PopupHeight}px;"
                 : string.Empty;
             var frontmostHeight = DrawerContext?.FrontmostHeight > 0
@@ -337,7 +350,11 @@
             var swipeStrength = strength.HasValue && double.IsFinite(strength.Value) && strength.Value > 0
                 ? strength.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 : "1";
-            var baseStyle = $"--drawer-swipe-progress: 0; --nested-drawers: {nestedDrawers}; --drawer-snap-point-offset: 0px; --drawer-swipe-strength: {swipeStrength};{height}{frontmostHeight}";
+            var snapPointOffset = ViewportContext?.SnapPointOffset ?? 0;
+            var renderedSnapPointOffset = double.IsFinite(snapPointOffset)
+                ? snapPointOffset.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : "0";
+            var baseStyle = $"--drawer-swipe-progress: 0; --nested-drawers: {nestedDrawers}; --drawer-snap-point-offset: {renderedSnapPointOffset}px; --drawer-swipe-strength: {swipeStrength};{height}{frontmostHeight}";
             var userStyle = StyleValue?.Invoke(s);
             return string.IsNullOrEmpty(userStyle) ? baseStyle : $"{baseStyle} {userStyle}";
         };
@@ -491,10 +508,11 @@
                 Context.RootId,
                 element,
                 dotNetRef,
-                DrawerContext.SwipeDirection.ToDataAttributeString());
+                DrawerContext.SwipeDirection.ToDataAttributeString(),
+                DrawerContext.ParentRootId);
             await UpdateDrawerPopupJsAsync();
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -518,9 +536,12 @@
                 DrawerContext.SwipeDirection.ToDataAttributeString(),
                 DrawerContext.SnapPoints?.Select(static point => point.ToString()).ToArray(),
                 DrawerContext.ActiveSnapPoint?.ToString(),
-                DrawerContext.FrontmostHeight);
+                DrawerContext.FrontmostHeight,
+                DrawerContext.HasNestedDrawer,
+                Context.TransitionStatus == TransitionStatus.Ending,
+                Context.NestedDialogCount);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -538,7 +559,7 @@
             var module = await DialogModuleTask.Value;
             await module.InvokeVoidAsync("setInitialFocusElement", Context.RootId, mode, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -582,7 +603,7 @@
             var module = await DialogModuleTask.Value;
             await module.InvokeVoidAsync("setFinalFocusElement", Context.RootId, mode, element);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }

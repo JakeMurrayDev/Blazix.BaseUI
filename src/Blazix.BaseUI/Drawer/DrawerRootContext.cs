@@ -4,6 +4,8 @@ internal sealed class DrawerRootContext
 {
     public string RootId { get; set; } = string.Empty;
 
+    public string? ParentRootId { get; set; }
+
     public DrawerSwipeDirection SwipeDirection { get; set; } = DrawerSwipeDirection.Down;
 
     public bool SnapToSequentialPoints { get; set; }

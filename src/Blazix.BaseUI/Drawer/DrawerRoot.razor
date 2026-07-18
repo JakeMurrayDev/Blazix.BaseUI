@@ -183,6 +183,7 @@
         context = new DrawerRootContext
         {
             RootId = rootId,
+            ParentRootId = ParentDrawerContext?.RootId,
             SwipeDirection = SwipeDirection,
             SnapToSequentialPoints = SnapToSequentialPoints,
             SnapPoints = SnapPoints,
@@ -221,6 +222,7 @@
         }
 
         context.SwipeDirection = SwipeDirection;
+        context.ParentRootId = ParentDrawerContext?.RootId;
         context.SnapToSequentialPoints = SnapToSequentialPoints;
         context.SnapPoints = SnapPoints;
         context.ActiveSnapPoint = activeSnapPoint;

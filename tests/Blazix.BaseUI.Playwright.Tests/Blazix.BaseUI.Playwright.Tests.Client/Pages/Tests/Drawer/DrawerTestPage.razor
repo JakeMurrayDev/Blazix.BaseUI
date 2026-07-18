@@ -4,7 +4,9 @@
 
 <PageTitle>Drawer Test Page (WebAssembly)</PageTitle>
 
-<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+<div data-testid="test-container"
+     data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()"
+     @onkeydown="HandleOuterKeyDown">
     <DrawerProvider>
         <DrawerIndentBackground data-testid="drawer-indent-background" style="position: fixed; inset: 0; pointer-events: none;" />
         <DrawerIndent data-testid="drawer-indent">
@@ -23,13 +25,14 @@
                 DefaultOpen="@DefaultOpen"
                 OnOpenChange="HandleOpenChange"
                 OnSnapPointChange="HandleSnapPointChangeDetails">
+                <DrawerVirtualKeyboardProvider>
                 <DrawerTrigger data-testid="drawer-trigger">
                     Open Drawer
                 </DrawerTrigger>
                 <DrawerSwipeArea
                     data-testid="drawer-swipe-area"
                     Disabled="@SwipeAreaDisabled"
-                    style="position: fixed; left: 0; right: 0; bottom: 0; height: 96px; z-index: 30;" />
+                    style="position: fixed; left: 0; right: 0; bottom: 0; height: 96px; z-index: 60;" />
                 <DrawerPortal KeepMounted="@KeepMounted">
                     @if (ShowBackdrop)
                     {
@@ -39,6 +42,7 @@
                         @RenderPopup()
                     </DrawerViewport>
                 </DrawerPortal>
+                </DrawerVirtualKeyboardProvider>
             </DrawerRoot>
         </DrawerIndent>
     </DrawerProvider>
@@ -49,6 +53,7 @@
         <div>Last Reason: <span data-testid="last-reason">@lastReason</span></div>
         <div>Snap Point: <span data-testid="snap-point">@FormatSnapPoint(activeSnapPoint)</span></div>
         <div>Snap Count: <span data-testid="snap-change-count">@snapChangeCount</span></div>
+        <div>Composite Key Count: <span data-testid="composite-key-count">@compositeKeyCount</span></div>
     </div>
 </div>
 
@@ -117,10 +122,14 @@
     [SupplyParameterFromQuery(Name = "swipeDirection")]
     public string? SwipeDirection { get; set; }
 
+    [SupplyParameterFromQuery(Name = "rejectSwipeDismiss")]
+    public bool RejectSwipeDismiss { get; set; }
+
     private bool isOpen;
     private bool nestedIsOpen;
     private int changeCount;
     private int snapChangeCount;
+    private int compositeKeyCount;
     private string lastReason = "";
     private DrawerSnapPoint? activeSnapPoint;
     private DrawerClose? closeButtonComponent;
@@ -158,6 +167,11 @@
     {
         changeCount++;
         lastReason = args.Reason.ToString();
+
+        if (RejectSwipeDismiss && !args.Open && args.Reason == DrawerOpenChangeReason.Swipe)
+        {
+            args.Cancel();
+        }
     }
 
     private Task HandleSnapPointChanged(DrawerSnapPoint? snapPoint)
@@ -169,6 +183,14 @@
     private void HandleSnapPointChangeDetails(DrawerSnapPointChangeEventArgs args)
     {
         snapChangeCount++;
+    }
+
+    private void HandleOuterKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key is "ArrowUp" or "ArrowDown" or "ArrowLeft" or "ArrowRight" or "Home" or "End")
+        {
+            compositeKeyCount++;
+        }
     }
 
     private static string FormatSnapPoint(DrawerSnapPoint? snapPoint)
