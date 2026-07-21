@@ -38,6 +38,52 @@ public abstract class SelectTriggerCancelTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task MouseUpFivePixelsOutsideTriggerBounds_KeepsPopupOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/select-trigger-cancel"));
+        await WaitForSelectTriggerJsAsync();
+
+        var trigger = GetByTestId("select-trigger");
+        var triggerBox = await trigger.BoundingBoxAsync()
+            ?? throw new InvalidOperationException("Trigger bounding box was null.");
+        var centerY = triggerBox.Y + triggerBox.Height / 2;
+
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width / 2, centerY);
+        await Page.Mouse.DownAsync();
+
+        var positioner = GetByTestId("select-positioner");
+        await Assertions.Expect(positioner).ToBeVisibleAsync();
+
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width + 5, centerY);
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(positioner).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public virtual async Task MouseUpSixPixelsOutsideTriggerBounds_ClosesPopup()
+    {
+        await NavigateAsync(CreateUrl("/tests/select-trigger-cancel"));
+        await WaitForSelectTriggerJsAsync();
+
+        var trigger = GetByTestId("select-trigger");
+        var triggerBox = await trigger.BoundingBoxAsync()
+            ?? throw new InvalidOperationException("Trigger bounding box was null.");
+        var centerY = triggerBox.Y + triggerBox.Height / 2;
+
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width / 2, centerY);
+        await Page.Mouse.DownAsync();
+
+        var positioner = GetByTestId("select-positioner");
+        await Assertions.Expect(positioner).ToBeVisibleAsync();
+
+        await Page.Mouse.MoveAsync(triggerBox.X + triggerBox.Width + 6, centerY);
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(positioner).ToBeHiddenAsync();
+    }
+
+    [Fact]
     public virtual async Task FocusMovingIntoPopup_DoesNotTriggerBlurOnTrigger()
     {
         await NavigateAsync(CreateUrl("/tests/select-trigger-cancel"));

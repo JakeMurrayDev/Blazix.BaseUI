@@ -8,7 +8,7 @@
                ClassValue="ClassValue"
                StyleValue="StyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="resolvedContent"
+               ChildContent="ResolveContent()"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
@@ -16,7 +16,6 @@
     private SelectValueState state;
     private RenderElement<SelectValueState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-    private RenderFragment? resolvedContent;
     private bool valueElementRegistered;
 
     [CascadingParameter]
@@ -107,7 +106,6 @@
     {
         state = BuildState();
         BuildComponentAttributes();
-        ResolveContent();
     }
 
     /// <inheritdoc />
@@ -137,7 +135,6 @@
     {
         state = BuildState();
         BuildComponentAttributes();
-        ResolveContent();
         InvokeAsync(StateHasChanged);
     }
 
@@ -177,19 +174,17 @@
         return new SelectValueState(placeholder, (object?)TypedRootContext.GetValue(), null);
     }
 
-    private void ResolveContent()
+    private RenderFragment? ResolveContent()
     {
         // ChildContent wins unconditionally — mirrors React's static `childrenProp != null` branch.
         if (ChildContent is not null && ValueContent is null && ValuesContent is null)
         {
-            resolvedContent = ChildContent;
-            return;
+            return ChildContent;
         }
 
         if (TypedRootContext is null)
         {
-            resolvedContent = ChildContent;
-            return;
+            return ChildContent;
         }
 
         var isMultiple = RootContext?.Multiple ?? false;
@@ -200,43 +195,32 @@
 
             if (ValuesContent is not null)
             {
-                resolvedContent = ValuesContent(values);
-                return;
+                return ValuesContent(values);
             }
 
             if (ChildContent is not null)
             {
-                resolvedContent = ChildContent;
-                return;
+                return ChildContent;
             }
 
             if (values.Count == 0)
             {
-                resolvedContent = ResolvePlaceholderFragment();
-                return;
+                return ResolvePlaceholderFragment();
             }
 
-            var labels = new List<string>();
-            foreach (var v in values)
-            {
-                labels.Add(TypedRootContext.GetLabel(v) ?? v?.ToString() ?? "");
-            }
-            resolvedContent = CreateTextFragment(string.Join(", ", labels));
-            return;
+            return CreateMultipleLabelsFragment(values);
         }
 
         var value = TypedRootContext.GetValue();
 
         if (ValueContent is not null)
         {
-            resolvedContent = ValueContent(value);
-            return;
+            return ValueContent(value);
         }
 
         if (ChildContent is not null)
         {
-            resolvedContent = ChildContent;
-            return;
+            return ChildContent;
         }
 
         if (value is null)
@@ -248,17 +232,15 @@
                 var nullLabel = TypedRootContext.GetLabel(default);
                 if (!string.IsNullOrEmpty(nullLabel))
                 {
-                    resolvedContent = CreateTextFragment(nullLabel);
-                    return;
+                    return CreateTextFragment(nullLabel);
                 }
             }
 
-            resolvedContent = ResolvePlaceholderFragment();
-            return;
+            return ResolvePlaceholderFragment();
         }
 
         var label = TypedRootContext.GetLabel(value);
-        resolvedContent = CreateTextFragment(label ?? value?.ToString());
+        return TypedRootContext.GetLabelContent(value) ?? CreateTextFragment(label ?? value?.ToString());
     }
 
     private RenderFragment? ResolvePlaceholderFragment()
@@ -279,4 +261,28 @@
 
         return builder => builder.AddContent(0, text);
     }
+
+    private RenderFragment CreateMultipleLabelsFragment(IReadOnlyList<TValue> values) => builder =>
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            builder.OpenRegion(0);
+            if (index > 0)
+            {
+                builder.AddContent(0, ", ");
+            }
+
+            var value = values[index];
+            var content = TypedRootContext?.GetLabelContent(value);
+            if (content is not null)
+            {
+                builder.AddContent(1, content);
+            }
+            else
+            {
+                builder.AddContent(2, TypedRootContext?.GetLabel(value) ?? value?.ToString() ?? string.Empty);
+            }
+            builder.CloseRegion();
+        }
+    };
 }

@@ -1,4 +1,6 @@
-@implements IDisposable
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 <RenderElement TState="SelectItemIndicatorState"
                Tag="span"
@@ -17,13 +19,19 @@
 
     private bool isMounted;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
-    private CancellationTokenSource? transitionCts;
+    private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<SelectItemIndicator>? dotNetRef;
+    private bool transitionPending;
     private SelectItemIndicatorState state;
     private RenderElement<SelectItemIndicatorState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private bool previousSelected;
     private TransitionStatus previousTransitionStatus = TransitionStatus.Undefined;
     private bool hasInitializedTransition;
+
+    private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Blazix.BaseUI/blazix-baseui-select.min.js").AsTask());
 
     private bool Rendered => ItemContext?.Selected ?? false;
 
@@ -105,10 +113,66 @@
     }
 
     /// <inheritdoc />
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        transitionCts?.Cancel();
-        transitionCts?.Dispose();
+        if (!transitionPending || !Element.HasValue)
+        {
+            return;
+        }
+
+        transitionPending = false;
+        dotNetRef ??= DotNetObjectReference.Create(this);
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("beginPartTransition", Element.Value, dotNetRef, Rendered);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask?.IsValueCreated == true && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("disposePartTransition", Element.Value);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Completes the current entry or exit transition after the DOM reports its
+    /// actual animation lifetime.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnTransitionEnd(bool open)
+    {
+        if (open != Rendered)
+        {
+            return;
+        }
+
+        if (!open)
+        {
+            isMounted = false;
+        }
+        transitionStatus = TransitionStatus.Undefined;
+        state = new SelectItemIndicatorState(Rendered, transitionStatus);
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
     }
 
     private void BuildComponentAttributes()
@@ -138,68 +202,18 @@
         {
             isMounted = true;
             transitionStatus = TransitionStatus.Starting;
-            ScheduleTransitionEnd();
+            transitionPending = true;
         }
         else if (!isRendered && wasRendered)
         {
             transitionStatus = TransitionStatus.Ending;
-            ScheduleUnmount();
+            transitionPending = true;
         }
         else if (isRendered && wasRendered && transitionStatus == TransitionStatus.Ending)
         {
             // Re-selected mid-exit: cancel pending unmount, restart entry.
-            transitionCts?.Cancel();
             transitionStatus = TransitionStatus.Starting;
-            ScheduleTransitionEnd();
+            transitionPending = true;
         }
-    }
-
-    private void ScheduleTransitionEnd()
-    {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(1, token);
-                if (!token.IsCancellationRequested)
-                {
-                    transitionStatus = TransitionStatus.Undefined;
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                await DispatchExceptionAsync(ex);
-            }
-        }, token);
-    }
-
-    private void ScheduleUnmount()
-    {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(150, token);
-                if (!token.IsCancellationRequested)
-                {
-                    isMounted = false;
-                    transitionStatus = TransitionStatus.Undefined;
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                await DispatchExceptionAsync(ex);
-            }
-        }, token);
     }
 }

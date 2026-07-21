@@ -13,7 +13,7 @@
                ClassValue="ClassValue"
                StyleValue="WrappedStyleValue"
                ComponentAttributes="componentAttributes"
-               ChildContent="childContent"
+               ChildContent="@(ChildContent ?? DefaultChildContent)"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference" />
 
@@ -25,11 +25,11 @@
     private bool isMounted;
     private bool jsInitialized;
     private TransitionStatus transitionStatus = TransitionStatus.Undefined;
-    private CancellationTokenSource? transitionCts;
+    private DotNetObjectReference<SelectScrollUpArrow>? dotNetRef;
+    private bool transitionPending;
     private SelectScrollUpArrowState state;
     private RenderElement<SelectScrollUpArrowState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-    private RenderFragment? childContent;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -129,7 +129,6 @@
 
         var side = PositionerContext?.Side ?? Side.Bottom;
         state = new SelectScrollUpArrowState(visible, side, transitionStatus);
-        childContent = ChildContent ?? DefaultChildContent;
         BuildComponentAttributes();
     }
 
@@ -169,14 +168,26 @@
                 _ = ex;
             }
         }
+
+        if (transitionPending && Element.HasValue)
+        {
+            transitionPending = false;
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("beginPartTransition", Element.Value, dotNetRef, visible);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        transitionCts?.Cancel();
-        transitionCts?.Dispose();
-
         if (RootContext is not null)
         {
             RootContext.ScrollArrowsMountedCount--;
@@ -194,6 +205,10 @@
                 {
                     await module.InvokeVoidAsync("disposeScrollArrow", RootContext!.RootId, "up");
                 }
+                if (Element.HasValue)
+                {
+                    await module.InvokeVoidAsync("disposePartTransition", Element.Value);
+                }
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -201,6 +216,29 @@
                 _ = ex;
             }
         }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Completes the current entry or exit transition after its real DOM lifetime.
+    /// </summary>
+    [JSInvokable]
+    public async Task OnTransitionEnd(bool open)
+    {
+        if (open != visible)
+        {
+            return;
+        }
+
+        if (!open)
+        {
+            isMounted = false;
+        }
+        transitionStatus = TransitionStatus.Undefined;
+        state = new SelectScrollUpArrowState(visible, PositionerContext?.Side ?? Side.Bottom, transitionStatus);
+        BuildComponentAttributes();
+        await InvokeAsync(StateHasChanged);
     }
 
     private void OnRootStateChanged()
@@ -238,67 +276,18 @@
         {
             isMounted = true;
             transitionStatus = TransitionStatus.Starting;
-            ScheduleTransitionEnd();
+            transitionPending = true;
         }
         else if (!isRendered && wasRendered)
         {
             transitionStatus = TransitionStatus.Ending;
-            ScheduleUnmount();
+            transitionPending = true;
         }
         else if (isRendered && wasRendered && transitionStatus == TransitionStatus.Ending)
         {
             transitionStatus = TransitionStatus.Starting;
-            ScheduleTransitionEnd();
+            transitionPending = true;
         }
-    }
-
-    private void ScheduleTransitionEnd()
-    {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(1, token);
-                if (!token.IsCancellationRequested)
-                {
-                    transitionStatus = TransitionStatus.Undefined;
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                await DispatchExceptionAsync(ex);
-            }
-        }, token);
-    }
-
-    private void ScheduleUnmount()
-    {
-        transitionCts?.Cancel();
-        transitionCts = new CancellationTokenSource();
-        var token = transitionCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(150, token);
-                if (!token.IsCancellationRequested)
-                {
-                    isMounted = false;
-                    transitionStatus = TransitionStatus.Undefined;
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                await DispatchExceptionAsync(ex);
-            }
-        }, token);
     }
 
     private void BuildComponentAttributes()

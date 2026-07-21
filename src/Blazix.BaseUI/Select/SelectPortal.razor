@@ -3,7 +3,7 @@
 @if (RootContext is not null && (RootContext.GetMounted() || RootContext.ForceMount || KeepMounted))
 {
     <CascadingValue TValue="SelectPortalContext" Value="portalContext" IsFixed="true">
-        <Portal Target="@Container" Render="@Render" @attributes="AdditionalAttributes" @ref="portalRef">
+        <Portal Target="@Container" TargetElement="ContainerElement" Render="@Render" @attributes="AdditionalAttributes" @ref="portalRef">
             @ChildContent
         </Portal>
     </CascadingValue>
@@ -29,6 +29,13 @@
     /// </summary>
     [Parameter]
     public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets a concrete DOM container for the portal. When provided,
+    /// this takes precedence over <see cref="Container"/>.
+    /// </summary>
+    [Parameter]
+    public ElementReference? ContainerElement { get; set; }
 
     /// <summary>
     /// Gets or sets a custom render fragment that replaces the default element.

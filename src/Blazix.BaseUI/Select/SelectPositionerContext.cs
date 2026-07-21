@@ -39,7 +39,8 @@ internal sealed class SelectPositionerContext
     /// align-item-with-trigger pass so it doesn't run before the positioner has
     /// resolved its initial placement (avoids the FOUC race documented in
     /// <c>blazix-baseui-floating.min.js</c>'s <c>data-positioned</c> hide rule).
-    /// Resets to <see langword="false"/> on every popup close.
+    /// Resets to <see langword="false"/> after the close transition and at
+    /// the start of each open so sizing is recomputed before visibility.
     /// </summary>
     public bool IsPositioned { get; set; }
 

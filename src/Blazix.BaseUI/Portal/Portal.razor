@@ -39,6 +39,13 @@
     public string Target { get; set; } = "body";
 
     /// <summary>
+    /// Gets or sets a concrete DOM container for the portal. When provided,
+    /// this takes precedence over <see cref="Target"/>.
+    /// </summary>
+    [Parameter]
+    public ElementReference? TargetElement { get; set; }
+
+    /// <summary>
     /// Defines the child components of this instance.
     /// </summary>
     [Parameter]
@@ -69,7 +76,7 @@
             try
             {
                 var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("createPortal", Id, Target);
+                await module.InvokeVoidAsync("createPortal", Id, Target, TargetElement);
                 hasRendered = true;
                 BuildComponentAttributes();
                 StateHasChanged();

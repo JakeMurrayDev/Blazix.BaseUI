@@ -17,7 +17,8 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
         bool defaultOpen = true,
         bool multiple = false,
         bool alignItemWithTrigger = true,
-        FinalFocusTarget? finalFocus = null)
+        FinalFocusTarget? finalFocus = null,
+        RenderFragment<RenderProps<SelectPopupState>>? render = null)
     {
         return builder =>
         {
@@ -39,7 +40,11 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
                     {
                         posBuilder.AddAttribute(1, "FinalFocus", finalFocus.Value);
                     }
-                    posBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(popupBuilder =>
+                    if (render is not null)
+                    {
+                        posBuilder.AddAttribute(2, "Render", render);
+                    }
+                    posBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
                         popupBuilder.OpenComponent<SelectItem<string>>(0);
                         popupBuilder.AddAttribute(1, "Value", "apple");
@@ -224,10 +229,52 @@ public class SelectPopupTests : BunitContext, ISelectPopupContract
     }
 
     [Fact]
-    public Task CallsAlignItemPlacementOnFirstOpen()
+    public Task CallsInitializePopupWhenElementReferenceArrivesAfterFirstRender()
+    {
+        var module = JSInterop.SetupModule(SelectModule);
+        RenderFragment<RenderProps<SelectPopupState>> delayedRender = props => builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddContent(2, props.ChildContent);
+            builder.CloseElement();
+        };
+
+        var cut = Render(CreateSelectWithPopupNoList(
+            defaultOpen: true,
+            render: delayedRender));
+
+        module.Invocations.Count(i => i.Identifier == "initializePopup").ShouldBe(0);
+
+        var popup = cut.FindComponent<SelectPopup>();
+        var renderElement = popup.FindComponent<RenderElement<SelectPopupState>>().Instance;
+        typeof(RenderElement<SelectPopupState>)
+            .GetProperty(nameof(RenderElement<SelectPopupState>.Element))!
+            .SetValue(renderElement, new ElementReference("late-popup"));
+
+        popup.Render();
+        module.Invocations.Count(i => i.Identifier == "initializePopup").ShouldBe(1);
+
+        popup.Render();
+        module.Invocations.Count(i => i.Identifier == "initializePopup").ShouldBe(1);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DefersAlignItemPlacementUntilFloatingUiIsPositioned()
     {
         var module = JSInterop.SetupModule(SelectModule);
         var cut = Render(CreateSelectWithPopupNoList(defaultOpen: true, alignItemWithTrigger: true));
+
+        module.Invocations
+            .Any(i => i.Identifier == "beginAlignItemWithTriggerPlacement")
+            .ShouldBeFalse();
+
+        cut.FindComponent<SelectPositioner>().Instance.OnPositionUpdated(
+            "bottom",
+            "center",
+            anchorHidden: false,
+            arrowUncentered: false);
+        cut.Render();
 
         module.Invocations
             .Any(i => i.Identifier == "beginAlignItemWithTriggerPlacement")

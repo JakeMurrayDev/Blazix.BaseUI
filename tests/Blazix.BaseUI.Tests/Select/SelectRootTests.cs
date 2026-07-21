@@ -493,7 +493,9 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         string? name = null,
         string? form = null,
         bool required = false,
+        bool disabled = false,
         Func<string?, string?>? itemToStringValue = null,
+        Func<string, string, bool>? isItemEqualToValue = null,
         EventCallback<SelectValueChangeEventArgs<string>>? onValueChange = null,
         EventCallback<IReadOnlyList<string>>? valuesChanged = null)
     {
@@ -508,10 +510,99 @@ public class SelectRootTests : BunitContext, ISelectRootContract
             if (name is not null) builder.AddAttribute(i++, "Name", name);
             if (form is not null) builder.AddAttribute(i++, "Form", form);
             builder.AddAttribute(i++, "Required", required);
+            builder.AddAttribute(i++, "Disabled", disabled);
             if (itemToStringValue is not null) builder.AddAttribute(i++, "ItemToStringValue", itemToStringValue);
+            if (isItemEqualToValue is not null)
+                builder.AddAttribute(i++, "IsItemEqualToValue", isItemEqualToValue);
             if (onValueChange.HasValue) builder.AddAttribute(i++, "OnValueChange", onValueChange.Value);
             if (valuesChanged.HasValue) builder.AddAttribute(i++, "ValuesChanged", valuesChanged.Value);
             builder.AddAttribute(i++, "ChildContent", CreateDefaultChildren());
+            builder.CloseComponent();
+        };
+    }
+
+    private RenderFragment CreateMultipleSelectInFieldRoot(
+        IReadOnlyList<string> defaultValues,
+        Func<string, string, bool> isItemEqualToValue)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<SelectRoot<string>>(0);
+                fieldBuilder.AddAttribute(1, "Multiple", true);
+                fieldBuilder.AddAttribute(2, "DefaultValues", defaultValues);
+                fieldBuilder.AddAttribute(3, "DefaultOpen", true);
+                fieldBuilder.AddAttribute(4, "IsItemEqualToValue", isItemEqualToValue);
+                fieldBuilder.AddAttribute(5, "ChildContent", CreateDefaultChildren());
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private RenderFragment CreateClosedTypeaheadSelect(
+        IReadOnlyList<SelectOption<string>> items,
+        string? defaultValue = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            var i = 1;
+            if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
+            builder.AddAttribute(i++, "Items", items);
+            builder.AddAttribute(i++, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SelectTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(valueBuilder =>
+                {
+                    valueBuilder.OpenComponent<SelectValue<string>>(0);
+                    valueBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment CreatePortalChildren()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<SelectTrigger>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(valueBuilder =>
+            {
+                valueBuilder.OpenComponent<SelectValue<string>>(0);
+                valueBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+
+            builder.OpenComponent<SelectPortal>(10);
+            builder.AddAttribute(11, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<SelectPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(positionerBuilder =>
+                {
+                    positionerBuilder.OpenComponent<SelectPopup>(0);
+                    positionerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
+                    {
+                        popupBuilder.OpenComponent<SelectItem<string>>(0);
+                        popupBuilder.AddAttribute(1, "Value", "apple");
+                        popupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                            itemBuilder.AddContent(0, "Apple")));
+                        popupBuilder.CloseComponent();
+
+                        popupBuilder.OpenComponent<SelectItem<string>>(10);
+                        popupBuilder.AddAttribute(11, "Value", "banana");
+                        popupBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(itemBuilder =>
+                            itemBuilder.AddContent(0, "Banana")));
+                        popupBuilder.CloseComponent();
+                    }));
+                    positionerBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
             builder.CloseComponent();
         };
     }
@@ -690,6 +781,40 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task Value_ProgrammaticChangeDoesNotForceMountPopup()
+    {
+        var items = new[]
+        {
+            new SelectOption<string>("apple", "Apple"),
+            new SelectOption<string>("banana", "Banana")
+        };
+        var childContent = CreatePortalChildren();
+        var valueChanged = EventCallback.Factory.Create<string?>(this, _ => { });
+
+        var cut = Render<SelectRoot<string>>(parameters => parameters
+            .Add(p => p.Value, "apple")
+            .Add(p => p.ValueChanged, valueChanged)
+            .Add(p => p.Items, items)
+            .Add(p => p.ChildContent, childContent));
+
+        cut.Instance.typedContext.ForceMount.ShouldBeFalse();
+        cut.FindComponents<SelectPopup>().Count.ShouldBe(0);
+        cut.FindComponent<SelectValue<string>>().Markup.ShouldContain("Apple");
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Value, "banana")
+            .Add(p => p.ValueChanged, valueChanged)
+            .Add(p => p.Items, items)
+            .Add(p => p.ChildContent, childContent));
+
+        cut.Instance.typedContext.ForceMount.ShouldBeFalse();
+        cut.FindComponents<SelectPopup>().Count.ShouldBe(0);
+        cut.FindComponent<SelectValue<string>>().Markup.ShouldContain("Banana");
+
+        return Task.CompletedTask;
+    }
+
     // --- Form ---
 
     [Fact]
@@ -704,6 +829,57 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         hiddenInputs.Count.ShouldBe(2);
         hiddenInputs[0].GetAttribute("value").ShouldBe("APPLE");
         hiddenInputs[1].GetAttribute("value").ShouldBe("BANANA");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ItemToStringValue_MultipleNeverReceivesValueArrayOrWrongValue()
+    {
+        var callbackValues = new List<object?>();
+        var selectedValues = new object[] { "apple", "banana" };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SelectRoot<object>>(0);
+            builder.AddAttribute(1, "Multiple", true);
+            builder.AddAttribute(2, "Name", "fruits");
+            builder.AddAttribute(3, "DefaultValues", selectedValues);
+            builder.AddAttribute(4, "ItemToStringValue", (Func<object?, string?>)(value =>
+            {
+                callbackValues.Add(value);
+                return value?.ToString()?.ToUpperInvariant();
+            }));
+            builder.CloseComponent();
+        });
+
+        var hiddenInputs = cut.FindAll("input[type='hidden']");
+        hiddenInputs.Count.ShouldBe(2);
+        hiddenInputs[0].GetAttribute("value").ShouldBe("APPLE");
+        hiddenInputs[1].GetAttribute("value").ShouldBe("BANANA");
+
+        callbackValues.Count.ShouldBeGreaterThanOrEqualTo(2);
+        callbackValues.All(value => value is "apple" or "banana").ShouldBeTrue();
+        callbackValues.ShouldContain("apple");
+        callbackValues.ShouldContain("banana");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Multiple_DisabledDisablesAllHiddenInputs()
+    {
+        var cut = Render(CreateMultipleSelect(
+            name: "fruits",
+            defaultValues: new[] { "apple", "banana" },
+            disabled: true));
+
+        var validationInput = cut.Find("input[aria-hidden='true']");
+        validationInput.HasAttribute("disabled").ShouldBeTrue();
+
+        var hiddenInputs = cut.FindAll("input[type='hidden']");
+        hiddenInputs.Count.ShouldBe(2);
+        hiddenInputs.All(input => input.HasAttribute("disabled")).ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -1137,6 +1313,53 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task Multiple_DirtyClearsWhenValuesReturnToInitialOrderUsingCustomComparer()
+    {
+        var cut = Render(CreateMultipleSelectInFieldRoot(
+            ["APPLE", "BANANA"],
+            (item, value) => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)));
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-dirty").ShouldBeFalse();
+
+        var banana = cut.FindAll("[role='option']").First(item => item.TextContent.Contains("Banana"));
+        MouseClickItem(banana);
+
+        trigger = cut.Find("button");
+        trigger.HasAttribute("data-dirty").ShouldBeTrue();
+
+        banana = cut.FindAll("[role='option']").First(item => item.TextContent.Contains("Banana"));
+        MouseClickItem(banana);
+
+        trigger = cut.Find("button");
+        trigger.HasAttribute("data-dirty").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Multiple_DirtyRemainsWhenValuesReturnInDifferentOrderUsingCustomComparer()
+    {
+        var cut = Render(CreateMultipleSelectInFieldRoot(
+            ["APPLE", "BANANA"],
+            (item, value) => string.Equals(item, value, StringComparison.OrdinalIgnoreCase)));
+
+        var apple = cut.FindAll("[role='option']").First(item => item.TextContent.Contains("Apple"));
+        MouseClickItem(apple);
+
+        var trigger = cut.Find("button");
+        trigger.HasAttribute("data-dirty").ShouldBeTrue();
+
+        apple = cut.FindAll("[role='option']").First(item => item.TextContent.Contains("Apple"));
+        MouseClickItem(apple);
+
+        trigger = cut.Find("button");
+        trigger.HasAttribute("data-dirty").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
     // --- Highlight on hover ---
 
     [Fact]
@@ -1385,6 +1608,54 @@ public class SelectRootTests : BunitContext, ISelectRootContract
         await cut.InvokeAsync(async () => await root.typedContext.HandleClosedTypeaheadAsync("n"));
 
         root.typedContext.GetValue().ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ClosedTypeahead_SkipsDisabledItemAndSelectsNextMatch()
+    {
+        var cut = Render(CreateClosedTypeaheadSelect(
+        [
+            new SelectOption<string>("apricot", "Apricot", Disabled: true),
+            new SelectOption<string>("avocado", "Avocado")
+        ]));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        await cut.InvokeAsync(() => root.typedContext.HandleClosedTypeaheadAsync("a"));
+
+        root.typedContext.GetValue().ShouldBe("avocado");
+    }
+
+    [Fact]
+    public async Task ClosedTypeahead_AllMatchingItemsDisabledDoesNotChangeValue()
+    {
+        var cut = Render(CreateClosedTypeaheadSelect(
+        [
+            new SelectOption<string>("cherry", "Cherry"),
+            new SelectOption<string>("banana", "Banana", Disabled: true)
+        ]));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        await cut.InvokeAsync(() => root.typedContext.HandleClosedTypeaheadAsync("b"));
+
+        root.typedContext.GetValue().ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ClosedTypeahead_RepeatedCharacterCyclesEnabledMatchesPastDisabledItem()
+    {
+        var cut = Render(CreateClosedTypeaheadSelect(
+        [
+            new SelectOption<string>("aaron", "Aaron", Disabled: true),
+            new SelectOption<string>("apple", "Apple"),
+            new SelectOption<string>("avocado", "Avocado")
+        ]));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        await cut.InvokeAsync(() => root.typedContext.HandleClosedTypeaheadAsync("a"));
+        root.typedContext.GetValue().ShouldBe("apple");
+
+        await cut.InvokeAsync(() => root.typedContext.HandleClosedTypeaheadAsync("a"));
+        root.typedContext.GetValue().ShouldBe("avocado");
     }
 
     // --- IsItemEqualToValue ---

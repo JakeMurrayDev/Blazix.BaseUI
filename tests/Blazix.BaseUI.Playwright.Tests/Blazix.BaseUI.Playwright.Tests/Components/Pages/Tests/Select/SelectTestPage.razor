@@ -28,28 +28,40 @@
                              FinalFocus="ResolveFinalFocus()">
                     @if (ShowGroups)
                     {
-                        <SelectGroup>
-                            <SelectGroupLabel>Fruits</SelectGroupLabel>
-                            <SelectItem TValue="string" Value="@("apple")" Label="Apple" data-testid="select-item-apple">
-                                <SelectItemText>Apple</SelectItemText>
-                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
-                            </SelectItem>
-                            <SelectItem TValue="string" Value="@("banana")" Label="Banana" data-testid="select-item-banana">
-                                <SelectItemText>Banana</SelectItemText>
-                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
-                            </SelectItem>
-                            <SelectItem TValue="string" Value="@("cherry")" Label="Cherry" data-testid="select-item-cherry">
-                                <SelectItemText>Cherry</SelectItemText>
-                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
-                            </SelectItem>
-                        </SelectGroup>
-                        <SelectGroup>
-                            <SelectGroupLabel>Vegetables</SelectGroupLabel>
-                            <SelectItem TValue="string" Value="@("carrot")" Label="Carrot" data-testid="select-item-carrot">
-                                <SelectItemText>Carrot</SelectItemText>
-                                <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
-                            </SelectItem>
-                        </SelectGroup>
+                        <SelectScrollUpArrow KeepMounted="true" data-testid="select-scroll-up" style="height: 24px;">&#9650;</SelectScrollUpArrow>
+                        <SelectList data-testid="select-list" style="max-height: 128px; overflow-y: auto;">
+                            <SelectGroup style="contain: layout;">
+                                <SelectGroupLabel>Fruits</SelectGroupLabel>
+                                @foreach (var item in Fruits)
+                                {
+                                    <SelectItem TValue="string" Value="@item.Value" Label="@item.Label" data-testid="@($"select-item-{item.Value}")" style="height: 32px;">
+                                        <SelectItemText>@item.Label</SelectItemText>
+                                        <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                                    </SelectItem>
+                                }
+                            </SelectGroup>
+                            <SelectGroup style="contain: layout;">
+                                <SelectGroupLabel>Vegetables</SelectGroupLabel>
+                                @foreach (var item in Vegetables)
+                                {
+                                    <SelectItem TValue="string" Value="@item.Value" Label="@item.Label" data-testid="@($"select-item-{item.Value}")" style="height: 32px;">
+                                        <SelectItemText>@item.Label</SelectItemText>
+                                        <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                                    </SelectItem>
+                                }
+                            </SelectGroup>
+                            <SelectGroup style="contain: layout;">
+                                <SelectGroupLabel>Herbs</SelectGroupLabel>
+                                @foreach (var item in Herbs)
+                                {
+                                    <SelectItem TValue="string" Value="@item.Value" Label="@item.Label" data-testid="@($"select-item-{item.Value}")" style="height: 32px;">
+                                        <SelectItemText>@item.Label</SelectItemText>
+                                        <SelectItemIndicator KeepMounted="true">&#10003;</SelectItemIndicator>
+                                    </SelectItem>
+                                }
+                            </SelectGroup>
+                        </SelectList>
+                        <SelectScrollDownArrow KeepMounted="true" data-testid="select-scroll-down" style="height: 24px;">&#9660;</SelectScrollDownArrow>
                     }
                     else
                     {
@@ -90,9 +102,27 @@
     </div>
 
     <button data-testid="outside-button" style="margin-top: 10px;">Outside Button</button>
+    <button data-testid="external-open-button" @onclick="ToggleExternalOpen" style="margin-top: 10px;">
+        Toggle Open Externally
+    </button>
 </div>
 
 @code {
+    private static readonly (string Value, string Label)[] Fruits =
+    [
+        ("apple", "Apple"), ("banana", "Banana"), ("cherry", "Cherry"),
+        ("grape", "Grape"), ("orange", "Orange"), ("pear", "Pear")
+    ];
+    private static readonly (string Value, string Label)[] Vegetables =
+    [
+        ("carrot", "Carrot"), ("celery", "Celery"), ("corn", "Corn"),
+        ("pepper", "Pepper"), ("potato", "Potato"), ("tomato", "Tomato")
+    ];
+    private static readonly (string Value, string Label)[] Herbs =
+    [
+        ("basil", "Basil"), ("dill", "Dill"), ("mint", "Mint"), ("thyme", "Thyme")
+    ];
+
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
 
@@ -145,6 +175,8 @@
         valueChangeCount++;
         selectedValue = args.Value ?? "";
     }
+
+    private void ToggleExternalOpen() => isOpen = !isOpen;
 
     private FinalFocusTarget? ResolveFinalFocus()
     {

@@ -321,6 +321,7 @@ public class SelectItemIndicatorTests : BunitContext, ISelectItemIndicatorContra
 
         var bananaItem = cut.Find("[data-testid='banana-item']");
         await bananaItem.TriggerEventAsync("onmousemove", new MouseEventArgs());
+        await bananaItem.TriggerEventAsync("onpointerdown", new PointerEventArgs { PointerType = "mouse" });
         bananaItem.Click();
 
         // Mirror React's `useTransitionStatus(selected)`: the deselected

@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Components;
+
 namespace Blazix.BaseUI;
 
 /// <summary>
@@ -36,9 +38,21 @@ internal sealed class PositionerConfig
     public double CollisionPadding { get; set; } = 5;
 
     /// <summary>
+    /// Gets or sets per-side collision padding. When set, this takes precedence
+    /// over <see cref="CollisionPadding"/>.
+    /// </summary>
+    public SidePadding? CollisionPaddingPerSide { get; set; }
+
+    /// <summary>
     /// Gets or sets the boundary used to detect collisions for repositioning.
     /// </summary>
     public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets a concrete DOM collision boundary. When set, this takes
+    /// precedence over <see cref="CollisionBoundary"/>.
+    /// </summary>
+    public ElementReference? CollisionBoundaryElement { get; set; }
 
     /// <summary>
     /// Gets or sets the minimum padding in pixels between the arrow and popup edges.
@@ -76,6 +90,20 @@ internal sealed class PositionerConfig
     /// Gets the position method string for JS interop.
     /// </summary>
     internal string PositionMethodString => PositionMethod == PositionMethod.Fixed ? "fixed" : "absolute";
+
+    internal object CollisionPaddingArgument => CollisionPaddingPerSide is null
+        ? CollisionPadding
+        : new
+        {
+            top = CollisionPaddingPerSide.Top,
+            right = CollisionPaddingPerSide.Right,
+            bottom = CollisionPaddingPerSide.Bottom,
+            left = CollisionPaddingPerSide.Left
+        };
+
+    internal object CollisionBoundaryArgument => CollisionBoundaryElement is { } element
+        ? element
+        : CollisionBoundary.ToDataAttributeString()!;
 
     /// <summary>
     /// Appends the collision avoidance arguments to the given list in the format

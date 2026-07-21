@@ -8,17 +8,21 @@ import { acquireScrollLock } from './blazix-baseui-scroll-lock.min.js';
 import {
     initializePositioner as floatingInitializePositioner,
     updatePositioner as floatingUpdatePositioner,
+    resetPositioner as floatingResetPositioner,
     disposePositioner as floatingDisposePositioner,
     checkForTransitionOrAnimation,
     setupTransitionEndListener,
     cleanupTransitionState,
-    contains
+    contains,
+    createVirtualElement,
+    updateVirtualElement,
+    disposeVirtualElement
 } from './blazix-baseui-floating.min.js';
 
-const BOUNDARY_OFFSET = 2;
+const BOUNDARY_OFFSET = 5;
 const ALIGN_ITEM_PLACEMENT_MAX_ATTEMPTS = 3600;
-const ALIGN_ITEM_PLACEMENT_PROBE_DELAYS = [0, 50, 250, 1000];
 const POINTER_COMPATIBILITY_WINDOW_MS = 750;
+const orphanPositionerReadyElements = new WeakSet();
 
 // ─── Popup Placement Constants & Helpers ──────────────────────────────
 // alignItemWithTrigger measurement, scroll-growth, and CSS variable
@@ -97,6 +101,35 @@ function getTargetScrollTop(items, isUp, scrollTop, clientHeight, scrollArrowHei
         : maxScrollTop;
 }
 
+function scrollItemIntoViewIfNeeded(scroller, item) {
+    if (!scroller || !item || !scroller.scrollTo) return;
+    if (scroller.clientHeight >= scroller.scrollHeight) return;
+
+    const scrollerStyles = getComputedStyle(scroller);
+    const itemStyles = getComputedStyle(item);
+    const scrollPaddingTop = parseFloat(scrollerStyles.scrollPaddingTop) || 0;
+    const scrollPaddingBottom = parseFloat(scrollerStyles.scrollPaddingBottom) || 0;
+    const scrollMarginTop = parseFloat(itemStyles.scrollMarginTop) || 0;
+    const scrollMarginBottom = parseFloat(itemStyles.scrollMarginBottom) || 0;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const itemTop = itemRect.top - scrollerRect.top - scroller.clientTop + scroller.scrollTop;
+    let targetTop = scroller.scrollTop;
+
+    if (itemTop - scrollMarginTop < scroller.scrollTop + scrollPaddingTop) {
+        targetTop = itemTop - scrollMarginTop - scrollPaddingTop;
+    } else if (
+        itemTop + item.offsetHeight + scrollMarginBottom >
+        scroller.scrollTop + scroller.clientHeight - scrollPaddingBottom
+    ) {
+        targetTop =
+            itemTop + item.offsetHeight + scrollMarginBottom -
+            scroller.clientHeight + scrollPaddingBottom;
+    }
+
+    scroller.scrollTo({ top: targetTop, behavior: 'auto' });
+}
+
 function getScale(el) {
     const rect = el.getBoundingClientRect();
     const w = el.offsetWidth;
@@ -129,6 +162,18 @@ function normalizeRect(rect, scale) {
 function isWebKit() {
     if (typeof navigator === 'undefined') return false;
     return /\bAppleWebKit\b/.test(navigator.userAgent) && !/\bChrome\b/.test(navigator.userAgent);
+}
+
+function isVirtualClickEvent(event) {
+    if (event.pointerType === '' && event.isTrusted) {
+        return true;
+    }
+
+    if (typeof navigator !== 'undefined' && /\bAndroid\b/i.test(navigator.userAgent) && event.pointerType) {
+        return event.type === 'click' && event.buttons === 1;
+    }
+
+    return event.detail === 0 && !event.pointerType;
 }
 
 function unsetTransformStyles(popupElement) {
@@ -176,13 +221,23 @@ function ensurePopupState(rootState) {
             pointerDownHandler: null,
             touchStartHandler: null,
             keyDownHandler: null,
+            clickHandler: null,
             mouseMoveHandler: null,
             scrollHandler: null,
             resizeHandler: null,
-            alignItemWithTriggerActive: false
+            alignItemWithTriggerActive: false,
+            standardFallbackPending: false,
+            placementInProgressRevision: -1,
+            placementInProgressInputRevision: -1,
+            placementCommittedRevision: -1,
+            placementCommittedInputRevision: -1
         };
     }
     return rootState.popup;
+}
+
+function invalidateAlignItemPlacement(rootState) {
+    rootState.placementInputRevision += 1;
 }
 
 function isMouseWithinBounds(event) {
@@ -237,6 +292,56 @@ if (!window[STATE_KEY]) {
     };
 }
 const state = window[STATE_KEY];
+const partTransitions = new WeakMap();
+
+export function beginPartTransition(element, dotNetRef, isOpen) {
+    if (!(element instanceof HTMLElement) || !dotNetRef) return;
+
+    const previous = partTransitions.get(element);
+    if (previous) {
+        cleanupTransitionState(previous);
+        if (previous.rafId) cancelAnimationFrame(previous.rafId);
+    }
+
+    const transitionState = {
+        popupElement: element,
+        dotNetRef,
+        transitionCleanup: null,
+        fallbackTimeoutId: null,
+        rafId: 0
+    };
+    partTransitions.set(element, transitionState);
+
+    if (isOpen) {
+        transitionState.rafId = requestAnimationFrame(() => {
+            transitionState.rafId = requestAnimationFrame(() => {
+                transitionState.rafId = 0;
+                if (partTransitions.get(element) === transitionState) {
+                    dotNetRef.invokeMethodAsync('OnTransitionEnd', true).catch(() => { });
+                }
+            });
+        });
+        return;
+    }
+
+    if (checkForTransitionOrAnimation(element)) {
+        setupTransitionEndListener(transitionState, false);
+    } else {
+        queueMicrotask(() => {
+            if (partTransitions.get(element) === transitionState) {
+                dotNetRef.invokeMethodAsync('OnTransitionEnd', false).catch(() => { });
+            }
+        });
+    }
+}
+
+export function disposePartTransition(element) {
+    const transitionState = partTransitions.get(element);
+    if (!transitionState) return;
+    cleanupTransitionState(transitionState);
+    if (transitionState.rafId) cancelAnimationFrame(transitionState.rafId);
+    partTransitions.delete(element);
+}
 
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
@@ -318,25 +423,51 @@ function handleGlobalKeyDown(e) {
             setActiveItem(topmostRoot, items, nextIndex);
         }
     } else if (e.key === 'Enter') {
-        e.preventDefault();
         if (currentIndex >= 0 && currentIndex < items.length) {
-            items[currentIndex].click();
+            activateItemFromKeydown(e, items[currentIndex]);
         }
     } else if (e.key === ' ') {
-        e.preventDefault();
         // React parity: when a typeahead query is mid-flight, append the space
         // to the query instead of committing. This lets users search for labels
         // that contain spaces ("San Fr").
         if (topmostRoot.typeaheadBuffer && topmostRoot.typeaheadBuffer.length > 0) {
+            e.preventDefault();
             handleTypeahead(topmostRoot, items, ' ');
         } else if (currentIndex >= 0 && currentIndex < items.length) {
-            items[currentIndex].click();
+            activateItemFromKeydown(e, items[currentIndex]);
         }
     } else if (e.key === 'Tab') {
         topmostRoot.dotNetRef.invokeMethodAsync('OnTabKey').catch(() => { });
     } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         handleTypeahead(topmostRoot, items, e.key);
     }
+}
+
+function activateItemFromKeydown(event, item) {
+    const originalPreventDefault = event.preventDefault;
+    let consumerPrevented = false;
+    event.preventDefault = () => {
+        consumerPrevented = true;
+        originalPreventDefault.call(event);
+    };
+
+    queueMicrotask(() => {
+        event.preventDefault = originalPreventDefault;
+        if (consumerPrevented || event.defaultPrevented) return;
+
+        originalPreventDefault.call(event);
+        const win = item.ownerDocument.defaultView;
+        item.dispatchEvent(new win.MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            view: win,
+            detail: 0,
+            shiftKey: event.shiftKey,
+            ctrlKey: event.ctrlKey,
+            altKey: event.altKey,
+            metaKey: event.metaKey
+        }));
+    });
 }
 
 function setPointerInteraction(rootState, interactionType, event = null) {
@@ -461,6 +592,10 @@ function getNavigableItems(container) {
     return Array.from(container.querySelectorAll('[role="option"]'));
 }
 
+function isItemDisabled(item) {
+    return item.hasAttribute('disabled') || item.getAttribute('aria-disabled') === 'true';
+}
+
 function findNextIndex(items, currentIndex, direction, loop) {
     const length = items.length;
     if (length === 0) return -1;
@@ -482,6 +617,27 @@ function findNextIndex(items, currentIndex, direction, loop) {
     return -1;
 }
 
+function findNextEnabledIndex(items, currentIndex, direction, loop) {
+    const length = items.length;
+    if (length === 0) return -1;
+
+    let index = currentIndex + direction;
+    for (let i = 0; i < length; i++) {
+        if (index < 0) {
+            index = loop ? length - 1 : 0;
+            if (!loop) return -1;
+        } else if (index >= length) {
+            index = loop ? 0 : length - 1;
+            if (!loop) return -1;
+        }
+
+        if (!isItemDisabled(items[index])) return index;
+        index += direction;
+    }
+
+    return -1;
+}
+
 function handleTypeahead(rootState, items, char) {
     clearTimeout(rootState.typeaheadTimer);
     rootState.typeaheadBuffer += char.toLowerCase();
@@ -491,10 +647,17 @@ function handleTypeahead(rootState, items, char) {
     }, 500);
 
     const startIndex = rootState.activeIndex >= 0 ? rootState.activeIndex : -1;
+    const query = rootState.typeaheadBuffer.length > 1 &&
+        Array.from(rootState.typeaheadBuffer).every(value => value === rootState.typeaheadBuffer[0])
+        ? rootState.typeaheadBuffer[0]
+        : rootState.typeaheadBuffer;
 
     for (let offset = 1; offset <= items.length; offset++) {
         const index = (startIndex + offset) % items.length;
         const item = items[index];
+        if (isItemDisabled(item)) {
+            continue;
+        }
 
         // Prefer an explicit author-provided label via data-blazix-base-ui-label;
         // fall back to SelectItemText's rendered textContent. Mirrors React
@@ -503,7 +666,7 @@ function handleTypeahead(rootState, items, char) {
         // React parity: no trim — explicit `data-blazix-base-ui-label` is consumed verbatim,
         // and `textContent` is used as-is to mirror React's `useCompositeListItem({ textRef })`.
         const label = item.getAttribute('data-blazix-base-ui-label') || item.textContent || '';
-        if (label.toLowerCase().startsWith(rootState.typeaheadBuffer)) {
+        if (label.toLowerCase().startsWith(query)) {
             setActiveItem(rootState, items, index);
             return;
         }
@@ -511,24 +674,16 @@ function handleTypeahead(rootState, items, char) {
 }
 
 function setActiveItem(rootState, items, index) {
-    const container = rootState.listElement || rootState.popupElement;
+    const renderedList = items[index]?.closest('[role="listbox"]');
+    const registeredList = rootState.listElement?.isConnected ? rootState.listElement : null;
+    const container = registeredList || renderedList || rootState.popupElement;
 
     items.forEach((item, i) => {
         if (i === index) {
             item.setAttribute('data-highlighted', '');
             item.setAttribute('tabindex', '0');
             item.focus({ preventScroll: true });
-            if (container) {
-                const itemTop = item.offsetTop;
-                const itemBottom = itemTop + item.offsetHeight;
-                const scrollTop = container.scrollTop;
-                const viewHeight = container.clientHeight;
-                if (itemTop < scrollTop) {
-                    container.scrollTop = itemTop;
-                } else if (itemBottom > scrollTop + viewHeight) {
-                    container.scrollTop = itemBottom - viewHeight;
-                }
-            }
+            scrollItemIntoViewIfNeeded(container, item);
         } else {
             item.removeAttribute('data-highlighted');
             item.setAttribute('tabindex', '-1');
@@ -557,6 +712,11 @@ function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
     if (popupState && !popupState.alignItemWithTriggerActive && !alignItemDomActive) {
         return;
     }
+    if (popupState?.standardFallbackPending) return;
+    if (
+        popupState?.placementCommittedRevision === rootState.openRevision &&
+        popupState?.placementCommittedInputRevision === rootState.placementInputRevision
+    ) return;
 
     requestAnimationFrame(() => {
         const nextPopupState = rootState.popup;
@@ -569,6 +729,11 @@ function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
         if (nextPopupState && !nextPopupState.alignItemWithTriggerActive && !nextAlignItemDomActive) {
             return;
         }
+        if (nextPopupState?.standardFallbackPending) return;
+        if (
+            nextPopupState?.placementCommittedRevision === rootState.openRevision &&
+            nextPopupState?.placementCommittedInputRevision === rootState.placementInputRevision
+        ) return;
         if (!nextPopupState && !nextAlignItemDomActive) {
             scheduleOpenAlignItemPlacement(rootId, attempt + 1);
             return;
@@ -576,6 +741,14 @@ function scheduleOpenAlignItemPlacement(rootId, attempt = 0) {
 
         const triggerElement = rootState.triggerElement;
         if (!nextPopupElement || !nextPositionerElement || !triggerElement) {
+            scheduleOpenAlignItemPlacement(rootId, attempt + 1);
+            return;
+        }
+
+        if (
+            rootState.positionerReadyElement !== nextPositionerElement ||
+            rootState.positionerReadyRevision !== rootState.openRevision
+        ) {
             scheduleOpenAlignItemPlacement(rootId, attempt + 1);
             return;
         }
@@ -604,9 +777,6 @@ function queueOpenAlignItemPlacement(rootId) {
 
     scheduleOpenAlignItemPlacement(rootId);
     startOpenAlignItemPlacementWatchdog(rootId);
-    for (const delay of ALIGN_ITEM_PLACEMENT_PROBE_DELAYS) {
-        setTimeout(() => scheduleOpenAlignItemPlacement(rootId), delay);
-    }
 }
 
 function startOpenAlignItemPlacementWatchdog(rootId) {
@@ -631,10 +801,15 @@ function startOpenAlignItemPlacementWatchdog(rootId) {
             popupElement?.classList.contains('blazix-base-ui-disable-scrollbar');
         const alignItemActive =
             !!popupState?.alignItemWithTriggerActive || alignItemDomActive;
+        const positionerReady =
+            !!positionerElement &&
+            currentRootState.positionerReadyElement === positionerElement &&
+            currentRootState.positionerReadyRevision === currentRootState.openRevision;
         const positioned = !!positionerElement?.hasAttribute('data-positioned');
 
         if (
             alignItemActive &&
+            positionerReady &&
             !positioned &&
             popupElement &&
             positionerElement &&
@@ -646,25 +821,21 @@ function startOpenAlignItemPlacementWatchdog(rootId) {
                 // Placement is idempotent and retried below while the popup stays open.
             }
 
-            const elapsed = performance.now() - startedAt;
-            const positionerRect = positionerElement.getBoundingClientRect();
-            const popupRect = popupElement.getBoundingClientRect();
-            const hasStableGeometry =
-                positionerRect.width > 0 &&
-                positionerRect.height > 0 &&
-                popupRect.width > 0 &&
-                popupRect.height > 0 &&
-                popupElement.scrollHeight > 0;
-            const isTopLeftPlaceholder = positionerRect.left === 0 && positionerRect.top === 0;
-            if (elapsed > 250 && hasStableGeometry && !isTopLeftPlaceholder) {
-                positionerElement.setAttribute('data-positioned', '');
-                if (popupState) {
-                    popupState.initialPlaced = true;
-                }
-                notifyScrollArrowVisibility(currentRootState);
+            // A current-revision Floating pass is ready, so the local align
+            // commit runs synchronously. Re-read the DOM ownership token before
+            // deciding it failed; the value captured before the call is stale
+            // when a loaded WASM open first becomes ready after 250 ms. If it
+            // still cannot commit, request the standard Floating UI path through the
+            // component callback. Never expose geometry directly from here.
+            if (
+                !positionerElement.hasAttribute('data-positioned') &&
+                performance.now() - startedAt > 250 &&
+                requestStandardPositioningFallback(currentRootState, popupState)
+            ) {
                 currentRootState.alignItemPlacementWatchdog = false;
                 return;
             }
+
         }
 
         const elapsed = performance.now() - startedAt;
@@ -679,12 +850,49 @@ function startOpenAlignItemPlacementWatchdog(rootId) {
     requestAnimationFrame(tick);
 }
 
+function requestStandardPositioningFallback(rootState, popupState) {
+    if (!popupState?.dotNetRef) return false;
+    // A committed align-item layout remains authoritative until a real
+    // placement input changes. A late watchdog or duplicate callback from the
+    // same revision must not replace it with standard Floating placement and
+    // visibly collapse the popup after it has opened.
+    if (
+        popupState.placementCommittedRevision === rootState.openRevision &&
+        popupState.placementCommittedInputRevision === rootState.placementInputRevision
+    ) return false;
+    if (popupState.standardFallbackPending) return true;
+
+    popupState.standardFallbackPending = true;
+    clearPopupStylesInternal(rootState);
+    popupState.initialPlaced = true;
+    popupState.alignItemWithTriggerActive = false;
+
+    // Do not make completed standard placement depend on a Blazor round-trip.
+    // Under WASM suite load (and on a congested Server circuit), the callback
+    // can be processed after the visibility watchdog has yielded. Switch the
+    // live Floating registration to the standard path immediately; Floating UI
+    // remains the sole owner of data-positioned and releases visibility only
+    // after its size middleware and coordinate writes have completed.
+    for (const [positionerId, registration] of state.positioners) {
+        if (registration.positionerElement !== rootState.positionerElement) continue;
+
+        registration.alignItemWithTriggerActive = false;
+        floatingUpdatePositioner(positionerId, {
+            alignItemWithTriggerActive: false,
+            disableAnchorTracking: registration.disableAnchorTracking
+        }).catch(() => { });
+        break;
+    }
+
+    popupState.dotNetRef.invokeMethodAsync('OnFallbackToAlignPopupToTrigger').catch(() => { });
+    return true;
+}
+
 // ─── Popup Placement ──────────────────────────────────────────────────
 // alignItemWithTrigger pipeline (measurement, scroll-growth, pinch-zoom
 // fallback, --transform-origin). C# wiring calls
-// `beginAlignItemWithTriggerPlacement` on every render while
-// `alignItemWithTriggerActive && open`; the placement runs inside a
-// `queueMicrotask` so the layout pass runs after the render commit.
+// `beginAlignItemWithTriggerPlacement` once Floating UI has committed the
+// current open/input revision. DOM readiness retries stay in requestAnimationFrame.
 
 function saveOriginalPositionerStyles(popupState, positionerElement) {
     if (popupState.savedPositionerStyles) return;
@@ -712,15 +920,14 @@ function handlePopupScrollInternal(rootState, scroller) {
         return;
     }
 
-    if (popupState.reachedMaxHeight || !popupState.alignItemWithTriggerActive) {
-        notifyScrollArrowVisibility(rootState);
-        return;
-    }
-
     const isTopPositioned = positionerElement.style.top === '0px';
     const isBottomPositioned = positionerElement.style.bottom === '0px';
 
-    if (!isTopPositioned && !isBottomPositioned) {
+    if (
+        popupState.reachedMaxHeight ||
+        !popupState.alignItemWithTriggerActive ||
+        (!isTopPositioned && !isBottomPositioned)
+    ) {
         notifyScrollArrowVisibility(rootState);
         return;
     }
@@ -740,67 +947,50 @@ function handlePopupScrollInternal(rootState, scroller) {
     const scrollTop = scroller.scrollTop;
     const maxScrollTop = getMaxScrollTop(scroller);
 
-    let nextPositionerHeight = 0;
+    // `Infinity` requests a scroll to the recomputed maximum offset.
     let nextScrollTop = null;
-    let setReachedMax = false;
-    let scrollToMax = false;
 
     const setHeight = (height) => {
         positionerElement.style.height = `${height}px`;
     };
 
-    const handleSmallDiff = (diff, targetScrollTop) => {
+    const diff = isTopPositioned ? maxScrollTop - scrollTop : scrollTop;
+    const nextHeight = Math.min(currentHeight + diff, maxAvailableHeight);
+
+    if (diff <= SCROLL_EDGE_TOLERANCE_PX) {
         const heightDelta = clamp(diff, 0, maxAvailableHeight - currentHeight);
         if (heightDelta > 0) {
             setHeight(currentHeight + heightDelta);
         }
-        scroller.scrollTop = targetScrollTop;
+        scroller.scrollTop = isTopPositioned ? maxScrollTop : 0;
         if (maxAvailableHeight - (currentHeight + heightDelta) <= SCROLL_EDGE_TOLERANCE_PX) {
             popupState.reachedMaxHeight = true;
         }
         notifyScrollArrowVisibility(rootState);
-    };
-
-    const diff = isTopPositioned ? maxScrollTop - scrollTop : scrollTop;
-    const nextHeight = Math.min(currentHeight + diff, maxAvailableHeight);
-
-    nextPositionerHeight = nextHeight;
-
-    if (diff <= SCROLL_EDGE_TOLERANCE_PX) {
-        handleSmallDiff(diff, isTopPositioned ? maxScrollTop : 0);
         return;
     }
 
     if (maxAvailableHeight - nextHeight > SCROLL_EDGE_TOLERANCE_PX) {
-        if (isTopPositioned) {
-            scrollToMax = true;
-        } else {
-            nextScrollTop = 0;
-        }
-    } else {
-        setReachedMax = true;
-
-        if (isBottomPositioned && scrollTop < maxScrollTop) {
-            const overshoot = currentHeight + diff - maxAvailableHeight;
-            nextScrollTop = scrollTop - (diff - overshoot);
-        }
+        nextScrollTop = isTopPositioned ? Infinity : 0;
+    } else if (isBottomPositioned && scrollTop < maxScrollTop) {
+        const overshoot = currentHeight + diff - maxAvailableHeight;
+        nextScrollTop = scrollTop - (diff - overshoot);
     }
 
-    nextPositionerHeight = Math.ceil(nextPositionerHeight);
+    const nextPositionerHeight = Math.ceil(nextHeight);
 
     if (nextPositionerHeight !== 0) {
         setHeight(nextPositionerHeight);
     }
 
-    if (scrollToMax || nextScrollTop != null) {
-        const nextMaxScrollTop = getMaxScrollTop(scroller);
-        const target = scrollToMax ? nextMaxScrollTop : clamp(nextScrollTop, 0, nextMaxScrollTop);
+    if (nextScrollTop != null) {
+        const target = clamp(nextScrollTop, 0, getMaxScrollTop(scroller));
         if (Math.abs(scroller.scrollTop - target) > SCROLL_EDGE_TOLERANCE_PX) {
             scroller.scrollTop = target;
         }
     }
 
-    if (setReachedMax || nextPositionerHeight >= maxAvailableHeight - SCROLL_EDGE_TOLERANCE_PX) {
+    if (nextPositionerHeight >= maxAvailableHeight - SCROLL_EDGE_TOLERANCE_PX) {
         popupState.reachedMaxHeight = true;
     }
 
@@ -813,6 +1003,7 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
     initGlobalListeners();
 
     state.roots.set(rootId, {
+        rootId,
         dotNetRef,
         isOpen: false,
         loopFocus: loopFocus ?? false,
@@ -821,11 +1012,18 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         readOnly: !!readOnly,
         disabled: !!disabled,
         activeIndex: -1,
+        selectedIndex: -1,
         keyboardActive: false,
         triggerElement: null,
         popupElement: null,
         listElement: null,
         positionerElement: null,
+        positionerReadyElement: null,
+        openRevision: 0,
+        positionerReadyRevision: -1,
+        pendingPositionerReadyElement: null,
+        pendingPositionerReadyRevision: -1,
+        acceptNextOpenPositioning: false,
         triggerCleanup: null,
         triggerDotNetRef: null,
         scrollLockCleanup: null,
@@ -844,7 +1042,12 @@ export function initializeRoot(rootId, dotNetRef, loopFocus, modal, direction, r
         lastOutsidePointerType: null,
         lastOutsidePointerTime: 0,
         lastOutsidePointerHandled: false,
-        alignItemPlacementWatchdog: false
+        alignItemPlacementWatchdog: false,
+        placementInputRevision: 0,
+        optionRegistrations: new Map(),
+        optionClickMetadata: new WeakMap(),
+        observedOptions: [],
+        optionObserver: null
     });
 }
 
@@ -854,6 +1057,11 @@ export function disposeRoot(rootId) {
         clearTimeout(rootState.typeaheadTimer);
         clearInterval(rootState.continuousScrollInterval);
         cleanupTransitionState(rootState);
+        rootState.optionObserver?.disconnect();
+        for (const [element, registration] of rootState.optionRegistrations) {
+            element.removeEventListener('click', registration.clickHandler, true);
+        }
+        rootState.optionRegistrations.clear();
         removeScrollListener(rootState);
         if (rootState.scrollLockCleanup) {
             rootState.scrollLockCleanup();
@@ -875,13 +1083,54 @@ export function disposeRoot(rootId) {
     }
 }
 
-export function setRootOpen(rootId, isOpen, reason) {
+export function renameRoot(previousRootId, nextRootId) {
+    if (!previousRootId || !nextRootId || previousRootId === nextRootId) return;
+    const rootState = state.roots.get(previousRootId);
+    if (!rootState) return;
+    state.roots.delete(previousRootId);
+    rootState.rootId = nextRootId;
+    state.roots.set(nextRootId, rootState);
+    for (const registration of state.positioners.values()) {
+        if (registration.rootId === previousRootId) {
+            registration.rootId = nextRootId;
+        }
+    }
+}
+
+export function setRootOpen(rootId, isOpen, reason, selectedIndex = -1) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
 
+    const wasOpen = rootState.isOpen;
     rootState.isOpen = isOpen;
+    rootState.selectedIndex = Number.isInteger(selectedIndex) ? selectedIndex : -1;
 
-    if (isOpen) {
+    if (isOpen && !wasOpen) {
+        rootState.openRevision += 1;
+        rootState.positionerReadyElement = null;
+        rootState.positionerReadyRevision = -1;
+        rootState.positionerElement?.removeAttribute('data-positioned');
+
+        if (
+            rootState.pendingPositionerReadyElement === rootState.positionerElement &&
+            rootState.pendingPositionerReadyRevision === rootState.openRevision
+        ) {
+            rootState.positionerReadyElement = rootState.positionerElement;
+            rootState.positionerReadyRevision = rootState.openRevision;
+        } else if (
+            rootState.openRevision === 1 &&
+            rootState.positionerElement &&
+            orphanPositionerReadyElements.has(rootState.positionerElement)
+        ) {
+            rootState.positionerReadyElement = rootState.positionerElement;
+            rootState.positionerReadyRevision = rootState.openRevision;
+            orphanPositionerReadyElements.delete(rootState.positionerElement);
+        }
+        rootState.pendingPositionerReadyElement = null;
+        rootState.pendingPositionerReadyRevision = -1;
+        rootState.acceptNextOpenPositioning = false;
+        if (rootState.popup) rootState.popup.standardFallbackPending = false;
+
         queueOpenAlignItemPlacement(rootId);
 
         // Scroll lock is owned exclusively by SelectPositioner (C#-side) to cover
@@ -889,24 +1138,34 @@ export function setRootOpen(rootId, isOpen, reason) {
 
         function waitForPopupAndFocus() {
             let attempts = 0;
-            const maxAttempts = 10;
+            const maxAttempts = 60;
 
             function check() {
                 attempts++;
-                const containerEl = rootState.listElement || rootState.popupElement;
+                const renderedList = rootState.popupElement?.querySelector('[role="listbox"]');
+                const registeredList = rootState.listElement?.isConnected ? rootState.listElement : null;
+                const containerEl = registeredList || renderedList || rootState.popupElement;
 
-                if (containerEl && document.contains(containerEl)) {
+                if (
+                    containerEl &&
+                    document.contains(containerEl) &&
+                    rootState.popupElement?.hasAttribute('data-open') &&
+                    containerEl.clientHeight > 0
+                ) {
                     const items = getNavigableItems(containerEl);
                     if (items.length > 0) {
-                        let targetIndex = -1;
-                        for (let i = 0; i < items.length; i++) {
-                            if (items[i].hasAttribute('data-selected')) {
-                                targetIndex = i;
-                                break;
+                        let targetIndex = rootState.selectedIndex;
+                        if (targetIndex < 0 || targetIndex >= items.length) {
+                            targetIndex = -1;
+                            for (let i = 0; i < items.length; i++) {
+                                if (items[i].getAttribute('aria-selected') === 'true') {
+                                    targetIndex = i;
+                                    break;
+                                }
                             }
                         }
                         if (targetIndex === -1) {
-                            targetIndex = findNextIndex(items, -1, 1, false);
+                            targetIndex = findNextEnabledIndex(items, -1, 1, false);
                         }
                         if (targetIndex >= 0) {
                             setActiveItem(rootState, items, targetIndex);
@@ -970,14 +1229,6 @@ export function setRootOpen(rootId, isOpen, reason) {
 
         rootState.activeIndex = -1;
 
-        if (reason !== 'outside-press' && !rootState.finalFocusManaged) {
-            requestAnimationFrame(() => {
-                if (rootState.triggerElement) {
-                    rootState.triggerElement.focus();
-                }
-            });
-        }
-
         const popupEl = rootState.listElement || rootState.popupElement;
         if (popupEl && checkForTransitionOrAnimation(popupEl)) {
             setupTransitionEndListener(rootState, false);
@@ -1000,6 +1251,9 @@ export function setTriggerElement(rootId, element) {
     }
 
     rootState.triggerElement = element;
+    if (triggerChanged) {
+        invalidateAlignItemPlacement(rootState);
+    }
 
     if (element && rootState.dotNetRef && (!rootState.triggerCleanup || triggerChanged)) {
         initializeTrigger(rootId, element, rootState.dotNetRef);
@@ -1010,7 +1264,15 @@ export function setTriggerElement(rootId, element) {
 export function setPopupElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
-        rootState.popupElement = element;
+        if (rootState.popupElement !== element && !rootState.listElement) {
+            rootState.optionObserver?.disconnect();
+            rootState.optionObserver = null;
+        }
+        if (rootState.popupElement !== element) {
+            rootState.popupElement = element;
+            invalidateAlignItemPlacement(rootState);
+        }
+        ensureOptionObserver(rootState);
         queueOpenAlignItemPlacement(rootId);
     }
 }
@@ -1020,7 +1282,15 @@ export function setListElement(rootId, element) {
     if (!rootState) return;
 
     const previous = rootState.listElement;
+    if (previous !== element) {
+        rootState.optionObserver?.disconnect();
+        rootState.optionObserver = null;
+    }
     rootState.listElement = element;
+    if (previous !== element) {
+        invalidateAlignItemPlacement(rootState);
+    }
+    ensureOptionObserver(rootState);
 
     // If the scroll listener is currently attached to a stale target (e.g. the
     // popup before the list registered), re-point it at `listElement || popup`
@@ -1028,6 +1298,18 @@ export function setListElement(rootId, element) {
     // the React `scrollHandlerRef.current?.(event.currentTarget)` bridge that
     // is wired via onScroll on SelectList itself.
     if (previous === element) return;
+    queueOpenAlignItemPlacement(rootId);
+    if (rootState.isOpen && element) {
+        requestAnimationFrame(() => {
+            if (!rootState.isOpen || rootState.listElement !== element) return;
+            const items = getNavigableItems(element);
+            const selectedIndex = items.findIndex(item => item.getAttribute('aria-selected') === 'true');
+            const targetIndex = selectedIndex >= 0 ? selectedIndex : rootState.selectedIndex;
+            if (targetIndex >= 0 && targetIndex < items.length) {
+                setActiveItem(rootState, items, targetIndex);
+            }
+        });
+    }
     if (rootState.scrollListener) {
         attachScrollListener(rootState);
         notifyScrollArrowVisibility(rootState);
@@ -1037,7 +1319,22 @@ export function setListElement(rootId, element) {
 export function registerPositioner(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
-        rootState.positionerElement = element;
+        if (
+            rootState.isOpen &&
+            rootState.openRevision === 1 &&
+            orphanPositionerReadyElements.has(element)
+        ) {
+            rootState.positionerReadyElement = element;
+            rootState.positionerReadyRevision = rootState.openRevision;
+            orphanPositionerReadyElements.delete(element);
+        } else if (rootState.positionerElement !== element) {
+            rootState.positionerReadyElement = null;
+            rootState.positionerReadyRevision = -1;
+        }
+        if (rootState.positionerElement !== element) {
+            rootState.positionerElement = element;
+            invalidateAlignItemPlacement(rootState);
+        }
         queueOpenAlignItemPlacement(rootId);
     }
 }
@@ -1046,6 +1343,10 @@ export function unregisterPositioner(rootId) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.positionerElement = null;
+        rootState.positionerReadyElement = null;
+        rootState.positionerReadyRevision = -1;
+        rootState.pendingPositionerReadyElement = null;
+        rootState.pendingPositionerReadyRevision = -1;
     }
 }
 
@@ -1210,10 +1511,11 @@ function checkScrollArrows(rootState) {
     const containerEl = rootState.listElement || rootState.popupElement;
     if (!containerEl) return { up: false, down: false };
 
-    const { scrollTop, scrollHeight, clientHeight } = containerEl;
+    const maxScrollTop = getMaxScrollTop(containerEl);
+    const scrollTop = normalizeScrollOffset(containerEl.scrollTop, maxScrollTop);
     return {
         up: scrollTop > 0,
-        down: Math.round(scrollTop + clientHeight) < scrollHeight
+        down: scrollTop < maxScrollTop
     };
 }
 
@@ -1424,11 +1726,62 @@ export function disposeScrollArrow(rootId, direction) {
 
 // ─── Positioner API ───────────────────────────────────────────────────
 
-export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidance, alignItemWithTrigger, dotNetRef, rootId) {
+export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidance, alignItemWithTrigger, dotNetRef, rootId, hasSideOffsetFn, hasAlignOffsetFn, virtualAnchor, controlledDisableAnchorTracking = false) {
+    const initialRootState = rootId ? state.roots.get(rootId) : null;
+    if (initialRootState?.positionerElement === positionerElement) {
+        initialRootState.positionerReadyElement = null;
+        initialRootState.positionerReadyRevision = -1;
+        positionerElement.removeAttribute('data-positioned');
+    }
+
+    const registration = {
+        virtualId: null,
+        rootId,
+        positionerElement,
+        alignItemWithTriggerActive: !!alignItemWithTrigger,
+        disableAnchorTracking: !!controlledDisableAnchorTracking,
+        sideObserver: null
+    };
     let onPositionUpdated = null;
     if (dotNetRef) {
         onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
-            if (alignItemWithTrigger) {
+            // Root initialization and positioner initialization can complete in
+            // either order under WASM/default-open rendering. Resolve the live
+            // root at callback time rather than capturing a missing root.
+            const currentRootId = registration.rootId;
+            const currentRootState = currentRootId ? state.roots.get(currentRootId) : null;
+            if (
+                currentRootState?.isOpen &&
+                currentRootState.positionerElement === positionerElement
+            ) {
+                currentRootState.positionerReadyElement = positionerElement;
+                currentRootState.positionerReadyRevision = currentRootState.openRevision;
+            } else if (
+                currentRootState &&
+                !currentRootState.isOpen &&
+                currentRootState.positionerElement === positionerElement &&
+                currentRootState.acceptNextOpenPositioning &&
+                registration.alignItemWithTriggerActive
+            ) {
+                // Controlled parameter changes can render descendants before
+                // the root's asynchronous setRootOpen interop completes. This
+                // fresh pass belongs to the immediately upcoming open revision.
+                currentRootState.pendingPositionerReadyElement = positionerElement;
+                currentRootState.pendingPositionerReadyRevision = currentRootState.openRevision + 1;
+            } else if (
+                !currentRootState?.positionerElement ||
+                (!currentRootState.isOpen &&
+                    currentRootState.openRevision === 0 &&
+                    currentRootState.positionerElement === positionerElement)
+            ) {
+                // Child initialization can finish before the root has received
+                // its RenderElement reference or before the first setRootOpen.
+                // Preserve only that initial registration-order result; a
+                // different non-null element is a stale callback.
+                orphanPositionerReadyElements.add(positionerElement);
+            }
+
+            if (registration.alignItemWithTriggerActive) {
                 positionerElement.setAttribute('data-side', 'none');
             }
 
@@ -1451,15 +1804,26 @@ export async function initializePositioner(positionerElement, triggerElement, si
             // re-renders (e.g., once items mount and the placement should
             // refine), so this JS-side invocation is purely the "first paint"
             // accelerator, not a replacement for the gate.
-            if (alignItemWithTrigger && rootId) {
-                try { beginAlignItemWithTriggerPlacement(rootId, true); } catch { /* idempotent */ }
+            if (
+                registration.alignItemWithTriggerActive &&
+                currentRootId &&
+                currentRootState?.isOpen &&
+                currentRootState.positionerElement === positionerElement &&
+                currentRootState.positionerReadyRevision === currentRootState.openRevision
+            ) {
+                try { beginAlignItemWithTriggerPlacement(currentRootId, true); } catch { /* idempotent */ }
             }
         };
     }
 
+    const virtualElement = virtualAnchor
+        ? createVirtualElement(virtualAnchor.x, virtualAnchor.y, virtualAnchor.width, virtualAnchor.height)
+        : null;
+    registration.virtualId = virtualElement?.virtualId ?? null;
     const positionerId = await floatingInitializePositioner({
         positionerElement,
-        triggerElement,
+        triggerElement: virtualElement ? null : triggerElement,
+        virtualId: virtualElement?.virtualId ?? null,
         side,
         align,
         sideOffset,
@@ -1476,18 +1840,46 @@ export async function initializePositioner(positionerElement, triggerElement, si
         // and the data-positioned attribute (the align-item commit owns those).
         alignItemWithTriggerActive: !!alignItemWithTrigger,
         onPositionUpdated,
-        dotNetRef: dotNetRef || null
+        dotNetRef: dotNetRef || null,
+        hasSideOffsetFn: !!hasSideOffsetFn,
+        hasAlignOffsetFn: !!hasAlignOffsetFn
     });
 
     // alignItemWithTrigger placement is invoked from SelectPopup via
     // `beginAlignItemWithTriggerPlacement` so the popup-level layout pass
     // can read selectedItemText / valueElement refs.
+    if (positionerId) {
+        registration.sideObserver = new MutationObserver(() => {
+            if (
+                registration.alignItemWithTriggerActive &&
+                positionerElement.getAttribute('data-side') !== 'none'
+            ) {
+                positionerElement.setAttribute('data-side', 'none');
+            }
+        });
+        registration.sideObserver.observe(positionerElement, {
+            attributes: true,
+            attributeFilter: ['data-side']
+        });
+        if (registration.alignItemWithTriggerActive) {
+            positionerElement.setAttribute('data-side', 'none');
+        }
+        state.positioners.set(positionerId, registration);
+    }
     return positionerId;
 }
 
-export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidance, alignItemWithTrigger) {
+export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidance, alignItemWithTrigger, hasSideOffsetFn, hasAlignOffsetFn, virtualAnchor, controlledDisableAnchorTracking = false) {
+    const registration = state.positioners.get(positionerId);
+    if (registration) {
+        registration.alignItemWithTriggerActive = !!alignItemWithTrigger;
+        registration.disableAnchorTracking = !!controlledDisableAnchorTracking;
+    }
+    if (registration?.virtualId && virtualAnchor) {
+        updateVirtualElement(registration.virtualId, virtualAnchor.x, virtualAnchor.y, virtualAnchor.width, virtualAnchor.height);
+    }
     await floatingUpdatePositioner(positionerId, {
-        triggerElement,
+        ...(registration?.virtualId ? {} : { triggerElement }),
         side,
         align,
         sideOffset,
@@ -1499,14 +1891,35 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
         sticky: sticky || false,
         positionMethod: positionMethod || 'absolute',
         collisionAvoidance: collisionAvoidance || 'flip-shift',
-        alignItemWithTriggerActive: !!alignItemWithTrigger
+        alignItemWithTriggerActive: !!alignItemWithTrigger,
+        disableAnchorTracking: !!controlledDisableAnchorTracking,
+        hasSideOffsetFn: !!hasSideOffsetFn,
+        hasAlignOffsetFn: !!hasAlignOffsetFn
     });
 
     // alignItemWithTrigger placement is invoked from SelectPopup, not here,
     // because it needs the popup-level selectedItemText / valueElement refs.
 }
 
+export function resetPositionerForOpen(positionerId, rootId) {
+    const rootState = rootId ? state.roots.get(rootId) : null;
+    if (rootState) {
+        rootState.positionerReadyElement = null;
+        rootState.positionerReadyRevision = -1;
+        rootState.pendingPositionerReadyElement = null;
+        rootState.pendingPositionerReadyRevision = -1;
+        rootState.acceptNextOpenPositioning = !rootState.isOpen;
+        rootState.positionerElement?.removeAttribute('data-positioned');
+    }
+
+    floatingResetPositioner(positionerId);
+}
+
 export function disposePositioner(positionerId) {
+    const registration = state.positioners.get(positionerId);
+    if (registration?.virtualId) disposeVirtualElement(registration.virtualId);
+    registration?.sideObserver?.disconnect();
+    state.positioners.delete(positionerId);
     floatingDisposePositioner(positionerId);
 }
 
@@ -1524,15 +1937,29 @@ export function initializePopup(rootId, popupElement, dotNetRef, finalFocusManag
         popupState.popupElement.removeEventListener('pointerdown', popupState.pointerDownHandler);
         popupState.popupElement.removeEventListener('touchstart', popupState.touchStartHandler);
         popupState.popupElement.removeEventListener('keydown', popupState.keyDownHandler);
+        popupState.popupElement.removeEventListener('click', popupState.clickHandler, true);
         popupState.popupElement.removeEventListener('mousemove', popupState.mouseMoveHandler);
         popupState.popupElement.removeEventListener('scroll', popupState.scrollHandler);
     }
 
-    rootState.popupElement = popupElement;
+    if (rootState.popupElement !== popupElement) {
+        rootState.popupElement = popupElement;
+        invalidateAlignItemPlacement(rootState);
+    }
     rootState.finalFocusManaged = !!finalFocusManaged;
     popupState.popupElement = popupElement;
     popupState.dotNetRef = dotNetRef;
     queueOpenAlignItemPlacement(rootId);
+
+    popupState.clickHandler = (event) => {
+        const option = event.target?.closest?.('[role="option"]');
+        if (!option || !popupElement.contains(option)) return;
+        rootState.optionClickMetadata.set(option, {
+            isVirtualClick: isVirtualClickEvent(event),
+            pointerTypeDefined: event.pointerType !== undefined
+        });
+    };
+    popupElement.addEventListener('click', popupState.clickHandler, true);
 
     popupState.pointerLeaveHandler = (event) => {
         const dotNet = popupState.dotNetRef;
@@ -1663,6 +2090,9 @@ export function disposePopup(rootId) {
         if (popupState.keyDownHandler) {
             popupState.popupElement.removeEventListener('keydown', popupState.keyDownHandler);
         }
+        if (popupState.clickHandler) {
+            popupState.popupElement.removeEventListener('click', popupState.clickHandler, true);
+        }
         if (popupState.mouseMoveHandler) {
             popupState.popupElement.removeEventListener('mousemove', popupState.mouseMoveHandler);
         }
@@ -1692,9 +2122,11 @@ export function disposePopup(rootId) {
     popupState.pointerDownHandler = null;
     popupState.touchStartHandler = null;
     popupState.keyDownHandler = null;
+    popupState.clickHandler = null;
     popupState.mouseMoveHandler = null;
     popupState.scrollHandler = null;
     popupState.alignItemWithTriggerActive = false;
+    popupState.standardFallbackPending = false;
     popupState.initialPlaced = false;
     popupState.reachedMaxHeight = false;
     popupState.savedPositionerStyles = false;
@@ -1708,6 +2140,8 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
     const popupState = ensurePopupState(rootState);
+
+    if (alignItemWithTriggerActive && popupState.standardFallbackPending) return;
 
     popupState.alignItemWithTriggerActive = !!alignItemWithTriggerActive;
 
@@ -1723,29 +2157,81 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
         return;
     }
 
+    // A rendered SelectList can exist one lifecycle turn before its element
+    // reference reaches JS. Measuring the popup as the scroller during that
+    // gap exposes the full intrinsic list height, then visibly shrinks it when
+    // the real constrained list registers. React's layout effect already has
+    // the list ref before it releases the popup.
+    const renderedList = popupElement.querySelector('[role="listbox"]');
+    if (renderedList && rootState.listElement !== renderedList) {
+        scheduleOpenAlignItemPlacement(rootId);
+        return;
+    }
+    if (
+        popupElement.querySelector('[role="option"]') &&
+        !rootState.selectedItemTextElement?.isConnected
+    ) {
+        scheduleOpenAlignItemPlacement(rootId);
+        return;
+    }
+
+    // React waits for useFloating's first positioned result before measuring
+    // the align-item popup. Nonzero DOM geometry is not sufficient: before the
+    // size middleware runs the popup still has its intrinsic width/height and
+    // --anchor-width/--available-height are unresolved. Releasing the FOUC
+    // hide at that point exposes a narrow, fully populated popup for a frame.
+    if (
+        popupState.alignItemWithTriggerActive &&
+        (rootState.positionerReadyElement !== positionerElement ||
+            rootState.positionerReadyRevision !== rootState.openRevision)
+    ) {
+        scheduleOpenAlignItemPlacement(rootId);
+        return;
+    }
+
     if (popupState.alignItemWithTriggerActive) {
         positionerElement.setAttribute('data-side', 'none');
     }
 
     saveOriginalPositionerStyles(popupState, positionerElement);
+    popupState.initialPlaced = true;
+    popupElement.style.removeProperty('--transform-origin');
 
     if (!popupState.alignItemWithTriggerActive) {
         popupState.initialPlaced = true;
         notifyScrollArrowVisibility(rootState);
-        popupElement.style.removeProperty('--transform-origin');
         return;
     }
 
-    // queueMicrotask lets the pending render commit before we measure.
-    queueMicrotask(() => {
-        if (!rootState.isOpen) return;
-        if (!popupState.popupElement) return;
-        if (!rootState.positionerElement) return;
+    const placementRevision = rootState.openRevision;
+    const placementInputRevision = rootState.placementInputRevision;
+    if (
+        popupState.placementCommittedRevision === placementRevision &&
+        popupState.placementCommittedInputRevision === placementInputRevision
+    ) {
+        // Floating may transiently clear its visibility token while processing
+        // an update whose inputs are unchanged. The committed align geometry
+        // remains valid, so preserve visibility instead of hiding and later
+        // falling back to a differently sized standard layout.
+        positionerElement.setAttribute('data-positioned', '');
+        return;
+    }
+    if (
+        popupState.placementInProgressRevision === placementRevision &&
+        popupState.placementInProgressInputRevision === placementInputRevision
+    ) return;
 
-        const restoreTransformStyles = unsetTransformStyles(popupElement);
-        popupElement.style.removeProperty('--transform-origin');
+    popupState.placementInProgressRevision = placementRevision;
+    popupState.placementInProgressInputRevision = placementInputRevision;
 
-        try {
+    const restoreTransformStyles = unsetTransformStyles(popupElement);
+
+    try {
+            if (!rootState.isOpen || rootState.openRevision !== placementRevision) return;
+            if (rootState.placementInputRevision !== placementInputRevision) return;
+            if (!popupState.alignItemWithTriggerActive || popupState.standardFallbackPending) return;
+            if (!popupState.popupElement || !rootState.positionerElement) return;
+
             const positionerStyles = getComputedStyle(positionerElement);
             const popupStyles = getComputedStyle(popupElement);
             const doc = triggerElement.ownerDocument;
@@ -1834,15 +2320,22 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
                 rightOverflow = Math.max(0, left + positionerRect.width - maxRight);
             }
 
-            // === Measurement phase: project post-commit layout without mutating the DOM ===
-            // Once the mutations below are applied, the scroll container's clientHeight
-            // will equal `height` (popup fills positioner at 100%), so maxScrollTop is
-            // deterministic: scrollHeight - height.
-            const projectedMaxScrollTop = Math.max(0, scrollHeight - height);
-            const isTopPositioned = scrollTop >= projectedMaxScrollTop - SCROLL_EDGE_TOLERANCE_PX;
+            // React applies the governing height before reading maxScrollTop. A
+            // separate SelectList, padding, borders, and box sizing can make
+            // `scrollHeight - height` differ from the browser's live result.
+            positionerElement.style.position = 'fixed';
+            positionerElement.style.left = `${left + leftOverflow - rightOverflow}px`;
+            positionerElement.style.height = `${height}px`;
+            positionerElement.style.maxHeight = 'none';
+            positionerElement.style.marginTop = `${marginTop}px`;
+            positionerElement.style.marginBottom = `${marginBottom}px`;
+            popupElement.style.height = '100%';
+
+            const maxScrollTop = getMaxScrollTop(scroller);
+            const isTopPositioned = scrollTop >= maxScrollTop - SCROLL_EDGE_TOLERANCE_PX;
 
             if (isTopPositioned) {
-                height = Math.min(viewportHeight, positionerRect.height) - (scrollTop - projectedMaxScrollTop);
+                height = Math.min(viewportHeight, positionerRect.height) - (scrollTop - maxScrollTop);
             }
 
             const fallbackToAlignPopupToTrigger =
@@ -1854,23 +2347,15 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             const isPinchZoomed = visualScale !== 1 && isWebKit();
 
             if (fallbackToAlignPopupToTrigger || isPinchZoomed) {
-                if (!popupState.dotNetRef) {
+                if (!requestStandardPositioningFallback(rootState, popupState)) {
                     scheduleOpenAlignItemPlacement(rootId);
-                    return;
                 }
-
-                // Fallback BEFORE committing any style mutations so the popup has
-                // clean inline styles for the standard floating-positioner path.
-                popupState.initialPlaced = true;
-                clearPopupStylesInternal(rootState);
-                popupState.alignItemWithTriggerActive = false;
-                popupState.dotNetRef.invokeMethodAsync('OnFallbackToAlignPopupToTrigger').catch(() => { });
                 return;
             }
 
             attachWindowResizeListener(rootId);
 
-            // === Commit phase: apply all layout mutations together ===
+            // === Commit phase ===
             // Force `position: fixed` so the placement coordinates are resolved
             // against the viewport instead of the nearest positioned ancestor.
             // The body scroll-lock applies `position: relative` to <body>, which
@@ -1879,13 +2364,7 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             // "to the top of the page" for sections reached by scrolling.
             // Mirrors React's `FIXED = { position: 'fixed' }` branch for
             // `alignItemWithTriggerActive` in SelectPositioner.tsx.
-            positionerElement.style.position = 'fixed';
-            positionerElement.style.left = `${left + leftOverflow - rightOverflow}px`;
             positionerElement.style.height = `${height}px`;
-            positionerElement.style.maxHeight = 'auto';
-            positionerElement.style.marginTop = `${marginTop}px`;
-            positionerElement.style.marginBottom = `${marginBottom}px`;
-            popupElement.style.height = '100%';
 
             const initialHeight = Math.max(minHeight, height);
 
@@ -1908,6 +2387,8 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
             // the popup invisible until this attribute lands — eliminating the
             // brief flash of the floating-default placement.
             positionerElement.setAttribute('data-positioned', '');
+            popupState.placementCommittedRevision = placementRevision;
+            popupState.placementCommittedInputRevision = placementInputRevision;
 
             if (textRect) {
                 const popupTop = positionerRect.top;
@@ -1926,16 +2407,19 @@ export function beginAlignItemWithTriggerPlacement(rootId, alignItemWithTriggerA
 
             notifyScrollArrowVisibility(rootState);
 
-            setTimeout(() => {
-                popupState.initialPlaced = true;
-            }, 0);
-        } catch (error) {
-            void error;
-            scheduleOpenAlignItemPlacement(rootId);
-        } finally {
-            restoreTransformStyles();
+    } catch (error) {
+        void error;
+        scheduleOpenAlignItemPlacement(rootId);
+    } finally {
+        restoreTransformStyles();
+        if (
+            popupState.placementInProgressRevision === placementRevision &&
+            popupState.placementInProgressInputRevision === placementInputRevision
+        ) {
+            popupState.placementInProgressRevision = -1;
+            popupState.placementInProgressInputRevision = -1;
         }
-    });
+    }
 }
 
 export function handlePopupScroll(rootId, scroller) {
@@ -2039,8 +2523,28 @@ export function injectScrollbarDisableStyle(nonce) {
 
 export function setSelectedItemTextElement(rootId, element) {
     const rootState = state.roots.get(rootId);
-    if (rootState) {
+    if (rootState && rootState.selectedItemTextElement !== element) {
         rootState.selectedItemTextElement = element;
+        invalidateAlignItemPlacement(rootState);
+        if (
+            rootState.isOpen &&
+            rootState.positionerReadyElement === rootState.positionerElement &&
+            rootState.positionerReadyRevision === rootState.openRevision
+        ) {
+            beginAlignItemWithTriggerPlacement(rootId, true);
+        } else {
+            queueOpenAlignItemPlacement(rootId);
+        }
+        if (rootState.isOpen && element) {
+            requestAnimationFrame(() => {
+                if (!rootState.isOpen || rootState.selectedItemTextElement !== element) return;
+                const item = element.closest('[role="option"]');
+                const scroller = rootState.listElement || item?.closest('[role="listbox"]');
+                if (item && scroller) {
+                    scrollItemIntoViewIfNeeded(scroller, item);
+                }
+            });
+        }
     }
 }
 
@@ -2063,14 +2567,90 @@ export function getOptionDomIndex(element) {
     return -1;
 }
 
+function notifyOptionIndexes(rootState) {
+    const container = rootState.listElement || rootState.popupElement;
+    if (!container) return false;
+    const items = Array.from(container.querySelectorAll('[role="option"]'));
+    const layoutChanged =
+        items.length !== rootState.observedOptions.length ||
+        items.some((item, index) => rootState.observedOptions[index] !== item);
+    rootState.observedOptions = items;
+    for (let index = 0; index < items.length; index++) {
+        const registration = rootState.optionRegistrations.get(items[index]);
+        registration?.dotNetRef.invokeMethodAsync('OnDomIndexChanged', index).catch(() => { });
+    }
+    return layoutChanged;
+}
+
+function ensureOptionObserver(rootState) {
+    const container = rootState.listElement || rootState.popupElement;
+    if (!container || rootState.optionObserver) return;
+    rootState.optionObserver = new MutationObserver(() => {
+        if (notifyOptionIndexes(rootState)) {
+            invalidateAlignItemPlacement(rootState);
+            queueOpenAlignItemPlacement(rootState.rootId);
+        }
+    });
+    notifyOptionIndexes(rootState);
+    rootState.optionObserver.observe(container, { childList: true, subtree: true });
+}
+
+export function registerOption(rootId, element, dotNetRef) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !element) return -1;
+    const previousRegistration = rootState.optionRegistrations.get(element);
+    if (previousRegistration) {
+        element.removeEventListener('click', previousRegistration.clickHandler, true);
+    }
+    const registration = {
+        dotNetRef,
+        clickMetadata: null,
+        clickHandler(event) {
+            registration.clickMetadata = {
+                isVirtualClick: isVirtualClickEvent(event),
+                pointerTypeDefined: event.pointerType !== undefined
+            };
+        }
+    };
+    element.addEventListener('click', registration.clickHandler, true);
+    rootState.optionRegistrations.set(element, registration);
+    ensureOptionObserver(rootState);
+    const index = getOptionDomIndex(element);
+    queueMicrotask(() => notifyOptionIndexes(rootState));
+    return index;
+}
+
+export function unregisterOption(rootId, element) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState || !element) return;
+    const registration = rootState.optionRegistrations.get(element);
+    if (registration) {
+        element.removeEventListener('click', registration.clickHandler, true);
+    }
+    rootState.optionRegistrations.delete(element);
+    queueMicrotask(() => notifyOptionIndexes(rootState));
+}
+
+export function consumeOptionClickMetadata(rootId, element) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return null;
+    const registration = rootState.optionRegistrations.get(element);
+    const metadata = registration?.clickMetadata || rootState.optionClickMetadata.get(element) || null;
+    if (registration) registration.clickMetadata = null;
+    rootState.optionClickMetadata.delete(element);
+    return metadata;
+}
+
 export function getElementText(element) {
     return element?.textContent ?? null;
 }
 
 export function setValueElement(rootId, element) {
     const rootState = state.roots.get(rootId);
-    if (rootState) {
+    if (rootState && rootState.valueElement !== element) {
         rootState.valueElement = element;
+        invalidateAlignItemPlacement(rootState);
+        queueOpenAlignItemPlacement(rootId);
     }
 }
 
@@ -2097,6 +2677,13 @@ export function applyScrollLock(referenceElement) {
     const id = `sel-sl-${++scrollLocks.counter}`;
     scrollLocks.map.set(id, release);
     return id;
+}
+
+export function shouldLockTouchScroll(positionerElement) {
+    if (!(positionerElement instanceof HTMLElement)) return false;
+    const win = positionerElement.ownerDocument.defaultView;
+    if (!win) return false;
+    return positionerElement.getBoundingClientRect().width >= win.innerWidth - 20;
 }
 
 export function releaseScrollLock(id) {

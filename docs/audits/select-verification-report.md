@@ -1,50 +1,83 @@
 # Select Verification Report
 
-Date: 2026-06-10
-Repository: `Blazix.BaseUI`
+Date: 2026-07-21
 
-## Local Blazor Verification
+## Blazor Verification
 
-| Command | Result | Log |
-| --- | --- | --- |
-| `dotnet build Blazix.BaseUI.slnx` | Passed. 0 warnings, 0 errors. | `docs/audits/logs/select-dotnet-build.log` |
-| `dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --filter "FullyQualifiedName~Blazix.BaseUI.Tests.Select."` | Passed. 281 passed, 0 failed. | `docs/audits/logs/select-bunit-select.log` |
-| `dotnet test tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~Blazix.BaseUI.Playwright.Tests.Tests.Select."` | Passed. 44 passed, 0 failed. | `docs/audits/logs/select-playwright.log` |
-| `/opt/homebrew/bin/bash scripts/lint-rules.sh` | Passed. 0 textual lint violations. | `docs/audits/logs/select-lint-rules.log` |
+| Command/check | Result |
+| --- | --- |
+| `dotnet build Blazix.BaseUI.slnx -p:NuGetAudit=false` | Passed; 0 warnings, 0 errors. |
+| `bash scripts/lint-rules.sh` | Passed; 0 violations. Structural analyzers also passed in build. |
+| `dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --no-build -p:NuGetAudit=false --filter "FullyQualifiedName~Blazix.BaseUI.Tests.Select."` | Passed; 291/291. |
+| `dotnet test ...Blazix.BaseUI.Playwright.Tests.csproj --no-build --filter "FullyQualifiedName~Blazix.BaseUI.Playwright.Tests.Tests.Select"` | Passed; 86/86 across Server and WebAssembly. |
+| Focused popup-readiness regressions | Passed; 12/12 covering flat/grouped frame sizing, externally controlled reopen, runtime root rename/closed-transition rejection, watchdog no-commit behavior, and successful standard fallback in Server/WASM. |
+| `node --check` on Select/Floating/Portal source and minified modules | Passed. |
+| Vendored terser `--compress --mangle --module` for Select/Floating/Portal | Passed; minified assets regenerated after final JS changes. |
+| `git diff --check` | Passed. |
 
-## Source Verification
+The original full Playwright TRX is stored locally at `docs/audits/logs/select-playwright-2026-07-19.trx`. The final 86-case follow-up TRX is stored at `docs/audits/logs/select-playwright-2026-07-21-final.trx`. The popup-resize rerun transcript is stored at `docs/audits/logs/select-popup-resize-playwright-2026-07-21.log`. Generated logs are excluded from staging by repository policy.
 
-| Command | Result | Log |
-| --- | --- | --- |
-| `pnpm --dir .base-ui run docs:validate -- "(docs)/react/components/select"` | Passed. No files needed updating. Source emitted existing `IncludesInstantiable` warnings. | `docs/audits/logs/select-source-docs-validate.log` |
-| `pnpm --dir .base-ui run test:jsdom -- packages/react/src/select` | Passed. 277 files passed, 4 skipped; 6152 tests passed, 867 skipped. The workspace script runs additional configured projects. | `docs/audits/logs/select-source-jsdom.log` |
-| `pnpm --dir .base-ui --filter @base-ui/react run typescript` | Passed. | `docs/audits/logs/select-source-typescript.log` |
-| `pnpm --dir .base-ui exec playwright install chromium firefox webkit` | Passed after the first source browser run reported missing source browser binaries. | `docs/audits/logs/select-source-playwright-install.log` |
-| Bundled .NET Playwright Node driver `cli.js install chromium` | Passed after the .NET Playwright fixture reported missing Chromium build v1200 and `pwsh` was unavailable. | `docs/audits/logs/select-dotnet-playwright-install.log` |
-| `pnpm --dir .base-ui run test:browsers -- packages/react/src/select` | Failed due unrelated non-Select suites because the workspace script runs all configured projects. Select entries in the log show execution across browsers. | `docs/audits/logs/select-source-browsers.log` |
-| `pnpm --dir .base-ui exec cross-env TZ=UTC VITEST_ENV=all-browsers vitest --project @base-ui/react --run packages/react/src/select` | Failed inside React source browser run. 1393 passed, 48 skipped, 2 WebKit Select failures. | `docs/audits/logs/select-source-browsers-select-only.log` |
-| `pnpm --dir .base-ui exec cross-env TZ=UTC VITEST_ENV=chromium vitest --project @base-ui/react --run packages/react/src/select` | Passed. 18 files passed; 465 passed, 16 skipped. | `docs/audits/logs/select-source-browsers-chromium.log` |
-| `pnpm --dir .base-ui exec cross-env TZ=UTC VITEST_ENV=firefox vitest --project @base-ui/react --run packages/react/src/select` | Failed inside React source browser run. 17 files passed, 1 failed; 464 passed, 16 skipped, 1 source failure. | `docs/audits/logs/select-source-browsers-firefox.log` |
-| `pnpm --dir .base-ui exec cross-env TZ=UTC VITEST_ENV=webkit vitest --project @base-ui/react --run packages/react/src/select` | Failed inside React source browser run. 17 files passed, 1 failed; 464 passed, 16 skipped, 1 source failure. | `docs/audits/logs/select-source-browsers-webkit.log` |
+An exploratory broad unit filter matched 325 tests because unrelated method names contained `Select`; it reported 324 passes and one unrelated `FloatingFocusManagerTests.PassesInitialFocusSelectorOption` timing failure. The exact Select namespace rerun, including the delayed popup-reference regression added afterward, passed 291/291.
 
-## Manual Browser Check
+### Diagnostic iterations
 
-The in-app browser was used against the local test host to inspect a default-value Select instance. The audited checks confirmed:
+- The first full run after removing the unsafe watchdog visibility release passed 77/82. Five WASM keyboard/item cases remained hidden because popup JS initialization was conditioned on the parent's first render while the child `RenderElement` reference arrived later. The delayed-reference lifecycle repair made those five cases and the complete 13-case diagnostic filter pass.
+- The next full run passed 81/82; one Server `ArrowUpNavigatesToPreviousItem` assertion was intermittent and passed five consecutive isolated reruns. A clean full rerun then passed 82/82 before the two successful-fallback cases were added.
+- The initial successful-fallback regression did not enter the intended collision branch. The fixture was corrected to invoke the align placement entry point explicitly; both Server and WASM cases then passed and proved callback dispatch, Floating-owned `data-positioned`, non-`none` side, resolved size variables, and nonzero final geometry.
+- The first forced delayed-reference bUnit fixture did not produce an `ElementReference` under bUnit's custom-render capture. The fixture was corrected to inject the late reference into `RenderElement`, then verified zero initialization before availability and exactly one initialization across subsequent renders.
+- After the opening/scroll repair, the Select minified module was regenerated, the complete solution rebuilt, and the packaged-asset Playwright run passed 86/86.
+- The opening/scroll follow-up added a 16-option, three-group, `contain: layout` fixture with a 128px list viewport. The new Server/WASM regression selected the final item, reopened, moved from maximum scroll to zero, waited 1200 ms beyond the former final probe, and verified the popup stayed open, the selection remained `thyme`, and the first option was visible.
+- Per-animation-frame sizing capture now records popup/positioner height plus list `scrollTop`; every visible frame must remain equal to the first visible frame. Position changes are recorded but intentionally excluded because this regression concerns resizing, not repositioning. The first visible frame must occur within 16 animation frames of the open DOM state under the loaded Server/WASM harness.
+- The final WASM trace exposed a transient Floating update that cleared `data-positioned` after an align-item revision had committed. The old watchdog treated the missing token as failure and replaced the 556px aligned layout with the 128px standard layout. Current-revision commits now remain authoritative, preserve the visibility token through same-input Floating churn, and reject late standard fallback.
 
-- popup opens and renders visible content
-- positioner receives stable nonzero geometry
-- `data-positioned` is released after placement
-- trigger receives `data-popup-side="bottom"`
-- align-item DOM state uses source-equivalent `data-side` behavior
+## React Source Verification
 
-## Source Browser Residuals
+| Command/check | Result |
+| --- | --- |
+| `pnpm --dir .base-ui install --offline --frozen-lockfile` | Passed; workspace already current. |
+| `pnpm --dir .base-ui --filter @base-ui/utils build` | Passed; required because the workspace React package resolves Utils through its built symlink. |
+| `pnpm --dir .base-ui test:jsdom -- src/select` | Passed; workspace runner executed 304 files: 299 passed, 5 skipped; 6,875 passed, 1,113 skipped. All Select suites passed. |
+| `pnpm --dir .base-ui exec cross-env TZ=UTC VITEST_ENV=chromium vitest --project @base-ui/react --run packages/react/src/select` | Passed; 18/18 files, 493 passed, 16 skipped. |
+| `pnpm --dir .base-ui --filter @base-ui/react run typescript` | Passed. |
+| `pnpm --dir .base-ui run docs:validate -- "(docs)/react/components/select"` | Passed; no generated files changed. Existing `IncludesInstantiable` informational warnings were emitted. |
 
-These residuals are in the local React source browser tests and were not introduced by the Blazor port:
+An initial package-scoped Vitest invocation could not resolve `@base-ui/utils/error` because the local build-symlink target was stale. Building `@base-ui/utils` through PNPM repaired the source workspace; the canonical workspace jsdom and targeted Chromium runs then passed.
 
-- Firefox Select-only source run: `SelectRoot.test.tsx`, `prop: highlightItemOnHover`, expected `data-highlighted` after popup mouseout while disabled.
-- WebKit Select-only source run: `SelectRoot.test.tsx`, `select inside popover`, `vitest-fail-on-console` failed on a React `act(...)` warning.
-- Broad all-browser source run: unrelated upstream suites failed, including Menubar, Drawer, Menu, Checkbox, TemporalAdapterLuxon, and others.
+## In-App Browser Comparison
 
-## Staging Intent
+Compared the live React docs at `http://localhost:3005/react/components/select` with the local Blazor Server and WebAssembly harnesses.
 
-Stage only source, JS, and test changes required for the Select repair. Do not stage `docs/audits/**` logs or reports. The framework-agnostic spec was written under `../base-ui-specs/select`; that directory is outside this repository and is not a git repository in this environment.
+- React and Blazor triggers exposed `role=combobox`, `aria-expanded=true`, `aria-controls`, and a controlled listbox.
+- Both rendered one `tabindex=0` active option and string `aria-selected` values on open.
+- Blazor Arrow/Home/End navigation retained disabled-option focusability as upstream requires.
+- Enter on a disabled active option did not select or close.
+- Enter on an enabled option selected it, closed the popup, and returned focus to the combobox.
+- Every kept-mounted closing option immediately had `tabindex=-1`.
+- Server and WebAssembly harnesses produced no browser console errors or warnings.
+- Live source docs rendered all Select anatomy, positioning, multiple, object-value, grouped, labeling, placeholder, and API sections used for the comparison.
+
+### Reported WASM popup-resize reproduction
+
+- `ffprobe` identified the supplied recording as 830x1156 H.264, 346 frames, 6.025 seconds.
+- `ffmpeg` extracted every frame. On the recorded second open, frame 180 showed all options at the narrow intrinsic width, frame 181 hid the popup, and frame 182 showed the same populated popup at its final trigger-derived width. This isolated sizing readiness from repositioning and from incremental child rendering.
+- A pre-fix WASM DOM trace measured a fully populated visible popup at 129.7px before `--anchor-width`/`--available-height` existed, followed by the final 252px popup after middleware resolution.
+- After repair, the rebuilt docs were forced into WASM mode and sampled on every animation frame:
+
+| Docs sample | Visible frames sampled | Options present from first frame | Anchor width | Popup widths observed |
+| --- | ---: | ---: | ---: | --- |
+| Usage/hero | 290 | 5 | 160px | `188px` only |
+| Object values | 288 | 3 | 256px | `284px` only |
+| Grouped | 257 | 16 | 224px | `252px` only |
+
+Every sampled visible frame had `data-positioned`; no intrinsic-to-final resize occurred.
+
+## Automated Coverage Inventory
+
+- bUnit Select facts: 291.
+- Concrete Playwright Select cases: 86 (Server/WASM inheritance and theory data included).
+- React Chromium Select tests: 509 discovered, 493 passed, 16 skipped by upstream conditions.
+- Added regressions cover multiple disabled hidden inputs, multiple serializer isolation, dirty order/comparer semantics, disabled/repeated closed typeahead, programmatic value/no force-mount, generic/assistive virtual clicks, 5px/6px trigger release boundaries, first-visible-frame sizing and vertical stability with a changed trigger width, externally controlled reopen, root rename and closed-transition rejection, delayed popup element-reference initialization, watchdog no-commit ownership, successful standard fallback sizing/visibility, and grouped bottom-to-top scroll persistence beyond the former one-second probe window.
+
+## Staging Boundary
+
+Stage the Select repair, shared JS/portal/positioner dependencies, tests, durable audit Markdown, and regenerated minified assets. Do not stage raw logs or `output/`. Do not commit until the maintainer reports personal testing complete.

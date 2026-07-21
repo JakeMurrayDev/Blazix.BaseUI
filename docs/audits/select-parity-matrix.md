@@ -1,59 +1,49 @@
 # Select Parity Matrix
 
-Date: 2026-06-10
-Source root: `.base-ui/packages/react/src/select`
-Port root: `src/Blazix.BaseUI/Select`
+Date: 2026-07-21
+React head: `bdcb685fadcca9d18b18f013c052795a53b6aa33`
 
-| React source item | Required behavior | Blazor equivalent | Status |
+| React source/hook/utility | Required behavior | Blazor equivalent | Verification |
 | --- | --- | --- | --- |
-| `SelectRoot.tsx` | Canonical value/open/mounted/item/form state | `SelectRoot.razor`, `SelectRootContext.cs` | Verified |
-| `store.ts` selectors | Fine-grained selected, item, popup, label, side, transition state | Context properties plus `StateChanged` dispatch | Verified |
-| `SelectTrigger.tsx` | Combobox ARIA, field attrs, popup state attrs, mouseup gate, cancel-open, forwarded handlers | `SelectTrigger.razor`, `SelectTriggerState.cs`, JS event helpers | Repaired and verified |
-| `useButton` | Native button semantics and disabled/read-only interaction blocking | Trigger button attributes and guarded event paths | Verified |
-| `useTimeout` in trigger | Deferred mouseup listener and 400 ms selection gate | C# delay/cancellation and JS mouseup handling | Repaired and verified |
-| `useMergedRefs`, `useValueAsRef`, `useStableCallback` | Stable element refs and callbacks | ElementReference registration, context setters, guarded handlers | Verified |
-| `useFieldRootContext`, `useLabelableContext`, `useLabelableId` | Field label/description/name/disabled/invalid integration | Existing Blazor field and label contexts | Verified |
-| `SelectValue.tsx` | Placeholder, label formatting, object and multiple values | `SelectValue.razor` | Verified |
-| `SelectIcon.tsx` | Open state data attributes | `SelectIcon.razor` | Verified |
-| `SelectPortal.tsx` | Mounted/force-mounted portal behavior | `SelectPortal.razor` | Verified |
-| `SelectBackdrop.tsx` | Internal backdrop open/mounted/transition state | `SelectBackdrop.razor`, select JS | Verified |
-| `SelectPositioner.tsx` | Floating position, side/align attrs, align-item fallback, resize behavior | `SelectPositioner.razor`, `blazix-baseui-floating.js`, `blazix-baseui-select.js` | Repaired and verified |
-| `useAnchorPositioning` | DOM geometry, physical side, available size, transform origin | Shared floating JS plus Select positioner callbacks | Repaired and verified |
-| `SelectPopup.tsx` | Listbox/presentation role switching, focus, transition attrs, popup ref | `SelectPopup.razor`, select JS | Repaired and verified |
-| Popup utils | Align selected/first item to trigger and release positioning after geometry | `blazix-baseui-select.js` scheduler and watchdog | Repaired and verified |
-| `SelectArrow.tsx` | Arrow side/align/open attrs and CSS vars | `SelectArrow.razor` | Verified |
-| `SelectList.tsx` | Own listbox role when present, list ref lifetime | `SelectList.razor` | Repaired and verified |
-| `SelectGroup.tsx` | Group context propagation | `SelectGroup.razor`, `SelectGroupContext.cs` | Verified |
-| `SelectGroupLabel.tsx` | Label id registration, no role | `SelectGroupLabel.razor`, group context | Repaired and verified |
-| `SelectItem.tsx` | Option role, disabled/read-only guards, highlighted/selected state, pointer selection | `SelectItem.razor` | Repaired and verified |
-| `SelectItemText.tsx` | Text ref registration and selected text display | `SelectItemText.razor` | Verified |
-| `SelectItemIndicator.tsx` | Selected transition mount/unmount state | `SelectItemIndicator.razor` | Repaired and verified |
-| `SelectScrollArrow.tsx` | Scroll arrow visibility and hover scroll behavior | `SelectScrollUpArrow.razor`, `SelectScrollDownArrow.razor`, select JS | Verified |
-| `useTransitionStatus` | Open/closed/starting/ending transition state | Component transition state and `OnTransitionEnd` | Repaired and verified |
-| `useOpenChangeComplete` | Completion callback after current transition only | `SelectRoot.razor`, indicator/arrow completion handling | Repaired and verified |
-| `useIsoLayoutEffect` | Layout-time DOM registration and cleanup | `OnAfterRenderAsync`, dispose methods, JS registration | Repaired and verified |
-| `useRenderElement` | Custom render element, state, attrs, class/style functions | `RenderElement<TState>` across Select parts | Verified |
-| Data attribute files | Source data attributes emitted only when applicable | Component state dictionaries and tests | Repaired and verified |
-| ARIA attributes | String boolean ARIA and source role ownership | Component attributes and bUnit assertions | Repaired and verified |
-| Hidden inputs | Native form, autofill, validation, multiple serialization | `SelectRoot.razor` form input rendering/change handling | Repaired and verified |
-| Source docs | Docs output matches source | PNPM docs validation | Verified |
-| Source tests | React source baseline used for comparison | PNPM jsdom/typescript/browser logs | Accounted |
+| `SelectRoot.tsx`, store selectors | Canonical open/value/mounted/active/form state | `SelectRoot.razor`, `SelectRootContext.cs` | 291 bUnit + browser |
+| React synced-value/value-change hooks | Effects only after resolved controlled/uncontrolled change | `OnParametersSet` observer and snapshots | Programmatic-value regression |
+| Root ID test | Dynamic trigger/label/list/ARIA IDs | Mutable context ID + JS `renameRoot` | Build/bUnit structure |
+| Hidden input/form utilities | Single/multiple serialization, disabled, required, autofill, visually hidden variants | Root input rendering and guarded change handler | bUnit |
+| Field/label contexts | Name, filled, dirty, touched, invalid, described/labelled state | Field and Labelable contexts | bUnit |
+| `SelectTrigger`/click interaction | Combobox semantics, 400ms gate, 5px slip tolerance | Trigger Razor + component JS | Server/WASM Playwright |
+| `SelectValue`, `resolveValueLabel` | Placeholder, rich labels, multiple labels, object Label/Value | `SelectValue`, `SelectOption.LabelContent`, `SelectValueResolver` | bUnit/source browser |
+| `SelectLabel` | Visible label registration and focus | `SelectLabel` | Server/WASM Playwright |
+| `SelectPortal`/FloatingPortal | Mount lifetime and selector/element target | `SelectPortal`, shared `Portal.TargetElement` | Build/browser |
+| `SelectPopup` | Role ownership, transition state, focus restore/final focus, delayed element-reference registration | Popup + FloatingFocusManager + first-available-reference lifecycle gate | bUnit + Server/WASM Playwright |
+| Focus manager open method | Programmatic opener vs trigger return | `InteractionType`, single FFM owner | In-app browser + Playwright |
+| Anchored popup scroll lock | Non-touch lock; full-width touch only | DOM width measurement + positioner desired state | Browser architecture |
+| `SelectPositioner`, `useAnchorPositioning` | Static/function offsets, per-side padding, element/virtual anchors/boundaries | Positioner parameters + shared Floating JS | Build/source mapping |
+| `useFloating.isPositioned`, `size()` middleware | Popup stays hidden until the current open has fresh anchor/available-size output | Per-open readiness revision, controlled pre-open handoff, suspended generation reset, C# `IsPositioned`, same-frame JS commit | Server/WASM frame regression + WASM docs trace |
+| `a68d387d6a` close-transition reset | Reopen cannot reuse stale position or sizing | Close/open invalidation, `data-positioned` removal, fresh Floating UI update | Reopen with trigger width changed 224px to 280px |
+| Controlled open and root rename | Pre-open callbacks target exactly the next revision, reject closed-transition auto-updates, and follow a changed root ID | Explicit pre-open reset token + pending readiness revision + mutable positioner registration root ID | Server/WASM controlled reopen and rename regressions |
+| Placement watchdog and standard fallback | Retry stalled commits without exposing uncommitted geometry; switch ownership atomically when align placement cannot complete | Watchdog calls placement only; fallback cancels queued align commits and starts standard Floating UI with restored anchor tracking | Server/WASM no-commit and successful-fallback regressions |
+| `ownerWindow(floating).devicePixelRatio` | Pixel snapping uses the floating element's realm | `ownerDocument.defaultView?.devicePixelRatio` | JS source inspection and syntax check |
+| Collision middleware | Raw shift/size padding; biased flip only | Shared Floating JS overflow options | JS syntax/source mapping |
+| Align-item popup logic | Current-revision sizing, fixed pre-position state, no stale origin, `maxHeight:none` | Select JS generation gate and placement commit | Per-rAF in-app browser + Playwright |
+| Popup placement effect dependencies | Stable open/layout inputs commit once; active index and arrow visibility do not replay placement | Open/input revision commit guard; transition-only C# readiness call; no fixed-delay probes | Server/WASM 1.2-second grouped-scroll regression |
+| Committed placement visibility | A same-input Floating update cannot hide or replace a valid align-item layout | Current-revision commit preserves `data-positioned` and blocks late standard fallback | Server/WASM per-frame height regression |
+| Scroll edges/growth | Fractional normalization and reduced mutation path | Select JS normalization/growth handler | Source/browser mapping |
+| `SelectList` | Live listbox ownership/registration | `SelectList` | bUnit/browser |
+| Composite item registry | Atomic metadata/index and grouped reorder handling | Context registry + shared option MutationObserver | bUnit/browser |
+| List navigation | Disabled focusable by arrows; skipped initially | Separate next/next-enabled functions | In-app browser |
+| Composite nearest scrolling | Selected and active items scroll correctly through nested group offset parents | Open-layout readiness gate + list-relative rectangle scrolling | Server/WASM overflowing grouped fixture |
+| Typeahead | Disabled skip, repeated cycling, buffered current match | JS open + C# closed typeahead | Added bUnit/source tests |
+| `SelectItem` | Option state, disabled/read-only guard, consumer-first click, drag | `SelectItem` + root guards | bUnit/browser |
+| Item virtual-click gate | Generic virtual clicks require highlight; assistive pointer metadata may activate unhighlighted items | Native capture metadata + C# commit gate | Server/WASM Playwright |
+| Custom item keyboard | Preserved modifiers, one activation, prevented keydown | `activateItemFromKeydown` | Source mapping/JS syntax |
+| Item tab order | `open && highlighted` | Item attribute builder | In-app browser |
+| `SelectItemText` | Text and selected-text refs | `SelectItemText` context registration | bUnit |
+| `SelectItemIndicator`/transition hook | Real CSS lifetime and reversal | JS part transition listener | bUnit/build |
+| `SelectScrollArrow`/scroll edges | Visibility, hover scrolling, real transition lifetime | Arrow components + Select JS | bUnit/source browser |
+| Group/GroupLabel | Group semantics and label association | Group contexts | bUnit |
+| Arrow/Icon/Backdrop | Source state and structural attributes | Matching Razor parts | bUnit/source tests |
+| `useRenderElement` | Custom render/state/class/style without fragment caching | `RenderElement<TState>`; live fragment resolution | Build/bUnit |
 
-## Source Component Test Coverage
+## Verification Judgment
 
-| Source test group | Chromium | Firefox | WebKit | Notes |
-| --- | --- | --- | --- | --- |
-| Root | Pass | 1 source-runner failure | 1 source-runner failure | Failures are in React source browser run, not Blazor port |
-| Trigger | Pass | Pass | Pass | Covered in Blazor bUnit and Playwright |
-| Popup | Pass | Pass | Pass | Covered in Blazor bUnit and Playwright |
-| Positioner | Pass | Pass | Pass | Covered in Blazor bUnit and Playwright |
-| Item | Pass | Pass | Pass | Covered in Blazor bUnit |
-| Value | Pass | Pass | Pass | Covered in Blazor bUnit |
-| List | Pass | Pass | Pass | Covered in Blazor bUnit |
-| Group/GroupLabel | Pass | Pass | Pass | Covered in Blazor bUnit |
-| ItemText/Indicator | Pass | Pass | Pass | Covered in Blazor bUnit |
-| Arrow/Scroll arrows/Icon/Portal/Backdrop | Pass | Pass | Pass | Covered by source and Blazor tests where ported |
-
-## Validation Judgment
-
-The Blazor Select port now has verified equivalents for all React source hooks, utilities, contexts, attributes, and DOM-heavy behaviors identified during the audit. DOM geometry and focus behaviors remain in JavaScript by design and are covered by browser tests.
+Every Select production part, hook-equivalent, utility, ARIA/data attribute, and audited upstream fix has a verified Blazor equivalent. DOM geometry, focus, ordering, transition, and scroll work remains in JavaScript; canonical public/structural state remains in Blazor.

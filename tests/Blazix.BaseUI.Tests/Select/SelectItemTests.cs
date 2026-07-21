@@ -75,9 +75,9 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         var cut = Render(CreateSelectWithItems(defaultOpen: true));
 
         var items = cut.FindAll("[role='option']");
-        // React parity: a mouse click on an item requires the item to be highlighted first
-        // (normally achieved by onmouseenter in a real browser).
-        await items[0].TriggerEventAsync("onmouseenter", new MouseEventArgs());
+        // React parity: a real unhighlighted mouse click is accepted when pointerdown
+        // began on the item.
+        await items[0].TriggerEventAsync("onpointerdown", new PointerEventArgs { PointerType = "mouse" });
         items = cut.FindAll("[role='option']");
         items[0].Click();
 
