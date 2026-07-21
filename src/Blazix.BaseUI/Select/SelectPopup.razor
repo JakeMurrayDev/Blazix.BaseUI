@@ -21,6 +21,8 @@
                           Disabled="@(!(RootContext?.GetMounted() ?? false))"
                           InitialFocus="@false"
                           FinalFocus="FinalFocus"
+                          RestoreFocus="@true"
+                          InteractionType="@ResolveOpenInteractionType()"
                           CloseOnFocusOut="@true">
         @ChildContent
     </FloatingFocusManager>
@@ -38,6 +40,7 @@
     private bool resizeAttached;
     private bool previousOpen;
     private bool previousAlignActive;
+    private bool previousPositionerIsPositioned;
     private bool? previousHighlightItemOnHover;
     private bool? previousFinalFocusManaged;
     private bool subscribedToStateChanged;
@@ -127,6 +130,7 @@
         if (RootContext is not null)
         {
             RootContext.FinalFocus = FinalFocus;
+            RootContext.PopupId = $"{RootContext.RootId}-list";
         }
 
         BuildStateAndAttributes();
@@ -141,7 +145,11 @@
         var alignActive = state.AlignItemWithTriggerActive;
         var finalFocusManaged = FinalFocus.HasValue;
 
-        if (firstRender && Element.HasValue && !jsInitialized)
+        // RenderElement publishes its captured ElementReference after the parent
+        // component's first render in some WASM scheduling orders. Initialize as
+        // soon as the reference exists instead of permanently missing popup JS
+        // registration when it was unavailable on firstRender.
+        if (Element.HasValue && !jsInitialized)
         {
             RootContext.SetPopupElement(Element);
 
@@ -211,12 +219,14 @@
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { _ = ex; }
         }
 
-        // Run alignItemWithTrigger placement on every render while active & open.
-        // The JS routine is idempotent and owns releasing the FOUC hide by setting
-        // data-positioned after it writes the fixed placement. Waiting for the C#
-        // IsPositioned round-trip can leave Server-rendered popups invisible when
-        // Floating UI's first callback is delayed or skipped.
-        if (isActiveAndOpen)
+        // Match React's `alignItemWithTriggerActive && isPositioned` gate. The
+        // JS callback from Floating UI owns the first placement without waiting
+        // for a Server round-trip; subsequent renders may refine the placement
+        // only after size middleware has resolved the anchor/viewport variables.
+        var isPositioned = PositionerContext?.IsPositioned == true;
+        var placementBecameReady = isActiveAndOpen && isPositioned &&
+            (!previousOpen || !previousAlignActive || !previousPositionerIsPositioned);
+        if (placementBecameReady)
         {
             try
             {
@@ -251,6 +261,7 @@
 
         previousOpen = open;
         previousAlignActive = alignActive;
+        previousPositionerIsPositioned = isPositioned;
     }
 
     /// <inheritdoc />
@@ -346,6 +357,15 @@
         state = new SelectPopupState(open, side, align, transitionStatus, alignActive);
         BuildComponentAttributes();
     }
+
+    private string? ResolveOpenInteractionType() => RootContext?.OpenInteractionType switch
+    {
+        InteractionType.Keyboard => "keyboard",
+        InteractionType.Mouse => "mouse",
+        InteractionType.Touch => "touch",
+        InteractionType.Pen => "pen",
+        _ => null
+    };
 
     private void OnRootStateChanged()
     {

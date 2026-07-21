@@ -41,7 +41,9 @@
     private bool computedArrowUncentered;
     private bool controlledAlignItemWithTrigger;
     private bool alignItemWithTriggerActive;
+    private bool lastOpen;
     private bool lastMounted;
+    private bool positionerResetPending;
     private int prevItemMapSize;
     private List<object?> prevItemMapValues = new();
     private bool itemMapSubscribed;
@@ -50,6 +52,7 @@
     private Task scrollLockOp = Task.CompletedTask;
     private ElementReference? lastPositionerElement;
     private bool rootStateSubscribed;
+    private bool touchScrollLock;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -70,25 +73,52 @@
     /// Gets or sets the distance between the anchor and the popup in pixels.
     /// </summary>
     [Parameter]
-    public int SideOffset { get; set; }
+    public double SideOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that computes the side offset from the current
+    /// anchor and popup dimensions.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? SideOffsetFunction { get; set; }
 
     /// <summary>
     /// Gets or sets additional offset along the alignment axis in pixels.
     /// </summary>
     [Parameter]
-    public int AlignOffset { get; set; }
+    public double AlignOffset { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that computes the alignment-axis offset from the
+    /// current anchor and popup dimensions.
+    /// </summary>
+    [Parameter]
+    public Func<OffsetData, double>? AlignOffsetFunction { get; set; }
 
     /// <summary>
     /// Gets or sets additional space to maintain from the edge of the collision boundary.
     /// </summary>
     [Parameter]
-    public int CollisionPadding { get; set; } = 5;
+    public double CollisionPadding { get; set; } = 5;
+
+    /// <summary>
+    /// Gets or sets per-side collision padding. When set, this takes precedence
+    /// over <see cref="CollisionPadding"/>.
+    /// </summary>
+    [Parameter]
+    public SidePadding? CollisionPaddingPerSide { get; set; }
 
     /// <summary>
     /// Gets or sets an element or rectangle that delimits the area the popup is confined to.
     /// </summary>
     [Parameter]
     public CollisionBoundary CollisionBoundary { get; set; } = CollisionBoundary.ClippingAncestors;
+
+    /// <summary>
+    /// Gets or sets a concrete DOM element used as the collision boundary.
+    /// </summary>
+    [Parameter]
+    public ElementReference? CollisionBoundaryElement { get; set; }
 
     /// <summary>
     /// Gets or sets how to handle collisions when positioning the popup.
@@ -139,6 +169,18 @@
     /// </summary>
     [Parameter]
     public ElementReference? Anchor { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that resolves the current DOM anchor.
+    /// </summary>
+    [Parameter]
+    public Func<ElementReference?>? AnchorProvider { get; set; }
+
+    /// <summary>
+    /// Gets or sets a virtual rectangle used instead of a DOM anchor.
+    /// </summary>
+    [Parameter]
+    public SelectVirtualAnchor? VirtualAnchor { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -242,25 +284,54 @@
             lastPositionerElement = Element;
         }
 
+        if (positionerInterop.HasRendered && Element.HasValue && positionerResetPending && positionerInterop.IsInitialized)
+        {
+            positionerResetPending = !await ResetPositionerForOpenAsync();
+        }
+
         if (positionerInterop.HasRendered && Element.HasValue && RootContext?.Mounted == true)
         {
             if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
+                positionerResetPending = false;
             }
-            else if (!alignItemWithTriggerActive)
+            else if (!alignItemWithTriggerActive || !positionerContext.IsPositioned)
             {
-                // Skip floating-ui re-positioning when alignItemWithTrigger is active.
-                // The popup-level `beginAlignItemWithTriggerPlacement` pass owns placement
-                // in that mode; running `updatePosition` here overwrites those styles
-                // with the standard bottom-of-trigger layout, producing a visible flash
-                // (notably during exit transitions, when no microtask re-applies
-                // align-item styles afterward). Mirrors React's discard of
-                // `positioning.positionerStyles` in favor of FIXED while align-item is on.
+                // Align-item placement still requires one Floating UI pass per open
+                // to refresh size middleware variables and its readiness revision.
+                // The JS floating layer computes that pass without writing visual
+                // coordinates while align-item mode owns the fixed placement.
                 // `DisableAnchorTracking` only disables anchor resize/layout-shift
                 // observers in Base UI; it does not suppress mount/open/rerender
                 // position recomputation.
                 await UpdatePositionAsync();
+            }
+        }
+
+        if (Element.HasValue && RootContext is not null)
+        {
+            var shouldMeasureTouchLock = RootContext.Open &&
+                RootContext.OpenInteractionType == InteractionType.Touch &&
+                (AlignItemWithTrigger || RootContext.Modal);
+            var nextTouchScrollLock = false;
+            if (shouldMeasureTouchLock)
+            {
+                try
+                {
+                    var module = await SelectModule.Value;
+                    nextTouchScrollLock = await module.InvokeAsync<bool>("shouldLockTouchScroll", Element.Value);
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+                {
+                    _ = ex;
+                }
+            }
+
+            if (nextTouchScrollLock != touchScrollLock)
+            {
+                touchScrollLock = nextTouchScrollLock;
+                SyncRootState();
             }
         }
     }
@@ -341,6 +412,18 @@
     /// position callback pattern so <c>data-side</c>/<c>data-align</c>/
     /// <c>data-anchor-hidden</c> and the positioner context reflect the
     /// post-collision values.
+    /// </summary>
+    [JSInvokable]
+    public double ComputeSideOffset(OffsetData data) => SideOffsetFunction?.Invoke(data) ?? SideOffset;
+
+    /// <summary>
+    /// Computes the alignment offset for JavaScript positioning middleware.
+    /// </summary>
+    [JSInvokable]
+    public double ComputeAlignOffset(OffsetData data) => AlignOffsetFunction?.Invoke(data) ?? AlignOffset;
+
+    /// <summary>
+    /// Receives an effective placement update from the positioning middleware.
     /// </summary>
     [JSInvokable]
     public void OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
@@ -429,6 +512,12 @@
         var modal = RootContext.Modal;
         var openMethod = RootContext.OpenInteractionType;
 
+        if (open && !lastOpen)
+        {
+            positionerContext.IsPositioned = false;
+            positionerResetPending = true;
+        }
+
         // Reset the latch when unmounted so the next open picks up the current prop.
         if (!mounted && controlledAlignItemWithTrigger != AlignItemWithTrigger)
         {
@@ -451,22 +540,21 @@
                 RootContext.ScrollDownArrowVisible = false;
             }
 
-            // Intentionally do NOT reset `positionerContext.IsPositioned` here.
-            // Mirrors React's `useFloating`: `isPositioned` stays true across
-            // opens for a persistent positioner — only a true unmount (Dispose)
-            // resets it. Resetting here would close SelectPopup's align-item
-            // gate, and because `OnAfterRenderAsync` deliberately skips
-            // `UpdatePositionAsync` while `alignItemWithTriggerActive` is on,
-            // `OnPositionUpdated` would never re-fire to flip it back true,
-            // leaving every reopen stuck at the floating-default placement.
+            // React resets useFloating's isPositioned latch after the close
+            // transition. A keep-mounted Blazor positioner must do the same so
+            // stale anchor and viewport sizing cannot release the next open.
+            positionerContext.IsPositioned = false;
+            positionerResetPending = true;
         }
 
         RootContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
         RootContext.PopupSide = computedSide;
 
-        // Body scroll lock, per React useScrollLock((aliw || modal) && open && !touch).
+        // Anchored-popup scroll lock: non-touch opens lock immediately; touch
+        // opens lock only when the popup nearly spans the viewport.
         var shouldScrollLock =
-            (alignItemWithTriggerActive || modal) && open && openMethod != InteractionType.Touch;
+            (alignItemWithTriggerActive || modal) && open &&
+            (openMethod != InteractionType.Touch || touchScrollLock);
 
         // Use a synchronous desired-state flag and a chained task to prevent
         // double-acquire races when multiple renders fire before the async
@@ -489,7 +577,31 @@
         positionerContext.AlignItemWithTriggerActive = alignItemWithTriggerActive;
 
         BuildComponentAttributes();
+        lastOpen = open;
         lastMounted = mounted;
+    }
+
+    private async Task<bool> ResetPositionerForOpenAsync()
+    {
+        if (RootContext is null || string.IsNullOrEmpty(positionerInterop.PositionerId))
+        {
+            return false;
+        }
+
+        try
+        {
+            var module = await SelectModule.Value;
+            await module.InvokeVoidAsync( // lint-ignore:RULE-09 Catch filter uses IsJSInteropUnavailable helper covering JSDisconnectedException, TaskCanceledException, and the SignalR-init InvalidOperationException.
+                "resetPositionerForOpen",
+                positionerInterop.PositionerId,
+                RootContext.RootId);
+            return true;
+        }
+        catch (Exception ex) when (IsJSInteropUnavailable(ex))
+        {
+            _ = ex;
+            return false;
+        }
     }
 
     private void BuildComponentAttributes()
@@ -599,7 +711,9 @@
         SideOffset = SideOffset,
         AlignOffset = AlignOffset,
         CollisionPadding = CollisionPadding,
+        CollisionPaddingPerSide = CollisionPaddingPerSide,
         CollisionBoundary = CollisionBoundary,
+        CollisionBoundaryElement = CollisionBoundaryElement,
         ArrowPadding = ArrowPadding,
         Sticky = Sticky,
         PositionMethod = PositionMethod,
@@ -615,8 +729,8 @@
             return;
         }
 
-        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
-        if (!anchorElement.HasValue)
+        var anchorElement = AnchorProvider?.Invoke() ?? Anchor ?? RootContext.GetTriggerElement();
+        if (!anchorElement.HasValue && VirtualAnchor is null)
         {
             return;
         }
@@ -633,12 +747,18 @@
         // dependency on slow Server circuits).
         await positionerInterop.InitializeAsync(
             Element.Value,
-            anchorElement.Value,
+            anchorElement ?? default,
             BuildConfig(),
             arrowElement,
             alignItemWithTriggerActive,
             positionerDotNetRef,
-            RootContext.RootId);
+            RootContext.RootId,
+            SideOffsetFunction is not null,
+            AlignOffsetFunction is not null,
+            VirtualAnchor is { } virtualAnchor
+                ? new { x = virtualAnchor.X, y = virtualAnchor.Y, width = virtualAnchor.Width, height = virtualAnchor.Height }
+                : null,
+            DisableAnchorTracking);
     }
 
     private async Task UpdatePositionAsync()
@@ -648,13 +768,23 @@
             return;
         }
 
-        var anchorElement = Anchor ?? RootContext.GetTriggerElement();
-        if (!anchorElement.HasValue)
+        var anchorElement = AnchorProvider?.Invoke() ?? Anchor ?? RootContext.GetTriggerElement();
+        if (!anchorElement.HasValue && VirtualAnchor is null)
         {
             return;
         }
 
-        await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement, alignItemWithTriggerActive);
+        await positionerInterop.UpdateAsync(
+            anchorElement ?? default,
+            BuildConfig(),
+            arrowElement,
+            alignItemWithTriggerActive,
+            SideOffsetFunction is not null,
+            AlignOffsetFunction is not null,
+            VirtualAnchor is { } virtualAnchor
+                ? new { x = virtualAnchor.X, y = virtualAnchor.Y, width = virtualAnchor.Width, height = virtualAnchor.Height }
+                : null,
+            DisableAnchorTracking);
     }
 
     /// <summary>

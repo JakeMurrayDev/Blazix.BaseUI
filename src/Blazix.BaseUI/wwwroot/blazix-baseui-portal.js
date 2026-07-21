@@ -6,9 +6,11 @@ if (!window[STATE_KEY]) {
 
 const portalMap = window[STATE_KEY];
 
-export function createPortal(id, target = "body") {
+export function createPortal(id, target = "body", targetElement = null) {
     const content = document.getElementById(id);
-    const container = document.querySelector(target);
+    const container = targetElement instanceof Element || targetElement instanceof ShadowRoot
+        ? targetElement
+        : document.querySelector(target);
 
     if (content && container) {
         if (!portalMap.has(id)) {

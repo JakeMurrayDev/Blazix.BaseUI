@@ -591,7 +591,10 @@ export async function initializePositioner(options) {
         computedSide: side,
         computedAlign: align,
         computedAnchorHidden: false,
-        computedArrowUncentered: false
+        computedArrowUncentered: false,
+        hasPositioned: false,
+        generation: 0,
+        suspended: false
     };
 
     state.positioners.set(positionerId, positionerState);
@@ -608,6 +611,7 @@ export async function updatePositioner(positionerId, options) {
     const previousTriggerElement = positionerState.triggerElement;
     const previousDisableAnchorTracking = positionerState.disableAnchorTracking;
     Object.assign(positionerState, options);
+    positionerState.suspended = false;
     await updatePositionInternal(positionerState);
 
     const triggerElementChanged = Object.prototype.hasOwnProperty.call(options, 'triggerElement')
@@ -616,6 +620,16 @@ export async function updatePositioner(positionerId, options) {
         || (options.disableAnchorTracking !== undefined && options.disableAnchorTracking !== previousDisableAnchorTracking)) {
         await setupAutoUpdate(positionerState);
     }
+}
+
+export function resetPositioner(positionerId) {
+    const positionerState = state.positioners.get(positionerId);
+    if (!positionerState) return;
+
+    positionerState.generation += 1;
+    positionerState.suspended = true;
+    positionerState.hasPositioned = false;
+    positionerState.positionerElement?.removeAttribute('data-positioned');
 }
 
 export function disposePositioner(positionerId) {
@@ -710,13 +724,20 @@ async function updatePositionInternal(positionerState) {
         sideOffset,
         alignOffset,
         collisionPadding,
+        collisionBoundary,
         arrowElement,
         sticky,
         positionMethod,
         collisionAvoidance
     } = positionerState;
 
-    if (!positionerElement || !triggerElement) return;
+    if (!positionerElement || !triggerElement || positionerState.suspended) return;
+
+    const generation = positionerState.generation;
+    const isCurrentGeneration = () =>
+        state.positioners.get(positionerState.positionerId) === positionerState &&
+        positionerState.generation === generation &&
+        !positionerState.suspended;
 
     // Skip positioning when the element is inside a display:none container (e.g. portal
     // still has display:none during first render). autoUpdate's ResizeObserver will
@@ -725,6 +746,7 @@ async function updatePositionInternal(positionerState) {
 
     try {
         const FloatingUI = await ensureFloatingUI();
+        if (!isCurrentGeneration()) return;
 
         // Ensure the element's CSS position matches the strategy BEFORE computePosition
         // reads offsetParent. The FOUC CSS rule applies position:fixed !important which
@@ -774,21 +796,28 @@ async function updatePositionInternal(positionerState) {
             }));
         }
 
-        // Normalize collision padding into per-side object and add iOS bias
+        // Normalize collision padding. Flip gets a 1px precedence inset on every
+        // side plus an extra 1px on the preferred-side edge. Shift/size retain
+        // the exact caller-provided padding.
         const rawPadding = typeof collisionPadding === 'object' && collisionPadding !== null
             ? collisionPadding
             : { top: collisionPadding || 0, right: collisionPadding || 0, bottom: collisionPadding || 0, left: collisionPadding || 0 };
-        const bias = 1;
-        const biasedPadding = {
-            top: (rawPadding.top || 0) + (side === 'bottom' ? bias : 0),
-            bottom: (rawPadding.bottom || 0) + (side === 'top' ? bias : 0),
-            left: (rawPadding.left || 0) + (side === 'right' ? bias : 0),
-            right: (rawPadding.right || 0) + (side === 'left' ? bias : 0)
+        const flipPadding = {
+            top: (rawPadding.top || 0) + 1 + (side === 'bottom' ? 1 : 0),
+            bottom: (rawPadding.bottom || 0) + 1 + (side === 'top' ? 1 : 0),
+            left: (rawPadding.left || 0) + 1 + (side === 'right' ? 1 : 0),
+            right: (rawPadding.right || 0) + 1 + (side === 'left' ? 1 : 0)
         };
+        const overflowBoundary = collisionBoundary instanceof Element || Array.isArray(collisionBoundary)
+            ? { boundary: collisionBoundary }
+            : collisionBoundary === 'viewport'
+                ? { rootBoundary: 'viewport' }
+                : { boundary: 'clippingAncestors' };
 
         // Flip middleware (handles side collision)
         const flipMiddleware = ca.side === 'none' ? null : FloatingUI.flip({
-            padding: biasedPadding,
+            padding: flipPadding,
+            ...overflowBoundary,
             mainAxis: ca.side === 'flip',
             crossAxis: ca.align === 'flip' ? 'alignment' : false,
             fallbackAxisSideDirection: ca.fallbackAxisSide
@@ -800,7 +829,8 @@ async function updatePositionInternal(positionerState) {
         const shiftCrossAxis = positionerState.shiftCrossAxis || false;
 
         const shiftMiddleware = shiftDisabled ? null : FloatingUI.shift({
-            padding: biasedPadding,
+            padding: rawPadding,
+            ...overflowBoundary,
             mainAxis: ca.align !== 'none',
             crossAxis: crossAxisShiftEnabled,
             limiter: (sticky || shiftCrossAxis) ? undefined : FloatingUI.limitShift(arrowElement ? (limitData) => {
@@ -809,8 +839,8 @@ async function updatePositionInternal(positionerState) {
                 const sideAxis = (placementSide === 'top' || placementSide === 'bottom') ? 'y' : 'x';
                 const arrowSize = sideAxis === 'y' ? width : height;
                 const offsetAmount = sideAxis === 'y'
-                    ? biasedPadding.left + biasedPadding.right
-                    : biasedPadding.top + biasedPadding.bottom;
+                    ? rawPadding.left + rawPadding.right
+                    : rawPadding.top + rawPadding.bottom;
                 return { offset: arrowSize / 2 + offsetAmount / 2 };
             } : undefined)
         });
@@ -827,13 +857,16 @@ async function updatePositionInternal(positionerState) {
         // Size middleware for available space
         middleware.push(FloatingUI.size({
             padding: collisionPadding,
+            ...overflowBoundary,
             apply({ availableWidth, availableHeight, rects }) {
+                if (!isCurrentGeneration()) return;
+
                 positionerElement.style.setProperty(AVAILABLE_WIDTH_VAR, `${availableWidth}px`);
                 positionerElement.style.setProperty(AVAILABLE_HEIGHT_VAR, `${availableHeight}px`);
 
                 // Snap anchor dimensions to device pixels to ensure the popup's visual
                 // width matches the anchor's, avoiding sub-pixel misalignment.
-                const dpr = window.devicePixelRatio || 1;
+                const dpr = positionerElement.ownerDocument.defaultView?.devicePixelRatio || 1;
                 const ref = rects.reference;
                 const anchorWidth = (Math.round((ref.x + ref.width) * dpr) - Math.round(ref.x * dpr)) / dpr;
                 const anchorHeight = (Math.round((ref.y + ref.height) * dpr) - Math.round(ref.y * dpr)) / dpr;
@@ -844,7 +877,8 @@ async function updatePositionInternal(positionerState) {
 
         // Hide middleware for anchor detection
         middleware.push(FloatingUI.hide({
-            strategy: 'referenceHidden'
+            strategy: 'referenceHidden',
+            ...overflowBoundary
         }));
 
         // Arrow middleware
@@ -856,7 +890,14 @@ async function updatePositionInternal(positionerState) {
             }));
         }
 
-        positionerElement.style.setProperty('position', strategy, 'important');
+        // Align-item Select keeps the live positioner fixed while Floating UI
+        // computes middleware data. React renders the same FIXED branch and
+        // waits for isPositioned before committing align-item coordinates.
+        // Writing absolute here would temporarily replace the already-committed
+        // fixed placement during auto-update and expose an offscreen frame.
+        if (!positionerState.alignItemWithTriggerActive) {
+            positionerElement.style.setProperty('position', strategy, 'important');
+        }
 
         const { x, y, placement: finalPlacement, middlewareData } = await FloatingUI.computePosition(
             triggerElement,
@@ -867,6 +908,7 @@ async function updatePositionInternal(positionerState) {
                 middleware
             }
         );
+        if (!isCurrentGeneration()) return;
 
         // Parse the final placement
         const { side: effectiveSide, align: effectiveAlign } = fromFloatingPlacement(finalPlacement);
@@ -936,7 +978,10 @@ async function updatePositionInternal(positionerState) {
         }
 
         // Set data attributes
-        positionerElement.setAttribute('data-side', effectiveSide);
+        positionerElement.setAttribute(
+            'data-side',
+            positionerState.alignItemWithTriggerActive ? 'none' : effectiveSide
+        );
         positionerElement.setAttribute('data-align', effectiveAlign);
 
         // Handle anchor hidden state
@@ -1021,21 +1066,25 @@ async function updatePositionInternal(positionerState) {
             positionerState.computedAlign !== effectiveAlign ||
             positionerState.computedAnchorHidden !== anchorHidden ||
             positionerState.computedArrowUncentered !== arrowUncentered;
+        const firstPositioned = !positionerState.hasPositioned;
 
         // Store computed placement for safePolygon
+        positionerState.hasPositioned = true;
         positionerState.computedSide = effectiveSide;
         positionerState.computedAlign = effectiveAlign;
         positionerState.computedAnchorHidden = anchorHidden;
         positionerState.computedArrowUncentered = arrowUncentered;
 
         // Notify C# of computed position values
-        if (positionChanged && positionerState.onPositionUpdated) {
+        if ((firstPositioned || positionChanged) && positionerState.onPositionUpdated) {
             positionerState.onPositionUpdated(effectiveSide, effectiveAlign, anchorHidden, arrowUncentered);
         }
 
     } catch {
         // Fallback to basic positioning if Floating UI fails
-        updatePositionFallback(positionerState);
+        if (isCurrentGeneration()) {
+            updatePositionFallback(positionerState);
+        }
     }
 }
 
@@ -1056,6 +1105,30 @@ function updatePositionFallback(positionerState) {
 
     const isRtl = positionerState.direction === 'rtl';
     const triggerRect = triggerElement.getBoundingClientRect();
+    const ownerWindow = positionerElement.ownerDocument.defaultView || window;
+    const dpr = ownerWindow.devicePixelRatio || 1;
+    const anchorWidth = (Math.round((triggerRect.x + triggerRect.width) * dpr) - Math.round(triggerRect.x * dpr)) / dpr;
+    const anchorHeight = (Math.round((triggerRect.y + triggerRect.height) * dpr) - Math.round(triggerRect.y * dpr)) / dpr;
+    positionerElement.style.setProperty(AVAILABLE_WIDTH_VAR, `${ownerWindow.innerWidth}px`);
+    positionerElement.style.setProperty(AVAILABLE_HEIGHT_VAR, `${ownerWindow.innerHeight}px`);
+    positionerElement.style.setProperty('--anchor-width', `${anchorWidth}px`);
+    positionerElement.style.setProperty('--anchor-height', `${anchorHeight}px`);
+
+    const firstPositioned = !positionerState.hasPositioned;
+    const positionChanged = positionerState.computedSide !== side || positionerState.computedAlign !== align;
+    positionerState.hasPositioned = true;
+    positionerState.computedSide = side;
+    positionerState.computedAlign = align;
+
+    if (positionerState.alignItemWithTriggerActive) {
+        positionerElement.setAttribute('data-side', side);
+        positionerElement.setAttribute('data-align', align);
+        if ((firstPositioned || positionChanged) && positionerState.onPositionUpdated) {
+            positionerState.onPositionUpdated(side, align, false, false);
+        }
+        return;
+    }
+
     const popupWidth = positionerElement.offsetWidth || 200;
     const popupHeight = positionerElement.offsetHeight || 100;
 
@@ -1122,8 +1195,9 @@ function updatePositionFallback(positionerState) {
     positionerElement.setAttribute('data-side', side);
     positionerElement.setAttribute('data-align', align);
 
-    positionerState.computedSide = side;
-    positionerState.computedAlign = align;
+    if ((firstPositioned || positionChanged) && positionerState.onPositionUpdated) {
+        positionerState.onPositionUpdated(side, align, false, false);
+    }
 }
 
 // ============================================================================
@@ -3401,10 +3475,12 @@ export function createFloatingFocusManager(options) {
                         active && !contains(floatingElement, active);
 
                     if (!hasMoved && !isHoverClose) {
-                        const returnTarget = triggerElement || getPreviouslyFocusedElement();
+                        const returnTarget = interactionType
+                            ? triggerElement || getPreviouslyFocusedElement()
+                            : this.previouslyFocusedElement || triggerElement || getPreviouslyFocusedElement();
                         const returnEl = this.returnFocus instanceof HTMLElement
                             ? this.returnFocus
-                            : this.returnFocusElement || this.previouslyFocusedElement || returnTarget;
+                            : this.returnFocusElement || returnTarget;
                         // When the close was driven by the keyboard, return focus with a
                         // visible focus ring so the trigger shows :focus-visible (#5093).
                         const returnFocusVisible = lastInteractionType === 'keyboard';
@@ -4197,23 +4273,25 @@ let virtualCounter = 0;
  * Creates a virtual element at specified coordinates that conforms to
  * FloatingUI's VirtualElement interface.
  */
-export function createVirtualElement(x, y) {
+export function createVirtualElement(x, y, width = 0, height = 0) {
     const virtualId = `virtual-${++virtualCounter}`;
 
     const virtualElement = {
         virtualId,
         _x: x,
         _y: y,
+        _width: width,
+        _height: height,
         getBoundingClientRect() {
             return {
                 x: this._x,
                 y: this._y,
                 top: this._y,
                 left: this._x,
-                bottom: this._y,
-                right: this._x,
-                width: 0,
-                height: 0
+                bottom: this._y + this._height,
+                right: this._x + this._width,
+                width: this._width,
+                height: this._height
             };
         },
         update(newX, newY) {
@@ -4229,11 +4307,13 @@ export function createVirtualElement(x, y) {
 /**
  * Updates the coordinates of an existing virtual element.
  */
-export function updateVirtualElement(virtualId, x, y) {
+export function updateVirtualElement(virtualId, x, y, width = 0, height = 0) {
     const ve = virtualElements.get(virtualId);
     if (!ve) return;
     ve._x = x;
     ve._y = y;
+    ve._width = width;
+    ve._height = height;
 }
 
 /**

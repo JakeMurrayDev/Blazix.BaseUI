@@ -33,6 +33,8 @@
     private bool hasRegisteredLabelResolver;
     private ElementReference? textElement;
     private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private DotNetObjectReference<SelectItem<TValue>>? dotNetRef;
+    private bool jsRegistered;
 
     // Pointer/drag tracking, mirroring React `pointerTypeRef` + `didPointerDownRef`.
     private string pointerType = "mouse";
@@ -203,12 +205,37 @@
             try
             {
                 var module = await moduleTask.Value;
+                if (jsRegistered && RootContext is not null && Element.HasValue)
+                {
+                    await module.InvokeVoidAsync("unregisterOption", RootContext.RootId, Element.Value);
+                }
                 await module.DisposeAsync();
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
                 _ = ex;
             }
+        }
+
+        dotNetRef?.Dispose();
+    }
+
+    /// <summary>
+    /// Receives the item's authoritative DOM index from the shared option
+    /// registry when items are inserted, reordered, moved, or removed.
+    /// </summary>
+    [JSInvokable]
+    public void OnDomIndexChanged(int index)
+    {
+        if (index == itemIndex)
+        {
+            return;
+        }
+
+        itemIndex = index;
+        if (RefreshDerivedState())
+        {
+            _ = InvokeAsync(StateHasChanged);
         }
     }
 
@@ -239,7 +266,7 @@
 
         if (!hasRegisteredLabelResolver)
         {
-            RootContext.RegisterItemLabelResolver(boxedValue, ResolveTypeaheadLabelAsync);
+            RootContext.RegisterItemLabelResolver(boxedValue, ResolveTypeaheadLabelAsync, () => Disabled);
             registeredLabelResolverKey = boxedValue;
             hasRegisteredLabelResolver = true;
         }
@@ -296,24 +323,12 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // The C# `RegisterItem` registry returns insertion-order indexes which can
-        // diverge from DOM order when items are inserted mid-list (e.g., a conditional
-        // @if block adds an item between two existing ones). JS's keyboard navigation
-        // and `data-highlighted` writes always use DOM order via `querySelectorAll`,
-        // so we ask JS for the authoritative index after every render and reconcile.
         if (RootContext is null || !Element.HasValue)
         {
             return;
         }
 
-        // Skip the JS reconciliation while the popup is closed (or its exit
-        // transition has completed and items are only still mounted because
-        // KeepMounted/ForceMount kept the portal alive). DOM order can't have
-        // shifted relative to the listbox while the listbox isn't visible, and
-        // running per-item JS interop on every parent re-render for closed
-        // Selects is the dominant per-render cost when multiple demos share a
-        // page (~N_items round-trips per outer render).
-        if (!RootContext.GetMounted())
+        if (jsRegistered)
         {
             return;
         }
@@ -321,15 +336,10 @@
         try
         {
             var module = await ModuleTask.Value;
-            var domIndex = await module.InvokeAsync<int>("getOptionDomIndex", Element.Value);
-            if (domIndex != itemIndex && domIndex >= 0)
-            {
-                itemIndex = domIndex;
-                if (RefreshDerivedState())
-                {
-                    StateHasChanged();
-                }
-            }
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            itemIndex = await module.InvokeAsync<int>("registerOption", RootContext.RootId, Element.Value, dotNetRef);
+            jsRegistered = true;
+            RefreshDerivedState();
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -339,11 +349,8 @@
 
     private bool RefreshDerivedState()
     {
-        // `itemIndex` is the DOM-order index seeded in OnInitialized via RegisterItem
-        // (C# insertion order, correct for static lists) and corrected in
-        // OnAfterRenderAsync via JS `getOptionDomIndex` (authoritative for dynamic
-        // mid-list insertions). Don't call `RootContext.GetItemIndex(this)` here —
-        // that returns the C# registration order which may be stale.
+        // `itemIndex` is seeded by C# registration and then owned by the DOM
+        // registry, whose MutationObserver reconciles dynamic wrapper moves.
         var idx = itemIndex;
         var newSelected = RootContext?.IsValueSelected(Value) ?? false;
 
@@ -411,7 +418,7 @@
                 attrs,
                 Disabled,
                 focusableWhenDisabled: true,
-                tabIndex: highlighted ? 0 : -1);
+                tabIndex: RootContext?.Open == true && highlighted ? 0 : -1);
         }
         else
         {
@@ -419,7 +426,7 @@
                 attrs,
                 Disabled,
                 focusableWhenDisabled: true,
-                tabIndex: highlighted ? 0 : -1);
+                tabIndex: RootContext?.Open == true && highlighted ? 0 : -1);
         }
 
         // `ApplyButtonAttributes` writes role="button"; override back to the listbox
@@ -448,12 +455,34 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        var isInvalidMouseClick = pointerType != "touch" && !highlighted && !allowMouseSelection;
+        // Consumer handlers run before the Base UI behavior, matching mergeProps.
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
+
+        var isMouseClick = pointerType != "touch";
+        var isVirtualMouseClick = isMouseClick && highlighted && e.Detail == 0;
+        if (isMouseClick && !isVirtualMouseClick && !allowMouseSelection && jsRegistered && Element.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                var clickMetadata = await module.InvokeAsync<SelectOptionClickMetadata?>(
+                    "consumeOptionClickMetadata",
+                    RootContext?.RootId,
+                    Element.Value);
+                isVirtualMouseClick = clickMetadata?.IsVirtualClick == true
+                    && (clickMetadata.PointerTypeDefined || highlighted);
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            {
+                _ = ex;
+            }
+        }
+
+        var isInvalidMouseClick = isMouseClick && !isVirtualMouseClick && !allowMouseSelection;
         allowMouseSelection = false;
 
-        if (Disabled || TypedRootContext is null || RootContext is null)
+        if (Disabled || RootContext?.Disabled == true || TypedRootContext is null || RootContext is null)
         {
-            await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
             return;
         }
 
@@ -469,7 +498,6 @@
             ? InteractionType.Keyboard
             : ResolvePointerInteractionType(pointerType);
         await TypedRootContext.SelectValueAsync(Value);
-        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
     private async Task HandlePointerEnter(PointerEventArgs e)
@@ -524,7 +552,7 @@
     {
         ResetDragMovement();
 
-        if (Disabled || TypedRootContext is null || RootContext is null)
+        if (Disabled || RootContext?.Disabled == true || TypedRootContext is null || RootContext is null)
         {
             return;
         }
@@ -545,10 +573,11 @@
         }
 
         allowMouseSelection = true;
+        await EventUtilities.InvokeOnMouseUpAsync(AdditionalAttributes, e);
+        await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
         RootContext.CloseInteractionType = ResolvePointerInteractionType(pointerType);
         await TypedRootContext.SelectValueAsync(Value);
         allowMouseSelection = false;
-        await EventUtilities.InvokeOnMouseUpAsync(AdditionalAttributes, e);
     }
 
     private static InteractionType ResolvePointerInteractionType(string? value)

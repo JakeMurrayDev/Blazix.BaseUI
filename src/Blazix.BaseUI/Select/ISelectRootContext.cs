@@ -477,7 +477,10 @@ internal interface ISelectRootContext
     /// <c>textContent</c> from the text element on demand. Mirrors the React
     /// <c>textRef</c> path through <c>useCompositeListItem</c>.
     /// </summary>
-    void RegisterItemLabelResolver(object? boxedValue, Func<Task<string?>> resolver);
+    void RegisterItemLabelResolver(
+        object? boxedValue,
+        Func<Task<string?>> resolver,
+        Func<bool>? isDisabled = null);
 
     /// <summary>
     /// Removes a previously-registered lazy typeahead label resolver.

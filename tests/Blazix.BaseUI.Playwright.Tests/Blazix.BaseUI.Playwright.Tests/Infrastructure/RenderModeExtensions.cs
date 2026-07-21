@@ -1209,6 +1209,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithSelectGroups(bool value)
+    {
+        queryParams["showGroups"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     // Autocomplete-specific parameters
     public TestPageUrlBuilder WithAutocompleteDefaultValue(string value)
     {

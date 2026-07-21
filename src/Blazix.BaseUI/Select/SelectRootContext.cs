@@ -17,7 +17,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
 
     private readonly List<object?> registeredValues = new();
     private readonly List<object> registeredItems = new();
-    private readonly List<KeyValuePair<object?, Func<Task<string?>>>> itemLabelResolvers = new();
+    private readonly List<(object? Value, Func<Task<string?>> Resolver, Func<bool> IsDisabled)> itemLabelResolvers = new();
     private bool hasNullItemLabel;
     private string? nullItemLabel;
     private Func<object?, object?, bool>? areValuesEqual;
@@ -26,7 +26,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     private CancellationTokenSource? typeaheadCts;
 
     /// <inheritdoc />
-    public string RootId { get; init; } = string.Empty;
+    public string RootId { get; set; } = string.Empty;
 
     /// <inheritdoc />
     public bool Open { get; set; }
@@ -292,7 +292,6 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public void Dispose()
     {
         typeaheadCts?.Cancel();
-        typeaheadCts?.Dispose();
         typeaheadCts = null;
     }
 
@@ -342,19 +341,22 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     }
 
     /// <inheritdoc />
-    public void RegisterItemLabelResolver(object? boxedValue, Func<Task<string?>> resolver)
+    public void RegisterItemLabelResolver(
+        object? boxedValue,
+        Func<Task<string?>> resolver,
+        Func<bool>? isDisabled = null)
     {
         var comparer = AreValuesEqual;
         for (var i = 0; i < itemLabelResolvers.Count; i++)
         {
-            if (comparer(itemLabelResolvers[i].Key, boxedValue))
+            if (comparer(itemLabelResolvers[i].Value, boxedValue))
             {
-                itemLabelResolvers[i] = new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver);
+                itemLabelResolvers[i] = (boxedValue, resolver, isDisabled ?? (() => false));
                 return;
             }
         }
 
-        itemLabelResolvers.Add(new KeyValuePair<object?, Func<Task<string?>>>(boxedValue, resolver));
+        itemLabelResolvers.Add((boxedValue, resolver, isDisabled ?? (() => false)));
     }
 
     /// <inheritdoc />
@@ -363,7 +365,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
         var comparer = AreValuesEqual;
         for (var i = 0; i < itemLabelResolvers.Count; i++)
         {
-            if (comparer(itemLabelResolvers[i].Key, boxedValue))
+            if (comparer(itemLabelResolvers[i].Value, boxedValue))
             {
                 itemLabelResolvers.RemoveAt(i);
                 return;
@@ -684,6 +686,11 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             return labeled.Label;
         }
 
+        if (SelectValueResolver.TryGetLabel(value, out var objectLabel))
+        {
+            return objectLabel?.ToString();
+        }
+
         if (value is null && hasNullItemLabel)
         {
             return nullItemLabel;
@@ -698,7 +705,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
         {
             foreach (var item in Items)
             {
-                if (AreEqual(item.Value, value))
+                if (AreValuesEqual(item.Value, ResolveComparableValue(value)))
                 {
                     return item.Label;
                 }
@@ -711,7 +718,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             {
                 foreach (var item in group.Items)
                 {
-                    if (AreEqual(item.Value, value))
+                    if (AreValuesEqual(item.Value, ResolveComparableValue(value)))
                     {
                         return item.Label;
                     }
@@ -723,6 +730,46 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     }
 
     /// <summary>
+    /// Gets rich label content supplied by static items or by a selected value's
+    /// conventional <c>Label</c> property.
+    /// </summary>
+    public RenderFragment? GetLabelContent(TValue? value)
+    {
+        if (SelectValueResolver.TryGetLabel(value, out var objectLabel) && objectLabel is RenderFragment fragment)
+        {
+            return fragment;
+        }
+
+        var comparableValue = ResolveComparableValue(value);
+        if (Items is not null)
+        {
+            foreach (var item in Items)
+            {
+                if (AreValuesEqual(item.Value, comparableValue))
+                {
+                    return item.LabelContent;
+                }
+            }
+        }
+
+        if (ItemGroups is not null)
+        {
+            foreach (var group in ItemGroups)
+            {
+                foreach (var item in group.Items)
+                {
+                    if (AreValuesEqual(item.Value, comparableValue))
+                    {
+                        return item.LabelContent;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Gets the form submission string for a given value using <see cref="ItemToStringValue"/> if available,
     /// otherwise falls back to <see cref="object.ToString"/>.
     /// </summary>
@@ -731,6 +778,11 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
         if (ItemToStringValue is not null)
         {
             return ItemToStringValue(value);
+        }
+
+        if (SelectValueResolver.TryGetValue(value, out var nestedValue))
+        {
+            return nestedValue?.ToString();
         }
 
         return value?.ToString();
@@ -867,7 +919,6 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
 
         var previousCts = typeaheadCts;
         previousCts?.Cancel();
-        previousCts?.Dispose();
 
         var cts = new CancellationTokenSource();
         typeaheadCts = cts;
@@ -883,6 +934,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             IReadOnlyList<TCandidate> candidates,
             Func<TCandidate, TValue?> getValue,
             Func<TCandidate, string?> getLabel,
+            Func<TCandidate, bool> isDisabled,
             out TValue? value)
         {
             value = default;
@@ -896,7 +948,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             {
                 if (AreEqual(getValue(candidates[i]), currentValue))
                 {
-                    startIndex = i + 1;
+                    startIndex = i + (GetTypeaheadQuery().Length == 1 ? 1 : 0);
                     break;
                 }
             }
@@ -905,9 +957,14 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             {
                 var index = (startIndex + offset) % candidates.Count;
                 var candidate = candidates[index];
+                if (isDisabled(candidate))
+                {
+                    continue;
+                }
+
                 var label = getLabel(candidate);
                 if (!string.IsNullOrEmpty(label) &&
-                    label.StartsWith(typeaheadBuffer, StringComparison.OrdinalIgnoreCase))
+                    label.StartsWith(GetTypeaheadQuery(), StringComparison.OrdinalIgnoreCase))
                 {
                     value = getValue(candidate);
                     return true;
@@ -923,6 +980,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 Items,
                 item => item.Value,
                 item => item.Label,
+                item => GetRegisteredDisabled(item.Value) ?? item.Disabled,
                 out matchValue);
         }
 
@@ -941,38 +999,19 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 groupedItems,
                 item => item.Value,
                 item => item.Label,
-                out matchValue);
-        }
-
-        if (!found)
-        {
-            var labels = new List<(TValue? Value, string? Label)>();
-            if (hasNullItemLabel)
-            {
-                labels.Add((default, nullItemLabel));
-            }
-
-            foreach (var kvp in itemLabels)
-            {
-                labels.Add((kvp.Key, kvp.Value));
-            }
-
-            found = TryFindMatch(
-                labels,
-                candidate => candidate.Value,
-                candidate => candidate.Label,
+                item => GetRegisteredDisabled(item.Value) ?? item.Disabled,
                 out matchValue);
         }
 
         if (!found && itemLabelResolvers.Count > 0)
         {
-            var resolvedLabels = new List<(TValue? Value, string? Label)>();
-            foreach (var kvp in itemLabelResolvers)
+            var resolvedLabels = new List<(TValue? Value, string? Label, bool Disabled)>();
+            foreach (var registration in itemLabelResolvers)
             {
-                var label = await kvp.Value();
-                if (TryGetTypedValue(kvp.Key, out var typedKey))
+                var label = await registration.Resolver();
+                if (TryGetTypedValue(registration.Value, out var typedKey))
                 {
-                    resolvedLabels.Add((typedKey, label));
+                    resolvedLabels.Add((typedKey, label, registration.IsDisabled()));
                 }
             }
 
@@ -980,6 +1019,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
                 resolvedLabels,
                 candidate => candidate.Value,
                 candidate => candidate.Label,
+                candidate => candidate.Disabled,
                 out matchValue);
         }
 
@@ -988,24 +1028,68 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
             await SelectValueAsync(matchValue);
         }
 
-        _ = Task.Delay(500, token).ContinueWith(
-            task =>
+        _ = ResetTypeaheadAsync(cts, token);
+
+        string GetTypeaheadQuery()
+        {
+            if (typeaheadBuffer.Length < 2)
             {
-                if (task.Status == TaskStatus.RanToCompletion)
+                return typeaheadBuffer;
+            }
+
+            var first = typeaheadBuffer[0];
+            for (var i = 1; i < typeaheadBuffer.Length; i++)
+            {
+                if (typeaheadBuffer[i] != first)
                 {
-                    typeaheadBuffer = string.Empty;
+                    return typeaheadBuffer;
+                }
+            }
+
+            return first.ToString();
+        }
+
+        bool? GetRegisteredDisabled(TValue? value)
+        {
+            var foundRegistration = false;
+            var allDisabled = true;
+            foreach (var registration in itemLabelResolvers)
+            {
+                if (!TryGetTypedValue(registration.Value, out var registeredValue) ||
+                    !AreEqual(registeredValue, value))
+                {
+                    continue;
                 }
 
-                if (ReferenceEquals(typeaheadCts, cts))
-                {
-                    typeaheadCts = null;
-                }
+                foundRegistration = true;
+                allDisabled &= registration.IsDisabled();
+            }
 
-                cts.Dispose();
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
+            return foundRegistration ? allDisabled : null;
+        }
+    }
+
+    private object? ResolveComparableValue(TValue? value) =>
+        SelectValueResolver.TryGetValue(value, out var nestedValue) ? nestedValue : value;
+
+    private async Task ResetTypeaheadAsync(CancellationTokenSource cts, CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(500, token);
+            if (ReferenceEquals(typeaheadCts, cts))
+            {
+                typeaheadBuffer = string.Empty;
+                typeaheadCts = null;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            cts.Dispose();
+        }
     }
 
     private static bool TryGetTypedValue(object? boxedValue, out TValue? value)

@@ -22,14 +22,18 @@
 @{
     var hasName = !string.IsNullOrEmpty(ResolvedName);
     var hasField = FieldContext is not null;
-    var serializedValue = typedContext?.GetFormValue(CurrentValue) ?? CurrentValue?.ToString() ?? string.Empty;
+    var serializedValue = Multiple
+        ? string.Empty
+        : typedContext?.GetFormValue(CurrentValue) ?? CurrentValue?.ToString() ?? string.Empty;
     var hasMultipleSelection = Multiple && GetCurrentValues().Count > 0;
     var hiddenInputName = Multiple ? null : ResolvedName;
     var hiddenInputId = hiddenInputName is null ? $"{rootId}-hidden-input" : null;
     var describedBy = LabelableContext?.GetAriaDescribedBy();
 }
 
-<input style="border:0;clip:rect(0 0 0 0);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;white-space:nowrap;width:1px"
+<input style="@(hasName
+           ? "border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;white-space:nowrap;width:1px"
+           : "border:0;clip-path:inset(50%);height:1px;left:0;margin:-1px;overflow:hidden;padding:0;position:fixed;top:0;white-space:nowrap;width:1px")"
        tabindex="-1"
        aria-hidden="true"
        id="@hiddenInputId"
@@ -40,7 +44,7 @@
        disabled="@ResolvedDisabled"
        required="@(Required && !hasMultipleSelection)"
        readonly="@ReadOnly"
-       aria-invalid="@(FieldState.Valid == false ? "true" : null)"
+       aria-invalid="@(FieldState.Valid == false && !ResolvedDisabled ? "true" : null)"
        aria-describedby="@(string.IsNullOrEmpty(describedBy) ? null : describedBy)"
        @ref="hiddenInputElement"
        @onfocus="HandleHiddenInputFocus"
@@ -51,12 +55,17 @@
     var values = GetCurrentValues();
     @foreach (var v in values)
     {
-        <input type="hidden" name="@ResolvedName" form="@Form" value="@(typedContext?.GetFormValue(v) ?? v?.ToString())" />
+        <input type="hidden"
+               name="@ResolvedName"
+               form="@Form"
+               value="@(typedContext?.GetFormValue(v) ?? v?.ToString())"
+               disabled="@ResolvedDisabled" />
     }
 }
 
 @code {
     private string rootId = null!;
+    private string generatedRootId = null!;
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
@@ -84,6 +93,9 @@
     private bool hasValueParameter;
     private bool hasValuesParameter;
     private SelectRootActions? previousActionsRef;
+    private bool hasObservedValue;
+    private TValue? observedValue;
+    private List<TValue> observedValues = new();
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -331,7 +343,8 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
-        rootId = Id ?? Guid.NewGuid().ToIdString();
+        generatedRootId = Guid.NewGuid().ToIdString();
+        rootId = Id ?? generatedRootId;
         isOpen = DefaultOpen;
 
         if (CurrentOpen)
@@ -416,12 +429,25 @@
         context = typedContext;
         previousDisabled = ResolvedDisabled;
         previousDirection = EffectiveDirection;
+        CaptureObservedValue();
         SyncActionsRef();
     }
 
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        var desiredRootId = Id ?? generatedRootId;
+        if (desiredRootId != rootId)
+        {
+            var previousRootId = rootId;
+            rootId = desiredRootId;
+            typedContext.RootId = rootId;
+            if (hasRendered)
+            {
+                _ = RenameRootAsync(previousRootId, rootId);
+            }
+        }
+
         var currentOpen = CurrentOpen;
         var effectiveDirection = EffectiveDirection;
         var reconciledMountedOpen = false;
@@ -436,7 +462,6 @@
             else
             {
                 transition.BeginClose();
-                context.OpenInteractionType = InteractionType.None;
                 SyncSelectedIndex();
             }
 
@@ -489,6 +514,12 @@
         typedContext.IsItemEqualToValue = IsItemEqualToValue;
         typedContext.FieldState = FieldState;
 
+        if (ObserveResolvedValueChange())
+        {
+            HandleValueChanged();
+            typedContext.NotifyStateChanged();
+        }
+
         state = SelectRootState.FromFieldState(FieldState, currentOpen);
 
         if (!currentOpen)
@@ -532,6 +563,19 @@
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task RenameRootAsync(string previousRootId, string nextRootId)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("renameRoot", previousRootId, nextRootId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
         }
     }
 
@@ -733,6 +777,7 @@
             // page snowball into per-render JS interop in every mounted item
             // (SelectItem.OnAfterRenderAsync calls `getOptionDomIndex`).
             context.ForceMount = false;
+            context.OpenInteractionType = InteractionType.None;
         }
 
         _ = InvokeOpenChangeCompleteAsync(open);
@@ -804,7 +849,6 @@
             {
                 context.CloseInteractionType = ResolveCloseInteractionType(reason);
             }
-            context.OpenInteractionType = InteractionType.None;
             SyncSelectedIndex();
 
             if (reason is SelectOpenChangeReason.OutsidePress or SelectOpenChangeReason.FocusOut)
@@ -859,7 +903,7 @@
                 _ => null
             };
 
-            await module.InvokeVoidAsync("setRootOpen", rootId, open, reasonString);
+            await module.InvokeVoidAsync("setRootOpen", rootId, open, reasonString, typedContext?.SelectedIndex ?? -1);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -869,7 +913,7 @@
 
     private async Task SelectValueInternalAsync(TValue? value)
     {
-        if (ReadOnly)
+        if (ReadOnly || ResolvedDisabled)
         {
             return;
         }
@@ -910,7 +954,11 @@
                 await ValueChanged.InvokeAsync(value);
             }
 
-            HandleValueChanged();
+            if (!IsValuesControlled)
+            {
+                CaptureObservedValue();
+                HandleValueChanged();
+            }
 
             typedContext.NotifyStateChanged();
             await InvokeAsync(StateHasChanged);
@@ -935,7 +983,11 @@
                 await ValueChanged.InvokeAsync(value);
             }
 
-            HandleValueChanged();
+            if (!IsValueControlled)
+            {
+                CaptureObservedValue();
+                HandleValueChanged();
+            }
 
             await SetOpenAsync(false, SelectOpenChangeReason.ItemPress);
         }
@@ -943,7 +995,7 @@
 
     private async Task SetValueBoxedInternalAsync(object? boxedValue, SelectOpenChangeReason reason)
     {
-        if (ReadOnly)
+        if (ReadOnly || ResolvedDisabled)
         {
             return;
         }
@@ -982,7 +1034,11 @@
                 await ValuesChanged.InvokeAsync(replacement);
             }
 
-            HandleValueChanged();
+            if (!IsValuesControlled)
+            {
+                CaptureObservedValue();
+                HandleValueChanged();
+            }
             typedContext.NotifyStateChanged();
             await InvokeAsync(StateHasChanged);
         }
@@ -1008,7 +1064,11 @@
                 await ValueChanged.InvokeAsync(value);
             }
 
-            HandleValueChanged();
+            if (!IsValueControlled)
+            {
+                CaptureObservedValue();
+                HandleValueChanged();
+            }
             typedContext.NotifyStateChanged();
             await InvokeAsync(StateHasChanged);
         }
@@ -1030,7 +1090,7 @@
 
         var validationValue = GetValidationValue();
         var initialValue = FieldContext?.ValidityData.InitialValue;
-        var isDirty = !EqualityComparer<object>.Default.Equals(validationValue, initialValue);
+        var isDirty = IsValueDirty(validationValue, initialValue);
 
         FieldContext?.SetDirty(isDirty);
         FieldContext?.SetFilled(!IsPlaceholderState());
@@ -1200,7 +1260,85 @@
         return string.IsNullOrEmpty(serialized);
     }
 
+    private bool IsValueDirty(object? currentValue, object? initialValue)
+    {
+        if (!Multiple)
+        {
+            return !EqualityComparer<object>.Default.Equals(currentValue, initialValue);
+        }
+
+        var currentValues = currentValue as IEnumerable<TValue> ?? Array.Empty<TValue>();
+        var initialValues = initialValue as IEnumerable<TValue> ?? Array.Empty<TValue>();
+        using var currentEnumerator = currentValues.GetEnumerator();
+        using var initialEnumerator = initialValues.GetEnumerator();
+
+        while (true)
+        {
+            var hasCurrent = currentEnumerator.MoveNext();
+            var hasInitial = initialEnumerator.MoveNext();
+            if (hasCurrent != hasInitial)
+            {
+                return true;
+            }
+
+            if (!hasCurrent)
+            {
+                return false;
+            }
+
+            if (!typedContext.AreEqual(currentEnumerator.Current, initialEnumerator.Current))
+            {
+                return true;
+            }
+        }
+    }
+
     private bool IsValuesControlled => hasValuesParameter;
+
+    private bool ObserveResolvedValueChange()
+    {
+        if (!hasObservedValue)
+        {
+            CaptureObservedValue();
+            return false;
+        }
+
+        var changed = Multiple
+            ? !AreValueListsEqual(observedValues, GetCurrentValues())
+            : !typedContext.AreEqual(observedValue, CurrentValue);
+
+        if (changed)
+        {
+            CaptureObservedValue();
+        }
+
+        return changed;
+    }
+
+    private void CaptureObservedValue()
+    {
+        hasObservedValue = true;
+        observedValue = CurrentValue;
+        observedValues = Multiple ? new List<TValue>(GetCurrentValues()) : new List<TValue>();
+    }
+
+    private bool AreValueListsEqual(IReadOnlyList<TValue> left, IReadOnlyList<TValue> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < left.Count; index++)
+        {
+            if (!typedContext.AreEqual(left[index], right[index]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private IReadOnlyList<TValue> GetCurrentValues()
     {
@@ -1243,7 +1381,7 @@
 
             if (CurrentOpen)
             {
-                await module.InvokeVoidAsync("setRootOpen", rootId, true, (string?)null);
+                await module.InvokeVoidAsync("setRootOpen", rootId, true, (string?)null, typedContext?.SelectedIndex ?? -1);
             }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

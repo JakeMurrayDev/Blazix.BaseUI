@@ -121,9 +121,10 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (Id is not null && Id != triggerId)
+        var resolvedId = Id ?? RootContext?.RootId ?? triggerId;
+        if (resolvedId != triggerId)
         {
-            triggerId = Id;
+            triggerId = resolvedId;
             LabelableContext?.SetControlId(triggerId);
             if (RootContext is not null)
             {
@@ -258,7 +259,7 @@
             attrs["aria-describedby"] = describedBy;
         }
 
-        if (fieldState.Valid == false)
+        if (fieldState.Valid == false && !disabled)
         {
             attrs["aria-invalid"] = "true";
         }
