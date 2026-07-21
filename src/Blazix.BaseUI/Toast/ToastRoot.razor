@@ -31,6 +31,9 @@
     private bool swiping;
     private ToastSwipeDirection? swipeDirection;
     private ElementReference? previousElement;
+    private bool? previousEnding;
+    private bool? previousSwipeEnabled;
+    private string? previousSwipeDirections;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -130,21 +133,32 @@
                     dotNetRef,
                     IsSwipeEnabled(),
                     SwipeDirection.Select(direction => direction.ToDataAttributeString()).ToArray());
+                previousEnding = Toast.TransitionStatus == TransitionStatus.Ending;
+                previousSwipeEnabled = IsSwipeEnabled();
+                previousSwipeDirections = string.Join(',', SwipeDirection.Select(direction => direction.ToDataAttributeString()));
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
         }
 
         var currentElement = Element;
-        if (!Nullable.Equals(previousElement, currentElement))
+        var elementChanged = !Nullable.Equals(previousElement, currentElement);
+        if (elementChanged)
         {
             previousElement = currentElement;
             Store?.SetToastElement(Toast.Id, currentElement);
         }
 
-        if (hasRendered && Element.HasValue)
+        var ending = Toast.TransitionStatus == TransitionStatus.Ending;
+        var swipeEnabled = IsSwipeEnabled();
+        var swipeDirections = string.Join(',', SwipeDirection.Select(direction => direction.ToDataAttributeString()));
+        var interopStateChanged = elementChanged ||
+            previousEnding != ending || previousSwipeEnabled != swipeEnabled ||
+            !string.Equals(previousSwipeDirections, swipeDirections, StringComparison.Ordinal);
+
+        if (!firstRender && hasRendered && Element.HasValue && interopStateChanged)
         {
             try
             {
@@ -153,11 +167,14 @@
                     "updateRoot",
                     rootId,
                     Element.Value,
-                    Toast.TransitionStatus == TransitionStatus.Ending,
-                    IsSwipeEnabled(),
+                    ending,
+                    swipeEnabled,
                     SwipeDirection.Select(direction => direction.ToDataAttributeString()).ToArray());
+                previousEnding = ending;
+                previousSwipeEnabled = swipeEnabled;
+                previousSwipeDirections = swipeDirections;
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -175,7 +192,7 @@
                 await module.InvokeVoidAsync("disposeRoot", rootId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -185,13 +202,14 @@
     }
 
     [JSInvokable]
-    public void OnMeasuredHeight(double height)
+    public Task OnMeasuredHeight(double height)
     {
         RecalculateHeight(height, true);
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public void OnSwipeStateChanged(bool nextSwiping, string? direction)
+    public async Task OnSwipeStateChanged(bool nextSwiping, string? direction)
     {
         if (nextSwiping)
         {
@@ -208,21 +226,28 @@
         }
 
         SetSwipeState(nextSwiping, ParseSwipeDirection(direction));
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
-    public void OnSwipeDismissed()
+    public async Task OnSwipeEnded(bool dismissed, string? direction)
     {
-        Store?.CloseToast(Toast.Id);
+        await OnSwipeStateChanged(false, direction);
+        if (dismissed)
+        {
+            Store?.CloseToast(Toast.Id);
+        }
     }
 
     [JSInvokable]
-    public void OnTransitionComplete()
+    public Task OnTransitionComplete()
     {
         if (Toast.TransitionStatus == TransitionStatus.Ending)
         {
             Store?.RemoveToast(Toast.Id);
         }
+
+        return Task.CompletedTask;
     }
 
     private void UpdateContextAndState()
@@ -357,7 +382,6 @@
         swipeDirection = nextDirection;
         UpdateContextAndState();
         BuildComponentAttributes();
-        _ = InvokeAsync(StateHasChanged);
     }
 
     private void RecalculateHeight(double height, bool clearStartingStatus)
@@ -365,7 +389,8 @@
         Store?.UpdateToastHeight(Toast.Id, height);
     }
 
-    private bool IsSwipeEnabled() => Toast.PositionerProps?.Anchor is null && SwipeDirection.Count > 0;
+    private bool IsSwipeEnabled() =>
+        !(Toast.PositionerProps?.Has(nameof(ToastPositionerOptions.Anchor)) ?? false) && SwipeDirection.Count > 0;
 
     private static ToastSwipeDirection? ParseSwipeDirection(string? direction) =>
         direction switch

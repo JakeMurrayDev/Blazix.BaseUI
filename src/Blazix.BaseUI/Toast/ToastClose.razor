@@ -1,4 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 @if (RootContext is not null && Store is not null)
 {
@@ -15,10 +18,17 @@
 }
 
 @code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-button.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
     private ToastCloseState state = new(null);
     private RenderElement<ToastCloseState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
     private bool hasFocus;
+    private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton = true;
+    private ElementReference? previousElement;
 
     [CascadingParameter]
     private ToastStore? Store { get; set; }
@@ -73,11 +83,63 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    public ToastClose()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
         state = new ToastCloseState(RootContext?.Toast.Type);
         BuildComponentAttributes();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        var elementChanged = !Nullable.Equals(previousElement, Element);
+        if (firstRender || elementChanged || Disabled != previousDisabled || NativeButton != previousNativeButton)
+        {
+            var previousNeedsJs = !previousNativeButton || previousDisabled;
+            hasRendered = true;
+            previousElement = Element;
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+
+            if (!NativeButton || Disabled)
+            {
+                await SyncJsAsync(dispose: false);
+            }
+            else if (previousNeedsJs)
+            {
+                await SyncJsAsync(dispose: true);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (hasRendered && moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex;
+            }
+        }
     }
 
     private void BuildComponentAttributes()
@@ -130,5 +192,23 @@
         hasFocus = false;
         BuildComponentAttributes();
         await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
+    }
+
+    private async Task SyncJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("sync", Element.Value, Disabled, false, NativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex;
+        }
     }
 }

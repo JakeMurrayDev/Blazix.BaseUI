@@ -70,7 +70,8 @@
     protected override void OnParametersSet()
     {
         resolvedChildContent = ChildContent ?? ToastRenderFragmentUtilities.ToRenderFragment(RootContext?.Toast.Title);
-        shouldRender = resolvedChildContent is not null;
+        shouldRender = Render is not null || ChildContent is not null ||
+            ToastRenderFragmentUtilities.IsRenderableValue(RootContext?.Toast.Title);
         state = new ToastTitleState(RootContext?.Toast.Type);
         BuildComponentAttributes();
         RootContext?.SetTitleId(shouldRender ? ResolvedId : null);

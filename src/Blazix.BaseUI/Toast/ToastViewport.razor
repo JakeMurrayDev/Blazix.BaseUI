@@ -17,15 +17,24 @@
                    ClassValue="ClassValue"
                    StyleValue="StyleValue"
                    ComponentAttributes="componentAttributes"
-                   ChildContent="ChildContent"
                    @attributes="AdditionalAttributes"
-                   @ref="renderElementReference" />
+                   @ref="renderElementReference">
+        @if (!Store.IsEmpty && hasPreviousFocusElement)
+        {
+            <FocusGuard OnFocus="HandleFocusGuardAsync" />
+        }
+        @ChildContent
+        @if (!Store.IsEmpty && hasPreviousFocusElement)
+        {
+            <FocusGuard OnFocus="HandleFocusGuardAsync" />
+        }
+    </RenderElement>
     @if (!Store.Focused && Store.Toasts.Any(toast => toast.Priority == ToastPriority.High))
     {
         <div style="@VisuallyHiddenStyle">
             @foreach (var toast in Store.Toasts.Where(toast => toast.Priority == ToastPriority.High))
             {
-                <div role="alert" aria-atomic="true">
+                <div @key="toast.Id" role="alert" aria-atomic="true">
                     <div>@RenderToastValue(toast.Title)</div>
                     <div>@RenderToastValue(toast.Description)</div>
                 </div>
@@ -47,6 +56,8 @@
     private bool hasPreviousFocusElement;
     private bool markedReadyForMouseLeave;
     private bool hadTransitioningToasts;
+    private bool touchActive;
+    private bool? previousIsEmpty;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -124,20 +135,22 @@
                 var module = await ModuleTask.Value;
                 await module.InvokeVoidAsync("initializeViewport", viewportId, Element.Value, dotNetRef);
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
         }
 
-        if (hasRendered && Element.HasValue)
+        var isEmpty = Store?.IsEmpty ?? true;
+        if (hasRendered && Element.HasValue && previousIsEmpty != isEmpty)
         {
             try
             {
                 var module = await ModuleTask.Value;
-                await module.InvokeVoidAsync("updateViewport", viewportId, Store?.IsEmpty ?? true);
+                await module.InvokeVoidAsync("updateViewport", viewportId, isEmpty);
+                previousIsEmpty = isEmpty;
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -169,7 +182,7 @@
                 await module.InvokeVoidAsync("disposeViewport", viewportId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -179,7 +192,7 @@
     }
 
     [JSInvokable]
-    public void OnGlobalFocusHotkey()
+    public async Task OnGlobalFocusHotkey()
     {
         if (Store is null || Store.IsEmpty)
         {
@@ -189,42 +202,49 @@
         hasPreviousFocusElement = true;
         Store.PauseTimers();
         Store.SetFocused(true);
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
-    public void OnViewportFocus(bool focusVisible)
+    public Task OnViewportFocus(bool focusVisible)
     {
         if (Store is null || Store.Focused || !focusVisible)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         Store.SetFocused(true);
         Store.PauseTimers();
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public void OnViewportBlur(bool focusInside)
+    public Task OnViewportBlur(bool focusInside)
     {
         if (Store is null || !Store.Focused || focusInside)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         Store.SetFocused(false);
-        Store.ResumeTimers();
+        if (Store.IsWindowFocused)
+        {
+            Store.ResumeTimers();
+        }
+
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public void OnWindowBlur()
+    public Task OnWindowBlur()
     {
         Store?.SetIsWindowFocused(false);
         Store?.PauseTimers();
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public void OnWindowFocus(bool shouldResumeTimers)
+    public Task OnWindowFocus(bool shouldResumeTimers)
     {
         if (shouldResumeTimers)
         {
@@ -232,23 +252,16 @@
         }
 
         Store?.SetIsWindowFocused(true);
+        return Task.CompletedTask;
     }
 
     [JSInvokable]
-    public void OnDocumentTouchPointerDownOutside()
+    public Task OnDocumentTouchPointerDownOutside()
     {
         Store?.ResumeTimers();
         Store?.SetHovering(false);
         Store?.SetFocused(false);
-    }
-
-    [JSInvokable]
-    public void OnTouchActiveChanged(bool active)
-    {
-        if (!active)
-        {
-            FlushMouseLeave();
-        }
+        return Task.CompletedTask;
     }
 
     private void BuildComponentAttributes()
@@ -261,20 +274,25 @@
             ["aria-atomic"] = "false",
             ["aria-relevant"] = "additions text",
             ["aria-label"] = "Notifications",
-            ["data-expanded"] = Store?.Expanded ?? false,
-            ["style"] = $"--toast-frontmost-height: {Store?.GetFrontmostHeight() ?? 0}px"
+            ["data-expanded"] = Store?.Expanded ?? false
         };
 
+        var frontmostHeight = Store?.GetFrontmostHeight() ?? 0;
+        if (frontmostHeight > 0)
+        {
+            attrs["style"] = $"--toast-frontmost-height: {frontmostHeight}px";
+        }
+
         attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-        attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
+        attrs["onmousemove"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseMoveAsync);
         attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
         attrs["onkeydown"] = EventCallback.Factory.Create<KeyboardEventArgs>(this, HandleKeyDownAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
-        attrs["onpointerup"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEndAsync);
-        attrs["onpointercancel"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerEndAsync);
+        attrs["onpointerup"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerUpAsync);
+        attrs["onpointercancel"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerCancelAsync);
 
         componentAttributes = attrs;
     }
@@ -287,19 +305,30 @@
         return EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
     }
 
+    private Task HandleMouseMoveAsync(MouseEventArgs e)
+    {
+        Store?.PauseTimers();
+        Store?.SetHovering(true);
+        markedReadyForMouseLeave = false;
+        return EventUtilities.InvokeOnMouseMoveAsync(AdditionalAttributes, e);
+    }
+
     private Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
         // While a toast is animating out, the dismissed toast sliding from under the
         // pointer fires a transient mouseleave. Collapsing immediately would compact
         // the stack and then re-expand it once the pointer settles over a sibling.
         // Defer the collapse and flush it after the transition settles instead.
-        if (HasTransitioningToasts)
+        if (HasTransitioningToasts || touchActive)
         {
             markedReadyForMouseLeave = true;
         }
         else
         {
-            Store?.ResumeTimers();
+            if (Store?.IsWindowFocused != false)
+            {
+                Store?.ResumeTimers();
+            }
             Store?.SetHovering(false);
         }
 
@@ -333,13 +362,27 @@
 
     private Task HandlePointerDownAsync(PointerEventArgs e)
     {
+        if (string.Equals(e.PointerType, "touch", StringComparison.Ordinal))
+        {
+            touchActive = true;
+            Store?.PauseTimers();
+        }
+
         return EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
     }
 
-    private Task HandlePointerEndAsync(PointerEventArgs e)
+    private async Task HandlePointerUpAsync(PointerEventArgs e)
     {
+        touchActive = false;
         FlushMouseLeave();
-        return Task.CompletedTask;
+        await EventUtilities.InvokeOnPointerUpAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerCancelAsync(PointerEventArgs e)
+    {
+        touchActive = false;
+        FlushMouseLeave();
+        await EventUtilities.InvokeOnPointerCancelAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleFocusManagementRequestedAsync(string? toastId)
@@ -354,7 +397,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("handleFocusAfterClose", viewportId, toastId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -372,7 +415,7 @@
             var module = await moduleTask.Value;
             await module.InvokeVoidAsync("handleFocusGuard", viewportId);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -380,16 +423,21 @@
 
     private void FlushMouseLeave()
     {
-        if (Store?.IsWindowFocused == false || HasTransitioningToasts || !markedReadyForMouseLeave)
+        if (HasTransitioningToasts || touchActive || !markedReadyForMouseLeave)
         {
             return;
         }
 
         markedReadyForMouseLeave = false;
-        Store?.ResumeTimers();
+        if (Store?.IsWindowFocused != false)
+        {
+            Store?.ResumeTimers();
+        }
         Store?.SetHovering(false);
     }
 
     private static RenderFragment? RenderToastValue(object? value) =>
-        ToastRenderFragmentUtilities.ToRenderFragment(value);
+        ToastRenderFragmentUtilities.IsRenderableValue(value)
+            ? ToastRenderFragmentUtilities.ToRenderFragment(value)
+            : null;
 }

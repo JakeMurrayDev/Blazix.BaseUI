@@ -62,6 +62,16 @@ internal static class EventUtilities
         return InvokeEventAsync(additionalAttributes, "onpointerdown", e);
     }
 
+    public static Task InvokeOnPointerUpAsync(IReadOnlyDictionary<string, object>? additionalAttributes, PointerEventArgs e)
+    {
+        return InvokeEventAsync(additionalAttributes, "onpointerup", e);
+    }
+
+    public static Task InvokeOnPointerCancelAsync(IReadOnlyDictionary<string, object>? additionalAttributes, PointerEventArgs e)
+    {
+        return InvokeEventAsync(additionalAttributes, "onpointercancel", e);
+    }
+
     public static Task InvokeOnPointerEnterAsync(IReadOnlyDictionary<string, object>? additionalAttributes, PointerEventArgs e)
     {
         return InvokeEventAsync(additionalAttributes, "onpointerenter", e);

@@ -1,4 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
 
 @if (RootContext is not null && shouldRender)
 {
@@ -15,12 +18,21 @@
 }
 
 @code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-button.min.js";
+
+    private readonly Lazy<Task<IJSObjectReference>> moduleTask;
     private ToastActionState state = new(null);
     private RenderElement<ToastActionState>? renderElementReference;
     private RenderFragment? computedChildContent;
     private Dictionary<string, object> componentAttributes = new();
     private IReadOnlyDictionary<string, object>? mergedAdditionalAttributes;
     private bool shouldRender;
+    private bool resolvedDisabled;
+    private bool resolvedNativeButton = true;
+    private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton = true;
+    private ElementReference? previousElement;
 
     private IReadOnlyDictionary<string, object>? MergedAdditionalAttributes => mergedAdditionalAttributes;
 
@@ -74,30 +86,81 @@
     /// </summary>
     public ElementReference? Element => renderElementReference?.Element;
 
+    public ToastAction()
+    {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+    }
+
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
         var actionProps = RootContext?.Toast.ActionProps;
         computedChildContent = actionProps?.ChildContent ?? ChildContent;
-        shouldRender = computedChildContent is not null;
+        shouldRender = Render is not null || computedChildContent is not null;
         state = new ToastActionState(RootContext?.Toast.Type);
+        resolvedDisabled = Disabled || (actionProps?.Disabled ?? false);
+        resolvedNativeButton = actionProps?.NativeButton ?? NativeButton;
         mergedAdditionalAttributes = MergeAdditionalAttributes(actionProps?.AdditionalAttributes, AdditionalAttributes);
         BuildComponentAttributes(actionProps);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!shouldRender || !Element.HasValue)
+        {
+            return;
+        }
+
+        var elementChanged = !Nullable.Equals(previousElement, Element);
+        if (firstRender || elementChanged || resolvedDisabled != previousDisabled ||
+            resolvedNativeButton != previousNativeButton)
+        {
+            var previousNeedsJs = !previousNativeButton || previousDisabled;
+            hasRendered = true;
+            previousElement = Element;
+            previousDisabled = resolvedDisabled;
+            previousNativeButton = resolvedNativeButton;
+            if (!resolvedNativeButton || resolvedDisabled)
+            {
+                await SyncJsAsync(dispose: false);
+            }
+            else if (previousNeedsJs)
+            {
+                await SyncJsAsync(dispose: true);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (hasRendered && moduleTask.IsValueCreated && Element.HasValue)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex;
+            }
+        }
     }
 
     private void BuildComponentAttributes(ToastActionOptions? actionProps)
     {
         var attrs = new Dictionary<string, object>();
-        var disabled = Disabled || (actionProps?.Disabled ?? false);
-        var nativeButton = actionProps?.NativeButton ?? NativeButton;
-
-        if (nativeButton)
+        if (resolvedNativeButton)
         {
-            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, false, 0);
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, resolvedDisabled, false, 0);
         }
         else
         {
-            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, false, 0);
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, resolvedDisabled, false, 0);
         }
 
         if (!string.IsNullOrWhiteSpace(state.Type))
@@ -107,7 +170,7 @@
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, async e =>
         {
-            if (disabled)
+            if (resolvedDisabled)
             {
                 return;
             }
@@ -123,6 +186,24 @@
         });
 
         componentAttributes = attrs;
+    }
+
+    private async Task SyncJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            await module.InvokeVoidAsync("sync", Element.Value, resolvedDisabled, false, resolvedNativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex;
+        }
     }
 
     private static IReadOnlyDictionary<string, object>? MergeAdditionalAttributes(

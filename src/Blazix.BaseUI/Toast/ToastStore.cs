@@ -130,6 +130,17 @@ internal sealed class ToastStore : IDisposable
         }
     }
 
+    internal bool AreTimersPaused
+    {
+        get
+        {
+            lock (syncRoot)
+            {
+                return areTimersPaused;
+            }
+        }
+    }
+
     public ToastStore(int timeout, int limit)
     {
         this.timeout = timeout;
@@ -176,6 +187,30 @@ internal sealed class ToastStore : IDisposable
             }
 
             this.isWindowFocused = isWindowFocused;
+        }
+
+        NotifyChanged();
+    }
+
+    public void SyncProviderProperties(int timeout, int limit)
+    {
+        lock (syncRoot)
+        {
+            var limitChanged = this.limit != limit;
+            if (this.timeout == timeout && !limitChanged)
+            {
+                return;
+            }
+
+            this.timeout = timeout;
+            this.limit = limit;
+
+            if (limitChanged)
+            {
+                var updatedToasts = toasts.ToList();
+                ApplyLimit(updatedToasts);
+                toasts = updatedToasts;
+            }
         }
 
         NotifyChanged();
@@ -241,6 +276,12 @@ internal sealed class ToastStore : IDisposable
     {
         lock (syncRoot)
         {
+            var toast = GetToast(id);
+            if (toast is null || toast.TransitionStatus == TransitionStatus.Ending || toast.Height == height)
+            {
+                return;
+            }
+
             UpdateToastInternal(
                 id,
                 new ToastManagerUpdateOptions(),
@@ -277,13 +318,7 @@ internal sealed class ToastStore : IDisposable
             if (closeAll)
             {
                 toastsToClose.AddRange(toasts);
-                foreach (var timer in timers.Values)
-                {
-                    timer.CancellationTokenSource?.Cancel();
-                    timer.CancellationTokenSource?.Dispose();
-                    timer.CancellationTokenSource = null;
-                }
-                timers.Clear();
+                ClearTimers();
             }
             else
             {
@@ -347,7 +382,7 @@ internal sealed class ToastStore : IDisposable
             }
 
             toasts = newToasts;
-            if (closeAll || toasts.Count == 1)
+            if (!toasts.Any(toast => toast.TransitionStatus != TransitionStatus.Ending))
             {
                 hovering = false;
                 focused = false;
@@ -677,43 +712,63 @@ internal sealed class ToastStore : IDisposable
         timer.CancellationTokenSource = cts;
         timer.StartedAt = DateTimeOffset.UtcNow;
 
-        _ = Task.Run(async () =>
+        _ = RunTimerAsync(id, timer, delay, cts);
+    }
+
+    private async Task RunTimerAsync(
+        string id,
+        TimerInfo timer,
+        int delay,
+        CancellationTokenSource cts)
+    {
+        var shouldInvoke = false;
+        try
         {
-            var shouldInvoke = false;
-            try
+            await Task.Delay(delay, cts.Token).ConfigureAwait(false);
+            if (cts.Token.IsCancellationRequested)
             {
-                await Task.Delay(delay, cts.Token).ConfigureAwait(false);
-                if (cts.Token.IsCancellationRequested)
-                {
-                    return;
-                }
+                return;
+            }
 
-                lock (syncRoot)
+            lock (syncRoot)
+            {
+                if (timers.Remove(id))
                 {
-                    if (timers.Remove(id))
+                    if (ReferenceEquals(timer.CancellationTokenSource, cts))
                     {
-                        if (ReferenceEquals(timer.CancellationTokenSource, cts))
-                        {
-                            timer.CancellationTokenSource = null;
-                        }
-
-                        shouldInvoke = true;
+                        timer.CancellationTokenSource = null;
                     }
+
+                    ResetPausedStateIfNoTimersRemain();
+                    shouldInvoke = true;
                 }
             }
-            catch (OperationCanceledException)
-            {
-            }
-            finally
-            {
-                cts.Dispose();
-            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            cts.Dispose();
+        }
 
-            if (shouldInvoke)
-            {
-                InvokeTimerCallbackIfActive(timer.Callback);
-            }
-        });
+        if (shouldInvoke)
+        {
+            InvokeTimerCallbackIfActive(timer.Callback);
+        }
+    }
+
+    private void ClearTimers()
+    {
+        foreach (var timer in timers.Values)
+        {
+            timer.CancellationTokenSource?.Cancel();
+            timer.CancellationTokenSource?.Dispose();
+            timer.CancellationTokenSource = null;
+        }
+
+        timers.Clear();
+        areTimersPaused = false;
     }
 
     private void ClearTimer(string id)
@@ -726,6 +781,15 @@ internal sealed class ToastStore : IDisposable
         timer.CancellationTokenSource?.Cancel();
         timer.CancellationTokenSource?.Dispose();
         timer.CancellationTokenSource = null;
+        ResetPausedStateIfNoTimersRemain();
+    }
+
+    private void ResetPausedStateIfNoTimersRemain()
+    {
+        if (timers.Count == 0)
+        {
+            areTimersPaused = false;
+        }
     }
 
     private void InvokeTimerCallbackIfActive(Action callback)
@@ -761,16 +825,18 @@ internal sealed class ToastStore : IDisposable
         {
             var result = await task.ConfigureAwait(false);
             var successOptions = options.Success.Resolve(result);
-            successOptions.Type ??= "success";
+            successOptions.Type = "success";
             successOptions.HasType = true;
+            successOptions.HasTimeout = true;
             UpdateToast(id, successOptions);
             return result;
         }
         catch (Exception ex)
         {
             var errorOptions = options.Error.Resolve(ex);
-            errorOptions.Type ??= "error";
+            errorOptions.Type = "error";
             errorOptions.HasType = true;
+            errorOptions.HasTimeout = true;
             UpdateToast(id, errorOptions);
             throw;
         }
@@ -823,28 +889,28 @@ internal sealed class ToastStore : IDisposable
         new()
         {
             Title = options.Title,
-            HasTitle = true,
+            HasTitle = options.HasTitle,
             Type = options.Type,
-            HasType = true,
+            HasType = options.HasType,
             Description = options.Description,
-            HasDescription = true,
+            HasDescription = options.HasDescription,
             Timeout = options.Timeout,
-            HasTimeout = true,
-            Priority = options.Priority,
+            HasTimeout = options.HasTimeout,
+            Priority = options.HasPriority ? options.Priority : null,
             OnClose = options.OnClose,
-            HasOnClose = true,
+            HasOnClose = options.HasOnClose,
             OnCloseCallback = options.OnCloseCallback,
-            HasOnCloseCallback = options.OnCloseCallback.HasDelegate,
+            HasOnCloseCallback = options.HasOnCloseCallback,
             OnRemove = options.OnRemove,
-            HasOnRemove = true,
+            HasOnRemove = options.HasOnRemove,
             OnRemoveCallback = options.OnRemoveCallback,
-            HasOnRemoveCallback = options.OnRemoveCallback.HasDelegate,
+            HasOnRemoveCallback = options.HasOnRemoveCallback,
             ActionProps = options.ActionProps,
-            HasActionProps = true,
+            HasActionProps = options.HasActionProps,
             PositionerProps = options.PositionerProps,
-            HasPositionerProps = true,
+            HasPositionerProps = options.HasPositionerProps,
             Data = options.Data,
-            HasData = true
+            HasData = options.HasData
         };
 
     private static ToastManagerAddOptions ToAddOptions(ToastManagerUpdateOptions options) =>

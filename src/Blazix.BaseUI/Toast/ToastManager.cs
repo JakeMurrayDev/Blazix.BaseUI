@@ -32,8 +32,7 @@ public sealed class ToastManager
             ? GenerateId()
             : options.Id!;
 
-        options.Id = id;
-        Emit(new ToastManagerEvent(ToastManagerAction.Add, options));
+        Emit(new ToastManagerEvent(ToastManagerAction.Add, options.CloneWithId(id)));
         return id;
     }
 
@@ -99,16 +98,18 @@ public sealed class ToastManager
         {
             var result = await task.ConfigureAwait(false);
             var successOptions = options.Success.Resolve(result);
-            successOptions.Type ??= "success";
+            successOptions.Type = "success";
             successOptions.HasType = true;
+            successOptions.HasTimeout = true;
             Update(id, successOptions);
             return result;
         }
         catch (Exception ex)
         {
             var errorOptions = options.Error.Resolve(ex);
-            errorOptions.Type ??= "error";
+            errorOptions.Type = "error";
             errorOptions.HasType = true;
+            errorOptions.HasTimeout = true;
             Update(id, errorOptions);
             throw;
         }

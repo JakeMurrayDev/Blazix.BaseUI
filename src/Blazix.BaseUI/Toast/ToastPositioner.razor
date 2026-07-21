@@ -19,13 +19,26 @@
 }
 
 @code {
+    private static readonly string[] PositionerParameterNames =
+    [
+        nameof(Anchor), nameof(Side), nameof(Align), nameof(SideOffset), nameof(AlignOffset),
+        nameof(CollisionBoundary), nameof(CollisionPadding), nameof(CollisionPaddingPerSide),
+        nameof(ArrowPadding), nameof(Sticky), nameof(DisableAnchorTracking), nameof(PositionMethod),
+        nameof(CollisionAvoidance)
+    ];
+
     private PositionerInterop positionerInterop = null!;
     private DotNetObjectReference<ToastPositioner>? positionerDotNetRef;
     private ToastPositionerState state = new(Side.Top, Align.Center, false);
     private ToastPositionerContext positionerContext = null!;
     private RenderElement<ToastPositionerState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
+    private readonly HashSet<string> suppliedParameters = new(StringComparer.Ordinal);
     private ElementReference? previousElement;
+    private ElementReference? previousAnchor;
+    private ElementReference? previousArrowElement;
+    private bool previousDisableAnchorTracking;
+    private string? previousOptionsKey;
     private Side computedSide;
     private Align computedAlign;
     private bool computedAnchorHidden;
@@ -170,6 +183,21 @@
         };
 
     /// <inheritdoc />
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        suppliedParameters.Clear();
+        foreach (var parameter in parameters)
+        {
+            if (PositionerParameterNames.Contains(parameter.Name, StringComparer.Ordinal))
+            {
+                suppliedParameters.Add(parameter.Name);
+            }
+        }
+
+        await base.SetParametersAsync(parameters);
+    }
+
+    /// <inheritdoc />
     protected override void OnInitialized()
     {
         positionerInterop = new PositionerInterop(JSRuntime, "./_content/Blazix.BaseUI/blazix-baseui-toast.min.js");
@@ -210,21 +238,36 @@
             positionerDotNetRef = DotNetObjectReference.Create(this);
         }
 
+        var options = ResolvedOptions;
         var currentElement = Element;
-        if (!Nullable.Equals(previousElement, currentElement))
+        var elementChanged = !Nullable.Equals(previousElement, currentElement);
+        var anchor = options.Anchor;
+        if (positionerInterop.IsInitialized &&
+            (!anchor.HasValue || elementChanged || previousDisableAnchorTracking != options.DisableAnchorTracking))
         {
-            previousElement = currentElement;
+            await positionerInterop.ResetAsync();
         }
 
-        if (positionerInterop.HasRendered && Element.HasValue)
+        previousElement = currentElement;
+        previousDisableAnchorTracking = options.DisableAnchorTracking;
+
+        if (positionerInterop.HasRendered && Element.HasValue && anchor.HasValue)
         {
             if (!positionerInterop.IsInitialized)
             {
                 await InitializePositionerAsync();
+                previousAnchor = anchor;
+                previousArrowElement = positionerContext.ArrowElement;
+                previousOptionsKey = GetOptionsKey(options);
             }
-            else
+            else if (!Nullable.Equals(previousAnchor, anchor) ||
+                     !Nullable.Equals(previousArrowElement, positionerContext.ArrowElement) ||
+                     !string.Equals(previousOptionsKey, GetOptionsKey(options), StringComparison.Ordinal))
             {
                 await UpdatePositionAsync();
+                previousAnchor = anchor;
+                previousArrowElement = positionerContext.ArrowElement;
+                previousOptionsKey = GetOptionsKey(options);
             }
         }
     }
@@ -232,8 +275,14 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await positionerInterop.DisposeAsync();
-        positionerDotNetRef?.Dispose();
+        try
+        {
+            await positionerInterop.DisposeAsync();
+        }
+        finally
+        {
+            positionerDotNetRef?.Dispose();
+        }
     }
 
     [JSInvokable]
@@ -265,22 +314,29 @@
         StateHasChanged();
     }
 
-    private ToastPositionerOptions ResolvedOptions => Toast.PositionerProps ?? new ToastPositionerOptions
+    private ToastPositionerOptions ResolvedOptions
     {
-        Anchor = Anchor,
-        Side = Side,
-        Align = Align,
-        SideOffset = SideOffset,
-        AlignOffset = AlignOffset,
-        CollisionBoundary = CollisionBoundary,
-        CollisionPadding = CollisionPadding,
-        CollisionPaddingPerSide = CollisionPaddingPerSide,
-        ArrowPadding = ArrowPadding,
-        Sticky = Sticky,
-        DisableAnchorTracking = DisableAnchorTracking,
-        PositionMethod = PositionMethod,
-        CollisionAvoidance = CollisionAvoidance
-    };
+        get
+        {
+            var manager = Toast.PositionerProps;
+            return new ToastPositionerOptions
+            {
+                Anchor = Resolve(nameof(Anchor), Anchor, manager is null ? Anchor : manager.Anchor, manager),
+                Side = Resolve(nameof(Side), Side, manager is null ? Side : manager.Side, manager),
+                Align = Resolve(nameof(Align), Align, manager is null ? Align : manager.Align, manager),
+                SideOffset = Resolve(nameof(SideOffset), SideOffset, manager is null ? SideOffset : manager.SideOffset, manager),
+                AlignOffset = Resolve(nameof(AlignOffset), AlignOffset, manager is null ? AlignOffset : manager.AlignOffset, manager),
+                CollisionBoundary = Resolve(nameof(CollisionBoundary), CollisionBoundary, manager is null ? CollisionBoundary : manager.CollisionBoundary, manager),
+                CollisionPadding = Resolve(nameof(CollisionPadding), CollisionPadding, manager is null ? CollisionPadding : manager.CollisionPadding, manager),
+                CollisionPaddingPerSide = Resolve(nameof(CollisionPaddingPerSide), CollisionPaddingPerSide, manager is null ? CollisionPaddingPerSide : manager.CollisionPaddingPerSide, manager),
+                ArrowPadding = Resolve(nameof(ArrowPadding), ArrowPadding, manager is null ? ArrowPadding : manager.ArrowPadding, manager),
+                Sticky = Resolve(nameof(Sticky), Sticky, manager is null ? Sticky : manager.Sticky, manager),
+                DisableAnchorTracking = Resolve(nameof(DisableAnchorTracking), DisableAnchorTracking, manager is null ? DisableAnchorTracking : manager.DisableAnchorTracking, manager),
+                PositionMethod = Resolve(nameof(PositionMethod), PositionMethod, manager is null ? PositionMethod : manager.PositionMethod, manager),
+                CollisionAvoidance = Resolve(nameof(CollisionAvoidance), CollisionAvoidance, manager is null ? CollisionAvoidance : manager.CollisionAvoidance, manager)
+            };
+        }
+    }
 
     private void BuildComponentAttributes()
     {
@@ -314,10 +370,23 @@
             ? new { top = options.CollisionPaddingPerSide.Top, right = options.CollisionPaddingPerSide.Right, bottom = options.CollisionPaddingPerSide.Bottom, left = options.CollisionPaddingPerSide.Left }
             : (object)options.CollisionPadding;
 
+    private string GetOptionsKey(ToastPositionerOptions options)
+    {
+        var collisionPadding = options.CollisionPaddingPerSide is null
+            ? options.CollisionPadding.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : $"{options.CollisionPaddingPerSide.Top},{options.CollisionPaddingPerSide.Right},{options.CollisionPaddingPerSide.Bottom},{options.CollisionPaddingPerSide.Left}";
+        var collisionAvoidance = options.CollisionAvoidance ?? new CollisionAvoidance();
+        return string.Join('|',
+            options.Side, options.Align, options.SideOffset, options.AlignOffset, collisionPadding,
+            options.CollisionBoundary, options.ArrowPadding, options.Sticky, options.DisableAnchorTracking,
+            options.PositionMethod, collisionAvoidance.Side, collisionAvoidance.Align,
+            collisionAvoidance.FallbackAxisSide);
+    }
+
     private async Task InitializePositionerAsync()
     {
         var options = ResolvedOptions;
-        var anchor = options.Anchor ?? Anchor;
+        var anchor = options.Anchor;
         if (!Element.HasValue || !anchor.HasValue)
         {
             return;
@@ -347,7 +416,7 @@
                 ca.FallbackAxisSide.ToJsString(),
                 positionerDotNetRef));
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
@@ -356,7 +425,7 @@
     private async Task UpdatePositionAsync()
     {
         var options = ResolvedOptions;
-        var anchor = options.Anchor ?? Anchor;
+        var anchor = options.Anchor;
         if (!positionerInterop.IsInitialized || !anchor.HasValue)
         {
             return;
@@ -384,9 +453,24 @@
                 ca.Align.ToJsString(),
                 ca.FallbackAxisSide.ToJsString());
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex;
         }
+    }
+
+    private T Resolve<T>(string propertyName, T directValue, T managerValue, ToastPositionerOptions? manager)
+    {
+        if (suppliedParameters.Contains(propertyName))
+        {
+            return directValue;
+        }
+
+        if (manager is not null && manager.Has(propertyName))
+        {
+            return managerValue!;
+        }
+
+        return directValue;
     }
 }
