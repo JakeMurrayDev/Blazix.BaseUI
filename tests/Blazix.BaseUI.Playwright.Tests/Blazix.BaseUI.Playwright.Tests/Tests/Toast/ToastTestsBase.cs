@@ -270,7 +270,16 @@ public abstract class ToastTestsBase : TestBase
 
         await GetByTestId("add-high").ClickAsync();
         await Assertions.Expect(GetByTestId("toast-high")).ToBeVisibleAsync();
-        await Page.WaitForTimeoutAsync(50);
+        await Page.WaitForFunctionAsync(
+            """
+            () => {
+                const state = window[Symbol.for('Blazix.BaseUI.Toast.State')];
+                const viewport = document.querySelector('[data-testid="toast-viewport"]');
+                return state && viewport && [...state.viewports.values()].some(
+                    entry => entry.viewport === viewport && entry.globalCleanups.length > 0);
+            }
+            """,
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
         await GetByTestId("before-toast").FocusAsync();
         await Page.Keyboard.PressAsync("F6");
         await Assertions.Expect(GetByTestId("toast-viewport")).ToBeFocusedAsync();

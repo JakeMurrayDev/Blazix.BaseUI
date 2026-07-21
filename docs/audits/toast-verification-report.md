@@ -24,7 +24,7 @@ Date: 2026-07-21
 | `pnpm exec vitest run --project @base-ui/react packages/react/src/toast` from `.base-ui` | 15 files; 272 passed; 25 skipped; exit 0 |
 | `dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --filter "FullyQualifiedName~ToastTests"` before repair | 13/13 passed; established baseline |
 | `dotnet build src/Blazix.BaseUI/Blazix.BaseUI.csproj -p:NuGetAudit=false -v minimal` | Passed, 0 warnings/errors |
-| `dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --filter "FullyQualifiedName~ToastTests|FullyQualifiedName~FocusGuardTests" --no-restore -p:NuGetAudit=false -v normal` | Passed 28/28 |
+| `dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --filter "FullyQualifiedName~ToastTests\|FullyQualifiedName~FocusGuardTests" --no-restore -p:NuGetAudit=false -v normal` | Passed 28/28 |
 | `dotnet build tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj --no-restore -p:NuGetAudit=false` | Passed |
 | `dotnet test tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj --filter "FullyQualifiedName~ToastTests" --no-restore -p:NuGetAudit=false -v normal` | Passed 26/26 in 12.7729 seconds |
 | `dotnet build Blazix.BaseUI.slnx --no-restore -p:NuGetAudit=false -v minimal` | Passed, 0 warnings/errors |
