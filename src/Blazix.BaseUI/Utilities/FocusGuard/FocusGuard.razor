@@ -7,8 +7,8 @@
 <span @ref="Element"
       tabindex="0"
       data-blazix-base-ui-focus-guard
-      role="@(isSafari ? "button" : null)"
-      aria-hidden="@(isSafari ? null : "true")"
+      role="@(needsButtonRole ? "button" : null)"
+      aria-hidden="@(needsButtonRole ? null : "true")"
       style="@VisuallyHiddenStyle"
       @onfocus="OnFocusAsync"
       @attributes="AdditionalAttributes" />
@@ -18,7 +18,7 @@
         "position:fixed;top:0;left:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0;";
 
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
-    private bool isSafari;
+    private bool needsButtonRole;
 
     public FocusGuard()
     {
@@ -52,14 +52,14 @@
             try
             {
                 var module = await moduleTask.Value;
-                var safari = await module.InvokeAsync<bool>("isSafari");
-                if (safari)
+                var shouldUseButtonRole = await module.InvokeAsync<bool>("needsFocusGuardButtonRole");
+                if (shouldUseButtonRole)
                 {
-                    isSafari = true;
+                    needsButtonRole = true;
                     StateHasChanged();
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex;
             }
@@ -75,7 +75,7 @@
                 var module = await moduleTask.Value;
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }

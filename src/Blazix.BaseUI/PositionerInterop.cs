@@ -62,6 +62,26 @@ internal sealed class PositionerInterop : IAsyncDisposable
     /// </summary>
     internal void SetPositionerId(string? id) => PositionerId = id;
 
+    internal async Task ResetAsync()
+    {
+        var id = PositionerId;
+        PositionerId = null;
+        if (moduleTask?.IsValueCreated != true || string.IsNullOrEmpty(id))
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask;
+            await module.InvokeVoidAsync("disposePositioner", id);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex;
+        }
+    }
+
     /// <summary>
     /// Marks the first render as complete. Call from <c>OnAfterRenderAsync</c> when <c>firstRender</c> is <see langword="true"/>.
     /// </summary>
@@ -171,17 +191,34 @@ internal sealed class PositionerInterop : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (moduleTask?.IsValueCreated == true && hasRendered && !string.IsNullOrEmpty(PositionerId))
+        if (moduleTask?.IsValueCreated == true)
         {
+            IJSObjectReference? module = null;
             try
             {
-                var module = await ModuleTask;
-                await module.InvokeVoidAsync("disposePositioner", PositionerId);
-                await module.DisposeAsync();
+                module = await ModuleTask;
+                if (hasRendered && !string.IsNullOrEmpty(PositionerId))
+                {
+                    await module.InvokeVoidAsync("disposePositioner", PositionerId);
+                }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+            finally
+            {
+                if (module is not null)
+                {
+                    try
+                    {
+                        await module.DisposeAsync();
+                    }
+                    catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+                    {
+                        _ = ex;
+                    }
+                }
             }
         }
 

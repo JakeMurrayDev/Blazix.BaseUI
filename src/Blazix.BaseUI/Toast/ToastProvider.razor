@@ -49,8 +49,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        store.Timeout = Timeout;
-        store.Limit = Limit;
+        store.SyncProviderProperties(Timeout, Limit);
 
         if (!ReferenceEquals(subscribedToastManager, ToastManager))
         {

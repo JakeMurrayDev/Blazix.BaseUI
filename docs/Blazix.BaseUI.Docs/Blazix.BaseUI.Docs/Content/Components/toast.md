@@ -6,7 +6,7 @@ Toast displays brief notifications with stacking, actions, promises, custom cont
 
 - Place a shared `ToastProvider` near the app root when notifications should use one viewport.
 - Keep the viewport keyboard reachable; `F6` moves focus into the toast region when toasts are present.
-- Add `data-blazix-base-ui-swipe-ignore` to custom interactive areas that should not start swipe dismissal.
+- Add `data-base-ui-swipe-ignore` to custom interactive areas that should not start swipe dismissal. The legacy `data-swipe-ignore` selector remains supported.
 - For high-priority toasts, put the announced screen-reader text in the toast title and description values.
 
 ## Anatomy
@@ -87,6 +87,7 @@ toastId = toastManager.Add(new ToastManagerAddOptions
     Title = "Action performed",
     Description = "You can undo this action.",
     Type = "success",
+    Timeout = 10_000,
     ActionProps = new ToastActionOptions
     {
         ChildContent = @<span>Undo</span>,

@@ -41,6 +41,19 @@ export function isSafari() {
     return typeof navigator !== 'undefined' && /apple/i.test(navigator.vendor);
 }
 
+export function needsFocusGuardButtonRole() {
+    if (typeof navigator === 'undefined' || typeof CSS === 'undefined') {
+        return false;
+    }
+
+    const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
+    const isIos = /^i(os$|p)/.test(platform) ||
+        (platform === 'macintel' && (navigator.maxTouchPoints || 0) > 1);
+    const isApple = isIos || (!isIos && platform.startsWith('mac'));
+    const isWebKit = Boolean(CSS.supports?.('-webkit-backdrop-filter:none'));
+    return isApple && isWebKit;
+}
+
 // ============================================================================
 // Floating UI Library Loading
 // ============================================================================

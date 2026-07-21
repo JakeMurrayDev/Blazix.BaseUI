@@ -614,7 +614,7 @@ public static class JsInteropSetup
         void SetupFocusGuardSafariPath(string path)
         {
             var module = jsInterop.SetupModule(path);
-            module.Setup<bool>("isSafari").SetResult(true);
+            module.Setup<bool>("needsFocusGuardButtonRole").SetResult(true);
         }
     }
 
@@ -626,7 +626,7 @@ public static class JsInteropSetup
         void SetupFocusGuardNonSafariPath(string path)
         {
             var module = jsInterop.SetupModule(path);
-            module.Setup<bool>("isSafari").SetResult(false);
+            module.Setup<bool>("needsFocusGuardButtonRole").SetResult(false);
         }
     }
 

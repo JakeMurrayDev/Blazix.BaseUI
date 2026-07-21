@@ -29,17 +29,30 @@
     <button type="button" data-testid="add-three" @onclick="AddThreeToasts">Add Three</button>
     <button type="button" data-testid="add-disabled-action" @onclick="AddDisabledActionToast">Add Disabled Action</button>
     <button type="button" data-testid="add-promise" @onclick="AddPromiseToast">Add Promise</button>
+    <button type="button" data-testid="add-keyboard-action" @onclick="AddKeyboardActionToast">Add Keyboard Action</button>
+    <button type="button" data-testid="add-keyboard-close" @onclick="AddKeyboardCloseToast">Add Keyboard Close</button>
+    <button type="button" data-testid="add-ignore" @onclick="AddIgnoreToast">Add Ignore Target</button>
+    <button type="button" data-testid="close-all" @onclick="() => manager.Close()">Close All</button>
+    <button type="button" data-testid="limit-zero" @onclick="() => limit = 0">Limit Zero</button>
+    <button type="button" data-testid="limit-two" @onclick="() => limit = 2">Limit Two</button>
 
-    <ToastProvider Timeout="0" Limit="2" ToastManager="manager" Context="toast">
+    <ToastProvider Timeout="0" Limit="limit" ToastManager="manager" Context="toast">
         <ToastViewport class="toast-viewport" data-testid="toast-viewport">
             @foreach (var item in toast.Toasts)
             {
-                <ToastRoot Toast="item" class="toast-root" data-testid="@($"toast-{item.Id}")">
+                <ToastRoot @key="item.Id" Toast="item" class="toast-root" data-testid="@($"toast-{item.Id}")">
                     <ToastContent data-testid="@($"toast-content-{item.Id}")">
                         <ToastTitle Id="@($"title-{item.Id}")" />
                         <ToastDescription Id="@($"description-{item.Id}")" />
-                        <ToastAction data-testid="@($"toast-action-{item.Id}")" />
-                        <ToastClose data-testid="@($"toast-close-{item.Id}")">Close</ToastClose>
+                        @if (item.Id == "ignore")
+                        {
+                            <div data-testid="swipe-ignore" data-base-ui-swipe-ignore>Ignore drag</div>
+                        }
+                        <ToastAction data-testid="@($"toast-action-{item.Id}")"
+                                     Render="@(item.Id == "keyboard-action" ? RenderNonNativeAction : null)" />
+                        <ToastClose data-testid="@($"toast-close-{item.Id}")"
+                                    NativeButton="@(item.Id != "keyboard-close")"
+                                    Render="@(item.Id == "keyboard-close" ? RenderNonNativeClose : null)">Close</ToastClose>
                     </ToastContent>
                 </ToastRoot>
             }
@@ -60,6 +73,25 @@
     private int removedCount;
     private int actionCount;
     private bool beforeFocused;
+    private int limit = 2;
+
+    private RenderFragment<RenderProps<ToastActionState>> RenderNonNativeAction => props => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddMultipleAttributes(1, props.Attributes);
+        builder.AddElementReferenceCapture(2, element => props.ElementReferenceCallback?.Invoke(element));
+        builder.AddContent(3, props.ChildContent);
+        builder.CloseElement();
+    };
+
+    private RenderFragment<RenderProps<ToastCloseState>> RenderNonNativeClose => props => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddMultipleAttributes(1, props.Attributes);
+        builder.AddElementReferenceCapture(2, element => props.ElementReferenceCallback?.Invoke(element));
+        builder.AddContent(3, props.ChildContent);
+        builder.CloseElement();
+    };
 
     private void AddLowToast()
     {
@@ -131,6 +163,45 @@
                 Timeout = 0
             }),
             Error = "Promise failed"
+        });
+    }
+
+    private void AddKeyboardActionToast()
+    {
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "keyboard-action",
+            Description = "Keyboard action",
+            Timeout = 0,
+            ActionProps = new ToastActionOptions
+            {
+                NativeButton = false,
+                ChildContent = builder => builder.AddContent(0, "Run action"),
+                OnClick = EventCallback.Factory.Create<MouseEventArgs>(this, () => actionCount++)
+            }
+        });
+    }
+
+    private void AddKeyboardCloseToast()
+    {
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "keyboard-close",
+            Description = "Keyboard close",
+            Timeout = 0,
+            OnCloseCallback = EventCallback.Factory.Create(this, () => closedCount++),
+            OnRemoveCallback = EventCallback.Factory.Create(this, () => removedCount++)
+        });
+    }
+
+    private void AddIgnoreToast()
+    {
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "ignore",
+            Description = "Ignore target",
+            Timeout = 0,
+            OnCloseCallback = EventCallback.Factory.Create(this, () => closedCount++)
         });
     }
 

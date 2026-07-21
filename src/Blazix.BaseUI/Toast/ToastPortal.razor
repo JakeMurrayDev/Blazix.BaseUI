@@ -1,16 +1,25 @@
 @using Blazix.BaseUI.Portal
 
 <Portal Target="@Container"
-        Render="Render"
+        TargetElement="@ContainerElement"
+        Render="ResolvedRender"
         ChildContent="ChildContent"
         @attributes="AdditionalAttributes" />
 
 @code {
+    private RenderFragment<RenderProps<object>>? ResolvedRender => Render is null
+        ? null
+        : props => Render(new RenderProps<ToastPortalState>(
+            props.Attributes,
+            new ToastPortalState(),
+            props.ChildContent,
+            props.ElementReferenceCallback));
+
     /// <summary>
     /// Gets or sets a custom render fragment that replaces the default portal element.
     /// </summary>
     [Parameter]
-    public RenderFragment<RenderProps<object>>? Render { get; set; }
+    public RenderFragment<RenderProps<ToastPortalState>>? Render { get; set; }
 
     /// <summary>
     /// Gets or sets a CSS selector for the parent element to render the portal into.
@@ -18,6 +27,13 @@
     /// </summary>
     [Parameter]
     public string Container { get; set; } = "body";
+
+    /// <summary>
+    /// Gets or sets a concrete DOM container for the portal. When provided,
+    /// this takes precedence over <see cref="Container"/>.
+    /// </summary>
+    [Parameter]
+    public ElementReference? ContainerElement { get; set; }
 
     /// <summary>
     /// Defines the child components of this instance.

@@ -425,7 +425,7 @@ public class ToastTests : BunitContext
             viewport.GetAttribute("aria-relevant").ShouldBe("additions text");
             viewport.GetAttribute("aria-label").ShouldBe("Notifications");
             viewport.GetAttribute("tabindex").ShouldBe("-1");
-            viewport.GetAttribute("style").ShouldContain("--toast-frontmost-height");
+            viewport.GetAttribute("style").ShouldBeNull();
 
             var root = cut.Find("[data-toast-id='high']");
             root.GetAttribute("role").ShouldBe("alertdialog");
@@ -563,12 +563,152 @@ public class ToastTests : BunitContext
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public void ProviderPropertySyncRecomputesLimitedFlags()
+    {
+        using var store = new ToastStore(timeout: 0, limit: 3);
+        store.AddToast(new ToastManagerAddOptions { Id = "one" });
+        store.AddToast(new ToastManagerAddOptions { Id = "two" });
+        store.AddToast(new ToastManagerAddOptions { Id = "three" });
+
+        store.SyncProviderProperties(timeout: 0, limit: 1);
+
+        store.Toasts.Single(toast => toast.Id == "three").Limited.ShouldBeFalse();
+        store.Toasts.Single(toast => toast.Id == "two").Limited.ShouldBeTrue();
+        store.Toasts.Single(toast => toast.Id == "one").Limited.ShouldBeTrue();
+
+        store.SyncProviderProperties(timeout: 0, limit: 0);
+        store.Toasts.Where(toast => toast.TransitionStatus != TransitionStatus.Ending)
+            .ShouldAllBe(toast => toast.Limited);
+
+        store.SyncProviderProperties(timeout: 0, limit: 3);
+        store.Toasts.ShouldAllBe(toast => !toast.Limited);
+    }
+
+    [Fact]
+    public void ClearingTheFinalTimerResetsPausedStateAcrossRemovalPaths()
+    {
+        using var store = new ToastStore(timeout: 10_000, limit: 3);
+
+        store.AddToast(new ToastManagerAddOptions { Id = "close" });
+        store.PauseTimers();
+        store.AreTimersPaused.ShouldBeTrue();
+        store.CloseToast("close");
+        store.AreTimersPaused.ShouldBeFalse();
+
+        store.AddToast(new ToastManagerAddOptions { Id = "untimed" });
+        store.PauseTimers();
+        store.UpdateToast("untimed", new ToastManagerUpdateOptions { Timeout = 0, HasTimeout = true });
+        store.AreTimersPaused.ShouldBeFalse();
+
+        store.AddToast(new ToastManagerAddOptions { Id = "all" });
+        store.PauseTimers();
+        store.CloseToast();
+        store.AreTimersPaused.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task PromiseBranchesForceTypeAndClearLoadingTimeout()
+    {
+        using var store = new ToastStore(timeout: 25, limit: 3);
+        var source = new TaskCompletionSource<int>();
+        var handled = store.PromiseToast(source.Task, new ToastManagerPromiseOptions<int>
+        {
+            Loading = new ToastManagerUpdateOptions { Description = "Loading", Timeout = 10_000 },
+            Success = new ToastManagerUpdateOptions { Description = "Done", Type = "custom" },
+            Error = "Failed"
+        });
+
+        source.SetResult(7);
+        (await handled).ShouldBe(7);
+
+        var toast = store.Toasts.Single();
+        toast.Type.ShouldBe("success");
+        toast.Timeout.ShouldBeNull();
+    }
+
+    [Fact]
+    public void PartialUpsertPreservesOmittedFieldsAndManagerDoesNotMutateOptions()
+    {
+        using var store = new ToastStore(timeout: 0, limit: 3);
+        var closed = 0;
+        store.AddToast(new ToastManagerAddOptions
+        {
+            Id = "stable",
+            Title = "Title",
+            Description = "Before",
+            Type = "info",
+            Timeout = 400,
+            Priority = ToastPriority.High,
+            OnClose = () => closed++,
+            Data = new object()
+        });
+
+        store.AddToast(new ToastManagerAddOptions { Id = "stable", Description = "After" });
+        var toast = store.Toasts.Single();
+        toast.Title.ShouldBe("Title");
+        toast.Description.ShouldBe("After");
+        toast.Type.ShouldBe("info");
+        toast.Timeout.ShouldBe(400);
+        toast.Priority.ShouldBe(ToastPriority.High);
+        toast.OnClose.ShouldNotBeNull();
+        toast.Data.ShouldNotBeNull();
+
+        var manager = new ToastManager();
+        var options = new ToastManagerAddOptions { Description = "Reusable" };
+        var first = manager.Add(options);
+        var second = manager.Add(options);
+        first.ShouldNotBe(second);
+        options.Id.ShouldBeNull();
+    }
+
+    [Fact]
+    public Task RenderOnlyTitleMountsAndRegistersItsAriaLabel()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(
+            manager,
+            titleRender: props => builder =>
+            {
+                builder.OpenElement(0, "h3");
+                builder.AddMultipleAttributes(1, props.Attributes);
+                builder.AddElementReferenceCapture(2, element => props.ElementReferenceCallback?.Invoke(element));
+                builder.AddContent(3, "Render title");
+                builder.CloseElement();
+            });
+
+        manager.Add(new ToastManagerAddOptions { Id = "render-only", Timeout = 0 });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("h3").TextContent.ShouldBe("Render title");
+            cut.Find("[data-toast-id='render-only']").GetAttribute("aria-labelledby").ShouldNotBeNullOrWhiteSpace();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public void PortalForwardsConcreteContainerElement()
+    {
+        var container = new ElementReference("toast-container");
+
+        var cut = Render<ToastPortal>(parameters => parameters
+            .Add(p => p.Container, "#fallback")
+            .Add(p => p.ContainerElement, container));
+
+        var portal = cut.FindComponent<Blazix.BaseUI.Portal.Portal>();
+        portal.Instance.Target.ShouldBe("#fallback");
+        portal.Instance.TargetElement.ShouldBe(container);
+    }
+
     private IRenderedComponent<ToastProvider> RenderProvider(
         ToastManager manager,
         int limit = 3,
         bool renderPositioner = false,
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null,
-        Func<bool>? shouldRenderLabelParts = null)
+        Func<bool>? shouldRenderLabelParts = null,
+        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -607,7 +747,8 @@ public class ToastTests : BunitContext
                                 toast,
                                 closeAdditionalAttributes,
                                 includeArrow: false,
-                                shouldRenderLabelParts);
+                                shouldRenderLabelParts,
+                                titleRender);
                         }
                     }
                 }));
@@ -620,7 +761,8 @@ public class ToastTests : BunitContext
         ToastObject toast,
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes,
         bool includeArrow,
-        Func<bool>? shouldRenderLabelParts = null)
+        Func<bool>? shouldRenderLabelParts = null,
+        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null)
     {
         var sequence = 0;
 
@@ -645,6 +787,10 @@ public class ToastTests : BunitContext
                 {
                     contentBuilder.OpenComponent<ToastTitle>(0);
                     contentBuilder.AddAttribute(1, "Id", $"title-{toast.Id}");
+                    if (titleRender is not null)
+                    {
+                        contentBuilder.AddAttribute(2, "Render", titleRender);
+                    }
                     contentBuilder.CloseComponent();
 
                     contentBuilder.OpenComponent<ToastDescription>(10);

@@ -151,4 +151,137 @@ public abstract class ToastTestsBase : TestBase
         await Assertions.Expect(GetByTestId("removed-count")).ToHaveTextAsync("1");
         await Assertions.Expect(toast).ToBeHiddenAsync();
     }
+
+    [Fact]
+    public virtual async Task CanonicalSwipeIgnoreTargetDoesNotStartOrDismissSwipe()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-ignore").ClickAsync();
+
+        var target = GetByTestId("swipe-ignore");
+        var toast = GetByTestId("toast-ignore");
+        var box = await target.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(box.X + box.Width + 100, box.Y + box.Height / 2);
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(toast).Not.ToHaveAttributeAsync("data-swiping", string.Empty);
+        await Assertions.Expect(GetByTestId("closed-count")).ToHaveTextAsync("0");
+        await Assertions.Expect(toast).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public virtual async Task DocumentPointerReleaseClearsSwipeAndAllowsNextDismissal()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-low").ClickAsync();
+
+        var toast = GetByTestId("toast-low");
+        var box = await toast.BoundingBoxAsync();
+        Assert.NotNull(box);
+        var startX = box.X + 20;
+        var startY = box.Y + 20;
+
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX + 20, startY);
+        await Page.EvaluateAsync("() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, pointerType: 'mouse', button: 0 }))");
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(toast).Not.ToHaveAttributeAsync("data-swiping", string.Empty);
+        await Assertions.Expect(GetByTestId("closed-count")).ToHaveTextAsync("0");
+
+        box = await toast.BoundingBoxAsync();
+        Assert.NotNull(box);
+        startX = box.X + 20;
+        startY = box.Y + 20;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX + 96, startY, new MouseMoveOptions { Steps = 8 });
+        await Page.Mouse.UpAsync();
+
+        await Assertions.Expect(GetByTestId("closed-count")).ToHaveTextAsync("1");
+        await Assertions.Expect(toast).ToBeHiddenAsync();
+    }
+
+    [Fact]
+    public virtual async Task TouchMoveIsPreventedOnlyDuringAnActiveSwipe()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-low").ClickAsync();
+        var toast = GetByTestId("toast-low");
+
+        var beforeSwipe = await toast.EvaluateAsync<bool>("element => { const event = new Event('touchmove', { bubbles: true, cancelable: true }); element.dispatchEvent(event); return event.defaultPrevented; }");
+        Assert.False(beforeSwipe);
+
+        var duringSwipe = await toast.EvaluateAsync<bool>("element => { element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 77, pointerType: 'touch', button: 0, clientX: 10, clientY: 10 })); const event = new Event('touchmove', { bubbles: true, cancelable: true }); element.dispatchEvent(event); document.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: 77, pointerType: 'touch' })); return event.defaultPrevented; }");
+        Assert.True(duringSwipe);
+    }
+
+    [Fact]
+    public virtual async Task NonNativeActionAndCloseImplementEnterAndSpaceActivation()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-keyboard-action").ClickAsync();
+
+        var action = GetByTestId("toast-action-keyboard-action");
+        await Assertions.Expect(action).ToHaveAttributeAsync("role", "button");
+        await action.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Page.Keyboard.PressAsync("Space");
+        await Assertions.Expect(GetByTestId("action-count")).ToHaveTextAsync("2");
+
+        await GetByTestId("add-keyboard-close").ClickAsync();
+        var close = GetByTestId("toast-close-keyboard-close");
+        await Assertions.Expect(close).ToHaveAttributeAsync("role", "button");
+        await close.FocusAsync();
+        await Page.Keyboard.PressAsync("Enter");
+        await Assertions.Expect(GetByTestId("toast-keyboard-close")).ToBeHiddenAsync();
+    }
+
+    [Fact]
+    public virtual async Task DynamicLimitZeroMarksAllToastsInertAndFocusGuardRestoresPriorFocus()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-three").ClickAsync();
+        await GetByTestId("limit-zero").ClickAsync();
+
+        await Page.WaitForFunctionAsync(
+            "() => [...document.querySelectorAll('[data-blazix-base-ui-toast-root]')].every(toast => toast.hasAttribute('data-limited') && toast.hasAttribute('inert'))",
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await GetByTestId("before-toast").FocusAsync();
+        await Page.Keyboard.PressAsync("F6");
+        await Assertions.Expect(GetByTestId("toast-viewport")).ToBeFocusedAsync();
+        await Page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(GetByTestId("before-toast")).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public virtual async Task GlobalListenersRebindAfterStoreReturnsFromEmptyState()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+        await GetByTestId("add-low").ClickAsync();
+        await GetByTestId("toast-close-low").ClickAsync();
+        await Assertions.Expect(GetByTestId("toast-low")).ToBeHiddenAsync();
+
+        await GetByTestId("add-high").ClickAsync();
+        await Assertions.Expect(GetByTestId("toast-high")).ToBeVisibleAsync();
+        await Page.WaitForFunctionAsync(
+            """
+            () => {
+                const state = window[Symbol.for('Blazix.BaseUI.Toast.State')];
+                const viewport = document.querySelector('[data-testid="toast-viewport"]');
+                return state && viewport && [...state.viewports.values()].some(
+                    entry => entry.viewport === viewport && entry.globalCleanups.length > 0);
+            }
+            """,
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+        await GetByTestId("before-toast").FocusAsync();
+        await Page.Keyboard.PressAsync("F6");
+        await Assertions.Expect(GetByTestId("toast-viewport")).ToBeFocusedAsync();
+    }
 }

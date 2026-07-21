@@ -23,7 +23,15 @@ const SWIPE_THRESHOLD = 40;
 const REVERSE_CANCEL_THRESHOLD = 10;
 const OPPOSITE_DIRECTION_DAMPING_FACTOR = 0.5;
 const MIN_DRAG_THRESHOLD = 1;
-const SWIPE_IGNORE_SELECTOR = '[data-blazix-base-ui-swipe-ignore], [data-swipe-ignore], button, a, input, textarea, [role="button"]';
+const SWIPE_IGNORE_SELECTOR = '[data-base-ui-swipe-ignore], [data-blazix-base-ui-swipe-ignore], [data-swipe-ignore], button, a, input, textarea, [role="button"]';
+
+function invokeDotNet(dotNetRef, method, ...args) {
+    return dotNetRef.invokeMethodAsync(method, ...args).catch((error) => {
+        if (!String(error).includes('disposed') && !String(error).includes('disconnected')) {
+            console.error(`Blazix.BaseUI Toast interop failed in ${method}.`, error);
+        }
+    });
+}
 
 export function initializeViewport(viewportId, viewport, dotNetRef) {
     disposeViewport(viewportId);
@@ -33,9 +41,11 @@ export function initializeViewport(viewportId, viewport, dotNetRef) {
         dotNetRef,
         isEmpty: true,
         prevFocusElement: null,
+        focusGuardRelatedTarget: null,
         touchActive: false,
         markedReadyForMouseLeave: false,
-        cleanups: []
+        cleanups: [],
+        globalCleanups: []
     };
 
     const win = viewport.ownerDocument.defaultView || window;
@@ -49,12 +59,12 @@ export function initializeViewport(viewportId, viewport, dotNetRef) {
         event.preventDefault();
         entry.prevFocusElement = activeElement(doc);
         viewport.focus({ preventScroll: true });
-        dotNetRef.invokeMethodAsync('OnGlobalFocusHotkey').catch(() => {});
+        invokeDotNet(dotNetRef, 'OnGlobalFocusHotkey');
     };
 
     const onWindowBlur = (event) => {
         if (getTarget(event) === win) {
-            dotNetRef.invokeMethodAsync('OnWindowBlur').catch(() => {});
+            invokeDotNet(dotNetRef, 'OnWindowBlur');
         }
     };
 
@@ -69,7 +79,7 @@ export function initializeViewport(viewportId, viewport, dotNetRef) {
             !contains(viewport, target) ||
             !matchesFocusVisible(currentActive);
 
-        setTimeout(() => dotNetRef.invokeMethodAsync('OnWindowFocus', shouldResume).catch(() => {}), 0);
+        setTimeout(() => invokeDotNet(dotNetRef, 'OnWindowFocus', shouldResume), 0);
     };
 
     const onDocumentPointerDown = (event) => {
@@ -81,30 +91,74 @@ export function initializeViewport(viewportId, viewport, dotNetRef) {
             return;
         }
 
-        dotNetRef.invokeMethodAsync('OnDocumentTouchPointerDownOutside').catch(() => {});
+        invokeDotNet(dotNetRef, 'OnDocumentTouchPointerDownOutside');
     };
 
     const onFocus = () => {
-        dotNetRef.invokeMethodAsync('OnViewportFocus', matchesFocusVisible(activeElement(doc))).catch(() => {});
+        invokeDotNet(dotNetRef, 'OnViewportFocus', matchesFocusVisible(activeElement(doc)));
     };
 
     const onBlur = (event) => {
-        dotNetRef.invokeMethodAsync('OnViewportBlur', contains(viewport, event.relatedTarget)).catch(() => {});
+        invokeDotNet(dotNetRef, 'OnViewportBlur', contains(viewport, event.relatedTarget));
     };
 
-    win.addEventListener('keydown', onKeyDown);
-    win.addEventListener('blur', onWindowBlur, true);
-    win.addEventListener('focus', onWindowFocus, true);
-    doc.addEventListener('pointerdown', onDocumentPointerDown, true);
+    const onViewportKeyDown = (event) => {
+        if (event.key !== 'Tab' || getTarget(event) !== viewport) {
+            return;
+        }
+
+        event.preventDefault();
+        if (event.shiftKey) {
+            entry.prevFocusElement?.focus?.({ preventScroll: true });
+            return;
+        }
+
+        const firstToast = viewport.querySelector('[data-blazix-base-ui-toast-root]:not([data-ending-style]):not([data-limited])');
+        firstToast?.focus?.({ preventScroll: true });
+        if (!firstToast) {
+            entry.prevFocusElement?.focus?.({ preventScroll: true });
+        }
+    };
+
+    const onDocumentFocusIn = (event) => {
+        if (getTarget(event)?.hasAttribute?.('data-blazix-base-ui-focus-guard')) {
+            entry.focusGuardRelatedTarget = event.relatedTarget;
+        }
+    };
+
+    const bindGlobalListeners = () => {
+        if (entry.globalCleanups.length > 0) {
+            return;
+        }
+
+        win.addEventListener('keydown', onKeyDown);
+        win.addEventListener('blur', onWindowBlur, true);
+        win.addEventListener('focus', onWindowFocus, true);
+        doc.addEventListener('pointerdown', onDocumentPointerDown, true);
+        entry.globalCleanups.push(() => win.removeEventListener('keydown', onKeyDown));
+        entry.globalCleanups.push(() => win.removeEventListener('blur', onWindowBlur, true));
+        entry.globalCleanups.push(() => win.removeEventListener('focus', onWindowFocus, true));
+        entry.globalCleanups.push(() => doc.removeEventListener('pointerdown', onDocumentPointerDown, true));
+    };
+
+    const unbindGlobalListeners = () => {
+        for (const cleanup of entry.globalCleanups.splice(0)) {
+            cleanup();
+        }
+    };
+
+    entry.bindGlobalListeners = bindGlobalListeners;
+    entry.unbindGlobalListeners = unbindGlobalListeners;
     viewport.addEventListener('focus', onFocus);
     viewport.addEventListener('blur', onBlur);
+    viewport.addEventListener('keydown', onViewportKeyDown);
+    doc.addEventListener('focusin', onDocumentFocusIn, true);
 
-    entry.cleanups.push(() => win.removeEventListener('keydown', onKeyDown));
-    entry.cleanups.push(() => win.removeEventListener('blur', onWindowBlur, true));
-    entry.cleanups.push(() => win.removeEventListener('focus', onWindowFocus, true));
-    entry.cleanups.push(() => doc.removeEventListener('pointerdown', onDocumentPointerDown, true));
     entry.cleanups.push(() => viewport.removeEventListener('focus', onFocus));
     entry.cleanups.push(() => viewport.removeEventListener('blur', onBlur));
+    entry.cleanups.push(() => viewport.removeEventListener('keydown', onViewportKeyDown));
+    entry.cleanups.push(() => doc.removeEventListener('focusin', onDocumentFocusIn, true));
+    entry.cleanups.push(unbindGlobalListeners);
 
     state.viewports.set(viewportId, entry);
 }
@@ -113,6 +167,11 @@ export function updateViewport(viewportId, isEmpty) {
     const entry = state.viewports.get(viewportId);
     if (entry) {
         entry.isEmpty = isEmpty;
+        if (isEmpty) {
+            entry.unbindGlobalListeners();
+        } else {
+            entry.bindGlobalListeners();
+        }
     }
 }
 
@@ -135,12 +194,15 @@ export function handleFocusGuard(viewportId) {
         return;
     }
 
-    const firstToast = entry.viewport.querySelector('[data-blazix-base-ui-toast-root]:not([data-ending-style])');
-    if (entry.viewport.ownerDocument.activeElement === entry.viewport && firstToast instanceof HTMLElement) {
+    const firstToast = entry.viewport.querySelector('[data-blazix-base-ui-toast-root]:not([data-ending-style]):not([data-limited])');
+    const HTMLElementCtor = entry.viewport.ownerDocument.defaultView?.HTMLElement;
+    if (entry.focusGuardRelatedTarget === entry.viewport && HTMLElementCtor && firstToast instanceof HTMLElementCtor) {
+        entry.focusGuardRelatedTarget = null;
         firstToast.focus({ preventScroll: true });
         return;
     }
 
+    entry.focusGuardRelatedTarget = null;
     entry.prevFocusElement?.focus?.({ preventScroll: true });
 }
 
@@ -162,10 +224,19 @@ export function handleFocusAfterClose(viewportId, toastId) {
         return;
     }
 
-    const selector = `[data-blazix-base-ui-toast-root]:not([data-ending-style])`;
-    const remaining = Array.from(viewport.querySelectorAll(selector));
-    const next = remaining.find((toast) => toast.getAttribute('data-toast-id') !== toastId);
-    if (next instanceof HTMLElement) {
+    const toasts = Array.from(viewport.querySelectorAll('[data-blazix-base-ui-toast-root]'));
+    const currentIndex = toasts.findIndex((toast) => toast.getAttribute('data-toast-id') === toastId);
+    const scan = (from, step) => {
+        for (let index = from; index >= 0 && index < toasts.length; index += step) {
+            if (!toasts[index].hasAttribute('data-ending-style')) {
+                return toasts[index];
+            }
+        }
+        return null;
+    };
+    const next = scan(currentIndex + 1, 1) || scan(currentIndex - 1, -1);
+    const HTMLElementCtor = doc.defaultView?.HTMLElement;
+    if (HTMLElementCtor && next instanceof HTMLElementCtor) {
         next.focus({ preventScroll: true });
     } else {
         entry.prevFocusElement?.focus?.({ preventScroll: true });
@@ -184,12 +255,9 @@ export function initializeContent(contentId, element) {
     const recalculate = () => measureRoot(rootEntry);
     recalculate();
 
-    const resizeObserver = typeof ResizeObserver === 'function'
-        ? new ResizeObserver(recalculate)
-        : null;
-    const mutationObserver = typeof MutationObserver === 'function'
-        ? new MutationObserver(recalculate)
-        : null;
+    const canObserve = typeof ResizeObserver === 'function' && typeof MutationObserver === 'function';
+    const resizeObserver = canObserve ? new ResizeObserver(recalculate) : null;
+    const mutationObserver = canObserve ? new MutationObserver(recalculate) : null;
 
     resizeObserver?.observe(element);
     mutationObserver?.observe(element, { childList: true, subtree: true, characterData: true });
@@ -233,41 +301,13 @@ export function initializeRoot(rootId, element, dotNetRef, swipeEnabled, swipeDi
         isFirstPointerMove: false,
         maxSwipeDisplacement: 0,
         abortController: null,
-        cleanups: []
+        completionController: null,
+        lastMeasuredHeight: null,
+        cleanups: [],
+        elementCleanups: []
     };
 
-    const onTransitionEnd = () => {
-        if (element.hasAttribute('data-ending-style')) {
-            dotNetRef.invokeMethodAsync('OnTransitionComplete').catch(() => {});
-        }
-    };
-
-    const onTouchMove = (event) => {
-        if (swipeEnabled && contains(element, getTarget(event))) {
-            event.preventDefault();
-        }
-    };
-    const onPointerDown = (event) => handlePointerDown(entry, event);
-    const onPointerMove = (event) => handlePointerMove(entry, event);
-    const onPointerUp = (event) => handleSwipeEnd(entry, event);
-    const onPointerCancel = (event) => handleSwipeEnd(entry, event);
-
-    element.addEventListener('transitionend', onTransitionEnd);
-    element.addEventListener('animationend', onTransitionEnd);
-    element.addEventListener('touchmove', onTouchMove, { passive: false });
-    element.addEventListener('pointerdown', onPointerDown);
-    element.addEventListener('pointermove', onPointerMove);
-    element.addEventListener('pointerup', onPointerUp);
-    element.addEventListener('pointercancel', onPointerCancel);
-
-    entry.cleanups.push(() => element.removeEventListener('transitionend', onTransitionEnd));
-    entry.cleanups.push(() => element.removeEventListener('animationend', onTransitionEnd));
-    entry.cleanups.push(() => element.removeEventListener('touchmove', onTouchMove));
-    entry.cleanups.push(() => element.removeEventListener('pointerdown', onPointerDown));
-    entry.cleanups.push(() => element.removeEventListener('pointermove', onPointerMove));
-    entry.cleanups.push(() => element.removeEventListener('pointerup', onPointerUp));
-    entry.cleanups.push(() => element.removeEventListener('pointercancel', onPointerCancel));
-
+    bindRootElement(entry, element);
     state.roots.set(rootId, entry);
     measureRoot(entry);
 }
@@ -278,12 +318,19 @@ export function updateRoot(rootId, element, ending, swipeEnabled, swipeDirection
         return;
     }
 
-    entry.element = element;
+    if (entry.element !== element) {
+        bindRootElement(entry, element);
+        entry.lastMeasuredHeight = null;
+        measureRoot(entry);
+    }
     entry.swipeEnabled = swipeEnabled;
     entry.swipeDirections = swipeDirections || [];
 
-    if (ending && !hasCssTransition(element)) {
-        setTimeout(() => entry.dotNetRef.invokeMethodAsync('OnTransitionComplete').catch(() => {}), 0);
+    if (ending) {
+        waitForRootAnimations(entry);
+    } else {
+        entry.completionController?.abort();
+        entry.completionController = null;
     }
 }
 
@@ -294,6 +341,8 @@ export function disposeRoot(rootId) {
     }
 
     entry.abortController?.abort();
+    entry.completionController?.abort();
+    unbindRootElement(entry);
     for (const cleanup of entry.cleanups) {
         cleanup();
     }
@@ -418,7 +467,16 @@ function handlePointerDown(entry, event) {
     entry.maxSwipeDisplacement = 0;
 
     entry.element.setPointerCapture?.(event.pointerId);
-    entry.dotNetRef.invokeMethodAsync('OnSwipeStateChanged', true, null).catch(() => {});
+    entry.abortController?.abort();
+    entry.abortController = new AbortController();
+    const doc = entry.element.ownerDocument;
+    doc.addEventListener('pointerup', (endEvent) => handleSwipeEnd(entry, endEvent), {
+        signal: entry.abortController.signal
+    });
+    doc.addEventListener('pointercancel', (endEvent) => handleSwipeEnd(entry, endEvent), {
+        signal: entry.abortController.signal
+    });
+    invokeDotNet(entry.dotNetRef, 'OnSwipeStateChanged', true, null);
 }
 
 function handlePointerMove(entry, event) {
@@ -476,13 +534,12 @@ function handlePointerMove(entry, event) {
         if (candidate && entry.swipeDirections.includes(candidate)) {
             entry.intendedDirection = candidate;
             entry.maxSwipeDisplacement = getDisplacement(candidate, deltaX, deltaY);
-            entry.dotNetRef.invokeMethodAsync('OnSwipeStateChanged', true, candidate).catch(() => {});
+            invokeDotNet(entry.dotNetRef, 'OnSwipeStateChanged', true, candidate);
         }
     } else {
         const currentDisplacement = getDisplacement(entry.intendedDirection, cancelDeltaX, cancelDeltaY);
         if (currentDisplacement > SWIPE_THRESHOLD) {
             entry.cancelledSwipe = false;
-            entry.dotNetRef.invokeMethodAsync('OnSwipeStateChanged', true, entry.intendedDirection).catch(() => {});
         } else if (
             !(entry.swipeDirections.includes('left') && entry.swipeDirections.includes('right')) &&
             !(entry.swipeDirections.includes('up') && entry.swipeDirections.includes('down')) &&
@@ -537,6 +594,8 @@ function handleSwipeEnd(entry, event) {
     }
 
     entry.activePointerId = null;
+    entry.abortController?.abort();
+    entry.abortController = null;
     entry.element.releasePointerCapture?.(event.pointerId);
     entry.element.style.transition = '';
     entry.element.style.transform = '';
@@ -548,13 +607,12 @@ function handleSwipeEnd(entry, event) {
 
     if (event.type !== 'pointercancel' && !entry.cancelledSwipe && dismissDirection) {
         entry.element.setAttribute('data-swipe-direction', dismissDirection);
-        entry.dotNetRef.invokeMethodAsync('OnSwipeStateChanged', false, dismissDirection).catch(() => {});
-        entry.dotNetRef.invokeMethodAsync('OnSwipeDismissed').catch(() => {});
+        invokeDotNet(entry.dotNetRef, 'OnSwipeEnded', true, dismissDirection);
     } else {
         entry.element.removeAttribute('data-swipe-direction');
         entry.element.style.setProperty('--toast-swipe-movement-x', '0px');
         entry.element.style.setProperty('--toast-swipe-movement-y', '0px');
-        entry.dotNetRef.invokeMethodAsync('OnSwipeStateChanged', false, null).catch(() => {});
+        invokeDotNet(entry.dotNetRef, 'OnSwipeEnded', false, null);
     }
 }
 
@@ -564,7 +622,10 @@ function measureRoot(entry) {
     element.style.height = 'auto';
     const height = element.offsetHeight;
     element.style.height = previousHeight;
-    entry.dotNetRef.invokeMethodAsync('OnMeasuredHeight', height).catch(() => {});
+    if (entry.lastMeasuredHeight !== height) {
+        entry.lastMeasuredHeight = height;
+        invokeDotNet(entry.dotNetRef, 'OnMeasuredHeight', height);
+    }
 }
 
 function findRootEntry(element) {
@@ -578,7 +639,8 @@ function findRootEntry(element) {
 
 function matchesFocusVisible(element) {
     try {
-        return element instanceof HTMLElement && element.matches(':focus-visible');
+        const HTMLElementCtor = element?.ownerDocument?.defaultView?.HTMLElement;
+        return Boolean(HTMLElementCtor && element instanceof HTMLElementCtor && element.matches(':focus-visible'));
     } catch {
         return true;
     }
@@ -693,24 +755,56 @@ function getElementTransform(element) {
     };
 }
 
-function hasCssTransition(element) {
-    const style = getComputedStyle(element);
-    const transitionDuration = parseDuration(style.transitionDuration);
-    const animationDuration = parseDuration(style.animationDuration);
-    return transitionDuration > 0 || animationDuration > 0;
+function bindRootElement(entry, element) {
+    unbindRootElement(entry);
+    entry.element = element;
+
+    const onTouchMove = (event) => {
+        if (entry.swipeEnabled && entry.activePointerId !== null && contains(entry.element, getTarget(event))) {
+            event.preventDefault();
+        }
+    };
+    const onPointerDown = (event) => handlePointerDown(entry, event);
+    const onPointerMove = (event) => handlePointerMove(entry, event);
+    const onPointerUp = (event) => handleSwipeEnd(entry, event);
+    const onPointerCancel = (event) => handleSwipeEnd(entry, event);
+
+    element.addEventListener('touchmove', onTouchMove, { passive: false });
+    element.addEventListener('pointerdown', onPointerDown);
+    element.addEventListener('pointermove', onPointerMove);
+    element.addEventListener('pointerup', onPointerUp);
+    element.addEventListener('pointercancel', onPointerCancel);
+    entry.elementCleanups.push(() => element.removeEventListener('touchmove', onTouchMove));
+    entry.elementCleanups.push(() => element.removeEventListener('pointerdown', onPointerDown));
+    entry.elementCleanups.push(() => element.removeEventListener('pointermove', onPointerMove));
+    entry.elementCleanups.push(() => element.removeEventListener('pointerup', onPointerUp));
+    entry.elementCleanups.push(() => element.removeEventListener('pointercancel', onPointerCancel));
 }
 
-function parseDuration(value) {
-    return value
-        .split(',')
-        .map((part) => part.trim())
-        .reduce((max, part) => {
-            if (part.endsWith('ms')) {
-                return Math.max(max, parseFloat(part));
-            }
-            if (part.endsWith('s')) {
-                return Math.max(max, parseFloat(part) * 1000);
-            }
-            return max;
-        }, 0);
+function unbindRootElement(entry) {
+    for (const cleanup of entry.elementCleanups.splice(0)) {
+        cleanup();
+    }
+}
+
+function waitForRootAnimations(entry) {
+    entry.completionController?.abort();
+    const controller = new AbortController();
+    entry.completionController = controller;
+    const win = entry.element.ownerDocument.defaultView || window;
+
+    win.requestAnimationFrame(async () => {
+        if (controller.signal.aborted || !entry.element.hasAttribute('data-ending-style')) {
+            return;
+        }
+
+        const animations = typeof entry.element.getAnimations === 'function'
+            ? entry.element.getAnimations()
+            : [];
+        await Promise.allSettled(animations.map((animation) => animation.finished));
+
+        if (!controller.signal.aborted && entry.element.hasAttribute('data-ending-style')) {
+            invokeDotNet(entry.dotNetRef, 'OnTransitionComplete');
+        }
+    });
 }
