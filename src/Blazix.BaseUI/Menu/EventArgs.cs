@@ -20,14 +20,15 @@ public sealed class MenuOpenChangeEventArgs : OpenChangeEventArgs<MenuOpenChange
 }
 
 /// <summary>
-/// Provides data for the <see cref="MenuRadioGroup.OnValueChange"/> event.
+/// Provides data for the <see cref="MenuRadioGroup{TValue}.OnValueChange"/> event.
 /// </summary>
-public sealed class MenuRadioGroupChangeEventArgs : EventArgs
+/// <typeparam name="TValue">The type used to identify radio items.</typeparam>
+public sealed class MenuRadioGroupChangeEventArgs<TValue> : EventArgs
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="MenuRadioGroupChangeEventArgs"/> class.
+    /// Initializes a new instance of the <see cref="MenuRadioGroupChangeEventArgs{TValue}"/> class.
     /// </summary>
-    public MenuRadioGroupChangeEventArgs(object? value, MenuRadioGroupChangeReason reason)
+    public MenuRadioGroupChangeEventArgs(TValue? value, MenuRadioGroupChangeReason reason)
     {
         Value = value;
         Reason = reason;
@@ -36,7 +37,7 @@ public sealed class MenuRadioGroupChangeEventArgs : EventArgs
     /// <summary>
     /// Gets the newly selected value.
     /// </summary>
-    public object? Value { get; }
+    public TValue? Value { get; }
 
     /// <summary>
     /// Gets the reason the selected value changed.

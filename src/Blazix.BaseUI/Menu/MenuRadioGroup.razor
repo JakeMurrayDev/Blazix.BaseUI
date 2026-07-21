@@ -1,5 +1,7 @@
+@typeparam TValue
+
 <CascadingValue TValue="IMenuGroupContext" Value="menuGroupContext" IsFixed="true">
-    <CascadingValue TValue="IMenuRadioGroupContext" Value="groupContext" IsFixed="true">
+    <CascadingValue TValue="IMenuRadioGroupContext<TValue>" Value="groupContext" IsFixed="true">
         <RenderElement TState="MenuRadioGroupState"
                        Tag="div"
                        State="state"
@@ -14,9 +16,9 @@
 </CascadingValue>
 
 @code {
-    private object? internalValue;
+    private TValue? internalValue;
     private string? labelId;
-    private MenuRadioGroupContext? groupContext;
+    private MenuRadioGroupContext<TValue> groupContext = null!;
     private MenuGroupContext? menuGroupContext;
     private MenuRadioGroupState state;
     private RenderElement<MenuRadioGroupState>? renderElementReference;
@@ -24,21 +26,21 @@
 
     private bool IsControlled => ValueChanged.HasDelegate;
 
-    private object? CurrentValue => IsControlled ? Value : internalValue;
+    private TValue? CurrentValue => IsControlled ? Value : internalValue;
 
     /// <summary>
     /// Gets or sets the controlled value of the radio item that should be currently selected.
     /// To render an uncontrolled radio group, use the <see cref="DefaultValue"/> property instead.
     /// </summary>
     [Parameter]
-    public object? Value { get; set; }
+    public TValue? Value { get; set; }
 
     /// <summary>
     /// Gets or sets the uncontrolled value of the radio item that should be initially selected.
     /// To render a controlled radio group, use the <see cref="Value"/> property instead.
     /// </summary>
     [Parameter]
-    public object? DefaultValue { get; set; }
+    public TValue? DefaultValue { get; set; }
 
     /// <summary>
     /// Determines whether the component should ignore user interaction.
@@ -51,13 +53,13 @@
     /// Gets or sets the callback for two-way binding of the selected value.
     /// </summary>
     [Parameter]
-    public EventCallback<object?> ValueChanged { get; set; }
+    public EventCallback<TValue?> ValueChanged { get; set; }
 
     /// <summary>
     /// Gets or sets the callback invoked when the selected value changes.
     /// </summary>
     [Parameter]
-    public EventCallback<MenuRadioGroupChangeEventArgs> OnValueChange { get; set; }
+    public EventCallback<MenuRadioGroupChangeEventArgs<TValue>> OnValueChange { get; set; }
 
     /// <summary>
     /// Allows you to replace the component's HTML element
@@ -99,7 +101,7 @@
     protected override void OnInitialized()
     {
         internalValue = DefaultValue;
-        groupContext = new MenuRadioGroupContext
+        groupContext = new MenuRadioGroupContext<TValue>
         {
             Disabled = Disabled,
             GetValue = () => CurrentValue,
@@ -115,10 +117,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        if (groupContext is not null)
-        {
-            groupContext.Disabled = Disabled;
-        }
+        groupContext.Disabled = Disabled;
 
         state = new MenuRadioGroupState(Disabled);
         BuildComponentAttributes();
@@ -156,7 +155,7 @@
         componentAttributes = attrs;
     }
 
-    private async Task SetValueInternalAsync(object? newValue, MenuRadioGroupChangeEventArgs eventArgs)
+    private async Task SetValueInternalAsync(TValue? newValue, MenuRadioGroupChangeEventArgs<TValue> eventArgs)
     {
         if (OnValueChange.HasDelegate)
         {

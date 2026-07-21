@@ -1,0 +1,112 @@
+@using Blazix.BaseUI.Dialog
+@using Blazix.BaseUI.Menu
+@using Blazix.BaseUI.Popover
+@using Blazix.BaseUI.PreviewCard
+@using Blazix.BaseUI.Tooltip
+
+<button data-testid="open-a-button" @onclick="OpenTriggerA">Open A</button>
+<button data-testid="open-b-button" @onclick="OpenTriggerB">Open B</button>
+<button data-testid="close-button" @onclick="Close">Close</button>
+<button data-testid="reopen-button" @onclick="Reopen">Reopen</button>
+
+@switch (ComponentName)
+{
+    case "menu":
+        <MenuTypedTrigger TPayload="string" id="trigger-a" Handle="menuHandle" Payload='@("Payload A")'>Trigger A</MenuTypedTrigger>
+        <MenuTypedTrigger TPayload="string" id="trigger-b" Handle="menuHandle" Payload='@("Payload B")'>Trigger B</MenuTypedTrigger>
+        <MenuRoot Open="isOpen" TriggerId="@activeTriggerId" Handle="menuHandle">
+            <ChildContent Context="payloadContext">
+                @RenderState(payloadContext.Payload, menuHandle.IsOpen, menuHandle.ActiveTriggerId, menuHandle.Payload)
+            </ChildContent>
+        </MenuRoot>
+        break;
+    case "popover":
+        <PopoverTypedTrigger TPayload="string" Id="trigger-a" Handle="popoverHandle" Payload='@("Payload A")'>Trigger A</PopoverTypedTrigger>
+        <PopoverTypedTrigger TPayload="string" Id="trigger-b" Handle="popoverHandle" Payload='@("Payload B")'>Trigger B</PopoverTypedTrigger>
+        <PopoverRoot Open="isOpen" TriggerId="@activeTriggerId" Handle="popoverHandle">
+            <ChildContent Context="payloadContext">
+                @RenderState(payloadContext.Payload, popoverHandle.IsOpen, popoverHandle.ActiveTriggerId, popoverHandle.Payload)
+            </ChildContent>
+        </PopoverRoot>
+        break;
+    case "tooltip":
+        <TooltipTypedTrigger TPayload="string" Id="trigger-a" Handle="tooltipHandle" Payload='@("Payload A")' Delay="0" CloseDelay="0">Trigger A</TooltipTypedTrigger>
+        <TooltipTypedTrigger TPayload="string" Id="trigger-b" Handle="tooltipHandle" Payload='@("Payload B")' Delay="0" CloseDelay="0">Trigger B</TooltipTypedTrigger>
+        <TooltipRoot Open="isOpen" TriggerId="@activeTriggerId" Handle="tooltipHandle">
+            <ChildContentWithPayload Context="payloadContext">
+                @RenderState(payloadContext.Payload, tooltipHandle.IsOpen, tooltipHandle.ActiveTriggerId, tooltipHandle.Payload)
+            </ChildContentWithPayload>
+        </TooltipRoot>
+        break;
+    case "preview-card":
+        <PreviewCardTypedTrigger TPayload="string" Id="trigger-a" Handle="previewCardHandle" Payload='@("Payload A")' Delay="0" CloseDelay="0" href="#">Trigger A</PreviewCardTypedTrigger>
+        <PreviewCardTypedTrigger TPayload="string" Id="trigger-b" Handle="previewCardHandle" Payload='@("Payload B")' Delay="0" CloseDelay="0" href="#">Trigger B</PreviewCardTypedTrigger>
+        <PreviewCardRoot Open="isOpen" TriggerId="@activeTriggerId" Handle="previewCardHandle">
+            <ChildContentWithPayload Context="payloadContext">
+                @RenderState(payloadContext.Payload, previewCardHandle.IsOpen, previewCardHandle.ActiveTriggerId, previewCardHandle.Payload)
+            </ChildContentWithPayload>
+        </PreviewCardRoot>
+        break;
+    case "dialog":
+        <DialogTypedTrigger TPayload="string" Id="trigger-a" Handle="dialogHandle" Payload='@("Payload A")'>Trigger A</DialogTypedTrigger>
+        <DialogTypedTrigger TPayload="string" Id="trigger-b" Handle="dialogHandle" Payload='@("Payload B")'>Trigger B</DialogTypedTrigger>
+        <DialogRoot Open="isOpen" TriggerId="@activeTriggerId" Handle="dialogHandle">
+            <ChildContent Context="payloadContext">
+                @RenderState(payloadContext.Payload, dialogHandle.IsOpen, dialogHandle.ActiveTriggerId, dialogHandle.Payload)
+            </ChildContent>
+        </DialogRoot>
+        break;
+    default:
+        <span data-testid="unknown-component">Unknown component: @ComponentName</span>
+        break;
+}
+
+@code {
+    private readonly MenuHandle<string> menuHandle = new();
+    private readonly PopoverHandle<string> popoverHandle = new();
+    private readonly TooltipHandle<string> tooltipHandle = new();
+    private readonly PreviewCardHandle<string> previewCardHandle = new();
+    private readonly DialogHandle<string> dialogHandle = new();
+
+    private bool isOpen;
+    private string activeTriggerId = "trigger-a";
+
+    [Parameter]
+    public string ComponentName { get; set; } = "menu";
+
+    private void OpenTriggerA()
+    {
+        OpenTrigger("trigger-a");
+    }
+
+    private void OpenTriggerB()
+    {
+        OpenTrigger("trigger-b");
+    }
+
+    private void OpenTrigger(string triggerId)
+    {
+        activeTriggerId = triggerId;
+        isOpen = true;
+    }
+
+    private void Close()
+    {
+        isOpen = false;
+    }
+
+    private void Reopen()
+    {
+        isOpen = true;
+    }
+
+    private RenderFragment RenderState(object? payload, bool handleOpen, string? handleTriggerId, object? handlePayload) => @<div>
+        <span data-testid="open-state">@isOpen.ToString().ToLowerInvariant()</span>
+        <span data-testid="payload-display">@FormatValue(payload)</span>
+        <span data-testid="handle-open">@handleOpen.ToString().ToLowerInvariant()</span>
+        <span data-testid="handle-trigger">@FormatValue(handleTriggerId)</span>
+        <span data-testid="handle-payload">@FormatValue(handlePayload)</span>
+    </div>;
+
+    private static string FormatValue(object? value) => value?.ToString() ?? "null";
+}

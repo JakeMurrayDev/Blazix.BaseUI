@@ -15,6 +15,8 @@
 </CascadingValue>
 
 @code {
+    private const long OutsidePressGuardMs = 500;
+
     private readonly string rootId = Guid.NewGuid().ToIdString();
     private readonly Dictionary<string, MenuRootTriggerData> registeredTriggers = [];
     // All trigger DOM ids associated with this root (inline triggers via RegisterTrigger +
@@ -47,6 +49,9 @@
     private MenuBarRootContext? previousMenuBarContext;
     private bool previousLoopFocus;
     private bool previousHighlightItemOnHover;
+    private bool syncRootOpenAfterRender;
+    private bool rootOpenToSyncAfterRender;
+    private long outsidePressGuardUntilTicks;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -264,18 +269,14 @@
     protected override void OnParametersSet()
     {
         var currentOpen = CurrentOpen;
+        var previousOpen = state.Open;
+        var parameterOpenChanged = previousOpen != currentOpen;
         var effectiveDirection = EffectiveDirection;
         var effectiveMenuBarContext = EffectiveMenuBarContext;
         var parentType = ParentType;
-        if (state.Open != currentOpen)
+        if (parameterOpenChanged)
         {
-            state = new MenuRootState(currentOpen);
-            if (currentOpen)
-            {
-                transition.BeginOpen();
-            }
-            context.Open = currentOpen;
-            context.Mounted = transition.IsMounted;
+            ApplyOpenParameterChange(currentOpen);
         }
 
         context.Disabled = Disabled;
@@ -285,7 +286,13 @@
         context.Direction = effectiveDirection.ToAttributeString() ?? "ltr";
         context.HighlightItemOnHover = HighlightItemOnHover;
 
-        if (CurrentOpen && context.TriggerId is not null && context.TriggerId != activeTriggerId)
+        var triggerChanged = context.TriggerId is not null && context.TriggerId != activeTriggerId;
+        if (currentOpen && previousOpen && triggerChanged)
+        {
+            outsidePressGuardUntilTicks = Environment.TickCount64 + OutsidePressGuardMs;
+        }
+
+        if (currentOpen && context.TriggerId is not null && (parameterOpenChanged || triggerChanged))
         {
             activeTriggerId = context.TriggerId;
             if (Handle?.TryGetTriggerPayloadAsObject(activeTriggerId, out var handlePayload) == true)
@@ -311,6 +318,11 @@
             effectiveMenuBarContext = EffectiveMenuBarContext;
             parentType = ParentType;
             context.ParentType = parentType;
+        }
+
+        if (parameterOpenChanged)
+        {
+            CompleteOpenParameterChange(currentOpen);
         }
 
         if (hasRendered &&
@@ -348,6 +360,12 @@
             dotNetRef = DotNetObjectReference.Create(this);
             await InitializeJsAsync();
         }
+
+        if (hasRendered && syncRootOpenAfterRender)
+        {
+            syncRootOpenAfterRender = false;
+            await SyncOpenParameterStateToJsAsync(rootOpenToSyncAfterRender);
+        }
     }
 
     /// <inheritdoc />
@@ -378,6 +396,12 @@
     [JSInvokable]
     public async Task OnOutsidePress()
     {
+        if (Environment.TickCount64 < outsidePressGuardUntilTicks)
+        {
+            outsidePressGuardUntilTicks = 0;
+            return;
+        }
+
         await SetOpenAsync(false, MenuOpenChangeReason.OutsidePress);
     }
 
@@ -609,6 +633,10 @@
 
         state = new MenuRootState(nextOpen);
         context.Open = nextOpen;
+        Handle?.SyncState(
+            nextOpen,
+            nextOpen ? activeTriggerId : null,
+            nextOpen ? activePayload : null);
 
         if (hasRendered)
         {
@@ -1066,6 +1094,74 @@
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private void ApplyOpenParameterChange(bool nextOpen)
+    {
+        var previousOpen = state.Open;
+
+        openChangeReason = MenuOpenChangeReason.None;
+        context.MenuOpenChangeReason = openChangeReason;
+        instantType = MenuInstantType.None;
+
+        if (nextOpen)
+        {
+            if (!previousOpen || !transition.IsMounted)
+            {
+                transition.BeginOpen();
+            }
+
+            activeIndex = 0;
+        }
+        else
+        {
+            preventUnmountOnClose = false;
+            context.InteractionType = null;
+
+            if (previousOpen)
+            {
+                transition.BeginClose();
+            }
+        }
+
+        state = new MenuRootState(nextOpen);
+        context.Open = nextOpen;
+        context.MenuInstantType = instantType;
+        context.TransitionStatus = transition.TransitionStatus;
+        context.Mounted = transition.IsMounted;
+        context.ActiveIndex = activeIndex;
+    }
+
+    private void CompleteOpenParameterChange(bool nextOpen)
+    {
+        Handle?.SyncState(
+            nextOpen,
+            nextOpen ? activeTriggerId : null,
+            nextOpen ? activePayload : null);
+
+        if (hasRendered)
+        {
+            rootOpenToSyncAfterRender = nextOpen;
+            syncRootOpenAfterRender = true;
+        }
+    }
+
+    private async Task SyncOpenParameterStateToJsAsync(bool nextOpen)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync(
+                "setRootOpen",
+                rootId,
+                nextOpen,
+                (string?)null,
+                false,
+                context.InteractionType);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
         }
     }
 

@@ -12,7 +12,7 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<RadioGroup<TValue>> Logger
 
-<CascadingValue Value="@((IRadioGroupContext<TValue>)groupContext!)" IsFixed="true">
+<CascadingValue TValue="IRadioGroupContext<TValue>" Value="groupContext" IsFixed="true">
     <RenderElement TState="RadioGroupState"
                    Tag="div"
                    State="state"

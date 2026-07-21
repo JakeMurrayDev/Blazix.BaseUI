@@ -3,12 +3,12 @@ namespace Blazix.BaseUI.Menu;
 /// <summary>
 /// Defines the contract for a radio group context that manages single-selection state.
 /// </summary>
-internal interface IMenuRadioGroupContext
+internal interface IMenuRadioGroupContext<TValue>
 {
     /// <summary>
     /// Gets the currently selected value.
     /// </summary>
-    object? Value { get; }
+    TValue? Value { get; }
 
     /// <summary>
     /// Gets whether the radio group is disabled.
@@ -18,16 +18,17 @@ internal interface IMenuRadioGroupContext
     /// <summary>
     /// Sets the selected value asynchronously.
     /// </summary>
-    Task SetValueAsync(object? newValue, MenuRadioGroupChangeEventArgs eventArgs);
+    Task SetValueAsync(TValue? newValue, MenuRadioGroupChangeEventArgs<TValue> eventArgs);
 }
 
 /// <summary>
-/// Provides shared state for a <see cref="MenuRadioGroup"/> and its descendant <see cref="MenuRadioItem"/> components.
+/// Provides shared state for a <see cref="MenuRadioGroup{TValue}"/> and its descendant <see cref="MenuRadioItem{TValue}"/> components.
 /// </summary>
-internal sealed class MenuRadioGroupContext : IMenuRadioGroupContext
+/// <typeparam name="TValue">The type used to identify radio items.</typeparam>
+internal sealed class MenuRadioGroupContext<TValue> : IMenuRadioGroupContext<TValue>
 {
-    private Func<object?> getValue = null!;
-    private Func<object?, MenuRadioGroupChangeEventArgs, Task> setValue = null!;
+    private Func<TValue?> getValue = null!;
+    private Func<TValue?, MenuRadioGroupChangeEventArgs<TValue>, Task> setValue = null!;
 
     /// <summary>
     /// Gets or sets whether the radio group is disabled.
@@ -37,18 +38,18 @@ internal sealed class MenuRadioGroupContext : IMenuRadioGroupContext
     /// <summary>
     /// Gets or sets the delegate that retrieves the current value.
     /// </summary>
-    public Func<object?> GetValue { get => getValue; init => getValue = value; }
+    public Func<TValue?> GetValue { get => getValue; init => getValue = value; }
 
     /// <summary>
     /// Gets or sets the delegate that sets the current value.
     /// </summary>
-    public Func<object?, MenuRadioGroupChangeEventArgs, Task> SetValue { get => setValue; init => setValue = value; }
+    public Func<TValue?, MenuRadioGroupChangeEventArgs<TValue>, Task> SetValue { get => setValue; init => setValue = value; }
 
     /// <inheritdoc />
-    public object? Value => getValue();
+    public TValue? Value => getValue();
 
     /// <inheritdoc />
-    public async Task SetValueAsync(object? newValue, MenuRadioGroupChangeEventArgs eventArgs)
+    public async Task SetValueAsync(TValue? newValue, MenuRadioGroupChangeEventArgs<TValue> eventArgs)
     {
         await setValue(newValue, eventArgs);
     }

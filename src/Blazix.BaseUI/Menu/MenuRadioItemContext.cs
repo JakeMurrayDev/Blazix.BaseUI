@@ -1,7 +1,7 @@
 namespace Blazix.BaseUI.Menu;
 
 /// <summary>
-/// Provides shared state for a <see cref="MenuRadioItem"/> and its descendant <see cref="MenuRadioItemIndicator"/>.
+/// Provides shared state for a <see cref="MenuRadioItem{TValue}"/> and its descendant <see cref="MenuRadioItemIndicator"/>.
 /// </summary>
 internal sealed class MenuRadioItemContext
 {

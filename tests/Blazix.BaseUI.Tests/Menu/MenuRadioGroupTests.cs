@@ -10,12 +10,12 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
 
     private RenderFragment CreateRadioGroupInRoot(
         bool defaultOpen = true,
-        object? groupValue = null,
-        object? defaultValue = null,
+        string? groupValue = null,
+        string? defaultValue = null,
         bool groupDisabled = false,
         RenderFragment<RenderProps<MenuRadioGroupState>>? render = null,
-        EventCallback<object?>? valueChanged = null,
-        EventCallback<MenuRadioGroupChangeEventArgs>? onValueChange = null)
+        EventCallback<string?>? valueChanged = null,
+        EventCallback<MenuRadioGroupChangeEventArgs<string>>? onValueChange = null)
     {
         return builder =>
         {
@@ -33,7 +33,7 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
                     posBuilder.OpenComponent<MenuPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.OpenComponent<MenuRadioGroup<string>>(0);
                         var attrIndex = 1;
 
                         if (groupValue is not null)
@@ -51,12 +51,12 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
 
                         popupBuilder.AddAttribute(attrIndex++, "ChildContent", (RenderFragment)(groupBuilder =>
                         {
-                            groupBuilder.OpenComponent<MenuRadioItem>(0);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(0);
                             groupBuilder.AddAttribute(1, "Value", "option1");
                             groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 1")));
                             groupBuilder.CloseComponent();
 
-                            groupBuilder.OpenComponent<MenuRadioItem>(3);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(3);
                             groupBuilder.AddAttribute(4, "Value", "option2");
                             groupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 2")));
                             groupBuilder.CloseComponent();
@@ -121,11 +121,11 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
     [Fact]
     public Task ControlledModeRespectsValueParameter()
     {
-        object? currentValue = "option1";
+        string? currentValue = "option1";
 
         var cut = Render(CreateRadioGroupInRoot(
             groupValue: currentValue,
-            valueChanged: EventCallback.Factory.Create<object?>(this, val => currentValue = val)
+            valueChanged: EventCallback.Factory.Create<string?>(this, val => currentValue = val)
         ));
 
         var items = cut.FindAll("[role='menuitemradio']");
@@ -150,11 +150,11 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
     public Task InvokesOnValueChange()
     {
         var invoked = false;
-        object? receivedValue = null;
+        string? receivedValue = null;
 
         var cut = Render(CreateRadioGroupInRoot(
             defaultValue: "option1",
-            onValueChange: EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs>(this, args =>
+            onValueChange: EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs<string>>(this, args =>
             {
                 invoked = true;
                 receivedValue = args.Value;
@@ -175,7 +175,7 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
     {
         var cut = Render(CreateRadioGroupInRoot(
             defaultValue: "option1",
-            onValueChange: EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs>(this, args =>
+            onValueChange: EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs<string>>(this, args =>
             {
                 args.Cancel();
             })
@@ -190,6 +190,47 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
         // Selection should not change because we canceled
         items[0].GetAttribute("aria-checked")!.ShouldBe("true");
         items[1].GetAttribute("aria-checked")!.ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SupportsValueTypeValues()
+    {
+        int? receivedValue = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<MenuRadioGroup<int>>(0);
+            builder.AddAttribute(1, "DefaultValue", 1);
+            builder.AddAttribute(2, "OnValueChange",
+                EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs<int>>(this, args =>
+                {
+                    receivedValue = args.Value;
+                }));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                groupBuilder.OpenComponent<MenuRadioItem<int>>(0);
+                groupBuilder.AddAttribute(1, "Value", 1);
+                groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                groupBuilder.CloseComponent();
+
+                groupBuilder.OpenComponent<MenuRadioItem<int>>(3);
+                groupBuilder.AddAttribute(4, "Value", 2);
+                groupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var items = cut.FindAll("[role='menuitemradio']");
+        items[0].GetAttribute("aria-checked")!.ShouldBe("true");
+
+        items[1].Click();
+
+        receivedValue.ShouldBe(2);
+        items = cut.FindAll("[role='menuitemradio']");
+        items[1].GetAttribute("aria-checked")!.ShouldBe("true");
 
         return Task.CompletedTask;
     }
@@ -231,14 +272,14 @@ public class MenuRadioGroupTests : BunitContext, IMenuRadioGroupContract
                     posBuilder.OpenComponent<MenuPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.OpenComponent<MenuRadioGroup<string>>(0);
                         popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
                         {
                             groupBuilder.OpenComponent<MenuGroupLabel>(0);
                             groupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Sort")));
                             groupBuilder.CloseComponent();
 
-                            groupBuilder.OpenComponent<MenuRadioItem>(2);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(2);
                             groupBuilder.AddAttribute(3, "Value", "option1");
                             groupBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 1")));
                             groupBuilder.CloseComponent();

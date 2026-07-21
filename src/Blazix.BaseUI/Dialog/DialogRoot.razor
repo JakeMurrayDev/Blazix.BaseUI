@@ -216,7 +216,8 @@
     protected override void OnParametersSet()
     {
         var currentOpen = pendingBindingUpdate ? state.Open : CurrentOpen;
-        if (state.Open != currentOpen)
+        var parameterOpenChanged = state.Open != currentOpen;
+        if (parameterOpenChanged)
         {
             state = new DialogRootState(currentOpen);
             if (currentOpen)
@@ -239,10 +240,15 @@
             }
         }
 
-        if (IsTriggerIdControlled && activeTriggerId != TriggerId)
+        var triggerIdChanged = IsTriggerIdControlled && activeTriggerId != TriggerId;
+        if (triggerIdChanged)
         {
             activeTriggerId = TriggerId;
             context.ActiveTriggerId = activeTriggerId;
+        }
+
+        if (currentOpen && (parameterOpenChanged || triggerIdChanged))
+        {
             UpdatePayloadFromActiveTrigger();
         }
 
@@ -261,6 +267,8 @@
             SubscribeToHandle();
             SyncHandlePopupId();
         }
+
+        SyncHandleState(currentOpen, currentOpen ? activeTriggerId : null);
     }
 
     /// <inheritdoc />
@@ -404,6 +412,12 @@
     void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerRegistered(string triggerId, ElementReference? element)
     {
         RegisterTriggerElement(triggerId, element);
+
+        if (CurrentOpen && activeTriggerId == triggerId)
+        {
+            UpdatePayloadFromActiveTrigger();
+            SyncHandleState(true, activeTriggerId);
+        }
     }
 
     void IComponentHandleSubscriberBase<DialogOpenChangeReason>.OnTriggerUnregistered(string triggerId)
@@ -498,6 +512,7 @@
         if (activeTriggerId == triggerId && CurrentOpen)
         {
             UpdatePayload(triggerPayload, rerender: true);
+            SyncHandleState(true, activeTriggerId);
         }
     }
 

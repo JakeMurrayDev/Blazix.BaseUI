@@ -77,21 +77,21 @@
                             <span>Show Sidebar</span>
                         </ContextMenuCheckboxItem>
                         <ContextMenuSeparator ClassValue="@(_ => SeparatorClass())" />
-                        <ContextMenuRadioGroup Value="@selectedTheme" OnValueChange="HandleThemeChange">
+                        <ContextMenuRadioGroup TValue="string" Value="@selectedTheme" OnValueChange="HandleThemeChange">
                             <ContextMenuGroupLabel ClassValue="@(_ => GroupLabelClass())">Theme</ContextMenuGroupLabel>
-                            <ContextMenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("light")">
+                            <ContextMenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("light")">
                                 <ContextMenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                     @DotIcon
                                 </ContextMenuRadioItemIndicator>
                                 <span>Light</span>
                             </ContextMenuRadioItem>
-                            <ContextMenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
+                            <ContextMenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
                                 <ContextMenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                     @DotIcon
                                 </ContextMenuRadioItemIndicator>
                                 <span>Dark</span>
                             </ContextMenuRadioItem>
-                            <ContextMenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("system")">
+                            <ContextMenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("system")">
                                 <ContextMenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                     @DotIcon
                                 </ContextMenuRadioItemIndicator>
@@ -218,9 +218,9 @@
 
     private bool showToolbar = true;
     private bool showSidebar = true;
-    private object? selectedTheme = "light";
+    private string? selectedTheme = "light";
 
-    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs e)
+    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs<string> e)
     {
         selectedTheme = e.Value;
         return Task.CompletedTask;

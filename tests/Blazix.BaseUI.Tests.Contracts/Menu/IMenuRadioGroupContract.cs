@@ -9,5 +9,6 @@ public interface IMenuRadioGroupContract
     Task UncontrolledModeUsesDefaultValue();
     Task InvokesOnValueChange();
     Task SupportsCancelInOnValueChange();
+    Task SupportsValueTypeValues();
     Task GroupLabelWiresAriaLabelledby();
 }

@@ -8,11 +8,11 @@
     <MenuPortal>
         <MenuPositioner SideOffset="8" class="outline-0">
             <MenuPopup class="relative box-border border border-slate-950 bg-white py-1 text-slate-950 shadow-[0.25rem_0.25rem_0_rgba(0,0,0,0.12)] outline-0 transition-[transform,opacity] duration-100 ease-out [transform-origin:var(--transform-origin)] data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 dark:border-white dark:bg-slate-950 dark:text-white dark:shadow-none">
-                <MenuRadioGroup @bind-Value="sortBy">
+                <MenuRadioGroup TValue="string" @bind-Value="sortBy">
                     <MenuGroupLabel class="select-none px-4 py-2 text-sm leading-4 text-slate-500 dark:text-slate-400">Sort</MenuGroupLabel>
                     @foreach (var option in SortOptions)
                     {
-                        <MenuRadioItem Value="@option.Value" class="relative z-0 grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 py-2 pl-2.5 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">
+                        <MenuRadioItem TValue="string" Value="@option.Value" class="relative z-0 grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 py-2 pl-2.5 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">
                             <MenuRadioItemIndicator class="col-start-1">
                                 <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
                                     <path d="m2.5 8.5 4 4 7-9" />
@@ -46,14 +46,14 @@
 </MenuRoot>
 
 @code {
-    private static readonly IReadOnlyList<(object Value, string Label)> SortOptions =
+    private static readonly IReadOnlyList<(string Value, string Label)> SortOptions =
     [
         ("date", "Date"),
         ("name", "Name"),
         ("type", "Type"),
     ];
 
-    private object? sortBy = "date";
+    private string? sortBy = "date";
     private bool showMinimap = true;
     private bool showSearch = true;
     private bool showSidebar;

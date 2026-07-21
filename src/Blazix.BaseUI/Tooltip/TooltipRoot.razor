@@ -4,7 +4,7 @@
 @implements ITooltipHandleSubscriber
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context">
+<CascadingValue Value="context" IsFixed="true">
     @if (ChildContentWithPayload is not null)
     {
         @ChildContentWithPayload(new TooltipRootPayloadContext(payload))
@@ -221,8 +221,7 @@
 
         if (TriggerId is not null)
         {
-            activeTriggerId = TriggerId;
-            context.ActiveTriggerId = activeTriggerId;
+            SetActiveTrigger(TriggerId);
         }
 
         TrySetImplicitActiveTrigger();
@@ -255,6 +254,11 @@
         {
             UnsubscribeFromHandle();
             SubscribeToHandle();
+        }
+
+        if (currentOpen)
+        {
+            SyncHandleState(true, activeTriggerId);
         }
 
         if (!ReferenceEquals(DelayGroupContext, subscribedDelayGroupContext))
@@ -441,6 +445,7 @@
         {
             payload = GetPayloadFromHandle(triggerId);
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
         }
 
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
@@ -649,6 +654,7 @@
         {
             payload = triggerPayload;
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
         }
     }
 

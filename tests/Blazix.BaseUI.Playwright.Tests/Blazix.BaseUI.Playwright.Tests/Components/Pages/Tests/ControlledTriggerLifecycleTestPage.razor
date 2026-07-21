@@ -1,0 +1,21 @@
+@page "/tests/controlled-trigger-lifecycle/server"
+@using Blazix.BaseUI.Playwright.Tests.Client.Components
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Controlled Trigger Lifecycle Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <ControlledTriggerLifecycleTest ComponentName="@componentName" />
+</div>
+
+@code {
+    private string componentName = "menu";
+
+    [SupplyParameterFromQuery(Name = "component")]
+    public string? ComponentName { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        componentName = ComponentName ?? "menu";
+    }
+}

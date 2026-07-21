@@ -28,6 +28,7 @@
         <MenuRoot
             @bind-Open="isOpen"
             Handle="handle"
+            TriggerId="@controlledTriggerId"
             DefaultOpen="@DefaultOpen"
             DefaultTriggerId="@DefaultTriggerId">
             <ChildContent Context="payloadContext">
@@ -49,6 +50,8 @@
             <button data-testid="open-a-button" @onclick="OpenTriggerA">Open A</button>
             <button data-testid="open-b-button" @onclick="OpenTriggerB">Open B</button>
             <button data-testid="close-button" @onclick="CloseHandle">Close</button>
+            <button data-testid="open-controlled-b-button" @onclick="OpenControlledTriggerB">Open B (controlled)</button>
+            <button data-testid="close-controlled-button" @onclick="CloseControlled">Close (controlled)</button>
         }
     }
     else
@@ -89,6 +92,7 @@
 @code {
     private readonly MenuHandle<string> handle = new();
     private bool isOpen;
+    private string? controlledTriggerId;
 
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
@@ -115,6 +119,17 @@
     private void OpenTriggerB() => handle.Open("trigger-b");
 
     private void CloseHandle() => handle.Close();
+
+    private void OpenControlledTriggerB()
+    {
+        controlledTriggerId = "trigger-b";
+        isOpen = true;
+    }
+
+    private void CloseControlled()
+    {
+        isOpen = false;
+    }
 
     private string GetPayloadDisplay()
     {

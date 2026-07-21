@@ -211,6 +211,11 @@
             SubscribeToHandle();
         }
 
+        if (currentOpen)
+        {
+            SyncHandleState(true, activeTriggerId);
+        }
+
         RefreshCascadingContext();
     }
 
@@ -345,6 +350,7 @@
         {
             payload = GetPayloadFromHandle(triggerId);
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
         }
 
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
@@ -550,6 +556,7 @@
         {
             payload = triggerPayload;
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
             context.NotifyStateChanged();
         }
     }

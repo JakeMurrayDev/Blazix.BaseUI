@@ -376,6 +376,101 @@ public class MenuRootTests : BunitContext, IMenuRootContract
     }
 
     [Fact]
+    public async Task ControlledTriggerLifecyclePreservesAssociationAndPayload()
+    {
+        var handle = new MenuHandle<string>();
+        MenuRootPayloadContext? capturedContext = null;
+        RenderFragment<MenuRootPayloadContext> childContent = ctx =>
+        {
+            capturedContext = ctx;
+            return innerBuilder =>
+            {
+                innerBuilder.OpenComponent<MenuTypedTrigger<string>>(0);
+                innerBuilder.AddAttribute(1, "Handle", handle);
+                innerBuilder.AddAttribute(2, "id", "trigger-1");
+                innerBuilder.AddAttribute(3, "Payload", "one");
+                innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<MenuTypedTrigger<string>>(10);
+                innerBuilder.AddAttribute(11, "Handle", handle);
+                innerBuilder.AddAttribute(12, "id", "trigger-2");
+                innerBuilder.AddAttribute(13, "Payload", "two");
+                innerBuilder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+                innerBuilder.CloseComponent();
+            };
+        };
+
+        var cut = Render<MenuRoot>(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, false)
+            .Add(p => p.TriggerId, "trigger-1")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-1")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() => capturedContext!.Value.Payload.ShouldBe("one"));
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext!.Value.Payload.ShouldBe("two");
+            handle.IsOpen.ShouldBeTrue();
+            handle.ActiveTriggerId.ShouldBe("trigger-2");
+            handle.Payload.ShouldBe("two");
+        });
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, false)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        handle.IsOpen.ShouldBeFalse();
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() => capturedContext!.Value.Payload.ShouldBe("two"));
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, false)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        await cut.InvokeAsync(() => cut.Instance.OnTransitionEnd(false));
+        capturedContext!.Value.Payload.ShouldBeNull();
+        handle.IsOpen.ShouldBeFalse();
+
+        cut.Render(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.Open, true)
+            .Add(p => p.TriggerId, "trigger-2")
+            .Add(p => p.ChildContent, childContent));
+
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext!.Value.Payload.ShouldBe("two");
+            handle.IsOpen.ShouldBeTrue();
+            handle.ActiveTriggerId.ShouldBe("trigger-2");
+            handle.Payload.ShouldBe("two");
+        });
+    }
+
+    [Fact]
     public Task ControlledTriggerIdChangeClearsPayloadWhenTriggerIsMissing()
     {
         MenuRootPayloadContext? capturedContext = null;

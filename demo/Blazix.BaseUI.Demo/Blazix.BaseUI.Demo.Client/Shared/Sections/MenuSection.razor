@@ -194,20 +194,20 @@
                 <MenuPortal>
                     <MenuPositioner SideOffset="8">
                         <MenuPopup ClassValue="@(_ => PopupClass())">
-                            <MenuRadioGroup Value="@selectedTheme" OnValueChange="HandleThemeChange">
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("light")">
+                            <MenuRadioGroup TValue="string" Value="@selectedTheme" OnValueChange="HandleThemeChange">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("light")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
                                     <span>Light</span>
                                 </MenuRadioItem>
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
                                     <span>Dark</span>
                                 </MenuRadioItem>
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("system")">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("system")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
@@ -468,11 +468,11 @@
     private bool showToolbar = true;
     private bool showSidebar = true;
     private bool showStatusBar = false;
-    private object? selectedTheme = "light";
+    private string? selectedTheme = "light";
     private int clickCount = 0;
     private bool controlledOpen = false;
 
-    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs e)
+    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs<string> e)
     {
         selectedTheme = e.Value;
         return Task.CompletedTask;

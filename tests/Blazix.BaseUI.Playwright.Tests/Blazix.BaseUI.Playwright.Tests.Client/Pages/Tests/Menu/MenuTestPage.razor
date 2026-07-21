@@ -75,18 +75,18 @@
 
                     @if (ShowRadioGroup)
                     {
-                        <MenuRadioGroup
+                        <MenuRadioGroup TValue="string"
                             @bind-Value="radioValue"
                             DefaultValue="@DefaultRadioValue"
                             OnValueChange="HandleRadioChange"
                             data-testid="menu-radio-group">
-                            <MenuRadioItem Value="@("option1")" data-testid="menu-radio-item-1">
+                            <MenuRadioItem TValue="string" Value="@("option1")" data-testid="menu-radio-item-1">
                                 Option 1
                             </MenuRadioItem>
-                            <MenuRadioItem Value="@("option2")" data-testid="menu-radio-item-2">
+                            <MenuRadioItem TValue="string" Value="@("option2")" data-testid="menu-radio-item-2">
                                 Option 2
                             </MenuRadioItem>
-                            <MenuRadioItem Value="@("option3")" Disabled="true" data-testid="menu-radio-item-3">
+                            <MenuRadioItem TValue="string" Value="@("option3")" Disabled="true" data-testid="menu-radio-item-3">
                                 Option 3 (Disabled)
                             </MenuRadioItem>
                         </MenuRadioGroup>
@@ -237,7 +237,7 @@
     private int lastItemClicked;
     private int noCloseClickCount;
     private bool checkboxChecked;
-    private object? radioValue;
+    private string? radioValue;
     private bool submenuOpen;
     private int lastSubmenuItemClicked;
     private bool nestedSubmenuOpen;
@@ -276,7 +276,7 @@
     {
     }
 
-    private void HandleRadioChange(MenuRadioGroupChangeEventArgs args)
+    private void HandleRadioChange(MenuRadioGroupChangeEventArgs<string> args)
     {
     }
 
