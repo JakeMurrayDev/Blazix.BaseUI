@@ -7,6 +7,7 @@
   <Project Path="src/Blazix.BaseUI/Blazix.BaseUI.csproj" Id="d7bfad9f-d1f2-42c5-9d80-9fec3257980b" />
   <Project Path="tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.Client/Blazix.BaseUI.Playwright.Tests.Client.csproj" />
   <Project Path="tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests.csproj" />
+  <Project Path="tests/Blazix.BaseUI.Analyzers.Tests/Blazix.BaseUI.Analyzers.Tests.csproj" />
   <Project Path="tests/Blazix.BaseUI.Tests.Contracts/Blazix.BaseUI.Tests.Contracts.csproj" />
   <Project Path="tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj" />
 </Solution>

@@ -119,6 +119,11 @@ internal sealed class TooltipRootContext
     public Action<ElementReference?> SetPopupElement { get; set; } = null!;
 
     /// <summary>
+    /// Gets or sets the delegate that snapshots viewport content before the active trigger changes.
+    /// </summary>
+    public Func<ElementReference, ElementReference, Task>? PrepareViewportTransitionAsync { get; set; }
+
+    /// <summary>
     /// Gets or sets the delegate that sets the tooltip's open state.
     /// </summary>
     public Func<bool, TooltipOpenChangeReason, string?, Task> SetOpenAsync { get; set; } = null!;

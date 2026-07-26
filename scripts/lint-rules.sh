@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Blazix.BaseUI Lint Rules — textual subset
-# Structural rules (R02, R03, R07, R09, R10, R11, R12, R13, R14, R15) live in
+# Structural rules (R02, R03, R07, R09-R19) live in
 # the Roslyn analyzer project at src/Blazix.BaseUI.Analyzers/ and run during
 # `dotnet build`. This script enforces the remaining text-only rules that do
 # not benefit from the C# AST: R01, R04, R05, R06.
 #
-# Usage: bash scripts/lint-rules.sh [--rule N]
+# Usage: bash scripts/lint-rules.sh [--rule N] [--source PATH]
 
 set -u
 
@@ -47,6 +47,13 @@ while [[ $# -gt 0 ]]; do
         echo "Invalid --rule value: $2 (valid: ${!RULE_NAMES[*]})"
         exit 1
       fi
+      shift 2 ;;
+    --source)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "Missing value for --source"
+        exit 1
+      fi
+      SRC_DIR="$(cd "$2" && pwd)"
       shift 2 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -195,7 +202,7 @@ if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   exit 1
 else
   echo -e "${GREEN}Total: 0 violations${NC}"
-  echo -e "${YELLOW}Note:${NC} structural rules (R02, R03, R07, R09–R15) are enforced by"
-  echo -e "      src/Blazix.BaseUI.Analyzers via 'dotnet build'."
+  echo -e "${YELLOW}Note:${NC} structural rules (R02, R03, R07, R09-R19) are enforced by"
+  echo -e "      src/Blazix.BaseUI.Analyzers via 'dotnet build' (R09-R19)."
   exit 0
 fi

@@ -8,8 +8,8 @@
     <TooltipRoot Handle="@demoTooltip">
         <ChildContentWithPayload Context="payloadContext">
             <TooltipPortal>
-                <TooltipPositioner SideOffset="11">
-                    <TooltipPopup class="blx-tooltip-popup">
+                <TooltipPositioner SideOffset="11" class="blx-tooltip-positioner">
+                    <TooltipPopup class="blx-tooltip-popup blx-tooltip-popup--viewport">
                         <TooltipArrow class="blx-tooltip-arrow" />
                         <TooltipViewport class="blx-tooltip-viewport">@payloadContext.Payload</TooltipViewport>
                     </TooltipPopup>

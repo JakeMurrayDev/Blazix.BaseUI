@@ -210,8 +210,9 @@
     }
 
     /// <inheritdoc />
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        var previousOpen = state.Open;
         var currentOpen = CurrentOpen;
         var parameterOpenChanged = state.Open != currentOpen;
         if (parameterOpenChanged)
@@ -219,9 +220,31 @@
             ApplyOpenParameterChange(currentOpen);
         }
 
+        var activeTriggerChanged = TriggerId is not null && TriggerId != activeTriggerId;
+        if (activeTriggerChanged
+            && previousOpen
+            && currentOpen
+            && activeTriggerId is not null
+            && context.PrepareViewportTransitionAsync is not null)
+        {
+            var previousTriggerElement = GetTriggerElementById(activeTriggerId);
+            var nextTriggerElement = GetTriggerElementById(TriggerId!);
+            if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
+            {
+                await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
+            }
+        }
+
         if (TriggerId is not null)
         {
             SetActiveTrigger(TriggerId);
+        }
+
+        if (activeTriggerChanged && previousOpen && currentOpen)
+        {
+            instantType = TooltipInstantType.None;
+            previousInstantType = null;
+            context.InstantType = instantType;
         }
 
         TrySetImplicitActiveTrigger();
@@ -520,6 +543,19 @@
             return;
         }
 
+        if (activeTriggerChanged
+            && currentOpen
+            && activeTriggerId is not null
+            && context.PrepareViewportTransitionAsync is not null)
+        {
+            var previousTriggerElement = GetTriggerElementById(activeTriggerId);
+            var nextTriggerElement = GetTriggerElementById(triggerId!);
+            if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
+            {
+                await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
+            }
+        }
+
         if (!nextOpen)
         {
             preventUnmountOnClose = args.PreventUnmount;
@@ -537,7 +573,9 @@
 
             instantType = reason == TooltipOpenChangeReason.TriggerFocus
                 ? TooltipInstantType.Focus
-                : (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true ? TooltipInstantType.Delay : TooltipInstantType.None);
+                : (!activeTriggerChanged && (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true)
+                    ? TooltipInstantType.Delay
+                    : TooltipInstantType.None);
             if (!currentOpen || !transition.IsMounted)
             {
                 transition.BeginOpen();
@@ -586,7 +624,14 @@
             context.Payload = null;
         }
 
-        ApplyInstantPhaseOverride();
+        if (activeTriggerChanged)
+        {
+            previousInstantType = null;
+        }
+        else
+        {
+            ApplyInstantPhaseOverride();
+        }
 
         SyncHandleState(nextOpen, activeTriggerId);
 

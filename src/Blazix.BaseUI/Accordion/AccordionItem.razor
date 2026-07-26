@@ -181,53 +181,15 @@
             index = RootContext.GetItemIndex(itemKey);
         }
 
-        if (itemContext is null)
-        {
-            itemContext = new AccordionItemContext<TValue>
-            {
-                RootContext = TypedRootContext,
-                Value = resolvedValue,
-                Index = index,
-                Disabled = currentDisabled,
-                TriggerHandler = HandleTrigger,
-                PanelIdSetter = SetPanelId,
-                TriggerIdSetter = SetTriggerId,
-                PanelMountedSetter = SetPanelMounted,
-                PanelId = panelId,
-                TriggerId = triggerId,
-                Hidden = Hidden
-            };
-        }
-        else
-        {
-            itemContext.RootContext = TypedRootContext;
-            itemContext.Value = resolvedValue;
-            itemContext.Index = index;
-            itemContext.Disabled = currentDisabled;
-            itemContext.Hidden = Hidden;
-        }
+        itemContext!.RootContext = TypedRootContext;
+        itemContext.Value = resolvedValue;
+        itemContext.Index = index;
+        itemContext.Disabled = currentDisabled;
+        itemContext.Hidden = Hidden;
 
-        if (collapsibleContext is null)
-        {
-            collapsibleContext = new CollapsibleRootContext
-            {
-                Open = currentOpen,
-                Disabled = currentDisabled,
-                TransitionStatus = transitionStatus,
-                PanelId = panelId,
-                HandleTrigger = HandleTrigger,
-                HandleBeforeMatch = HandleBeforeMatch,
-                SetPanelId = SetPanelId,
-                SetTransitionStatus = SetTransitionStatus,
-                ClearOpenChangeReason = ClearOpenChangeReason
-            };
-        }
-        else
-        {
-            collapsibleContext.Open = currentOpen;
-            collapsibleContext.Disabled = currentDisabled;
-            collapsibleContext.TransitionStatus = transitionStatus;
-        }
+        collapsibleContext!.Open = currentOpen;
+        collapsibleContext.Disabled = currentDisabled;
+        collapsibleContext.TransitionStatus = transitionStatus;
 
         if (state is null)
         {

@@ -12,6 +12,7 @@
                ComponentAttributes="componentAttributes"
                @attributes="AdditionalAttributes"
                @ref="renderElementReference">
+    <div data-previous-cache></div>
     <div data-current>
         @ChildContent
     </div>
@@ -24,7 +25,6 @@
     private TooltipViewportState state;
     private RenderElement<TooltipViewportState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
-    private string? previousActiveTriggerId;
     private string? activationDirection;
     private bool isTransitioning;
     private bool hasRendered;
@@ -82,6 +82,7 @@
         if (RootContext is not null)
         {
             RootContext.HasViewport = true;
+            RootContext.PrepareViewportTransitionAsync = PrepareTransitionAsync;
         }
     }
 
@@ -91,23 +92,6 @@
         var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
         state = new TooltipViewportState(instantType, activationDirection, isTransitioning);
         BuildComponentAttributes();
-
-        // Detect trigger change
-        var currentTriggerId = RootContext?.ActiveTriggerId;
-        if (hasRendered
-            && currentTriggerId != previousActiveTriggerId
-            && previousActiveTriggerId is not null
-            && currentTriggerId is not null
-            && RootContext?.GetOpen() == true)
-        {
-            var prevTriggerEl = RootContext.GetTriggerElementById(previousActiveTriggerId);
-            var newTriggerEl = RootContext.GetTriggerElementById(currentTriggerId);
-            if (prevTriggerEl.HasValue && newTriggerEl.HasValue)
-            {
-                _ = BeginTransitionAsync(prevTriggerEl.Value, newTriggerEl.Value);
-            }
-        }
-        previousActiveTriggerId = currentTriggerId;
     }
 
     /// <inheritdoc />
@@ -158,28 +142,34 @@
     /// </summary>
     /// <param name="direction">The activation direction string, or empty if not applicable.</param>
     [JSInvokable]
-    public void OnTransitionStarted(string direction)
+    public Task OnTransitionStarted(string direction)
     {
-        activationDirection = string.IsNullOrEmpty(direction) ? null : direction;
-        isTransitioning = true;
-        var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
-        state = new TooltipViewportState(instantType, activationDirection, isTransitioning);
-        BuildComponentAttributes();
-        StateHasChanged();
+        return InvokeAsync(() =>
+        {
+            activationDirection = string.IsNullOrEmpty(direction) ? null : direction;
+            isTransitioning = true;
+            var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
+            state = new TooltipViewportState(instantType, activationDirection, isTransitioning);
+            BuildComponentAttributes();
+            StateHasChanged();
+        });
     }
 
     /// <summary>
     /// Handles the end of a viewport transition from JavaScript interop.
     /// </summary>
     [JSInvokable]
-    public void OnTransitionEnded()
+    public Task OnTransitionEnded()
     {
-        activationDirection = null;
-        isTransitioning = false;
-        var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
-        state = new TooltipViewportState(instantType, activationDirection, isTransitioning);
-        BuildComponentAttributes();
-        StateHasChanged();
+        return InvokeAsync(() =>
+        {
+            activationDirection = null;
+            isTransitioning = false;
+            var instantType = RootContext?.InstantType ?? TooltipInstantType.None;
+            state = new TooltipViewportState(instantType, activationDirection, isTransitioning);
+            BuildComponentAttributes();
+            StateHasChanged();
+        });
     }
 
     /// <inheritdoc />
@@ -188,6 +178,10 @@
         if (RootContext is not null)
         {
             RootContext.HasViewport = false;
+            if (RootContext.PrepareViewportTransitionAsync == PrepareTransitionAsync)
+            {
+                RootContext.PrepareViewportTransitionAsync = null;
+            }
         }
 
         if (moduleTask?.IsValueCreated == true && hasRendered)
@@ -207,12 +201,12 @@
         dotNetRef?.Dispose();
     }
 
-    private async Task BeginTransitionAsync(ElementReference prevTrigger, ElementReference newTrigger)
+    private async Task PrepareTransitionAsync(ElementReference previousTrigger, ElementReference nextTrigger)
     {
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("beginTransition", viewportId, prevTrigger, newTrigger);
+            await module.InvokeVoidAsync("prepareTransition", viewportId, previousTrigger, nextTrigger);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -235,7 +229,11 @@
             attrs["data-activation-direction"] = activationDirection;
         }
 
-        attrs["data-transitioning"] = isTransitioning;
+        if (isTransitioning)
+        {
+            // lint-ignore:RULE-06 React Base UI parity requires this empty marker attribute.
+            attrs["data-transitioning"] = "";
+        }
 
         componentAttributes = attrs;
     }

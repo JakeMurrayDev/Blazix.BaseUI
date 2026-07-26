@@ -240,6 +240,17 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     }
 
     /// <summary>
+    /// Gets the element references for all registered triggers.
+    /// </summary>
+    internal ElementReference[] GetTriggerElements()
+    {
+        return registeredTriggers.Values
+            .Where(data => data.Element.HasValue)
+            .Select(data => data.Element!.Value)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Gets the focus target element reference for a trigger.
     /// </summary>
     internal ElementReference? GetTriggerFocusTarget(string? triggerId)
