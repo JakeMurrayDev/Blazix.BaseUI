@@ -230,6 +230,7 @@ public static class ContextMenuApi
         new("RadioGroup",
             "Manages single selection for radio items inside the menu. Renders a <div> element by default.",
             [
+                new ApiRow("TValue", "type parameter", "—", "The value type shared by the radio group and its radio items."),
                 new ApiRow("Value", "TValue?", "null", "The controlled value of the selected radio item. To render an uncontrolled group, use DefaultValue instead."),
                 new ApiRow("DefaultValue", "TValue?", "null", "The uncontrolled value used on the initial render."),
                 new ApiRow("Disabled", "bool", "false", "Disables all radio items in the group."),
@@ -246,6 +247,7 @@ public static class ContextMenuApi
         new("RadioItem",
             "A radio menu item within a RadioGroup. Renders a <div> element by default.",
             [
+                new ApiRow("TValue", "type parameter", "—", "The value type shared with the containing RadioGroup."),
                 new ApiRow("Value", "TValue?", "null", "The value selected in the RadioGroup when this item is chosen."),
                 new ApiRow("Disabled", "bool", "false", "Determines whether the item should ignore user interaction."),
                 new ApiRow("NativeButton", "bool", "false", "Renders the item as a native <button> instead of a <div>."),

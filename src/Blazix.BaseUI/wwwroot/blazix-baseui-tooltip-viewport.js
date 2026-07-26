@@ -189,6 +189,8 @@ function startPreparedTransition(viewportState) {
     const previousSnapshot = viewportState.pendingSnapshot;
     if (!currentContainer || !previousContainer || !previousSnapshot) return;
 
+    clearTimeout(viewportState.armTimeoutId);
+    viewportState.armTimeoutId = null;
     viewportState.transitionArmed = false;
     viewportState.pendingSnapshot = null;
     viewportState.latestSnapshot = cloneChildren(currentContainer);
@@ -297,6 +299,7 @@ export function initializeViewport(viewportId, viewportElement, dotNetRef) {
         popupElement: null,
         positionerElement: null,
         anchoringCleanup: null,
+        armTimeoutId: null,
         side: 'top',
         transitionArmed: false,
         pendingSnapshot: null,
@@ -323,6 +326,7 @@ export function prepareTransition(viewportId, previousTriggerElement, nextTrigge
     if (!viewportState?.currentContainer) return;
 
     viewportState.abortController?.abort();
+    clearTimeout(viewportState.armTimeoutId);
     cleanupTransitionAttributes(viewportState);
     viewportState.abortController = new AbortController();
     viewportState.pendingSnapshot = viewportState.latestSnapshot
@@ -332,6 +336,17 @@ export function prepareTransition(viewportId, previousTriggerElement, nextTrigge
     viewportState.pendingDimensions = viewportState.committedDimensions
         ?? (viewportState.popupElement ? getDimensions(viewportState.popupElement) : null);
     viewportState.transitionArmed = true;
+    viewportState.armTimeoutId = setTimeout(() => {
+        if (!viewportState.transitionArmed) return;
+
+        viewportState.transitionArmed = false;
+        viewportState.pendingSnapshot = null;
+        viewportState.pendingDirection = null;
+        viewportState.pendingDimensions = null;
+        viewportState.abortController?.abort();
+        viewportState.abortController = null;
+        viewportState.armTimeoutId = null;
+    }, MaximumTransitionWait);
 }
 
 export function initializeAutoResize(viewportId, popupElement, positionerElement, side) {
@@ -381,6 +396,7 @@ export function disposeViewport(viewportId) {
     if (!viewportState) return;
 
     viewportState.abortController?.abort();
+    clearTimeout(viewportState.armTimeoutId);
     viewportState.contentObserver?.disconnect();
     viewportState.resizeObserver?.disconnect();
     viewportState.anchoringCleanup?.();

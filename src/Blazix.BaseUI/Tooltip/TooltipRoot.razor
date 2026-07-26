@@ -221,18 +221,9 @@
         }
 
         var activeTriggerChanged = TriggerId is not null && TriggerId != activeTriggerId;
-        if (activeTriggerChanged
-            && previousOpen
-            && currentOpen
-            && activeTriggerId is not null
-            && context.PrepareViewportTransitionAsync is not null)
+        if (activeTriggerChanged && previousOpen && currentOpen)
         {
-            var previousTriggerElement = GetTriggerElementById(activeTriggerId);
-            var nextTriggerElement = GetTriggerElementById(TriggerId!);
-            if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
-            {
-                await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
-            }
+            await TryPrepareViewportTransitionAsync(TriggerId!);
         }
 
         if (TriggerId is not null)
@@ -543,17 +534,9 @@
             return;
         }
 
-        if (activeTriggerChanged
-            && currentOpen
-            && activeTriggerId is not null
-            && context.PrepareViewportTransitionAsync is not null)
+        if (activeTriggerChanged && currentOpen)
         {
-            var previousTriggerElement = GetTriggerElementById(activeTriggerId);
-            var nextTriggerElement = GetTriggerElementById(triggerId!);
-            if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
-            {
-                await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
-            }
+            await TryPrepareViewportTransitionAsync(triggerId!);
         }
 
         if (!nextOpen)
@@ -772,6 +755,21 @@
         }
 
         return GetTriggerElementFromHandle(triggerId);
+    }
+
+    private async Task TryPrepareViewportTransitionAsync(string nextTriggerId)
+    {
+        if (activeTriggerId is null || context.PrepareViewportTransitionAsync is null)
+        {
+            return;
+        }
+
+        var previousTriggerElement = GetTriggerElementById(activeTriggerId);
+        var nextTriggerElement = GetTriggerElementById(nextTriggerId);
+        if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
+        {
+            await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
+        }
     }
 
     private async Task InitializeJsAsync()

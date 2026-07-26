@@ -32,6 +32,7 @@ run_failure_case 6 "RULE-06"
 
 rm -rf "$fixture/Stub" "$fixture/Partition.cs" "$fixture/Data.js" "$fixture/Empty.cs"
 printf '%s\n' 'public sealed class Valid;' > "$fixture/Valid.cs"
-bash "$repo_root/scripts/lint-rules.sh" --source "$fixture" >/dev/null
+bash "$repo_root/scripts/lint-rules.sh" --source "$fixture" >"$fixture/output.txt"
+grep -q "dotnet build' (R02, R03, R07, R09-R19)" "$fixture/output.txt"
 
 echo "Validated positive and negative fixtures for textual lint rules 01, 04, 05, and 06."

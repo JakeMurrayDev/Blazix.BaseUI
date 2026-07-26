@@ -135,9 +135,90 @@ public sealed class ConventionAnalyzerTests
     }
 
     [Fact]
+    public async Task UtilityObjectParameter_IgnoresUnrelatedMemberWithSameIdentifier()
+    {
+        const string source = """
+            public sealed class Holder { public object value = 0; }
+            public static class ValueUtilities
+            {
+                public static int Parse(object value, Holder holder)
+                {
+                    _ = holder.value.ToString();
+                    return (int)value;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeSourceAsync(new AvoidableObjectBoxingAnalyzer(), source);
+
+        diagnostics.ShouldContain(diagnostic => diagnostic.Id == AvoidableObjectBoxingAnalyzer.DiagnosticId);
+    }
+
+    [Fact]
+    public async Task UtilityObjectParameter_IgnoresShadowedLocalFunctionParameter()
+    {
+        const string source = """
+            public static class ValueUtilities
+            {
+                public static int Parse(object value)
+                {
+                    static string Format(object value) => value.ToString();
+                    _ = Format("local");
+                    return (int)value;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeSourceAsync(new AvoidableObjectBoxingAnalyzer(), source);
+
+        diagnostics.ShouldContain(diagnostic => diagnostic.Id == AvoidableObjectBoxingAnalyzer.DiagnosticId);
+    }
+
+    [Fact]
     public async Task UtilityObjectParameter_ExemptsAttributeDictionaries()
     {
         const string source = "using System.Collections.Generic; public static class AttributeUtilities { public static int Add(Dictionary<string, object> attrs, object value) { attrs[\"value\"] = value; return (int)value; } }";
+
+        var diagnostics = await AnalyzeSourceAsync(new AvoidableObjectBoxingAnalyzer(), source);
+
+        diagnostics.ShouldNotContain(diagnostic => diagnostic.Id == AvoidableObjectBoxingAnalyzer.DiagnosticId);
+    }
+
+    [Fact]
+    public async Task UtilityObjectParameter_ExemptsAliasedAttributeDictionary()
+    {
+        const string source = """
+            using AttributeMap = System.Collections.Generic.Dictionary<string, object>;
+            public static class AttributeUtilities
+            {
+                public static int Add(AttributeMap attrs, object value)
+                {
+                    attrs["value"] = value;
+                    return (int)value;
+                }
+            }
+            """;
+
+        var diagnostics = await AnalyzeSourceAsync(new AvoidableObjectBoxingAnalyzer(), source);
+
+        diagnostics.ShouldNotContain(diagnostic => diagnostic.Id == AvoidableObjectBoxingAnalyzer.DiagnosticId);
+    }
+
+    [Fact]
+    public async Task UtilityObjectParameter_ExemptsFullyQualifiedAttributeDictionary()
+    {
+        const string source = """
+            public static class AttributeUtilities
+            {
+                public static int Add(
+                    global::System.Collections.Generic.Dictionary<global::System.String, global::System.Object> attrs,
+                    object value)
+                {
+                    attrs["value"] = value;
+                    return (int)value;
+                }
+            }
+            """;
 
         var diagnostics = await AnalyzeSourceAsync(new AvoidableObjectBoxingAnalyzer(), source);
 

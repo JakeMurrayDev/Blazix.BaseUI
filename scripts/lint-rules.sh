@@ -203,6 +203,6 @@ if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
 else
   echo -e "${GREEN}Total: 0 violations${NC}"
   echo -e "${YELLOW}Note:${NC} structural rules (R02, R03, R07, R09-R19) are enforced by"
-  echo -e "      src/Blazix.BaseUI.Analyzers via 'dotnet build' (R09-R19)."
+  echo -e "      src/Blazix.BaseUI.Analyzers via 'dotnet build' (R02, R03, R07, R09-R19)."
   exit 0
 fi

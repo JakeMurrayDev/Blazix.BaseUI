@@ -413,7 +413,13 @@ public class MenuRootTests : BunitContext, IMenuRootContract
             .Add(p => p.TriggerId, "trigger-1")
             .Add(p => p.ChildContent, childContent));
 
-        cut.WaitForAssertion(() => capturedContext!.Value.Payload.ShouldBe("one"));
+        cut.WaitForAssertion(() =>
+        {
+            capturedContext!.Value.Payload.ShouldBe("one");
+            handle.IsOpen.ShouldBeTrue();
+            handle.ActiveTriggerId.ShouldBe("trigger-1");
+            handle.Payload.ShouldBe("one");
+        });
 
         cut.Render(parameters => parameters
             .Add(p => p.Handle, handle)
