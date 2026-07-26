@@ -487,6 +487,20 @@ function cleanupPopupMouseDelegation(rootState, popupElement) {
     }
 }
 
+function scheduleOutsidePress(rootId, rootState) {
+    // Let the browser dispatch click before notifying .NET. An external controlled-open
+    // button can then update Open/TriggerId and arm the root's re-anchor guard before this
+    // callback is processed, which is especially important across a Blazor Server circuit.
+    setTimeout(() => {
+        const currentRootState = state.roots.get(rootId);
+        if (currentRootState !== rootState || !rootState.isOpen || !rootState.dotNetRef) {
+            return;
+        }
+
+        rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
+    }, 0);
+}
+
 function handleGlobalPointerDown(e) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.isOpen || !rootState.dotNetRef) continue;
@@ -539,7 +553,7 @@ function handleGlobalPointerDown(e) {
                 continue;
             }
 
-            rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
+            scheduleOutsidePress(id, rootState);
         }
     }
 }

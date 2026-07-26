@@ -968,18 +968,24 @@ async function updatePositionInternal(positionerState) {
             }
 
             if (sideX === 'right') {
+                const offsetParent = positionerElement.offsetParent;
                 const viewportWidth = strategy === 'fixed'
                     ? (window.visualViewport?.width ?? window.innerWidth)
-                    : positionerElement.offsetParent?.clientWidth ?? document.documentElement.clientWidth;
+                    : !offsetParent || offsetParent === document.body || offsetParent === document.documentElement
+                        ? document.documentElement.clientWidth
+                        : offsetParent.clientWidth;
                 positionerElement.style.right = `${viewportWidth - x - positionerElement.offsetWidth}px`;
             } else {
                 positionerElement.style.left = `${x}px`;
             }
 
             if (sideY === 'bottom') {
+                const offsetParent = positionerElement.offsetParent;
                 const viewportHeight = strategy === 'fixed'
                     ? (window.visualViewport?.height ?? window.innerHeight)
-                    : positionerElement.offsetParent?.clientHeight ?? document.documentElement.clientHeight;
+                    : !offsetParent || offsetParent === document.body || offsetParent === document.documentElement
+                        ? document.documentElement.clientHeight
+                        : offsetParent.clientHeight;
                 positionerElement.style.bottom = `${viewportHeight - y - positionerElement.offsetHeight}px`;
             } else {
                 positionerElement.style.top = `${y}px`;
@@ -1796,6 +1802,8 @@ export function safePolygon(options = {}) {
  * @param {boolean} options.mouseOnly - Only respond to mouse events
  * @param {boolean} options.useSafePolygon - Whether to use safe polygon
  * @param {Object} options.safePolygonOptions - Options for safe polygon
+ * @param {Function|null} options.isRelatedTargetInside - Whether a related target belongs to the same hover group
+ * @param {Function|null} options.shouldOpenImmediately - Whether to bypass the configured open delay
  * @param {string|null} options.treeId - Optional floating tree ID for child close coordination
  * @param {string|null} options.nodeId - Optional floating node ID for child close coordination
  * @returns {Object} Interaction controller with cleanup method
@@ -1818,6 +1826,8 @@ export function createHoverInteraction(options) {
         mouseOnly = false,
         useSafePolygon = true,
         safePolygonOptions = {},
+        isRelatedTargetInside = null,
+        shouldOpenImmediately = null,
         treeId = null,
         nodeId = null
     } = options;
@@ -1851,8 +1861,9 @@ export function createHoverInteraction(options) {
 
         closeTimeout.clear();
 
-        if (currentOpenDelay > 0) {
-            openTimeout.start(currentOpenDelay, () => {
+        const resolvedOpenDelay = shouldOpenImmediately?.() ? 0 : currentOpenDelay;
+        if (resolvedOpenDelay > 0) {
+            openTimeout.start(resolvedOpenDelay, () => {
                 if (!isOpen) {
                     isOpen = true;
                     onOpen?.('trigger-hover');
@@ -1871,6 +1882,12 @@ export function createHoverInteraction(options) {
 
         // If moving to floating element, don't close
         if (floatingElement && event.relatedTarget && contains(floatingElement, event.relatedTarget)) {
+            return;
+        }
+
+        // Keep a shared floating element open while the pointer moves between
+        // related triggers. The entering interaction takes ownership.
+        if (event.relatedTarget && isRelatedTargetInside?.(event.relatedTarget)) {
             return;
         }
 

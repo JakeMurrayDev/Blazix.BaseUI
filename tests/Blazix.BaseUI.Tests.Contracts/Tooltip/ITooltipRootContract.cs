@@ -1,6 +1,8 @@
+using Blazix.BaseUI.Tests.Contracts;
+
 namespace Blazix.BaseUI.Tests.Contracts.Tooltip;
 
-public interface ITooltipRootContract
+public interface ITooltipRootContract : IControlledTriggerLifecycleContract
 {
     Task RendersChildren();
     Task OpensByDefaultWhenDefaultOpenTrue();

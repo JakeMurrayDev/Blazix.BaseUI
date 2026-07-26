@@ -10,7 +10,7 @@ public class MenuRadioItemIndicatorTests : BunitContext, IMenuRadioItemIndicator
 
     private RenderFragment CreateRadioItemWithIndicator(
         bool defaultOpen = true,
-        object? defaultValue = null,
+        string? defaultValue = null,
         bool groupDisabled = false,
         bool keepMounted = false,
         Func<MenuRadioItemIndicatorState, string?>? indicatorClassValue = null,
@@ -34,7 +34,7 @@ public class MenuRadioItemIndicatorTests : BunitContext, IMenuRadioItemIndicator
                     posBuilder.OpenComponent<MenuPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.OpenComponent<MenuRadioGroup<string>>(0);
                         var groupAttrIndex = 1;
 
                         if (defaultValue is not null)
@@ -44,7 +44,7 @@ public class MenuRadioItemIndicatorTests : BunitContext, IMenuRadioItemIndicator
 
                         popupBuilder.AddAttribute(groupAttrIndex++, "ChildContent", (RenderFragment)(groupBuilder =>
                         {
-                            groupBuilder.OpenComponent<MenuRadioItem>(0);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(0);
                             groupBuilder.AddAttribute(1, "Value", "option1");
                             groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
                             {
@@ -66,7 +66,7 @@ public class MenuRadioItemIndicatorTests : BunitContext, IMenuRadioItemIndicator
                             }));
                             groupBuilder.CloseComponent();
 
-                            groupBuilder.OpenComponent<MenuRadioItem>(3);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(3);
                             groupBuilder.AddAttribute(4, "Value", "option2");
                             groupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 2")));
                             groupBuilder.CloseComponent();

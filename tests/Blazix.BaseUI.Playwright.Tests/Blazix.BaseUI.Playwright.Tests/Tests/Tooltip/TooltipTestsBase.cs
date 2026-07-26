@@ -470,21 +470,26 @@ public abstract class TooltipTestsBase : TestBase
 
         var firstTrigger = GetByTestId("tooltip-trigger-one");
         var secondTrigger = GetByTestId("tooltip-trigger-two");
-        var content = GetByTestId("tooltip-content");
+        var viewport = GetByTestId("tooltip-viewport");
+        var content = viewport.Locator("[data-current] [data-testid='tooltip-content']");
 
         await firstTrigger.HoverAsync();
         await WaitForTooltipOpenAsync();
         await Assertions.Expect(content).ToHaveTextAsync("one");
         await Assertions.Expect(firstTrigger).ToHaveAttributeAsync("data-popup-open", "");
 
-        await GetByTestId("outside-button").HoverAsync();
-        await WaitForTooltipClosedAsync();
-
         await secondTrigger.HoverAsync();
-        await WaitForTooltipOpenAsync();
         await Assertions.Expect(content).ToHaveTextAsync("two");
         await Assertions.Expect(firstTrigger).Not.ToHaveAttributeAsync("data-popup-open", "");
         await Assertions.Expect(secondTrigger).ToHaveAttributeAsync("data-popup-open", "");
+
+        await Assertions.Expect(viewport).ToHaveAttributeAsync("data-transitioning", "");
+        await Assertions.Expect(viewport.Locator("[data-previous]")).ToHaveTextAsync("one");
+        await Assertions.Expect(viewport).Not.ToHaveAttributeAsync("data-transitioning", "", new LocatorAssertionsToHaveAttributeOptions
+        {
+            Timeout = 2000 * TimeoutMultiplier
+        });
+        await Assertions.Expect(viewport.Locator("[data-previous-cache]")).ToHaveTextAsync("");
     }
 
     /// <summary>

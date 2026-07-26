@@ -45,6 +45,30 @@
         opacity: 1;
         transform: scale(1);
     }
+
+    .test-tooltip-viewport {
+        position: relative;
+        overflow: clip;
+    }
+
+    .test-tooltip-viewport [data-current],
+    .test-tooltip-viewport [data-previous] {
+        translate: 0;
+        opacity: 1;
+        transition: translate 250ms ease, opacity 125ms ease;
+    }
+
+    .test-tooltip-viewport[data-activation-direction~="right"] [data-current][data-starting-style],
+    .test-tooltip-viewport[data-activation-direction~="left"] [data-previous][data-ending-style] {
+        translate: 50% 0;
+        opacity: 0;
+    }
+
+    .test-tooltip-viewport[data-activation-direction~="left"] [data-current][data-starting-style],
+    .test-tooltip-viewport[data-activation-direction~="right"] [data-previous][data-ending-style] {
+        translate: -50% 0;
+        opacity: 0;
+    }
 </style>
 
 <div data-testid="test-container"
@@ -104,6 +128,7 @@
     else if (MultiTrigger)
     {
         <TooltipRoot
+            Handle="@multiTriggerHandle"
             @bind-Open="isOpen"
             DefaultOpen="@DefaultOpen"
             Disabled="@Disabled"
@@ -112,22 +137,24 @@
             OnOpenChange="HandleOpenChange"
             OnOpenChangeComplete="HandleOpenChangeComplete">
             <ChildContentWithPayload Context="payloadContext">
-                <TooltipTrigger
+                <TooltipTypedTrigger TPayload="string"
+                    Handle="@multiTriggerHandle"
                     Id="trigger-one"
                     Payload="@("one")"
                     Delay="@Delay"
                     CloseDelay="@CloseDelay"
                     data-testid="tooltip-trigger-one">
                     One
-                </TooltipTrigger>
-                <TooltipTrigger
+                </TooltipTypedTrigger>
+                <TooltipTypedTrigger TPayload="string"
+                    Handle="@multiTriggerHandle"
                     Id="trigger-two"
                     Payload="@("two")"
                     Delay="@Delay"
                     CloseDelay="@CloseDelay"
                     data-testid="tooltip-trigger-two">
                     Two
-                </TooltipTrigger>
+                </TooltipTypedTrigger>
                 <TooltipPortal KeepMounted="@KeepMounted">
                     <TooltipPositioner
                         SideOffset="@SideOffset"
@@ -144,7 +171,9 @@
                                     }
                                 </TooltipArrow>
                             }
-                            <div data-testid="tooltip-content">@payloadContext.Payload</div>
+                            <TooltipViewport class="test-tooltip-viewport" data-testid="tooltip-viewport">
+                                <div data-testid="tooltip-content">@payloadContext.Payload</div>
+                            </TooltipViewport>
                         </TooltipPopup>
                     </TooltipPositioner>
                 </TooltipPortal>
@@ -351,6 +380,7 @@
     private string lastReason = "";
     private int completeCount;
     private TooltipRootActions actionsRef = new();
+    private TooltipHandle<string> multiTriggerHandle = new();
 
     protected override void OnInitialized()
     {

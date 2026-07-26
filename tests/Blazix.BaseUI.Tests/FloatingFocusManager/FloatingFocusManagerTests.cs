@@ -5,7 +5,7 @@ namespace Blazix.BaseUI.Tests.FloatingFocusManager;
 
 public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerContract
 {
-    private const string FloatingModule = "./_content/Blazix.BaseUI/blazix-baseui-floating.js";
+    private const string FloatingModule = "./_content/Blazix.BaseUI/blazix-baseui-floating.min.js";
 
     public FloatingFocusManagerTests()
     {

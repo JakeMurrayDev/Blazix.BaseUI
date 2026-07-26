@@ -4,4 +4,5 @@ namespace Blazix.BaseUI.Menu;
 /// Groups radio items together, managing single-selection state.
 /// Renders a <c>&lt;div&gt;</c> element.
 /// </summary>
-public partial class MenuRadioGroup;
+/// <typeparam name="TValue">The type used to identify radio items.</typeparam>
+public partial class MenuRadioGroup<TValue>;

@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components.Web
+@typeparam TValue
 
 <CascadingValue TValue="MenuRadioItemContext" Value="itemContext" IsFixed="true">
     <RenderElement TState="MenuRadioItemState"
@@ -27,20 +28,21 @@
 
     private bool ResolvedDisabled => Disabled || (RadioGroupContext?.Disabled ?? false);
 
-    private bool Checked => RadioGroupContext is not null && Equals(RadioGroupContext.Value, Value);
+    private bool Checked => RadioGroupContext is not null &&
+        EqualityComparer<TValue>.Default.Equals(RadioGroupContext.Value, Value);
 
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
     [CascadingParameter]
-    private IMenuRadioGroupContext? RadioGroupContext { get; set; }
+    private IMenuRadioGroupContext<TValue>? RadioGroupContext { get; set; }
 
     /// <summary>
     /// Gets or sets the value of the radio item.
-    /// This is the value that will be set in the <see cref="MenuRadioGroup"/> when the item is selected.
+    /// This is the value that will be set in the <see cref="MenuRadioGroup{TValue}"/> when the item is selected.
     /// </summary>
     [Parameter]
-    public object? Value { get; set; }
+    public TValue? Value { get; set; }
 
     /// <summary>
     /// Determines whether the component should ignore user interaction.
@@ -193,7 +195,7 @@
 
         if (RadioGroupContext is not null)
         {
-            var eventArgs = new MenuRadioGroupChangeEventArgs(Value, MenuRadioGroupChangeReason.ItemPress);
+            var eventArgs = new MenuRadioGroupChangeEventArgs<TValue>(Value, MenuRadioGroupChangeReason.ItemPress);
             await RadioGroupContext.SetValueAsync(Value, eventArgs);
         }
 

@@ -1,6 +1,8 @@
+using Blazix.BaseUI.Tests.Contracts;
+
 namespace Blazix.BaseUI.Tests.Contracts.Menu;
 
-public interface IMenuRootContract
+public interface IMenuRootContract : IControlledTriggerLifecycleContract
 {
     Task CascadesContextToChildren();
     Task ControlledModeRespectsOpenParameter();

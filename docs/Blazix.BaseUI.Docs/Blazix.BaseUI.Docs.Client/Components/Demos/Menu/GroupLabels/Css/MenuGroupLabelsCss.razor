@@ -9,9 +9,9 @@
         <MenuPositioner SideOffset="8"
                         class="blx-menu-positioner">
             <MenuPopup class="blx-menu-popup">
-                <MenuRadioGroup @bind-Value="sortBy">
+                <MenuRadioGroup TValue="string" @bind-Value="sortBy">
                     <MenuGroupLabel class="blx-menu-group-label">Sort</MenuGroupLabel>
-                    <MenuRadioItem Value="@("date")" class="blx-menu-choice-item">
+                    <MenuRadioItem TValue="string" Value="@("date")" class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
                                 <path d="m2.5 8.5 4 4 7-9" />
@@ -19,7 +19,7 @@
                         </MenuRadioItemIndicator>
                         <span class="blx-menu-choice-text">Date</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("name")" class="blx-menu-choice-item">
+                    <MenuRadioItem TValue="string" Value="@("name")" class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
                                 <path d="m2.5 8.5 4 4 7-9" />
@@ -27,7 +27,7 @@
                         </MenuRadioItemIndicator>
                         <span class="blx-menu-choice-text">Name</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("type")" class="blx-menu-choice-item">
+                    <MenuRadioItem TValue="string" Value="@("type")" class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
                                 <path d="m2.5 8.5 4 4 7-9" />
@@ -72,7 +72,7 @@
 </MenuRoot>
 
 @code {
-    private object? sortBy = "date";
+    private string? sortBy = "date";
     private bool showMinimap = true;
     private bool showSearch = true;
     private bool showSidebar;

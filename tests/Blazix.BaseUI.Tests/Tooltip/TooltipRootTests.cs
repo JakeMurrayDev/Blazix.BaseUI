@@ -524,4 +524,90 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task ControlledTriggerLifecyclePreservesAssociationAndPayload()
+    {
+        var handle = new TooltipHandle<string>();
+        TooltipRootPayloadContext? capturedContext = null;
+        RenderFragment<TooltipRootPayloadContext> childContent = context =>
+        {
+            capturedContext = context;
+            return builder =>
+            {
+                builder.OpenComponent<TooltipTypedTrigger<string>>(0);
+                builder.AddAttribute(1, "Handle", handle);
+                builder.AddAttribute(2, "Id", "trigger-a");
+                builder.AddAttribute(3, "Payload", "Payload A");
+                builder.AddAttribute(4, "ChildContent", (RenderFragment)(content => content.AddContent(0, "Trigger A")));
+                builder.CloseComponent();
+
+                builder.OpenComponent<TooltipTypedTrigger<string>>(10);
+                builder.AddAttribute(11, "Handle", handle);
+                builder.AddAttribute(12, "Id", "trigger-b");
+                builder.AddAttribute(13, "Payload", "Payload B");
+                builder.AddAttribute(14, "ChildContent", (RenderFragment)(content => content.AddContent(0, "Trigger B")));
+                builder.CloseComponent();
+            };
+        };
+
+        var cut = Render<TooltipRoot>(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, false)
+            .Add(root => root.TriggerId, "trigger-a")
+            .Add(root => root.ChildContentWithPayload, childContent));
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, true)
+            .Add(root => root.TriggerId, "trigger-a")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        AssertOpenState("trigger-a", "Payload A");
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, true)
+            .Add(root => root.TriggerId, "trigger-b")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        AssertOpenState("trigger-b", "Payload B");
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, false)
+            .Add(root => root.TriggerId, "trigger-b")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        handle.IsOpen.ShouldBeFalse();
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, true)
+            .Add(root => root.TriggerId, "trigger-b")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        AssertOpenState("trigger-b", "Payload B");
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, false)
+            .Add(root => root.TriggerId, "trigger-b")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        await cut.InvokeAsync(() => cut.Instance.OnTransitionEnd(false));
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Handle, handle)
+            .Add(root => root.Open, true)
+            .Add(root => root.TriggerId, "trigger-b")
+            .Add(root => root.ChildContentWithPayload, childContent));
+        AssertOpenState("trigger-b", "Payload B");
+
+        void AssertOpenState(string triggerId, string expectedPayload)
+        {
+            cut.WaitForAssertion(() =>
+            {
+                capturedContext!.Value.Payload.ShouldBe(expectedPayload);
+                handle.IsOpen.ShouldBeTrue();
+                handle.ActiveTriggerId.ShouldBe(triggerId);
+                handle.Payload.ShouldBe(expectedPayload);
+            });
+        }
+    }
 }

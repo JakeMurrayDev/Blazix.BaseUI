@@ -1,6 +1,8 @@
+using Blazix.BaseUI.Tests.Contracts;
+
 namespace Blazix.BaseUI.Tests.Contracts.Dialog;
 
-public interface IDialogRootContract
+public interface IDialogRootContract : IControlledTriggerLifecycleContract
 {
     Task RendersChildren();
     Task OpensByDefaultWhenDefaultOpenTrue();

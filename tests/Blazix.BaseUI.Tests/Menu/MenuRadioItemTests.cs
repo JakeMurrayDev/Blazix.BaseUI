@@ -10,7 +10,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
 
     private RenderFragment CreateRadioItemInRoot(
         bool defaultOpen = true,
-        object? defaultValue = null,
+        string? defaultValue = null,
         bool groupDisabled = false,
         bool itemDisabled = false,
         string? label = null,
@@ -33,7 +33,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
                     posBuilder.OpenComponent<MenuPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.OpenComponent<MenuRadioGroup<string>>(0);
                         var groupAttrIndex = 1;
 
                         if (defaultValue is not null)
@@ -43,7 +43,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
 
                         popupBuilder.AddAttribute(groupAttrIndex++, "ChildContent", (RenderFragment)(groupBuilder =>
                         {
-                            groupBuilder.OpenComponent<MenuRadioItem>(0);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(0);
                             var firstItemAttrIndex = 1;
                             groupBuilder.AddAttribute(firstItemAttrIndex++, "Value", "option1");
                             if (itemDisabled)
@@ -57,7 +57,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
                             groupBuilder.AddAttribute(firstItemAttrIndex++, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 1")));
                             groupBuilder.CloseComponent();
 
-                            groupBuilder.OpenComponent<MenuRadioItem>(4);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(4);
                             groupBuilder.AddAttribute(5, "Value", "option2");
                             groupBuilder.AddAttribute(6, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 2")));
                             groupBuilder.CloseComponent();
@@ -142,7 +142,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
     [Fact]
     public Task SelectsOnClick()
     {
-        object? selectedValue = "option1";
+        string? selectedValue = "option1";
 
         var cut = Render(builder =>
         {
@@ -160,20 +160,20 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
                     posBuilder.OpenComponent<MenuPopup>(0);
                     posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
                     {
-                        popupBuilder.OpenComponent<MenuRadioGroup>(0);
+                        popupBuilder.OpenComponent<MenuRadioGroup<string>>(0);
                         popupBuilder.AddAttribute(1, "DefaultValue", "option1");
-                        popupBuilder.AddAttribute(2, "OnValueChange", EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs>(this, args =>
+                        popupBuilder.AddAttribute(2, "OnValueChange", EventCallback.Factory.Create<MenuRadioGroupChangeEventArgs<string>>(this, args =>
                         {
                             selectedValue = args.Value;
                         }));
                         popupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(groupBuilder =>
                         {
-                            groupBuilder.OpenComponent<MenuRadioItem>(0);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(0);
                             groupBuilder.AddAttribute(1, "Value", "option1");
                             groupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 1")));
                             groupBuilder.CloseComponent();
 
-                            groupBuilder.OpenComponent<MenuRadioItem>(3);
+                            groupBuilder.OpenComponent<MenuRadioItem<string>>(3);
                             groupBuilder.AddAttribute(4, "Value", "option2");
                             groupBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Option 2")));
                             groupBuilder.CloseComponent();

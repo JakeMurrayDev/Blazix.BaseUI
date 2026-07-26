@@ -156,6 +156,39 @@ public abstract class MenuTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task MultiTrigger_Handle_ControlledReanchorAndSameTriggerReopen()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")
+            .WithUseHandle(true)
+            .WithShowProgrammaticButtons(true));
+
+        var triggerA = GetByTestId("trigger-a");
+        await triggerA.ClickAsync();
+
+        var popup = GetByTestId("menu-popup");
+        var content = GetByTestId("popup-content");
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Content A");
+
+        var controlledOpenB = GetByTestId("open-controlled-b-button");
+        await controlledOpenB.ClickAsync();
+
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Content B");
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await GetByTestId("close-controlled-button").ClickAsync();
+        await WaitForTextContentAsync(GetByTestId("open-state"), "false");
+        await Assertions.Expect(popup).ToBeHiddenAsync();
+
+        await controlledOpenB.ClickAsync();
+
+        await Assertions.Expect(popup).ToBeVisibleAsync();
+        await Assertions.Expect(content).ToHaveTextAsync("Content B");
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
     public virtual async Task MultiTrigger_Handle_DefaultOpenWithTriggerId()
     {
         await NavigateAsync(CreateUrl("/tests/menu-multi-trigger")

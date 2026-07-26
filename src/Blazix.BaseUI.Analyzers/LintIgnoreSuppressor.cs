@@ -87,6 +87,10 @@ public sealed class LintIgnoreSuppressor : DiagnosticSuppressor
             ("BBUI0013", "13"),
             ("BBUI0014", "14"),
             ("BBUI0015", "15"),
+            ("BBUI0016", "16"),
+            ("BBUI0017", "17"),
+            ("BBUI0018", "18"),
+            ("BBUI0019", "19"),
         };
 
         var builder = ImmutableDictionary.CreateBuilder<string, SuppressionDescriptor>(StringComparer.Ordinal);

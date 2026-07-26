@@ -5,7 +5,7 @@ namespace Blazix.BaseUI.Toast;
 
 internal static class ToastRenderFragmentUtilities
 {
-    public static RenderFragment? ToRenderFragment(object? value)
+    public static RenderFragment? ToRenderFragment<T>(T? value)
     {
         return value switch
         {
@@ -16,7 +16,7 @@ internal static class ToastRenderFragmentUtilities
         };
     }
 
-    public static bool IsRenderableValue(object? value)
+    public static bool IsRenderableValue<T>(T? value)
     {
         return value switch
         {
@@ -24,7 +24,7 @@ internal static class ToastRenderFragmentUtilities
             bool => false,
             string text => text.Length > 0,
             MarkupString markup => markup.Value.Length > 0,
-            IEnumerable values => values.Cast<object?>().Any(IsRenderableValue),
+            IEnumerable values => values.Cast<T?>().Any(IsRenderableValue),
             _ => true
         };
     }

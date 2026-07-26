@@ -9,8 +9,8 @@
         <MenuPositioner SideOffset="8"
                         class="blx-menu-positioner">
             <MenuPopup class="blx-menu-popup">
-                <MenuRadioGroup @bind-Value="sortBy">
-                    <MenuRadioItem Value="@("date")"
+                <MenuRadioGroup TValue="string" @bind-Value="sortBy">
+                    <MenuRadioItem TValue="string" Value="@("date")"
                                    class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -19,7 +19,7 @@
                         </MenuRadioItemIndicator>
                         <span class="blx-menu-choice-text">Date</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("name")"
+                    <MenuRadioItem TValue="string" Value="@("name")"
                                    class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -28,7 +28,7 @@
                         </MenuRadioItemIndicator>
                         <span class="blx-menu-choice-text">Name</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("type")"
+                    <MenuRadioItem TValue="string" Value="@("type")"
                                    class="blx-menu-choice-item">
                         <MenuRadioItemIndicator class="blx-menu-choice-indicator">
                             <svg class="blx-menu-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -44,5 +44,5 @@
 </MenuRoot>
 
 @code {
-    private object? sortBy = "date";
+    private string? sortBy = "date";
 }

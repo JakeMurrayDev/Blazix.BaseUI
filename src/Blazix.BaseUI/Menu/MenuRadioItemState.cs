@@ -1,7 +1,7 @@
 namespace Blazix.BaseUI.Menu;
 
 /// <summary>
-/// Represents the state of a <see cref="MenuRadioItem"/> component.
+/// Represents the state of a <see cref="MenuRadioItem{TValue}"/> component.
 /// </summary>
 /// <param name="Disabled">Whether the radio item is disabled.</param>
 /// <param name="Highlighted">Whether the radio item is highlighted.</param>

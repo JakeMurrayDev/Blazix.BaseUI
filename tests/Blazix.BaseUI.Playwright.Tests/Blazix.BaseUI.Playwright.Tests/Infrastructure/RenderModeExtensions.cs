@@ -625,6 +625,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithControlledTriggerComponent(string componentName)
+    {
+        queryParams["component"] = componentName;
+        return this;
+    }
+
     public TestPageUrlBuilder WithRegisteredTriggerId(string triggerId)
     {
         queryParams["registeredTriggerId"] = triggerId;

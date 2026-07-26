@@ -1,4 +1,37 @@
 <Project>
+  <PropertyGroup>
+    <BlazixRepositoryRoot>$(MSBuildThisFileDirectory)</BlazixRepositoryRoot>
+    <BlazixLintSourceRoot Condition="'$(BlazixLintSourceRoot)' == ''">$(BlazixRepositoryRoot)src/Blazix.BaseUI</BlazixLintSourceRoot>
+    <BlazixJsWwwroot Condition="'$(BlazixJsWwwroot)' == ''">$(BlazixRepositoryRoot)src/Blazix.BaseUI/wwwroot</BlazixJsWwwroot>
+    <BlazixJsSourceRoot Condition="'$(BlazixJsSourceRoot)' == ''">$(BlazixRepositoryRoot)src/Blazix.BaseUI</BlazixJsSourceRoot>
+    <BlazixJsInteropSetup Condition="'$(BlazixJsInteropSetup)' == ''">$(BlazixRepositoryRoot)tests/Blazix.BaseUI.Tests/Infrastructure/JsInteropSetup.cs</BlazixJsInteropSetup>
+    <BlazixJsTestRoot Condition="'$(BlazixJsTestRoot)' == ''">$(BlazixRepositoryRoot)tests/Blazix.BaseUI.Tests</BlazixJsTestRoot>
+    <BlazixTerser Condition="'$(BlazixTerser)' == ''">$(BlazixRepositoryRoot).base-ui/node_modules/.bin/terser</BlazixTerser>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Blazix.BaseUI'">
+    <BlazixLintInput Include="$(BlazixLintSourceRoot)/**/*.cs;$(BlazixLintSourceRoot)/**/*.razor;$(BlazixLintSourceRoot)/**/*.js;$(BlazixRepositoryRoot)scripts/lint-rules.sh" />
+    <BlazixJsAssetInput Include="$(BlazixJsWwwroot)/*.js;$(BlazixJsSourceRoot)/**/*.cs;$(BlazixJsSourceRoot)/**/*.razor;$(BlazixJsTestRoot)/**/*.cs;$(BlazixRepositoryRoot)scripts/validate-js-assets.mjs" />
+  </ItemGroup>
+
+  <Target Name="ValidateBlazixTextLint"
+          BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'Blazix.BaseUI' and '$(DesignTimeBuild)' != 'true' and '$(SkipBlazixSourceValidation)' != 'true'"
+          Inputs="@(BlazixLintInput)"
+          Outputs="$(IntermediateOutputPath)blazix-text-lint.stamp">
+    <Exec Command="bash &quot;$(BlazixRepositoryRoot)scripts/lint-rules.sh&quot; --source &quot;$(BlazixLintSourceRoot)&quot;" />
+    <Touch Files="$(IntermediateOutputPath)blazix-text-lint.stamp" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="ValidateBlazixJsAssets"
+          BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'Blazix.BaseUI' and '$(DesignTimeBuild)' != 'true' and '$(SkipBlazixSourceValidation)' != 'true'"
+          Inputs="@(BlazixJsAssetInput)"
+          Outputs="$(IntermediateOutputPath)blazix-js-assets.stamp">
+    <Exec Command="node &quot;$(BlazixRepositoryRoot)scripts/validate-js-assets.mjs&quot; --wwwroot &quot;$(BlazixJsWwwroot)&quot; --source-root &quot;$(BlazixJsSourceRoot)&quot; --interop-setup &quot;$(BlazixJsInteropSetup)&quot; --test-root &quot;$(BlazixJsTestRoot)&quot; --terser &quot;$(BlazixTerser)&quot;" />
+    <Touch Files="$(IntermediateOutputPath)blazix-js-assets.stamp" AlwaysCreate="true" />
+  </Target>
+
   <Target Name="RemoveBinObj" AfterTargets="Clean">
     <RemoveDir Directories="$(BaseOutputPath)" />
     <RemoveDir Directories="$(BaseIntermediateOutputPath)" />

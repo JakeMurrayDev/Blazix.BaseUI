@@ -9,8 +9,8 @@
         <MenuPositioner SideOffset="8"
                         class="outline-0">
             <MenuPopup class="relative box-border border border-slate-950 bg-white py-1 text-slate-950 shadow-[0.25rem_0.25rem_0_rgba(0,0,0,0.12)] outline-0 transition-[transform,opacity] duration-100 ease-out [transform-origin:var(--transform-origin)] data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 dark:border-white dark:bg-slate-950 dark:text-white dark:shadow-none">
-                <MenuRadioGroup @bind-Value="sortBy">
-                    <MenuRadioItem Value="@("date")"
+                <MenuRadioGroup TValue="string" @bind-Value="sortBy">
+                    <MenuRadioItem TValue="string" Value="@("date")"
                                    class="relative z-0 grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 py-2 pl-2.5 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">
                         <MenuRadioItemIndicator class="col-start-1">
                             <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -19,7 +19,7 @@
                         </MenuRadioItemIndicator>
                         <span class="col-start-2">Date</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("name")"
+                    <MenuRadioItem TValue="string" Value="@("name")"
                                    class="relative z-0 grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 py-2 pl-2.5 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">
                         <MenuRadioItemIndicator class="col-start-1">
                             <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -28,7 +28,7 @@
                         </MenuRadioItemIndicator>
                         <span class="col-start-2">Name</span>
                     </MenuRadioItem>
-                    <MenuRadioItem Value="@("type")"
+                    <MenuRadioItem TValue="string" Value="@("type")"
                                    class="relative z-0 grid cursor-default select-none grid-cols-[1rem_1fr] items-center gap-2 py-2 pl-2.5 pr-8 text-sm leading-4 outline-none data-[highlighted]:text-white data-[disabled]:text-slate-500 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:-z-10 data-[highlighted]:before:bg-slate-950 dark:data-[highlighted]:text-slate-950 dark:data-[disabled]:text-slate-400 dark:data-[highlighted]:before:bg-white">
                         <MenuRadioItemIndicator class="col-start-1">
                             <svg class="block h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
@@ -44,5 +44,5 @@
 </MenuRoot>
 
 @code {
-    private object? sortBy = "date";
+    private string? sortBy = "date";
 }

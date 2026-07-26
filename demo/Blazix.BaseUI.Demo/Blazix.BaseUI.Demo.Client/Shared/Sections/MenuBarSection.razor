@@ -353,20 +353,20 @@
                 <MenuPortal>
                     <MenuPositioner SideOffset="4">
                         <MenuPopup ClassValue="@(_ => PopupClass())">
-                            <MenuRadioGroup Value="@selectedTheme" OnValueChange="HandleThemeChange">
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("light")">
+                            <MenuRadioGroup TValue="string" Value="@selectedTheme" OnValueChange="HandleThemeChange">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("light")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
                                     <span>Light</span>
                                 </MenuRadioItem>
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("dark")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
                                     <span>Dark</span>
                                 </MenuRadioItem>
-                                <MenuRadioItem ClassValue="@(_ => RadioItemClass())" Value="@("system")">
+                                <MenuRadioItem TValue="string" ClassValue="@(_ => RadioItemClass())" Value="@("system")">
                                     <MenuRadioItemIndicator ClassValue="@(_ => IndicatorClass())">
                                         @DotIcon
                                     </MenuRadioItemIndicator>
@@ -421,14 +421,14 @@
 
     private bool showToolbar = true;
     private bool showStatusBar = false;
-    private object? selectedTheme = "light";
+    private string? selectedTheme = "light";
 
     private void HandleClick()
     {
         Console.WriteLine("Clicked!");
     }
 
-    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs e)
+    private Task HandleThemeChange(MenuRadioGroupChangeEventArgs<string> e)
     {
         selectedTheme = e.Value;
         return Task.CompletedTask;

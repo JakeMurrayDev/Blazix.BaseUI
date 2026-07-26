@@ -25,6 +25,7 @@
         ["playback"] = ["Play", "Add to queue"],
         ["share"] = ["Share", "Copy link"],
     };
+    private static readonly IReadOnlyList<string> MissingControlledItems = ["Menu payload unavailable"];
 
     private readonly MenuHandle<string> controlledMenu = MenuHandleFactory.CreateHandle<string>();
     private bool isOpen;
@@ -53,6 +54,6 @@
     {
         return key is not null && ItemGroups.TryGetValue(key, out var items)
             ? items
-            : ItemGroups["library"];
+            : MissingControlledItems;
     }
 }

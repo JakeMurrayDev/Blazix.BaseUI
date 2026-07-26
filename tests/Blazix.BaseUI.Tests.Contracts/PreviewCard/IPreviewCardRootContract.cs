@@ -1,6 +1,8 @@
+using Blazix.BaseUI.Tests.Contracts;
+
 namespace Blazix.BaseUI.Tests.Contracts.PreviewCard;
 
-public interface IPreviewCardRootContract
+public interface IPreviewCardRootContract : IControlledTriggerLifecycleContract
 {
     Task RendersChildren();
     Task ControlledOpenPropShowsPopup();

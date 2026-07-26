@@ -1,10 +1,6 @@
 @implements IDisposable
 
-@{
-    var chipIndex = ResolveIndex();
-}
-
-<CascadingValue TValue="ComboboxChipContext" Value="new ComboboxChipContext { Index = chipIndex }" IsFixed="true">
+<CascadingValue TValue="ComboboxChipContext" Value="chipContext" IsFixed="true">
     <RenderElement TState="ComboboxChipState"
                    Tag="div"
                    State="state"
@@ -18,6 +14,8 @@
 </CascadingValue>
 
 @code {
+    private readonly ComboboxChipContext chipContext = new();
+
     private ComboboxChipState state;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -60,6 +58,8 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        chipContext.Index = ResolveIndex();
+
         var disabled = RootContext?.Disabled == true;
         var readOnly = RootContext?.ReadOnly == true;
         state = new ComboboxChipState(disabled, readOnly);

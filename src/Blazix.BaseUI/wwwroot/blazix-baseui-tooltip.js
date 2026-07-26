@@ -13,6 +13,7 @@ import {
     disposeVirtualElement,
     waitForPopupAndStartTransition as floatingWaitForPopup,
     startSimpleTransition,
+    contains,
     disposeHoverInteractionOnRoot,
     updateHoverInteractionFloatingOnRoot,
     setHoverInteractionOpenOnRoot,
@@ -81,10 +82,22 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
         // Use safePolygon when hoverable popup is enabled (disableHoverablePopup=false)
         useSafePolygon: !disableHoverablePopup,
         safePolygonOptions: { blockPointerEvents: false },
+        isRelatedTargetInside: (relatedTarget) => {
+            for (const relatedTrigger of rootState.triggerElements.values()) {
+                if (relatedTrigger !== triggerElement && contains(relatedTrigger, relatedTarget)) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        shouldOpenImmediately: () => rootState.isOpen,
         onOpen: (reason) => {
             if (rootState.dotNetRef && (!rootState.isOpen || rootState.activeTriggerId !== triggerId)) {
                 rootState.activeTriggerId = triggerId;
                 rootState.triggerElement = triggerElement;
+                for (const [interactionTriggerId, interaction] of rootState.hoverInteractions) {
+                    interaction.setOpen(interactionTriggerId === triggerId);
+                }
                 applyTriggerOpenAttributes(rootState);
                 rootState.dotNetRef.invokeMethodAsync('OnHoverOpen', triggerId).catch(() => { });
                 setTimeout(() => applyTriggerOpenAttributes(rootState), 0);
@@ -158,6 +171,10 @@ export function cancelPendingHoverOpen(rootId, triggerId) {
 export function updateHoverInteractionDelays(rootId, triggerId, openDelay, closeDelay) {
     const rootState = state.roots.get(rootId);
     rootState?.hoverInteractions.get(triggerId)?.setDelays(openDelay || 0, closeDelay || 0);
+}
+
+export function isPointerWithinElements(elements) {
+    return elements?.some(element => element?.matches?.(':hover')) ?? false;
 }
 
 // ============================================================================
@@ -262,7 +279,9 @@ export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
 
     // Sync with hover interaction
     if (isOpen) {
-        rootState.hoverInteractions.get(rootState.activeTriggerId)?.setOpen(true);
+        for (const [triggerId, interaction] of rootState.hoverInteractions) {
+            interaction.setOpen(triggerId === rootState.activeTriggerId);
+        }
     } else {
         for (const interaction of rootState.hoverInteractions.values()) {
             interaction.setOpen(false);

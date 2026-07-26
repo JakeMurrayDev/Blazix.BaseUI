@@ -1,6 +1,8 @@
+using Blazix.BaseUI.Tests.Contracts;
+
 namespace Blazix.BaseUI.Tests.Contracts.Popover;
 
-public interface IPopoverRootContract
+public interface IPopoverRootContract : IControlledTriggerLifecycleContract
 {
     Task RendersChildren();
     Task OpensByDefaultWhenDefaultOpenTrue();

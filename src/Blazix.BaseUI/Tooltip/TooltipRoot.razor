@@ -4,7 +4,7 @@
 @implements ITooltipHandleSubscriber
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="context">
+<CascadingValue Value="context" IsFixed="true">
     @if (ChildContentWithPayload is not null)
     {
         @ChildContentWithPayload(new TooltipRootPayloadContext(payload))
@@ -210,8 +210,9 @@
     }
 
     /// <inheritdoc />
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        var previousOpen = state.Open;
         var currentOpen = CurrentOpen;
         var parameterOpenChanged = state.Open != currentOpen;
         if (parameterOpenChanged)
@@ -219,10 +220,22 @@
             ApplyOpenParameterChange(currentOpen);
         }
 
+        var activeTriggerChanged = TriggerId is not null && TriggerId != activeTriggerId;
+        if (activeTriggerChanged && previousOpen && currentOpen)
+        {
+            await TryPrepareViewportTransitionAsync(TriggerId!);
+        }
+
         if (TriggerId is not null)
         {
-            activeTriggerId = TriggerId;
-            context.ActiveTriggerId = activeTriggerId;
+            SetActiveTrigger(TriggerId);
+        }
+
+        if (activeTriggerChanged && previousOpen && currentOpen)
+        {
+            instantType = TooltipInstantType.None;
+            previousInstantType = null;
+            context.InstantType = instantType;
         }
 
         TrySetImplicitActiveTrigger();
@@ -255,6 +268,11 @@
         {
             UnsubscribeFromHandle();
             SubscribeToHandle();
+        }
+
+        if (currentOpen)
+        {
+            SyncHandleState(true, activeTriggerId);
         }
 
         if (!ReferenceEquals(DelayGroupContext, subscribedDelayGroupContext))
@@ -441,6 +459,7 @@
         {
             payload = GetPayloadFromHandle(triggerId);
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
         }
 
         if (hasRendered && element.HasValue && activeTriggerId == triggerId)
@@ -515,6 +534,11 @@
             return;
         }
 
+        if (activeTriggerChanged && currentOpen)
+        {
+            await TryPrepareViewportTransitionAsync(triggerId!);
+        }
+
         if (!nextOpen)
         {
             preventUnmountOnClose = args.PreventUnmount;
@@ -532,7 +556,9 @@
 
             instantType = reason == TooltipOpenChangeReason.TriggerFocus
                 ? TooltipInstantType.Focus
-                : (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true ? TooltipInstantType.Delay : TooltipInstantType.None);
+                : (!activeTriggerChanged && (DelayGroupContext?.IsInstantPhase == true || ProviderContext?.IsInInstantPhase() == true)
+                    ? TooltipInstantType.Delay
+                    : TooltipInstantType.None);
             if (!currentOpen || !transition.IsMounted)
             {
                 transition.BeginOpen();
@@ -581,7 +607,14 @@
             context.Payload = null;
         }
 
-        ApplyInstantPhaseOverride();
+        if (activeTriggerChanged)
+        {
+            previousInstantType = null;
+        }
+        else
+        {
+            ApplyInstantPhaseOverride();
+        }
 
         SyncHandleState(nextOpen, activeTriggerId);
 
@@ -649,6 +682,7 @@
         {
             payload = triggerPayload;
             context.Payload = payload;
+            SyncHandleState(true, activeTriggerId);
         }
     }
 
@@ -721,6 +755,21 @@
         }
 
         return GetTriggerElementFromHandle(triggerId);
+    }
+
+    private async Task TryPrepareViewportTransitionAsync(string nextTriggerId)
+    {
+        if (activeTriggerId is null || context.PrepareViewportTransitionAsync is null)
+        {
+            return;
+        }
+
+        var previousTriggerElement = GetTriggerElementById(activeTriggerId);
+        var nextTriggerElement = GetTriggerElementById(nextTriggerId);
+        if (previousTriggerElement.HasValue && nextTriggerElement.HasValue)
+        {
+            await context.PrepareViewportTransitionAsync(previousTriggerElement.Value, nextTriggerElement.Value);
+        }
     }
 
     private async Task InitializeJsAsync()

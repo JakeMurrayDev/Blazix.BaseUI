@@ -1,12 +1,11 @@
 @using Blazix.BaseUI.DirectionProvider
 @using Blazix.BaseUI.Toolbar
-@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 
-<CascadingValue Value="@((IToggleGroupContext)groupContext)" IsFixed="true">
+<CascadingValue TValue="IToggleGroupContext" Value="groupContext" IsFixed="true">
     <RenderElement TState="ToggleGroupState"
                    Tag="@DefaultTag"
                    State="state"
