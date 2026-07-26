@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -11,6 +11,12 @@ const sourceRoot = resolve(options.sourceRoot ?? join(repoRoot, "src/Blazix.Base
 const interopSetup = resolve(options.interopSetup ?? join(repoRoot, "tests/Blazix.BaseUI.Tests/Infrastructure/JsInteropSetup.cs"));
 const testRoot = resolve(options.testRoot ?? join(repoRoot, "tests/Blazix.BaseUI.Tests"));
 const terser = resolve(options.terser ?? join(repoRoot, ".base-ui/node_modules/.bin/terser"));
+const terserInvocation = existsSync(terser)
+    ? { command: terser, arguments: [] }
+    : {
+        command: process.platform === "win32" ? "npx.cmd" : "npx",
+        arguments: ["--yes", "terser@5.47.1"]
+    };
 const errors = [];
 
 const files = readdirSync(wwwroot).filter(file => /^blazix-baseui-.*\.js$/.test(file));
@@ -70,17 +76,26 @@ function parseOptions(args) {
 function checkSyntax(path) {
     const result = spawnSync(process.execPath, ["--check", path], { encoding: "utf8" });
     if (result.status !== 0)
-        errors.push(`Invalid JavaScript syntax in ${relative(repoRoot, path)}: ${(result.stderr || result.stdout).trim()}`);
+        errors.push(`Invalid JavaScript syntax in ${relative(repoRoot, path)}: ${getSpawnFailure(result)}`);
 }
 
 function checkMinification(source, min) {
-    const result = spawnSync(terser, [join(wwwroot, source), "--compress", "--mangle", "--module"], { encoding: "utf8" });
+    const result = spawnSync(
+        terserInvocation.command,
+        [...terserInvocation.arguments, join(wwwroot, source), "--compress", "--mangle", "--module"],
+        { encoding: "utf8" });
     if (result.status !== 0) {
-        errors.push(`Terser failed for ${source}: ${(result.stderr || result.stdout).trim()}`);
+        errors.push(`Terser failed for ${source}: ${getSpawnFailure(result)}`);
         return;
     }
     if (readFileSync(join(wwwroot, min), "utf8") !== result.stdout.trimEnd())
         errors.push(`Minified module is out of date: ${min}`);
+}
+
+function getSpawnFailure(result) {
+    const detail = [result.stderr, result.stdout, result.error?.message]
+        .find(value => typeof value === "string" && value.trim().length > 0);
+    return detail?.trim() ?? `process exited with status ${result.status ?? "unknown"}`;
 }
 
 function checkExports(source, min) {

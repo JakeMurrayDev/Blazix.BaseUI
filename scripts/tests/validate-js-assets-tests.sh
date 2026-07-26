@@ -21,6 +21,19 @@ printf '%s\n' 'const string Module = "_content/Blazix.BaseUI/blazix-baseui-fixtu
 validate=(node "$repo_root/scripts/validate-js-assets.mjs" --wwwroot "$fixture/wwwroot" --source-root "$fixture/src" --interop-setup "$setup_file" --test-root "$fixture" --terser "$terser")
 "${validate[@]}" >/dev/null
 
+mkdir -p "$fixture/bin"
+printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'shift 2' \
+    "exec \"$terser\" \"\$@\"" > "$fixture/bin/npx"
+chmod +x "$fixture/bin/npx"
+PATH="$fixture/bin:$PATH" node "$repo_root/scripts/validate-js-assets.mjs" \
+    --wwwroot "$fixture/wwwroot" \
+    --source-root "$fixture/src" \
+    --interop-setup "$setup_file" \
+    --test-root "$fixture" \
+    --terser "$fixture/missing-terser" >/dev/null
+
 printf '%s\n' 'export function initialize(value) { return value + 2; }' > "$source_file"
 if "${validate[@]}" >"$fixture/output.txt" 2>&1; then
     echo "Expected stale minification fixture to fail" >&2
