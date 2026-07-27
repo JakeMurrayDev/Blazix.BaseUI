@@ -164,15 +164,12 @@ global using Xunit;
 }
 ```
 
-`AssemblyInfo.cs`:
+`AssemblyInfo.cs` — **only the collection-behavior attribute in this task.** The
+`[assembly: AssemblyFixture(typeof(ParityServerAssemblyFixture))]` line cannot appear
+yet: `ParityServerAssemblyFixture` is created in Task 4 Step 5, and referencing it now
+is a hard `CS0246` that would violate this task's own zero-error gate. Task 4 adds it.
 
 ```csharp
-using Blazix.BaseUI.Parity.Tests.Fixtures;
-
-// Single Blazor server, shared across all tests. It also serves the React bundle
-// under /react, so both legs are captured from one origin.
-[assembly: AssemblyFixture(typeof(ParityServerAssemblyFixture))]
-
 // Classes without an explicit [Collection] get their own; ParityStatic and
 // ParityTiming are declared explicitly in Task 14 and override this.
 [assembly: CollectionBehavior(CollectionBehavior.CollectionPerClass)]
@@ -398,6 +395,15 @@ public static class FixtureRegistry
 
         foreach (var type in typeof(FixtureRegistry).Assembly.GetTypes())
         {
+            // Nested types must be excluded: the Razor compiler emits closure classes
+            // such as Fixtures.Switch.Hero+<>c, whose FullName still splits into two
+            // segments and would otherwise register as `switch/hero+<>c`.
+            if (type.IsNested ||
+                !typeof(Microsoft.AspNetCore.Components.IComponent).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
             if (type.FullName is null || !type.FullName.StartsWith(prefix, StringComparison.Ordinal))
             {
                 continue;
@@ -476,16 +482,33 @@ dotnet build Blazix.BaseUI.slnx
 Expected: `Build succeeded. 0 Warning(s) 0 Error(s)`. Warnings are errors here, so any warning is a failure to fix before continuing.
 
 ```bash
-dotnet run --project tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --no-launch-profile --urls http://127.0.0.1:5199
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --no-launch-profile --urls http://127.0.0.1:5199
 ```
+
+The environment variable is required: in Production the Web SDK disables static web
+assets, so `/_framework/blazor.web.js` is served as an empty 200 and the page never
+becomes interactive.
 
 In another shell:
 
 ```bash
-curl -s http://127.0.0.1:5199/fixture/switch/hero/server | grep -c data-parity-root
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5199/fixture/switch/hero/server
 ```
 
-Expected: `1`. Stop the server.
+Expected: `200`.
+
+**Do not grep the curl output for `data-parity-root`.** The route uses
+`prerender: false`, so the initial HTML contains only a Blazor SSR marker comment —
+the root element appears solely after the interactive circuit boots. Verify the
+rendered DOM with a headless browser instead:
+
+```bash
+npx --yes playwright@1.57.0 open --browser chromium http://127.0.0.1:5199/fixture/switch/hero/server
+```
+
+Or, non-interactively, confirm the element exists once Task 4's Playwright fixtures
+land. For this task, a `200` plus a browser-confirmed `data-parity-root` is sufficient.
+Stop the server.
 
 - [ ] **Step 9: Commit**
 
@@ -1589,7 +1612,19 @@ Copy `tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Fixtur
         };
 ```
 
-Copy `BlazorServerAssemblyFixture.cs` to `Fixtures/ParityServerAssemblyFixture.cs`, changing the namespace, the class name, and the `.csproj` filename check to `Blazix.BaseUI.Parity.Tests.csproj`.
+Copy `BlazorServerAssemblyFixture.cs` to `Fixtures/ParityServerAssemblyFixture.cs`, changing the namespace, the class name, and the `.csproj` filename check to `Blazix.BaseUI.Parity.Tests.csproj`. Keep its `ASPNETCORE_ENVIRONMENT=Development` environment entry — without it the host runs in Production, static web assets are disabled, and `/_framework/blazor.web.js` is served as an empty 200, leaving the page permanently non-interactive.
+
+**Now that the type exists, add the assembly fixture attribute** that Task 1 deliberately deferred. Prepend to `AssemblyInfo.cs`:
+
+```csharp
+using Blazix.BaseUI.Parity.Tests.Fixtures;
+
+// Single Blazor server, shared across all tests. It also serves the React bundle
+// under /react, so both legs are captured from one origin.
+[assembly: AssemblyFixture(typeof(ParityServerAssemblyFixture))]
+```
+
+Verify it took effect: `dotnet build Blazix.BaseUI.slnx` must still report 0 warnings and 0 errors.
 
 Add `Infrastructure/SettleProtocol.cs`:
 
