@@ -44,7 +44,9 @@ tests/Blazix.BaseUI.Parity.Tests/
 ├─ Blazix.BaseUI.Parity.Tests.Client/           BlazorWebAssembly: fixture pages
 │   ├─ Program.cs  _Imports.razor
 │   ├─ Layout/ParityLayout.razor                bare layout — no chrome, no extra CSS
-│   ├─ Pages/FixtureHost.razor                  routes /fixture/{component}/{demo}/{mode}
+│   ├─ Components/FixtureHostBody.razor         shared body; renders the resolved fixture
+│   ├─ Pages/FixtureHost{Server,Wasm}.razor     routes /fixture/{component}/{demo}/{mode}
+│   ├─ FixtureRegistry.cs                       fixture id -> component type
 │   └─ Fixtures/<Component>/<Demo>.razor        the 29 fixtures + Canary
 ├─ react-fixtures/                              Vite app
 │   ├─ package.json  vite.config.mts  tsconfig.json
@@ -167,11 +169,13 @@ global using Xunit;
 ```csharp
 using Blazix.BaseUI.Parity.Tests.Fixtures;
 
-// Single Blazor server plus one static server for the React bundle, shared across all tests.
+// Single Blazor server, shared across all tests. It also serves the React bundle
+// under /react, so both legs are captured from one origin.
 [assembly: AssemblyFixture(typeof(ParityServerAssemblyFixture))]
 
-// Timing-sensitive comparators need a quiet machine; ParityTests declares explicit collections.
-[assembly: CollectionBehavior(CollectionBehavior.CollectionPerAssembly)]
+// Classes without an explicit [Collection] get their own; ParityStatic and
+// ParityTiming are declared explicitly in Task 14 and override this.
+[assembly: CollectionBehavior(CollectionBehavior.CollectionPerClass)]
 ```
 
 - [ ] **Step 3: Create `Program.cs`**
@@ -287,15 +291,15 @@ await builder.Build().RunAsync();
 @Body
 ```
 
-- [ ] **Step 6: Create the fixture host page and registry**
+- [ ] **Step 6: Create the fixture host pages and registry**
 
-`Client/Pages/FixtureHost.razor`. The `data-interactive` attribute is what the settle protocol waits on:
+Three files: one shared body and two thin route pages, because the render mode must
+differ per route and `@rendermode` cannot be varied within a single component.
+
+`Client/Components/FixtureHostBody.razor` — no `@page` directive. The `data-interactive`
+attribute is what the settle protocol waits on:
 
 ```razor
-@page "/fixture/{Component}/{Demo}/server"
-@page "/fixture/{Component}/{Demo}/wasm"
-@using Microsoft.AspNetCore.Components.Rendering
-
 <div data-parity-root
      data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
     @if (fixtureType is not null)
@@ -331,7 +335,7 @@ await builder.Build().RunAsync();
 }
 ```
 
-The render mode is set by the route, so add a second file `Client/Pages/FixtureHost.razor.cs`? No — instead put the render mode on the route by hosting two thin pages. Create `Client/Pages/FixtureHostServer.razor`:
+`Client/Pages/FixtureHostServer.razor`:
 
 ```razor
 @page "/fixture/{Component}/{Demo}/server"
@@ -348,7 +352,16 @@ The render mode is set by the route, so add a second file `Client/Pages/FixtureH
 }
 ```
 
-and `Client/Pages/FixtureHostWasm.razor` identical except `@page "/fixture/{Component}/{Demo}/wasm"` and `@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))`. Rename the body component created above to `Client/Components/FixtureHostBody.razor` and delete its `@page` directives.
+`Client/Pages/FixtureHostWasm.razor` — identical to `FixtureHostServer.razor` except for
+these two lines:
+
+```razor
+@page "/fixture/{Component}/{Demo}/wasm"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+```
+
+Add `@using Blazix.BaseUI.Parity.Tests.Client.Components` to `Client/_Imports.razor` so the
+route pages resolve `FixtureHostBody`.
 
 `Client/FixtureRegistry.cs`:
 
@@ -1002,8 +1015,8 @@ using Shouldly;
 
 namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
 
-[Collection("ParityStatic")]
 public sealed class CaptureScriptTests(PlaywrightFixture playwright)
+    : IClassFixture<PlaywrightFixture>
 {
     [Fact]
     public async Task SymbolizesGeneratedIdsAndPreservesReferences()
@@ -1646,7 +1659,7 @@ identical by construction rather than by convention."
 
 **Files:**
 - Create: `tests/Blazix.BaseUI.Parity.Tests/manifest/{fixtures.json,aliases.json,markers.json}`
-- Create: `.../Infrastructure/{FixtureManifest,AliasTable,ParityOptions}.cs`
+- Create: `.../Infrastructure/{FixtureManifest,AliasTable}.cs` (`ParityOptions` is Task 12)
 - Create: `.../Capture/ParityCapturer.cs`
 - Create: `.../Tests/HarnessTests/AliasTableTests.cs`
 
@@ -1943,7 +1956,44 @@ dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter
 
 Expected: FAIL — types do not exist.
 
-- [ ] **Step 3: Write the finding model**
+- [ ] **Step 3: Write the finding model and comparison context**
+
+`Diff/ComparisonContext.cs` — what every comparator receives:
+
+```csharp
+namespace Blazix.BaseUI.Parity.Tests.Diff;
+
+/// <summary>
+/// One step of one fixture, paired across the reference and candidate legs.
+/// </summary>
+/// <param name="Fixture">The fixture id, for example <c>select/grouped</c>.</param>
+/// <param name="Leg">The Blazor leg being compared against React.</param>
+/// <param name="Step">The manifest step name.</param>
+/// <param name="Reference">The React capture for this step.</param>
+/// <param name="Candidate">The Blazor capture for this step.</param>
+/// <param name="PixelThreshold">The fixture's screenshot mismatch threshold.</param>
+public sealed record ComparisonContext(
+    string Fixture,
+    Capture.ParityLeg Leg,
+    string Step,
+    Capture.StepCapture Reference,
+    Capture.StepCapture Candidate,
+    double PixelThreshold);
+
+/// <summary>Compares one dimension of a paired capture step.</summary>
+public interface IComparator
+{
+    /// <summary>Gets the finding category this comparator produces.</summary>
+    FindingKind Kind { get; }
+
+    /// <summary>
+    /// Compares the reference and candidate captures.
+    /// </summary>
+    /// <param name="context">The paired step.</param>
+    /// <returns>Zero or more findings.</returns>
+    IEnumerable<Finding> Compare(ComparisonContext context);
+}
+```
 
 `Diff/Finding.cs`:
 
@@ -2237,8 +2287,10 @@ public sealed class TimelineComparatorTests
     [Fact]
     public void IgnoresTimestampDifferences()
     {
-        var fast = [Event(0, "attribute", "data-starting-style"), Event(16, "transitionend", null)];
-        var slow = [Event(0, "attribute", "data-starting-style"), Event(340, "transitionend", null)];
+        // Collection expressions cannot be assigned to `var` — the element type
+        // must be stated explicitly.
+        TimelineEvent[] fast = [Event(0, "attribute", "data-starting-style"), Event(16, "transitionend", null)];
+        TimelineEvent[] slow = [Event(0, "attribute", "data-starting-style"), Event(340, "transitionend", null)];
 
         TimelineSequence.Normalize(fast).ShouldBe(TimelineSequence.Normalize(slow));
     }
@@ -2473,6 +2525,7 @@ a refresh instruction instead of silently diffing against old output."
 
 **Files:**
 - Create: `.../Report/{ReportModel,JsonReportWriter,HtmlReportWriter}.cs`
+- Create: `.../Report/report.source.css` (Tailwind input: `@import "tailwindcss"; @source "./";`)
 - Create: `.../Report/report.css` (Tailwind-generated, committed)
 - Create: `.../Tests/HarnessTests/ReportWriterTests.cs`
 
@@ -2585,11 +2638,12 @@ using Shouldly;
 namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
 
 [Collection("ParityStatic")]
-public sealed class CanaryTests(ParityRunner runner)
+public sealed class CanaryTests(PlaywrightFixture playwright)
 {
     [Fact]
     public async Task CanaryFixtureIsFlagged()
     {
+        var runner = new ParityRunner(playwright.Browser, ParityOptions.FromEnvironment());
         var fixture = FixtureManifest.Load().Single(f => f.Id == "harness/canary");
 
         var findings = await runner.RunAsync(fixture, ParityLeg.BlazorServer);
@@ -2614,11 +2668,24 @@ Expected: FAIL — `ParityRunner` does not exist.
 
 `ParityRunner.RunAsync` obtains the React bundle (baseline or live per `ParityOptions`), captures the requested Blazor leg, runs every comparator over each step pair, and returns the concatenated findings. A leg that throws is retried once; findings differing between attempts are re-emitted with `Severity.Flaky`.
 
-`ParityTests` exposes two theories over the manifest, in two collections so timing work runs serially:
+`ParityTests` exposes two theories over the manifest, in two collections so timing work runs
+serially. `[CollectionDefinition]` must live on a **separate marker class** — putting it on the
+test class itself does not register the collection:
 
 ```csharp
+/// <summary>Groups comparators that tolerate parallel execution.</summary>
+[CollectionDefinition("ParityStatic")]
+public sealed class ParityStaticCollection;
+
+/// <summary>
+/// Groups timing-sensitive comparators. CPU contention skews the durations the
+/// L3 timeline check measures, so this collection never runs in parallel.
+/// </summary>
+[CollectionDefinition("ParityTiming", DisableParallelization = true)]
+public sealed class ParityTimingCollection;
+
 [Collection("ParityStatic")]
-public sealed class ParityStaticTests(ParityRunner runner)
+public sealed class ParityStaticTests(PlaywrightFixture playwright)
 {
     public static TheoryData<string, ParityLeg> Cases => ParityTestData.Static();
 
@@ -2628,9 +2695,13 @@ public sealed class ParityStaticTests(ParityRunner runner)
 }
 
 [Collection("ParityTiming")]
-[CollectionDefinition("ParityTiming", DisableParallelization = true)]
-public sealed class ParityTimingTests(ParityRunner runner) { /* animation steps only */ }
+public sealed class ParityTimingTests(PlaywrightFixture playwright) { /* animation steps only */ }
 ```
+
+`ParityRunner` is **not** an xUnit fixture — xUnit only injects registered class or collection
+fixtures. Each test constructs it directly: `new ParityRunner(playwright.Browser, ParityOptions.FromEnvironment())`.
+`PlaywrightFixture` is supplied by adding it to each `[CollectionDefinition]` class via
+`ICollectionFixture<PlaywrightFixture>`.
 
 Each test applies `WaiverMatcher`, asserts `verdict.Failing.ShouldBeEmpty()` with a message listing each finding as `{kind} {nodePath} {property}: {react} vs {blazor}`, and accumulates findings for the report. Report writing happens in the assembly fixture's `DisposeAsync`, so one report covers the whole run.
 
