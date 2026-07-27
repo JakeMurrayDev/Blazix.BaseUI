@@ -1,0 +1,17 @@
+@* A purpose-built probe with known markup, used to pin the shared capture script's
+   normalization rules. The @onclick lambda is deliberately non-capturing: it makes the
+   Razor compiler emit a nested closure class, which is what FixtureRegistry's
+   nested-type guard exists to exclude. A lambda capturing `this` would compile to an
+   instance method and emit no nested type at all. *@
+
+<button class="px-3 py-1" style="color: rgb(1, 2, 3);"
+        aria-controls="@panelId" aria-expanded="true"
+        @onclick="() => Console.WriteLine()">Toggle</button>
+<section id="@panelId">Panel</section>
+@* Both spellings occur in the component library, so the rename must be idempotent:
+   the already-unprefixed marker has to survive untouched alongside the renamed one. *@
+<aside data-blazix-base-ui-portal="true" data-base-ui-focusable="">Portal marker</aside>
+
+@code {
+    private readonly string panelId = $"probe-{Guid.NewGuid():N}";
+}

@@ -38,7 +38,10 @@ builder.Logging.AddDebug();
 // component instantiation unless TimeProvider is registered - regardless of whether Delay is set.
 builder.Services.AddSingleton(TimeProvider.System);
 
-builder.Services.AddRazorComponents()
+// DetailedErrors keeps the Server leg from reporting only a generic "circuit terminated"
+// while the WASM leg prints the real exception - an asymmetry that makes a harness defect
+// look like a component discrepancy. This host is never deployed.
+builder.Services.AddRazorComponents(options => options.DetailedErrors = true)
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 
