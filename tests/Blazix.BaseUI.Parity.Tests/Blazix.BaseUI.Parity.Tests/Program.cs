@@ -34,6 +34,10 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 // Add services to the container.
+// AvatarFallback has an [Inject] TimeProvider property, so Blazor property injection throws at
+// component instantiation unless TimeProvider is registered - regardless of whether Delay is set.
+builder.Services.AddSingleton(TimeProvider.System);
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
@@ -51,8 +55,6 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-
 app.UseAntiforgery();
 
 app.MapStaticAssets();

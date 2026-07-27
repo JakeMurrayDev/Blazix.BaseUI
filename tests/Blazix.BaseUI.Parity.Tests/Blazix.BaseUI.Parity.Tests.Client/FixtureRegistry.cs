@@ -55,6 +55,17 @@ public static class FixtureRegistry
         return index;
     }
 
+    /// <summary>
+    /// Converts a PascalCase segment to kebab-case by inserting a separator before every
+    /// upper-case character.
+    /// </summary>
+    /// <remarks>
+    /// This conversion is not injective, so fixture directory and class names must be simple
+    /// PascalCase words with no acronym runs: <c>WithRtl</c> yields <c>with-rtl</c> but
+    /// <c>WithRTL</c> yields <c>with-r-t-l</c>, and digits get no separator, so <c>Level2</c>
+    /// yields <c>level2</c>. Ids derived here must match <c>manifest/fixtures.json</c> exactly,
+    /// and there is no way to recover the original name from the id.
+    /// </remarks>
     private static string ToKebab(string pascal)
     {
         var builder = new System.Text.StringBuilder(pascal.Length + 4);
