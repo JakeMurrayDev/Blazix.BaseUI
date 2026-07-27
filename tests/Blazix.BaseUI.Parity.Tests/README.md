@@ -38,6 +38,13 @@ trees — the React demos under `.base-ui` and the Blazor fixtures under
 two sides resolved Tailwind utilities from separate configurations, a configuration difference would
 surface as a fake component discrepancy.
 
+Both sides reach that one file over HTTP: the Blazor host links it from `wwwroot`, and
+`react-fixtures/index.html` links `/parity.css` — rooted, because the bundle is mounted under
+`/react/` on the same origin. The React bundle deliberately has **no Tailwind Vite plugin** and
+`src/parity.css` is deliberately **not** imported from `src/main.tsx`. Either would make Vite emit a
+second stylesheet, which is what the single-build guarantee exists to prevent; `src/parity.css` is
+the Tailwind CLI's input only.
+
 Tailwind v4 is CSS-first — there is no `tailwind.config.js`. Configuration lives in
 `react-fixtures/src/parity.css`. Tailwind cannot read an environment variable, so
 `react-fixtures/scripts/resolve-base-ui-source.mjs` writes the resolved base-ui path into a generated

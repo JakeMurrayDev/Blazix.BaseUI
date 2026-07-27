@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fixtureById, fixtures } from './fixtures';
-import './parity.css';
 
 function currentId(): string | null {
   const match = /^#\/fixture\/(.+)$/.exec(window.location.hash);

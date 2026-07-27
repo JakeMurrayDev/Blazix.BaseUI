@@ -3,12 +3,12 @@
     "trigger": "[aria-haspopup],[aria-expanded]",
     "popup": "[role=dialog],[role=menu],[role=listbox],[role=tooltip]",
     "input": "input,textarea,[contenteditable=true]",
-    "item": "[role=option]:nth-match({n})"
+    "item": ":nth-match([role=option], {n})"
   },
   "popover": { "trigger": "[aria-haspopup],[aria-expanded]" },
-  "menu": { "item": "[role=menuitem]:nth-match({n})" },
-  "select": { "item": "[role=option]:nth-match({n})" },
-  "tabs": { "item": "[role=tab]:nth-match({n})" },
+  "menu": { "item": ":nth-match([role=menuitem], {n})" },
+  "select": { "item": ":nth-match([role=option], {n})" },
+  "tabs": { "item": ":nth-match([role=tab], {n})" },
   "accordion": { "trigger": "[aria-expanded]" },
   "collapsible": { "trigger": "[aria-expanded]" }
 }
