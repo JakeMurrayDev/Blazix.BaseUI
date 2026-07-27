@@ -4,7 +4,9 @@
    nested-type guard exists to exclude. A lambda capturing `this` would compile to an
    instance method and emit no nested type at all. *@
 
-<button class="px-3 py-1" style="color: rgb(1, 2, 3);"
+@* --parity-probe stands in for the properties base-ui exposes (--anchor-width and
+   friends): a custom property that must survive the --tw-* exclusion. *@
+<button class="px-3 py-1" style="color: rgb(1, 2, 3); --parity-probe: 7px;"
         aria-controls="@panelId" aria-expanded="true"
         @onclick="() => Console.WriteLine()">Toggle</button>
 <section id="@panelId">Panel</section>

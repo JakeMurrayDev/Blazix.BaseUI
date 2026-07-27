@@ -112,9 +112,19 @@
     const out = {};
     // computedStyleMap is not available for custom properties in all engines;
     // enumerate the declared set from the element's own cascade instead.
+    //
+    // `--tw-*` is excluded deliberately. Tailwind v4 registers dozens of custom
+    // properties via @property, so every element inherits a large map of engine
+    // internals. Capturing them would bloat every baseline and bury the
+    // properties this harness actually compares — the ones base-ui exposes
+    // (--anchor-width, --available-width/height, --transform-origin,
+    // --positioner-*) — under Tailwind's bookkeeping. Both sides load the same
+    // stylesheet, so the excluded values are identical by construction anyway.
     for (let i = 0; i < cs.length; i++) {
       const prop = cs.item(i);
-      if (prop.startsWith('--')) out[prop] = cs.getPropertyValue(prop).trim();
+      if (prop.startsWith('--') && !prop.startsWith('--tw-')) {
+        out[prop] = cs.getPropertyValue(prop).trim();
+      }
     }
     return out;
   }

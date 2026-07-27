@@ -67,4 +67,24 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
         button.Attributes.ShouldNotContainKey("style");
         button.Classes.ShouldContain("px-3");
     }
+
+    [Fact]
+    public async Task ExcludesTailwindInternalsButKeepsOtherCustomProperties()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await CaptureScript.InjectAsync(page);
+        await page.GotoAsync($"{ParityServerAssemblyFixture.ServerAddress}/fixture/harness/capture-probe/server");
+        await SettleProtocol.WaitAsync(page);
+
+        var capture = await CaptureScript.CaptureAsync(page, "initial");
+        var button = capture.Dom.Descendants().Single(n => n.Tag == "button");
+        var props = capture.CustomProps[button.Path];
+
+        // Asserted first: without a property that must survive, a readCustomProps
+        // returning nothing at all would satisfy the exclusion assertion below.
+        props["--parity-probe"].ShouldBe("7px");
+
+        props.Keys.ShouldNotContain(name => name.StartsWith("--tw-", StringComparison.Ordinal));
+    }
 }
