@@ -36,7 +36,7 @@ Facts established while exploring the repo, all of which shape the design:
 | Decision | Choice |
 | --- | --- |
 | React baseline strategy | Committed baselines by default; `PARITY_LIVE=1` recaptures |
-| Fixture corpus | All 114 tailwind demos |
+| Fixture corpus | First milestone: 29 fixtures (a quarter of the 114); remainder follows once findings are triaged |
 | Verdict model | Waiver file with a required `reason`; unwaived diffs fail |
 | Output | Tailwind-styled HTML report + machine-readable JSON |
 | Render modes | Blazor Server and WASM (plus a free Server-vs-WASM cross-check) |
@@ -141,6 +141,29 @@ tripling every run.
   ]
 }
 ```
+
+### First-milestone corpus
+
+29 of the 114 demos. Selected to maximize **distinct mechanism coverage** rather than even spread —
+the purpose of the first quarter is to surface discrepancies and calibrate tolerances, not to be
+uniformly representative. 20 of 38 components are touched, and every mechanism class appears.
+
+| Class | Fixtures |
+| --- | --- |
+| Sanity (no floating, no animation) | `switch/hero`, `avatar/hero`, `separator/hero`, `progress/hero`, `meter/hero` |
+| Animation and mount/unmount | `collapsible/hero`, `accordion/multiple`, `dialog/hero`, `drawer/hero`, `toast/hero` |
+| Floating and positioning | `popover/hero`, `tooltip/hero`, `preview-card/hero`, `menu/arrow`, `select/hero` |
+| Composite and keyboard nav | `select/grouped`, `menu/checkbox-items`, `menubar/hero`, `tabs/hero`, `toolbar/hero` |
+| Form and validation | `field/hero`, `form/hero`, `number-field/hero`, `checkbox/hero`, `otp-field/hero` |
+| High-risk | `popover/detached-triggers-simple`, `navigation-menu/hero`, `scroll-area/hero`, `combobox/hero` |
+
+`accordion/multiple` is preferred over `accordion/hero` because it exercises independent open state;
+`menu/arrow` over `menu/hero` because it adds arrow positioning geometry.
+
+**All 29 already have Blazor docs ports** under
+`docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/`, so every fixture is a restyle
+of an existing port — transplanting Tailwind class strings onto known-good markup — not new
+component authoring.
 
 ### Element addressing
 
@@ -394,7 +417,7 @@ empty and the run reports a serene zero findings.
 
 ## Implementation sequencing
 
-The full corpus is in scope; this ordering exists so pipeline defects are not baked into 114 fixtures.
+The first milestone is 29 fixtures; this ordering exists so pipeline defects are not baked into them.
 
 1. **Skeleton** — projects, shared `parity.css`, `capture.js`, and **one** pair (Switch/Hero)
    end-to-end through every comparator and the report.
@@ -404,12 +427,17 @@ The full corpus is in scope; this ordering exists so pipeline defects are not ba
    calibrated here.
 4. **API-surface diff across all 38 components** — no fixtures, no browser, fast, and the step most
    likely to surface missing functionality immediately.
-5. **Bulk authoring** of the remaining ~109 pairs in component batches, triaging fix-or-waive as they
-   land.
+5. **The remaining 24 fixtures** of the first-milestone corpus, in component batches, triaging
+   fix-or-waive as they land. (Steps 1 and 3 already cover 5 of the 29.)
 6. **Generated `parity-limitations.md` + README.**
+
+The remaining 85 fixtures are a follow-up milestone, scoped once the first quarter's findings show
+whether the signal-to-noise ratio justifies the authoring cost.
 
 ## Out of scope
 
+- The remaining 85 fixtures beyond the first-milestone 29. The pipeline is built to carry them; only
+  the authoring is deferred.
 - A CI job. CI is lint-only today, and the React bundle depends on a gitignored checkout; wiring this
   into CI is a separate decision once baselines have proven stable.
 - LLM-based classification of findings (`--explain`).
