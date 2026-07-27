@@ -27,6 +27,7 @@
     <None Include="..\shared\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="shared" />
     <None Include="..\manifest\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="manifest" />
     <None Include="..\waivers\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="waivers" />
+    <None Include="..\react-fixtures\dist\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="react-dist" />
   </ItemGroup>
 
 </Project>
