@@ -854,11 +854,19 @@ export default defineConfig({
       'base-ui-demos': resolve(baseUi, DEMOS_SUBPATH),
       '@base-ui/react': resolve(baseUi, 'packages/react/src'),
       docs: resolve(baseUi, 'docs'),
+      // Render the React leg on the React the checkout pins, not the harness's.
+      // This side is the reference implementation, so it must run exactly what
+      // upstream tests against — the harness's own React is only a build-time
+      // dependency of the fixture shell.
+      react: resolve(baseUi, 'node_modules/react'),
+      'react-dom': resolve(baseUi, 'node_modules/react-dom'),
+      'react-dom/client': resolve(baseUi, 'node_modules/react-dom/client'),
     },
-    // The checkout ships its own React, and @vitejs/plugin-react does not dedupe.
-    // Without this, two React copies are bundled and every demo's hooks run
-    // against a React instance that never rendered them — a clean build in which
-    // no fixture actually works.
+    // Alias and dedupe address different mechanisms; both are wanted. The
+    // checkout ships its own React and @vitejs/plugin-react does not dedupe, so
+    // without this two React copies are bundled and every demo's hooks run
+    // against an instance that never rendered them — a clean build in which no
+    // fixture actually works.
     dedupe: ['react', 'react-dom'],
   },
   build: {
