@@ -180,7 +180,7 @@ is a hard `CS0246` that would violate this task's own zero-error gate. Task 4 ad
 Copy `tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Program.cs`, replacing the namespace, then make these four changes:
 
 1. Delete the `app.UseHttpsRedirection();` line — the parity server is HTTP-only on loopback, and a redirect would break the fixed-origin assumption in `ParityPaths`.
-2. Delete the `app.UseStatusCodePagesWithReExecute("/not-found", ...)` line. The parity host has no `/not-found` route, so a 404 would re-execute, match nothing, and return the `App.razor` shell under a 404 status — which produces a Blazor-only browser console message that Task 8's console comparator would report as a systematic false discrepancy.
+2. Delete the `app.UseStatusCodePagesWithReExecute("/not-found", ...)` line. It is dead config carried over by the copy: this host defines no `/not-found` route and its `Routes.razor` declares no `<NotFound>` fragment, so re-execution matches nothing and 404s return `Content-Length: 0`. Harmless but purposeless — do not carry it forward.
 3. **Keep** `builder.Services.AddSingleton(TimeProvider.System);` from the copied file. It is load-bearing, not boilerplate: `src/Blazix.BaseUI/Avatar/AvatarFallback.razor:5` declares `@inject TimeProvider TimeProvider`, which Razor lowers to an `[Inject]` property, so component instantiation throws `InvalidOperationException` without the registration — unconditionally, whether or not `Delay` is set. `avatar/hero` is the first fixture in Task 16's sanity batch. Add no *other* services.
 4. Replace the `app.MapStaticAssets(); app.MapRazorComponents<App>()...` block with the same call plus a static-file mount for the React bundle:
 
@@ -1643,7 +1643,21 @@ using Blazix.BaseUI.Parity.Tests.Fixtures;
 
 Verify it took effect: `dotnet build Blazix.BaseUI.slnx` must still report 0 warnings and 0 errors.
 
-Add `Infrastructure/SettleProtocol.cs`:
+**Enable detailed circuit errors on the parity host.** Add to `Program.cs` in the web-server
+branch, before `builder.Build()`:
+
+```csharp
+builder.Services.AddRazorComponents(options => options.DetailedErrors = true)
+```
+
+Without it the Server leg surfaces only a generic "circuit terminated" message while the WASM leg
+prints the real exception — an asymmetry that makes a harness defect look like a component
+discrepancy. This host is never deployed, so there is no disclosure concern.
+
+Add `Infrastructure/SettleProtocol.cs`. Note that `data-interactive` is only ever `true` in
+practice: both routes use `prerender: false`, so the component's first render is already the
+interactive one. `settled()` must therefore test for *presence* of `[data-parity-root]` with
+`data-interactive="true"` — never wait on a `false` → `true` transition, which cannot occur:
 
 ```csharp
 using Microsoft.Playwright;
