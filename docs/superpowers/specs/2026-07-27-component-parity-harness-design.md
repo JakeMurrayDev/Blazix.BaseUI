@@ -67,7 +67,8 @@ tests/Blazix.BaseUI.Parity.Tests/
 │    vite.config.mts  src/  dist/ (gitignored)
 ├─ shared/
 │    capture.js                         injected into both sides by the same runner
-│    parity.css                         one Tailwind v4 build scanning .tsx AND .razor
+├─ react-fixtures/src/parity.css        Tailwind input, scanning .tsx AND .razor
+│  …/Blazix.BaseUI.Parity.Tests/wwwroot/parity.css   generated output, loaded by both sides
 ├─ manifest/fixtures.json               the 114 pairs + interaction scripts
 ├─ manifest/markers.json                data-blazix-* classification
 ├─ manifest/naming.json                 React prop → Blazor parameter conventions
