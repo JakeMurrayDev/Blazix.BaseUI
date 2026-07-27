@@ -1299,7 +1299,12 @@ Expected: FAIL — `CaptureScript` does not exist (CS0103).
       if (name === 'class' || name === 'style') continue;
 
       // Blazor render-tree bookkeeping, never present on the React side.
-      if (name.startsWith('b-') || name === 'blazor:elementreference') continue;
+      // `_bl_<guid>` is the one that matters: RenderElement.razor captures an
+      // element reference on EVERY element the library renders, and the GUID
+      // changes each run — without this skip every Blazix element diffs,
+      // non-deterministically. (`blazor:elementreference` is the prerender
+      // spelling and never appears under prerender: false.)
+      if (name.startsWith('b-') || name.startsWith('_bl_')) continue;
 
       // Prefixed Blazix markers are renamed to their upstream spelling. The rule
       // is idempotent: already-unprefixed markers pass through untouched.
@@ -1404,10 +1409,22 @@ Expected: FAIL — `CaptureScript` does not exist (CS0103).
       const styles = {};
       const customProps = {};
       const geometry = {};
-      const trees = roots().map((root) => {
-        const idTable = buildIdTable(root);
-        return snapshot(root, idTable, styles, customProps, geometry);
-      });
+      const rootList = roots();
+
+      // ONE id table spanning every root, in document order. A per-root table
+      // leaves a trigger inside the fixture root pointing at a portalled popup
+      // holding a raw GUID — a guaranteed false diff on every popup component —
+      // and restarts the #idN counter so #id1 means different nodes per tree.
+      const idTable = buildIdTable(rootList);
+
+      // Paths are namespaced by root: `root > …` for the fixture root,
+      // `portal(N) > …` for the Nth portalled container. Without this every
+      // root writes key '' for itself and collides on deeper paths, so a
+      // portalled popup silently overwrites the main tree's geometry — exactly
+      // the data popup-positioning parity depends on.
+      const trees = rootList.map((root, i) =>
+        snapshot(root, i === 0 ? 'root' : `portal(${i})`, idTable, styles, customProps, geometry),
+      );
 
       const active = document.activeElement;
       const activeRoot = roots().find((r) => r.contains(active));
@@ -1424,6 +1441,11 @@ Expected: FAIL — `CaptureScript` does not exist (CS0103).
     },
 
     startTimeline() {
+      // Idempotent: capture() returns the timeline without stopping, so a
+      // per-step runner naturally does start -> capture -> start -> capture.
+      // Without tearing down first, the previous observer stays connected and a
+      // second copy of all six listeners is registered, double-recording events.
+      this.stopTimeline();
       state.timeline = [];
       state.startedAt = performance.now();
       const at = () => Math.round(performance.now() - state.startedAt);
@@ -1980,6 +2002,8 @@ Expected: PASS, 3 tests.
 1. Build the URL — React: `{server}/react/#/fixture/{id}`; Blazor: `{server}/fixture/{component}/{demo}/{server|wasm}`.
 2. `CaptureScript.InjectAsync`, subscribe to `page.Console`, `page.GotoAsync`, `SettleProtocol.WaitAsync`.
 3. For each step: if `settle == "animation"` call `startTimeline()` before the actions; replay each action through `AliasTable.Expand`; wait for settle; call `CaptureScript.CaptureAsync`; attach `AriaSnapshotAsync()`, the console buffer, and screenshots.
+
+**Portal timing must be handled in the settle protocol.** Blazix mounts portal containers from `OnAfterRenderAsync` via JS interop, which can land *after* `SettleProtocol`'s two quiet frames — so a popup step can be captured before its portal exists, producing a missing-node finding that is a harness artifact, not a component difference. After any step whose actions may open a floating component, wait for the expected portal container to appear (or for a bounded quiet period that begins only once `document.body.children` stops changing) before capturing. Do not paper over this with a fixed delay.
 4. Return the assembled `CaptureBundle`.
 
 Write it with one public method:
