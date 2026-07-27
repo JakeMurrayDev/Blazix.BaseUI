@@ -160,10 +160,17 @@ uniformly representative. 20 of 38 components are touched, and every mechanism c
 `accordion/multiple` is preferred over `accordion/hero` because it exercises independent open state;
 `menu/arrow` over `menu/hero` because it adds arrow positioning geometry.
 
-**All 29 already have Blazor docs ports** under
-`docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/`, so every fixture is a restyle
-of an existing port — transplanting Tailwind class strings onto known-good markup — not new
-component authoring.
+**All 29 already have Blazor Tailwind ports** under
+`docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/<Component>/<Demo>/Tailwind/`
+(90 such ports exist repo-wide). Fixture authoring is therefore neither new component work nor a
+restyle from CSS — the structure and component usage are already correct, and the task is to
+**sync the class strings verbatim from the React demo**.
+
+That sync is load-bearing, not cosmetic. The existing ports paraphrase: `Switch/Hero/Tailwind` uses
+`ease-in-out` where base-ui uses `ease-[ease]`, and `h-3.5 w-3.5` where base-ui uses `size-3.5`.
+Transplanting base-ui's exact strings ensures any surviving computed-style difference is attributable
+to the **component** — a missing `data-checked` attribute means `data-checked:bg-white` never
+applies — rather than to how the demo was written.
 
 ### Element addressing
 
@@ -219,7 +226,11 @@ Applied to both sides:
   (`aria-labelledby`, `aria-controls`, `aria-describedby`, `aria-activedescendant`, `for`) is rewritten
   through the same table. The relationship is preserved and diffed; the arbitrary string is not. A
   popup whose `aria-controls` points at the wrong node still fails.
-- `class` compared as a sorted set — Tailwind class order is meaningless, a missing class is not.
+- `class` is **excluded from the attribute diff and reported as `Info` only**. Tailwind admits
+  multiple spellings of the same result — `size-3.5` and `h-3.5 w-3.5` are computed-style identical
+  but class-set different — so class-set equality produces false positives. `ComputedStyle` is the
+  real assertion; the `Info` entry exists so an author can see class drift when triaging a style
+  finding.
 - Text nodes whitespace-normalized.
 - The `style` attribute is excluded from the attribute diff; inline positioning styles are covered by
   the computed-style and geometry comparators, which apply numeric tolerance rather than string
@@ -262,7 +273,7 @@ Severity is `Error` (unwaived → fail), `Info`, or `Flaky`.
 | Comparator | Checks | Tolerance |
 | --- | --- | --- |
 | `Structure` | node presence, ordering, depth | exact |
-| `Attribute` | all attributes except `style`, post-normalization | exact |
+| `Attribute` | all attributes except `style` and `class`, post-normalization | exact |
 | `AriaSnapshot` | role + accessible name + state tree | exact |
 | `ComputedStyle` | allowlisted properties per matched node | ±0.5px numeric |
 | `CustomProperty` | `--*` values | ±0.5px numeric |
