@@ -808,6 +808,8 @@ import { defineConfig } from 'vite';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+const DEMOS_SUBPATH = 'docs/src/app/(docs)/react/components';
+
 function locateBaseUi(): string {
   const override = process.env.PARITY_BASE_UI_PATH;
   if (override) return override;
@@ -826,12 +828,23 @@ function locateBaseUi(): string {
 
 const baseUi = locateBaseUi();
 
+// Validate the alias target, not just the checkout root — the override branch
+// above returns without any check. An alias pointing at a nonexistent directory
+// makes import.meta.glob match zero demos, which builds a bundle with no
+// fixtures instead of failing.
+if (!existsSync(resolve(baseUi, DEMOS_SUBPATH))) {
+  throw new Error(
+    `base-ui checkout at ${baseUi} has no demo directory at ${DEMOS_SUBPATH}. ` +
+      'Check PARITY_BASE_UI_PATH, or the upstream docs layout may have moved.',
+  );
+}
+
 export default defineConfig({
   base: '/react/',
   plugins: [react()],
   resolve: {
     alias: {
-      '/base-ui-demos': resolve(baseUi, 'docs/src/app/(docs)/react/components'),
+      '/base-ui-demos': resolve(baseUi, DEMOS_SUBPATH),
       '@base-ui/react': resolve(baseUi, 'packages/react/src'),
       docs: resolve(baseUi, 'docs'),
     },
@@ -892,6 +905,16 @@ grep -o 'accordion/hero' dist/assets/*.js | head -1
 ```
 
 Expected: `accordion/hero` — proving demos were globbed into the bundle.
+
+**A successful build is not sufficient evidence.** `import.meta.glob` matching zero files
+produces an empty fixture list and still builds cleanly. Assert the count as well:
+
+```bash
+grep -oE '"[a-z-]+/[a-z-]+"' dist/assets/*.js | sort -u | wc -l
+```
+
+Expected: a number in the low hundreds, consistent with base-ui's 114 tailwind demos. A result
+near zero means the glob or the alias is wrong, regardless of the build succeeding.
 
 - [ ] **Step 5: Write `BaseUiLocator` and `ParityPaths`**
 
