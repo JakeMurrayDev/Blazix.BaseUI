@@ -16,4 +16,5 @@
 
 @source "./";
 @source "../../Blazix.BaseUI.Parity.Tests.Client/";
+@source "../../Blazix.BaseUI.Parity.Tests/Components/";
 /* base-ui demo sources are appended by scripts/resolve-base-ui-source.mjs */

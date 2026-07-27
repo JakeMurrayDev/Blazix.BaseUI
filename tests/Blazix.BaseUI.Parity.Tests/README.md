@@ -68,7 +68,8 @@ PARITY_WRITE_BASELINES=1 dotnet test
 
 Each baseline records the base-ui git SHA and a content hash of the demo files it derives from. If
 the built bundle's hashes do not match, the run fails with `baselines stale — run pnpm parity:baseline`
-rather than diffing against stale output.
+rather than diffing against stale output. The `parity:baseline` script named in that message is added
+by a later task; until it exists, the two-command recipe above is its equivalent.
 
 ## When `.base-ui` is required
 
