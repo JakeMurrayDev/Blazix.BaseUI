@@ -1,0 +1,21 @@
+{
+  "name": "blazix-parity-react-fixtures",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "parity:css": "node scripts/resolve-base-ui-source.mjs && tailwindcss -i src/parity.css -o ../Blazix.BaseUI.Parity.Tests/wwwroot/parity.css",
+    "parity:build": "node scripts/resolve-base-ui-source.mjs && vite build",
+    "parity:dev": "vite"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.2.4",
+    "@vitejs/plugin-react": "5.0.4",
+    "tailwindcss": "4.2.4",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  },
+  "dependencies": {
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  }
+}
