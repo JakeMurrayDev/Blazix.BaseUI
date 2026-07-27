@@ -177,11 +177,12 @@ is a hard `CS0246` that would violate this task's own zero-error gate. Task 4 ad
 
 - [ ] **Step 3: Create `Program.cs`**
 
-Copy `tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Program.cs`, replacing the namespace, then make these three changes:
+Copy `tests/Blazix.BaseUI.Playwright.Tests/Blazix.BaseUI.Playwright.Tests/Program.cs`, replacing the namespace, then make these four changes:
 
 1. Delete the `app.UseHttpsRedirection();` line — the parity server is HTTP-only on loopback, and a redirect would break the fixed-origin assumption in `ParityPaths`.
-2. After `builder.Services.AddRazorComponents()...`, add nothing else; the fixture host needs no services.
-3. Replace the `app.MapStaticAssets(); app.MapRazorComponents<App>()...` block with the same call plus a static-file mount for the React bundle:
+2. Delete the `app.UseStatusCodePagesWithReExecute("/not-found", ...)` line. The parity host has no `/not-found` route, so a 404 would re-execute, match nothing, and return the `App.razor` shell under a 404 status — which produces a Blazor-only browser console message that Task 8's console comparator would report as a systematic false discrepancy.
+3. **Keep** `builder.Services.AddSingleton(TimeProvider.System);` from the copied file. It is load-bearing, not boilerplate: `src/Blazix.BaseUI/Avatar/AvatarFallback.razor:5` declares `@inject TimeProvider TimeProvider`, which Razor lowers to an `[Inject]` property, so component instantiation throws `InvalidOperationException` without the registration — unconditionally, whether or not `Delay` is set. `avatar/hero` is the first fixture in Task 16's sanity batch. Add no *other* services.
+4. Replace the `app.MapStaticAssets(); app.MapRazorComponents<App>()...` block with the same call plus a static-file mount for the React bundle:
 
 ```csharp
 app.MapStaticAssets();
@@ -257,12 +258,16 @@ Add `using Microsoft.Extensions.FileProviders;` at the top.
 
 - [ ] **Step 5: Create the client project files**
 
-`Client/Program.cs`:
+`Client/Program.cs`. The `TimeProvider` registration is required on this leg for the same
+reason as the host (`AvatarFallback` injects it unconditionally); the WASM leg resolves
+services from this container, not the server's:
 
 ```csharp
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+
+builder.Services.AddSingleton(TimeProvider.System);
 
 await builder.Build().RunAsync();
 ```
@@ -1019,6 +1024,18 @@ from one origin in one browser."
 - Create: `tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests/Capture/CaptureBundle.cs`
 - Create: `tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests/Tests/HarnessTests/CaptureScriptTests.cs`
 - Create: `tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests.Client/Fixtures/Harness/CaptureProbe.razor`
+- Create: `.../Blazix.BaseUI.Parity.Tests/Tests/HarnessTests/FixtureRegistryTests.cs`
+- Modify: `.../Blazix.BaseUI.Parity.Tests/AssemblyInfo.cs` (add the assembly fixture attribute deferred from Task 1)
+
+**Additional required test, carried over from Task 1's review.** `FixtureRegistry` is pure
+reflection — it needs no browser and no server fixture — but nothing currently prevents its
+nested-type guard from regressing, and later tasks consume `FixtureRegistry.Ids` to cross-check
+`manifest/fixtures.json`. Add `FixtureRegistryTests` asserting that `Ids` contains `switch/hero`
+and that no id contains `+`. To make the guard's absence detectable, the test must run against a
+fixture that emits a closure class: give `Client/Fixtures/Harness/CaptureProbe.razor` a
+**non-capturing** lambda (for example `@onclick="() => Console.WriteLine()"`) — a lambda capturing
+only `this` compiles to an instance method and emits no nested type, so it would not exercise the
+guard.
 
 **Interfaces:**
 - Consumes: `ParityPaths.SharedScript`.
