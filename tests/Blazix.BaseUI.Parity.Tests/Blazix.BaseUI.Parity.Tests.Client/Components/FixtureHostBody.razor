@@ -1,0 +1,33 @@
+<div data-parity-root
+     data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    @if (fixtureType is not null)
+    {
+        <DynamicComponent Type="fixtureType" />
+    }
+    else
+    {
+        <p data-parity-error>Unknown fixture: @Component/@Demo</p>
+    }
+</div>
+
+@code {
+    private Type? fixtureType;
+
+    /// <summary>
+    /// Gets or sets the component segment of the fixture id, for example <c>select</c>.
+    /// </summary>
+    [Parameter]
+    public string Component { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the demo segment of the fixture id, for example <c>grouped</c>.
+    /// </summary>
+    [Parameter]
+    public string Demo { get; set; } = string.Empty;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        fixtureType = FixtureRegistry.Resolve(Component, Demo);
+    }
+}

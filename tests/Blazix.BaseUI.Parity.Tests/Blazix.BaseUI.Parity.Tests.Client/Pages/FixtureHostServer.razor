@@ -1,0 +1,12 @@
+@page "/fixture/{Component}/{Demo}/server"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<FixtureHostBody Component="@Component" Demo="@Demo" />
+
+@code {
+    /// <summary>Gets or sets the component segment of the fixture id.</summary>
+    [Parameter] public string Component { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the demo segment of the fixture id.</summary>
+    [Parameter] public string Demo { get; set; } = string.Empty;
+}
