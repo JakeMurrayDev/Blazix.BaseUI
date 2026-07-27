@@ -753,7 +753,13 @@ export const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fixtureById, fixtures } from './fixtures';
-import './parity.css';
+
+// NOTE: parity.css is deliberately NOT imported here. The React page links the
+// host-served /parity.css (see index.html) so both legs load the byte-identical
+// stylesheet the Tailwind CLI generates. Importing the source through Vite would
+// pass it through uncompiled (no Tailwind plugin is registered), and adding one
+// would produce a second independently-compiled stylesheet — forfeiting the
+// one-stylesheet guarantee this harness depends on.
 
 function currentId(): string | null {
   const match = /^#\/fixture\/(.+)$/.exec(window.location.hash);
@@ -886,6 +892,8 @@ export default defineConfig({
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Parity fixtures</title>
+    <!-- The host serves this; both legs must load the same generated file. -->
+    <link rel="stylesheet" href="/parity.css" />
   </head>
   <body>
     <script type="module" src="/src/main.tsx"></script>
@@ -1873,7 +1881,7 @@ public sealed class AliasTableTests
     {
         var table = AliasTable.Load();
 
-        table.Expand("menu", "@item(2)").ShouldBe("[role=menuitem]:nth-match(3)");
+        table.Expand("menu", "@item(2)").ShouldBe(":nth-match([role=menuitem], 3)");
     }
 }
 ```
@@ -1896,12 +1904,12 @@ Expected: FAIL — `AliasTable` does not exist.
     "trigger": "[aria-haspopup],[aria-expanded]",
     "popup": "[role=dialog],[role=menu],[role=listbox],[role=tooltip]",
     "input": "input,textarea,[contenteditable=true]",
-    "item": "[role=option]:nth-match({n})"
+    "item": ":nth-match([role=option], {n})"
   },
   "popover": { "trigger": "[aria-haspopup],[aria-expanded]" },
-  "menu": { "item": "[role=menuitem]:nth-match({n})" },
-  "select": { "item": "[role=option]:nth-match({n})" },
-  "tabs": { "item": "[role=tab]:nth-match({n})" },
+  "menu": { "item": ":nth-match([role=menuitem], {n})" },
+  "select": { "item": ":nth-match([role=option], {n})" },
+  "tabs": { "item": ":nth-match([role=tab], {n})" },
   "accordion": { "trigger": "[aria-expanded]" },
   "collapsible": { "trigger": "[aria-expanded]" }
 }
