@@ -17,16 +17,32 @@ public static class ParityPaths
     /// <summary>Gets the waiver file path.</summary>
     public static string Waivers => Path.Combine(HarnessRoot, "waivers", "waivers.json");
 
-    /// <summary>Gets the built React bundle directory.</summary>
+    /// <summary>
+    /// Gets the React bundle's build output <em>in the source tree</em>
+    /// (<c>react-fixtures/dist</c>), which is what <c>pnpm parity:build</c> writes.
+    /// This is not the copy the test host serves: the csproj copies this directory
+    /// into the test output directory as <c>react-dist</c>, and the host mounts
+    /// <c>Path.Combine(AppContext.BaseDirectory, "react-dist")</c> at <c>/react</c>.
+    /// </summary>
     public static string ReactDist => Path.Combine(HarnessRoot, "react-fixtures", "dist");
 
     /// <summary>Gets the shared capture script path.</summary>
     public static string SharedScript => Path.Combine(HarnessRoot, "shared", "capture.js");
 
     /// <summary>Gets the report output directory.</summary>
-    public static string ReportDir { get; } =
-        Environment.GetEnvironmentVariable("PARITY_REPORT_DIR")
-        ?? Path.Combine(HarnessRoot, "parity-report");
+    public static string ReportDir { get; } = ResolveReportDir();
+
+    private static string ResolveReportDir()
+    {
+        // On Unix an exported-but-empty variable reads back as "" rather than null,
+        // which a bare `??` would accept and scatter reports into the process's
+        // working directory.
+        var overridePath = Environment.GetEnvironmentVariable("PARITY_REPORT_DIR");
+
+        return !string.IsNullOrEmpty(overridePath)
+            ? overridePath
+            : Path.Combine(HarnessRoot, "parity-report");
+    }
 
     private static string ResolveHarnessRoot()
     {

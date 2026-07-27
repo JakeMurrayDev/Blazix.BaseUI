@@ -6,6 +6,9 @@ namespace Blazix.BaseUI.Parity.Tests.Infrastructure;
 /// </summary>
 public static class BaseUiLocator
 {
+    /// <summary>The directory that distinguishes a base-ui checkout from any other directory.</summary>
+    private const string MarkerSubPath = "packages/react";
+
     /// <summary>
     /// Locates the base-ui checkout.
     /// </summary>
@@ -15,7 +18,10 @@ public static class BaseUiLocator
         var overridePath = Environment.GetEnvironmentVariable("PARITY_BASE_UI_PATH");
         if (!string.IsNullOrEmpty(overridePath))
         {
-            return Directory.Exists(overridePath) ? overridePath : null;
+            // An override is held to the same standard as the walk-up: merely
+            // existing is not enough, or a wrong path is accepted here and only
+            // surfaces later as an unrelated failure.
+            return IsCheckout(overridePath) ? overridePath : null;
         }
 
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -23,7 +29,7 @@ public static class BaseUiLocator
         for (var i = 0; i < 12 && dir is not null; i++, dir = dir.Parent)
         {
             var candidate = Path.Combine(dir.FullName, ".base-ui");
-            if (Directory.Exists(Path.Combine(candidate, "packages", "react")))
+            if (IsCheckout(candidate))
             {
                 return candidate;
             }
@@ -37,8 +43,34 @@ public static class BaseUiLocator
     /// </summary>
     /// <returns>The absolute path to the checkout.</returns>
     public static string Locate()
-        => TryLocate() ?? throw new DirectoryNotFoundException(
+    {
+        var located = TryLocate();
+        if (located is not null)
+        {
+            return located;
+        }
+
+        var overridePath = Environment.GetEnvironmentVariable("PARITY_BASE_UI_PATH");
+        if (!string.IsNullOrEmpty(overridePath))
+        {
+            // Telling the operator to set the variable they just set sends them
+            // looking in the wrong place; name the path and what was missing.
+            var reason = Directory.Exists(overridePath)
+                ? $"it has no '{MarkerSubPath}' directory"
+                : "no such directory exists";
+
+            throw new DirectoryNotFoundException(
+                $"PARITY_BASE_UI_PATH is set to '{overridePath}', which is not a base-ui " +
+                $"checkout: {reason}. Point it at the checkout root, or clear it to fall back " +
+                "to searching for .base-ui at the main repository root.");
+        }
+
+        throw new DirectoryNotFoundException(
             "Could not locate the .base-ui checkout. It is gitignored and lives at the main " +
             "repository root, so it is absent from git worktrees. Set PARITY_BASE_UI_PATH to " +
             "its absolute path, or clear PARITY_LIVE to use committed baselines instead.");
+    }
+
+    private static bool IsCheckout(string path)
+        => Directory.Exists(Path.Combine(path, MarkerSubPath));
 }

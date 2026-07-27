@@ -37,6 +37,18 @@ if (!existsSync(resolve(baseUi, DEMOS_SUBPATH))) {
   );
 }
 
+// The React leg is only a reference implementation if it runs the React release
+// upstream pins. That is the checkout's own copy, not this harness's.
+const baseUiReact = resolve(baseUi, 'node_modules/react');
+const baseUiReactDom = resolve(baseUi, 'node_modules/react-dom');
+
+if (!existsSync(baseUiReact) || !existsSync(baseUiReactDom)) {
+  throw new Error(
+    `base-ui checkout at ${baseUi} has no installed react/react-dom under node_modules. ` +
+      'Run `pnpm install` in the checkout so the React side runs the version upstream pins.',
+  );
+}
+
 export default defineConfig({
   base: '/react/',
   plugins: [react()],
@@ -44,7 +56,8 @@ export default defineConfig({
     // The demos and packages/react resolve `react` from the checkout's own
     // node_modules, which carries a different patch release than this project
     // pins. Without deduping, both copies are bundled and every demo's hooks
-    // run against a React that never rendered them.
+    // run against a React that never rendered them. This collapses the two
+    // copies; the aliases below decide *which* copy survives.
     dedupe: ['react', 'react-dom'],
     alias: {
       // Bare, not `/base-ui-demos`: import.meta.glob only routes a specifier
@@ -52,6 +65,17 @@ export default defineConfig({
       'base-ui-demos': resolve(baseUi, DEMOS_SUBPATH),
       '@base-ui/react': resolve(baseUi, 'packages/react/src'),
       docs: resolve(baseUi, 'docs'),
+      // Pin every React specifier to the checkout's copy. dedupe alone
+      // collapses toward this harness's node_modules (19.2.0), so base-ui's
+      // own source and every demo would render on a React release upstream
+      // does not pin. Alias and dedupe address different mechanisms — alias
+      // chooses the copy, dedupe stops a second one slipping in — so both stay.
+      // Subpaths ride the prefix rule (`react/jsx-runtime`, `react-dom/client`)
+      // but `react-dom/client` is spelled out ahead of `react-dom` so the more
+      // specific entry always wins regardless of match order.
+      'react-dom/client': resolve(baseUiReactDom, 'client.js'),
+      'react-dom': baseUiReactDom,
+      react: baseUiReact,
     },
   },
   build: {
