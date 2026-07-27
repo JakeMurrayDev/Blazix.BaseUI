@@ -32,15 +32,22 @@
     'aria-activedescendant', 'aria-details', 'aria-owns', 'for', 'headers',
   ];
 
-  /** Assigns stable #idN symbols in document order. */
-  function buildIdTable(root) {
+  /** Assigns stable #idN symbols in document order across every root.
+   *
+   * One table spanning all roots, never one per root: a trigger inside the fixture
+   * root routinely points at a popup portalled to <body>, and a per-root table
+   * cannot see across that boundary — it would leave aria-controls holding a raw
+   * Blazor GUID or React useId, which differs on every run and between legs. The
+   * counter has to span the roots too, or #id1 would name a different node in each
+   * tree. */
+  function buildIdTable(rootList) {
     const table = new Map();
     let n = 0;
     const walk = (el) => {
       if (el.id && !table.has(el.id)) table.set(el.id, `#id${++n}`);
       for (const child of el.children) walk(child);
     };
-    walk(root);
+    for (const { el } of rootList) walk(el);
     return table;
   }
 
@@ -53,7 +60,14 @@
       .join(' ');
   }
 
-  function nodePath(el, root) {
+  /** Builds a node's path within `root`, prefixed with that root's label.
+   *
+   * The label is a segment of its own rather than a separate field, so the root
+   * element itself gets a non-empty path instead of ''. Without it every root
+   * writes its own geometry to the same key, and the moment a popup portals to
+   * <body> the fixture tree's boxes — the data popup positioning is compared on —
+   * are overwritten by the portal's. */
+  function nodePath(el, root, label) {
     const segments = [];
     let node = el;
     while (node && node !== root) {
@@ -70,6 +84,7 @@
       segments.unshift(`${tag}${rolePart}${idxPart}`);
       node = parent;
     }
+    segments.unshift(label);
     return segments.join(' > ');
   }
 
@@ -82,8 +97,12 @@
       // comparator respectively; diffing them textually produces false positives.
       if (name === 'class' || name === 'style') continue;
 
-      // Blazor render-tree bookkeeping, never present on the React side.
-      if (name.startsWith('b-') || name === 'blazor:elementreference') continue;
+      // Blazor render-tree bookkeeping, never present on the React side. `b-*` is the
+      // scoped-CSS marker; `_bl_<referenceCaptureId>` is what the browser renderer
+      // stamps on for every AddElementReferenceCapture, which RenderElement issues on
+      // EVERY element the library renders. The id is regenerated per run, so leaving
+      // these in makes every Blazix element diff, and diff differently each time.
+      if (name.startsWith('b-') || name.startsWith('_bl_')) continue;
 
       // Prefixed Blazix markers are renamed to their upstream spelling. The rule
       // is idempotent: already-unprefixed markers pass through untouched.
@@ -139,21 +158,40 @@
     };
   }
 
+  /** The trees a capture spans, each paired with the label that namespaces its paths.
+   *
+   * The labels have to mean the same thing on both legs, whose <body> contents
+   * otherwise differ. `root` is resolved by attribute, so it never depends on where
+   * the framework puts the fixture host. Portal labels number only the elements that
+   * survive the SCRIPT / data-parity-ignore filter — framework chrome (Blazor's
+   * blazor.web.js tag, Vite's module tag) is excluded — leaving just the containers a
+   * fixture portals out, which both legs append to <body> in the order the fixture
+   * opens them. portal(1) is therefore the same logical portal on both sides. */
   function roots() {
     const primary = document.querySelector('[data-parity-root]');
-    const list = primary ? [primary] : [];
+    const list = primary ? [{ label: 'root', el: primary }] : [];
     // Portalled content mounts outside the fixture root.
+    let portals = 0;
     for (const el of document.body.children) {
       if (el !== primary && !el.hasAttribute('data-parity-ignore') && el.tagName !== 'SCRIPT') {
-        list.push(el);
+        list.push({ label: `portal(${++portals})`, el });
       }
     }
     return list;
   }
 
+  /** Resolves a labelled path for an element reached outside a snapshot walk — focus
+   * and the timeline observe the whole document, not one root. */
+  function pathIn(rootList, el) {
+    const owner = rootList.find((r) => r.el.contains(el));
+    return owner
+      ? nodePath(el, owner.el, owner.label)
+      : nodePath(el, document.body, 'body');
+  }
+
   function snapshot(root, idTable, styles, customProps, geometry) {
     const build = (el) => {
-      const path = nodePath(el, root);
+      const path = nodePath(el, root.el, root.label);
       styles[path] = readStyles(el);
       customProps[path] = readCustomProps(el);
       geometry[path] = readGeometry(el);
@@ -173,7 +211,7 @@
         children: Array.from(el.children).map(build),
       };
     };
-    return build(root);
+    return build(root.el);
   }
 
   const state = {
@@ -183,18 +221,26 @@
     listeners: [],
   };
 
+  function teardownTimeline() {
+    state.observer?.disconnect();
+    state.observer = null;
+    for (const [type, handler] of state.listeners) {
+      document.removeEventListener(type, handler, true);
+    }
+    state.listeners = [];
+  }
+
   window[KEY] = {
     capture(stepName) {
       const styles = {};
       const customProps = {};
       const geometry = {};
-      const trees = roots().map((root) => {
-        const idTable = buildIdTable(root);
-        return snapshot(root, idTable, styles, customProps, geometry);
-      });
+      const rootList = roots();
+      const idTable = buildIdTable(rootList);
+      const trees = rootList.map((root) => snapshot(root, idTable, styles, customProps, geometry));
 
       const active = document.activeElement;
-      const activeRoot = roots().find((r) => r.contains(active));
+      const activeRoot = rootList.find((r) => r.el.contains(active));
 
       return {
         step: stepName,
@@ -202,12 +248,17 @@
         styles,
         customProps,
         geometry,
-        focus: active && activeRoot ? nodePath(active, activeRoot) : null,
+        focus: active && activeRoot ? nodePath(active, activeRoot.el, activeRoot.label) : null,
         timeline: state.timeline.slice(),
       };
     },
 
     startTimeline() {
+      // capture() returns the timeline without stopping it, so a per-step runner
+      // naturally does start -> capture -> start. Without this teardown the previous
+      // observer stays connected and a second copy of all six listeners is registered,
+      // so every event lands in state.timeline once per live registration.
+      teardownTimeline();
       state.timeline = [];
       state.startedAt = performance.now();
       const at = () => Math.round(performance.now() - state.startedAt);
@@ -216,11 +267,10 @@
         for (const r of records) {
           if (r.type === 'attributes') {
             const el = r.target;
-            const root = roots().find((x) => x.contains(el)) ?? document.body;
             state.timeline.push({
               t: at(),
               kind: 'attribute',
-              path: nodePath(el, root),
+              path: pathIn(roots(), el),
               attr: r.attributeName,
               from: r.oldValue,
               to: el.getAttribute(r.attributeName),
@@ -228,7 +278,7 @@
           } else if (r.type === 'childList') {
             for (const n of r.addedNodes) {
               if (n.nodeType === Node.ELEMENT_NODE) {
-                state.timeline.push({ t: at(), kind: 'added', path: nodePath(n, document.body), attr: null, from: null, to: n.tagName.toLowerCase() });
+                state.timeline.push({ t: at(), kind: 'added', path: pathIn(roots(), n), attr: null, from: null, to: n.tagName.toLowerCase() });
               }
             }
             for (const n of r.removedNodes) {
@@ -250,9 +300,8 @@
       for (const type of ['transitionstart', 'transitionend', 'transitioncancel',
                           'animationstart', 'animationend', 'animationcancel']) {
         const handler = (e) => {
-          const root = roots().find((x) => x.contains(e.target)) ?? document.body;
           state.timeline.push({
-            t: at(), kind: type, path: nodePath(e.target, root),
+            t: at(), kind: type, path: pathIn(roots(), e.target),
             attr: e.propertyName ?? e.animationName ?? null, from: null, to: null,
           });
         };
@@ -262,12 +311,7 @@
     },
 
     stopTimeline() {
-      state.observer?.disconnect();
-      state.observer = null;
-      for (const [type, handler] of state.listeners) {
-        document.removeEventListener(type, handler, true);
-      }
-      state.listeners = [];
+      teardownTimeline();
       return state.timeline.slice();
     },
 
