@@ -703,7 +703,7 @@ drift between the two sides."
 
 **Interfaces:**
 - Consumes: `parity.css` (Task 2).
-- Produces: static bundle at `react-fixtures/dist/` serving `/react/#/fixture/{component}/{demo}`, mounting into `<div data-parity-root>`; `BaseUiLocator.Locate()` → `string`; `ParityPaths` with `RepoRoot`, `HarnessRoot`, `Manifest`, `Baselines`, `Waivers`, `ReactDist`, `SharedScript`.
+- Produces: static bundle at `react-fixtures/dist/` serving `/react/#/fixture/{component}/{demo}`, mounting into `<div data-parity-root>`; `BaseUiLocator.TryLocate()` / `.Locate()` → `string?` / `string`; `ParityPaths` with `HarnessRoot`, `Manifest`, `Baselines`, `Waivers`, `ReactDist`, `SharedScript`, `ReportDir`. (There is deliberately no `RepoRoot` — nothing needs it, and `HarnessRoot` is the only anchor the harness resolves against.)
 
 Routing is hash-based so the bundle needs no server rewrite rules when mounted under `/react`.
 
@@ -719,15 +719,22 @@ export interface Fixture {
   Component: ComponentType<unknown>;
 }
 
-// Vite resolves this at build time against the path injected by vite.config.mts.
+// `base-ui-demos` is the alias vite.config.mts points at the checkout's demo
+// directory. The specifier is deliberately bare: Vite joins a glob beginning
+// with `/` onto the project root WITHOUT consulting resolve.alias, so a rooted
+// spelling silently matches nothing — and an empty glob still builds cleanly.
 const modules = import.meta.glob<{ default: ComponentType<unknown> }>(
-  '/base-ui-demos/*/demos/*/tailwind/index.tsx',
+  'base-ui-demos/*/demos/*/tailwind/index.tsx',
   { eager: true },
 );
 
+// Keys arrive relative to the Vite root, so they carry a `../` prefix whose depth
+// depends on where the checkout sits. Only the trailing segments are stable.
+const idPattern = /([^/]+)\/demos\/([^/]+)\/tailwind\/index\.tsx$/;
+
 export const fixtures: Fixture[] = Object.entries(modules)
   .map(([path, mod]) => {
-    const match = /\/base-ui-demos\/([^/]+)\/demos\/([^/]+)\/tailwind\/index\.tsx$/.exec(path);
+    const match = idPattern.exec(path);
     if (!match) {
       throw new Error(`Unexpected demo path: ${path}`);
     }
@@ -844,10 +851,15 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '/base-ui-demos': resolve(baseUi, DEMOS_SUBPATH),
+      'base-ui-demos': resolve(baseUi, DEMOS_SUBPATH),
       '@base-ui/react': resolve(baseUi, 'packages/react/src'),
       docs: resolve(baseUi, 'docs'),
     },
+    // The checkout ships its own React, and @vitejs/plugin-react does not dedupe.
+    // Without this, two React copies are bundled and every demo's hooks run
+    // against a React instance that never rendered them — a clean build in which
+    // no fixture actually works.
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     outDir: 'dist',
@@ -1029,18 +1041,18 @@ Add to `Blazix.BaseUI.Parity.Tests.csproj`, so `Program.cs`'s `/react` mount fin
   </ItemGroup>
 ```
 
-- [ ] **Step 7a: Regenerate `parity.css`**
-
-Task 2 generated the stylesheet when `react-fixtures/src/` was empty. This task adds `main.tsx` and
-`fixtures.ts`, and the React demos now reachable through the glob bring in utilities the earlier scan
-never saw. Regenerate and commit:
+- [ ] **Step 7a: Confirm `parity.css` needs no regeneration**
 
 ```bash
 cd tests/Blazix.BaseUI.Parity.Tests/react-fixtures && pnpm parity:css && git diff --stat ../Blazix.BaseUI.Parity.Tests/wwwroot/parity.css
 ```
 
-Expected: a non-empty diff. If the file is unchanged, the glob did not reach the demos — stop and
-diagnose rather than proceeding.
+Expected: an **empty** diff. Tailwind's `@source` already points directly at the base-ui demo
+directory, so the stylesheet's coverage of React utilities is independent of the JavaScript glob —
+Task 2 already picked them up. Adding `main.tsx` and `fixtures.ts` introduces no new utility classes.
+
+A non-empty diff here means something unexpected changed the scan; stop and diagnose. The
+regeneration that *does* matter is in Tasks 15 and 16, where Blazor fixture markup gains classes.
 
 - [ ] **Step 7: Verify end to end**
 
