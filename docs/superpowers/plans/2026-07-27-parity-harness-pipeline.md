@@ -1103,11 +1103,17 @@ from one origin in one browser."
 reflection — it needs no browser and no server fixture — but nothing currently prevents its
 nested-type guard from regressing, and later tasks consume `FixtureRegistry.Ids` to cross-check
 `manifest/fixtures.json`. Add `FixtureRegistryTests` asserting that `Ids` contains `switch/hero`
-and that no id contains `+`. To make the guard's absence detectable, the test must run against a
-fixture that emits a closure class: give `Client/Fixtures/Harness/CaptureProbe.razor` a
-**non-capturing** lambda (for example `@onclick="() => Console.WriteLine()"`) — a lambda capturing
-only `this` compiles to an instance method and emits no nested type, so it would not exercise the
-guard.
+and that no id contains `+`.
+
+Give `Client/Fixtures/Harness/CaptureProbe.razor` a **non-capturing** lambda (for example
+`@onclick="() => Console.WriteLine()"`) so a closure class is actually emitted — a lambda capturing
+only `this` compiles to an instance method and emits no nested type at all.
+
+Note what this does and does not prove. `BuildIndex` filters on **both** `type.IsNested` and
+`IComponent` assignability, and the emitted closure class fails the `IComponent` check on its own,
+so deleting the `IsNested` clause leaves these tests passing. `IsNested` is defensive belt-and-braces,
+not the clause under test. The contract worth asserting is the observable one — no id contains `+` —
+so keep the tests, but do not describe them as guarding `IsNested`.
 
 **Interfaces:**
 - Consumes: `ParityPaths.SharedScript`.
@@ -1322,9 +1328,19 @@ Expected: FAIL — `CaptureScript` does not exist (CS0103).
     const out = {};
     // computedStyleMap is not available for custom properties in all engines;
     // enumerate the declared set from the element's own cascade instead.
+    //
+    // `--tw-*` is excluded deliberately. Tailwind v4 registers dozens of custom
+    // properties via @property, so every element inherits a large map of engine
+    // internals. Capturing them would bloat every baseline and bury the
+    // properties this harness actually compares — the ones base-ui exposes
+    // (--anchor-width, --available-width/height, --transform-origin,
+    // --positioner-*) — under Tailwind's bookkeeping. Both sides load the same
+    // stylesheet, so the excluded values are identical by construction anyway.
     for (let i = 0; i < cs.length; i++) {
       const prop = cs.item(i);
-      if (prop.startsWith('--')) out[prop] = cs.getPropertyValue(prop).trim();
+      if (prop.startsWith('--') && !prop.startsWith('--tw-')) {
+        out[prop] = cs.getPropertyValue(prop).trim();
+      }
     }
     return out;
   }
@@ -1668,10 +1684,7 @@ public static class CaptureScript
     /// <param name="page">The page to inject into.</param>
     /// <returns>A task that completes when the script is registered.</returns>
     public static Task InjectAsync(IPage page)
-        => page.AddInitScriptAsync(new PageAddInitScriptOptions
-        {
-            Path = Infrastructure.ParityPaths.SharedScript
-        });
+        => page.AddInitScriptAsync(scriptPath: Infrastructure.ParityPaths.SharedScript);
 
     /// <summary>
     /// Captures the current page state for the supplied step.
