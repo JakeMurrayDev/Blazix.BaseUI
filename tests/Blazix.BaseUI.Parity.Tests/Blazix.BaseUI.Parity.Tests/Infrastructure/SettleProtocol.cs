@@ -8,7 +8,8 @@ namespace Blazix.BaseUI.Parity.Tests.Infrastructure;
 public static class SettleProtocol
 {
     /// <summary>
-    /// Waits for interactivity, font loading, and two consecutive mutation-free frames.
+    /// Waits for interactivity, font loading, and two consecutive mutation-free frames
+    /// during which no Blazix portal is still being mounted.
     /// </summary>
     /// <param name="page">The page to wait on.</param>
     /// <param name="timeoutMs">The overall timeout in milliseconds.</param>
@@ -25,17 +26,50 @@ public static class SettleProtocol
 
         await page.EvaluateAsync("() => document.fonts.ready");
 
-        await page.EvaluateAsync("""
-            () => new Promise(resolve => {
-              let quiet = 0;
-              const observer = new MutationObserver(() => { quiet = 0; });
-              observer.observe(document.body, { attributes: true, subtree: true, childList: true });
-              const tick = () => {
-                if (++quiet >= 2) { observer.disconnect(); resolve(); return; }
-                requestAnimationFrame(tick);
-              };
-              requestAnimationFrame(tick);
-            })
-            """);
+        await page.EvaluateAsync(QuiesceScript, timeoutMs);
     }
+
+    /// <summary>
+    /// Waits for two consecutive mutation-free frames during which no Blazix portal is
+    /// mid-mount.
+    /// </summary>
+    /// <remarks>
+    /// The portal gate is what stops a popup step from being captured against a DOM the
+    /// popup has not reached yet. Blazix's <c>Portal</c> renders its container inline and
+    /// only moves it to the target from <c>OnAfterRenderAsync</c>, behind a lazy JS module
+    /// import and an interop round trip. Nothing mutates while that is in flight, so the
+    /// quiet frames elapse and the capture records a missing popup — a harness artifact
+    /// that looks exactly like a component difference.
+    /// <para>
+    /// The wait is on the component's own state rather than on a delay: <c>Portal.razor</c>
+    /// writes <c>display: none</c> inline while the move is pending, and the same JS that
+    /// performs the move removes the declaration, so the flag is set for exactly the
+    /// window that must be waited out. Marker attributes with no inline
+    /// <c>display: none</c> are deliberately not treated as pending: a container that is
+    /// never moved would otherwise hold the settle open until the deadline.
+    /// </para>
+    /// </remarks>
+    private const string QuiesceScript = """
+        (timeoutMs) => new Promise((resolve, reject) => {
+          const deadline = performance.now() + timeoutMs;
+          let quiet = 0;
+          const observer = new MutationObserver(() => { quiet = 0; });
+          observer.observe(document.body, { attributes: true, subtree: true, childList: true });
+
+          const portalPending = () => [...document.querySelectorAll('[data-blazix-base-ui-portal]')]
+            .some((el) => el.style.display === 'none');
+
+          const tick = () => {
+            if (performance.now() > deadline) {
+              observer.disconnect();
+              reject(new Error('Timed out waiting for the page to settle.'));
+              return;
+            }
+            if (portalPending()) { quiet = 0; requestAnimationFrame(tick); return; }
+            if (++quiet >= 2) { observer.disconnect(); resolve(); return; }
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        })
+        """;
 }

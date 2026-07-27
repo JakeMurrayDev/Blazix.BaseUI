@@ -1,0 +1,14 @@
+[
+  {
+    "id": "switch/hero",
+    "component": "switch",
+    "react": "switch/demos/hero/tailwind/index.tsx",
+    "blazor": "Switch/Hero",
+    "themes": ["light"],
+    "pixelThreshold": 0.001,
+    "steps": [
+      { "name": "initial" },
+      { "name": "toggle-off", "do": [{ "click": "[role=switch]" }] }
+    ]
+  }
+]

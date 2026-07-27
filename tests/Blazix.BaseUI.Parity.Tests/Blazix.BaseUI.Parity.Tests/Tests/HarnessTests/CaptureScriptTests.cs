@@ -168,9 +168,9 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
         await page.GotoAsync($"{ParityServerAssemblyFixture.ServerAddress}/fixture/harness/capture-probe/server");
 
         // The Portal container is appended to <body> from OnAfterRenderAsync, after a
-        // module import and an interop round trip. That can land later than the settle
-        // protocol's two quiet frames, so wait for the second root before settling.
-        await page.WaitForSelectorAsync("body > [data-blazix-base-ui-portal]");
+        // module import and an interop round trip, which can land later than the settle
+        // protocol's two quiet frames. SettleProtocol now gates on the container's own
+        // mid-mount flag, so no local wait is needed here.
         await SettleProtocol.WaitAsync(page);
 
         return page;

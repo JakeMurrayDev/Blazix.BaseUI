@@ -130,6 +130,19 @@ public sealed record StepCapture
     /// <summary>Gets the screenshot file names produced for this step.</summary>
     [JsonPropertyName("screenshots")]
     public IReadOnlyList<string> Screenshots { get; init; } = [];
+
+    /// <summary>
+    /// Gets the expanded step selectors that matched nothing on this leg.
+    /// </summary>
+    /// <remarks>
+    /// Steps address elements through role-based aliases because roles are the one
+    /// contract both implementations must honour, so a selector that resolves on one leg
+    /// and not the other is a parity result rather than a harness failure. The capturer
+    /// records it here and skips the action instead of throwing; comparing the two legs'
+    /// lists is what turns it into a finding.
+    /// </remarks>
+    [JsonPropertyName("unresolvedSelectors")]
+    public IReadOnlyList<string> UnresolvedSelectors { get; init; } = [];
 }
 
 /// <summary>All steps captured for one fixture on one leg.</summary>
