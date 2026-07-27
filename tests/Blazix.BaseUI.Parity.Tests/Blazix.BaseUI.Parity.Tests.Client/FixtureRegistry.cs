@@ -28,6 +28,15 @@ public static class FixtureRegistry
 
         foreach (var type in typeof(FixtureRegistry).Assembly.GetTypes())
         {
+            // Nested types must be excluded: the Razor compiler emits closure classes
+            // such as Fixtures.Switch.Hero+<>c, whose FullName still splits into two
+            // segments and would otherwise register as `switch/hero+<>c`.
+            if (type.IsNested ||
+                !typeof(Microsoft.AspNetCore.Components.IComponent).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
             if (type.FullName is null || !type.FullName.StartsWith(prefix, StringComparison.Ordinal))
             {
                 continue;
