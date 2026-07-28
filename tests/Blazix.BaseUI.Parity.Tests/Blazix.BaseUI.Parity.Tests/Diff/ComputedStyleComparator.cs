@@ -1,0 +1,102 @@
+namespace Blazix.BaseUI.Parity.Tests.Diff;
+
+/// <summary>
+/// Reports allowlisted computed style properties that differ between nodes that matched.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Each node is looked up under its own path, not the reference's: an extra wrapper on one
+/// leg puts the two halves of a pair at different depths, and reading both legs at the
+/// reference's path would miss the candidate's entry and report every property on it as
+/// Blazor-only.
+/// </para>
+/// <para>
+/// A node the DOM snapshot holds but the style map does not is read as a node with no
+/// styles. <c>capture.js</c> writes an entry for every element it walks, so an absence is a
+/// capture disagreeing with itself rather than a parity result; reporting the present leg's
+/// properties as one-sided keeps that loud, where skipping the pair would drop the node's
+/// styles from the run without a word. Nothing is reported when neither leg has an entry,
+/// because then there is no captured value on either side to differ.
+/// </para>
+/// </remarks>
+public sealed class ComputedStyleComparator : IComparator
+{
+    /// <summary>
+    /// Half a pixel: below what a colour channel, a keyword, or a step count can differ by,
+    /// and above the sub-pixel layout noise that otherwise makes nearly every element differ.
+    /// Kept private rather than shared: the custom property comparator's tolerance is the
+    /// same number today for its own reasons, and a shared constant would tie the two.
+    /// </summary>
+    private const double Epsilon = 0.5;
+
+    private static readonly IReadOnlyDictionary<string, string> NoStyles =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <inheritdoc />
+    public FindingKind Kind => FindingKind.ComputedStyle;
+
+    /// <inheritdoc />
+    public IEnumerable<Finding> Compare(ComparisonContext context)
+    {
+        var match = NodeMatcher.Match(context.Reference.Dom, context.Candidate.Dom);
+
+        foreach (var pair in match.Pairs)
+        {
+            var reference = context.Reference.Styles.TryGetValue(pair.Reference.Path, out var left)
+                ? left
+                : NoStyles;
+            var candidate = context.Candidate.Styles.TryGetValue(pair.Candidate.Path, out var right)
+                ? right
+                : NoStyles;
+
+            var names = reference.Keys
+                .Concat(candidate.Keys)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal);
+
+            foreach (var name in names)
+            {
+                var hasReference = reference.TryGetValue(name, out var referenceValue);
+                var hasCandidate = candidate.TryGetValue(name, out var candidateValue);
+
+                if (hasReference
+                    && hasCandidate
+                    && ValueTolerance.Equivalent(referenceValue!, candidateValue!, Epsilon))
+                {
+                    continue;
+                }
+
+                yield return new Finding
+                {
+                    Fixture = context.Fixture,
+                    Leg = context.Leg,
+                    Step = context.Step,
+                    Kind = FindingKind.ComputedStyle,
+                    Severity = Severity.Error,
+                    NodePath = pair.Reference.Path,
+                    Property = name,
+                    ReferenceValue = hasReference ? referenceValue : null,
+                    CandidateValue = hasCandidate ? candidateValue : null,
+                    Message =
+                        $"Computed style '{name}' differs at '{pair.Reference.Path}': " +
+                        $"React {Describe(hasReference, referenceValue)}, " +
+                        $"Blazor {Describe(hasCandidate, candidateValue)}." +
+                        RelaxedNote(pair)
+                };
+            }
+        }
+    }
+
+    private static string Describe(bool present, string? value)
+        => present ? $"'{value}'" : "absent";
+
+    /// <summary>
+    /// Says so when the two nodes only matched on their tag. They are still compared —
+    /// suppressing them would lose the layout difference beneath an identity difference the
+    /// structural finding does not describe — but the two operands may not correspond.
+    /// </summary>
+    private static string RelaxedNote(NodePair pair)
+        => pair.Relaxed
+            ? " The two nodes were paired on tag alone, so they may not be the same element."
+            : string.Empty;
+}
