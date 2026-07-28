@@ -128,7 +128,11 @@ public sealed class TimelineComparator : IComparator
     /// <summary>Whether a removal event could be tied to an animating node.</summary>
     private enum RemovalKind
     {
-        /// <summary>Nothing that could be this node was removed.</summary>
+        /// <summary>
+        /// The node was not removed: either the step recorded no removal at all, or the
+        /// node is in the snapshot the step ended on. Both are positive evidence, which is
+        /// what lets this state read as the obligation being satisfied.
+        /// </summary>
         None,
 
         /// <summary>Something was, and which removal it is cannot be decided.</summary>
@@ -261,69 +265,94 @@ public sealed class TimelineComparator : IComparator
     }
 
     /// <summary>
-    /// L3: measures each leg's run against its own declared duration, and records the delta
-    /// between the two.
+    /// L3: measures each of a leg's runs against its own declared duration, and records the
+    /// delta between the two legs run for run.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A declaration that is missing or zero is not checked. The step is captured once the
     /// animation is over, by which time the markers that switched the transition on are gone
     /// and the element may compute a <c>transition-duration</c> that says nothing about the
     /// run that happened; failing on that would report a defect where there is only a
     /// stylesheet whose transition is conditional. A comma-separated list is read at its
-    /// longest, because the span the timeline measures runs from the first start to the last
-    /// terminal event across every property that ran.
+    /// longest, because one run spans every property that ran within it.
+    /// </para>
+    /// <para>
+    /// A leg that overran is reported even when the other leg overran identically, which is
+    /// where this layer parts company with L2. An L2 obligation is a statement about what the
+    /// component did, and one React breaks too is not a Blazix defect. An overrun is a
+    /// statement about the measurement itself: a leg that contradicts the stylesheet it was
+    /// measured against has no usable duration for that step, and the other leg's number came
+    /// off the same clock. Silence there would leave the cross-leg record below as the only
+    /// output, reporting numbers from a basis known to be broken with nothing saying so.
+    /// </para>
     /// </remarks>
     /// <param name="context">The paired step.</param>
     /// <param name="path">The animating node.</param>
-    /// <returns>Up to one finding per leg, plus the cross-leg record.</returns>
+    /// <returns>One finding per overrunning run per leg, plus the cross-leg records.</returns>
     private static IEnumerable<Finding> CompareSpans(ComparisonContext context, string path)
     {
-        var reference = Span(context.Reference.Timeline, path);
-        var candidate = Span(context.Candidate.Timeline, path);
+        var reference = Spans(context.Reference.Timeline, path);
+        var candidate = Spans(context.Candidate.Timeline, path);
         var referenceDeclared = Declared(context.Reference.Styles, path);
         var candidateDeclared = Declared(context.Candidate.Styles, path);
 
-        if (reference is { } reactRun && referenceDeclared is { } reactDeclared
-            && Overruns(reactRun, reactDeclared))
+        // Every run, not merely the first or the last: a step that opens cleanly and closes
+        // in triple the declared time is a defect in the close, and one measurement covering
+        // both would report the average of a run that was right and a run that was wrong.
+        for (var i = 0; i < reference.Count; i++)
         {
-            yield return Overrun(context, path, "React", reactRun, reactDeclared, reference, candidate);
+            if (referenceDeclared is { } declared && Overruns(reference[i], declared))
+            {
+                yield return Overrun(
+                    context, path, "React", reference[i], declared, At(reference, i), At(candidate, i));
+            }
         }
 
-        if (candidate is { } blazorRun && candidateDeclared is { } blazorDeclared
-            && Overruns(blazorRun, blazorDeclared))
+        for (var i = 0; i < candidate.Count; i++)
         {
-            yield return Overrun(context, path, "Blazor", blazorRun, blazorDeclared, reference, candidate);
+            if (candidateDeclared is { } declared && Overruns(candidate[i], declared))
+            {
+                yield return Overrun(
+                    context, path, "Blazor", candidate[i], declared, At(reference, i), At(candidate, i));
+            }
         }
 
-        // Two runs that started at the same millisecond and lasted the same time have no
-        // delta to carry, so nothing is recorded for them.
-        if (reference is not { } left || candidate is not { } right || left == right)
+        for (var i = 0; i < Math.Min(reference.Count, candidate.Count); i++)
         {
-            yield break;
-        }
+            // Two runs that started at the same millisecond and lasted the same time have no
+            // delta to carry, so nothing is recorded for them.
+            if (reference[i] == candidate[i])
+            {
+                continue;
+            }
 
-        yield return new Finding
-        {
-            Fixture = context.Fixture,
-            Leg = context.Leg,
-            Step = context.Step,
-            Kind = FindingKind.Timeline,
-            // Never an error: this is the number a reader wants when a fixture feels slow,
-            // and the cross-leg comparison it comes from is exactly the one that must not
-            // decide a verdict.
-            Severity = Severity.Info,
-            NodePath = path,
-            Property = DurationProperty,
-            ReferenceValue = Milliseconds(left.Length),
-            CandidateValue = Milliseconds(right.Length),
-            Message =
-                $"Animation span at '{path}': "
-                + $"React started at {Milliseconds(left.Start)} ms and ran {Milliseconds(left.Length)} ms "
-                + $"(declared {FindingText.Describe(referenceDeclared is not null, referenceDeclared)}); "
-                + $"Blazor started at {Milliseconds(right.Start)} ms and ran {Milliseconds(right.Length)} ms "
-                + $"(declared {FindingText.Describe(candidateDeclared is not null, candidateDeclared)}); "
-                + $"the spans differ by {Milliseconds(Math.Abs(left.Length - right.Length))} ms."
-        };
+            var left = reference[i];
+            var right = candidate[i];
+
+            yield return new Finding
+            {
+                Fixture = context.Fixture,
+                Leg = context.Leg,
+                Step = context.Step,
+                Kind = FindingKind.Timeline,
+                // Never an error: this is the number a reader wants when a fixture feels
+                // slow, and the cross-leg comparison it comes from is exactly the one that
+                // must not decide a verdict.
+                Severity = Severity.Info,
+                NodePath = path,
+                Property = DurationProperty,
+                ReferenceValue = Milliseconds(left.Length),
+                CandidateValue = Milliseconds(right.Length),
+                Message =
+                    $"Animation span at '{path}': "
+                    + $"React started at {Milliseconds(left.Start)} ms and ran {Milliseconds(left.Length)} ms "
+                    + $"(declared {FindingText.Describe(referenceDeclared is not null, referenceDeclared)}); "
+                    + $"Blazor started at {Milliseconds(right.Start)} ms and ran {Milliseconds(right.Length)} ms "
+                    + $"(declared {FindingText.Describe(candidateDeclared is not null, candidateDeclared)}); "
+                    + $"the spans differ by {Milliseconds(Math.Abs(left.Length - right.Length))} ms."
+            };
+        }
     }
 
     /// <summary>Builds the finding for a run that does not match its own declaration.</summary>
@@ -332,8 +361,8 @@ public sealed class TimelineComparator : IComparator
     /// <param name="leg">Which leg overran, named as the messages name it.</param>
     /// <param name="run">That leg's measured run.</param>
     /// <param name="declared">That leg's declared duration, as the capture spelled it.</param>
-    /// <param name="reference">React's run, for the compared values.</param>
-    /// <param name="candidate">Blazor's run, for the compared values.</param>
+    /// <param name="reference">React's run at the same index, for the compared values.</param>
+    /// <param name="candidate">Blazor's run at the same index, for the compared values.</param>
     /// <returns>The finding.</returns>
     private static Finding Overrun(
         ComparisonContext context,
@@ -353,9 +382,13 @@ public sealed class TimelineComparator : IComparator
             Property = DurationProperty,
             ReferenceValue = reference is { } left ? Milliseconds(left.Length) : null,
             CandidateValue = candidate is { } right ? Milliseconds(right.Length) : null,
+            // The start is named because one step can hold several runs on one node, and two
+            // of them breaking the same declaration by the same amount would otherwise
+            // produce two findings a reader cannot tell apart.
             Message =
                 $"Animation duration differs from its own declaration at '{path}': "
-                + $"{leg} ran for {Milliseconds(run.Length)} ms against a declared '{declared}'."
+                + $"{leg} ran for {Milliseconds(run.Length)} ms starting at {Milliseconds(run.Start)} ms "
+                + $"against a declared '{declared}'."
         };
 
     /// <summary>Reads the parts of a capture the phase and duration layers work from.</summary>
@@ -480,9 +513,14 @@ public sealed class TimelineComparator : IComparator
 
         var matching = removals.Where(i => leg.Timeline[i].From == tag).ToList();
 
+        // Past the snapshot check the node is provably gone, so something removed it and
+        // "nothing did" is the one answer left that the recording rules out. A removal
+        // reports the root of the departing subtree and nothing under it, so an animating
+        // node carried away by its portal container is recorded under the container's tag —
+        // which is the ordinary shape of a close, not a corner case.
         if (matching.Count == 0)
         {
-            return new Removal(RemovalKind.None, 0);
+            return new Removal(RemovalKind.Ambiguous, 0);
         }
 
         if (matching.Count > 1 || leg.Animating.Count(other => TagOf(other) == tag) > 1)
@@ -511,15 +549,23 @@ public sealed class TimelineComparator : IComparator
         return qualifier < 0 ? segment : segment[..qualifier];
     }
 
-    /// <summary>Measures one leg's run on one node.</summary>
+    /// <summary>Measures each of one leg's runs on one node.</summary>
+    /// <remarks>
+    /// One step can hold several runs on one node — a popup that opens and closes, a tooltip
+    /// hovered in and out, a reposition that cancels and restarts a transform mid-open — and
+    /// the idle time between two runs belongs to neither of them. A start reopens the
+    /// measurement only once the run in progress has closed; a start arriving while one is
+    /// still open is a second property joining it, which the run already spans.
+    /// </remarks>
     /// <param name="timeline">The leg's events.</param>
     /// <param name="path">The animating node.</param>
     /// <returns>
-    /// The run, or <see langword="null"/> when the recording holds no start followed by a
-    /// terminal event — a step captured mid-run, which is not a measurement.
+    /// The runs in the order they happened. A start with no terminal event after it
+    /// contributes nothing — a step captured mid-run is not a measurement.
     /// </returns>
-    private static Run? Span(IReadOnlyList<TimelineEvent> timeline, string path)
+    private static List<Run> Spans(IReadOnlyList<TimelineEvent> timeline, string path)
     {
+        var runs = new List<Run>();
         int? start = null;
         int? terminal = null;
 
@@ -530,9 +576,16 @@ public sealed class TimelineComparator : IComparator
                 continue;
             }
 
-            if (start is null && StartKinds.Contains(recorded.Kind, StringComparer.Ordinal))
+            if (StartKinds.Contains(recorded.Kind, StringComparer.Ordinal))
             {
-                start = recorded.T;
+                if (start is { } reopened && terminal is { } reclosed)
+                {
+                    runs.Add(new Run(reopened, reclosed - reopened));
+                    start = null;
+                    terminal = null;
+                }
+
+                start ??= recorded.T;
             }
             else if (start is not null && TerminalKinds.Contains(recorded.Kind, StringComparer.Ordinal))
             {
@@ -542,8 +595,20 @@ public sealed class TimelineComparator : IComparator
             }
         }
 
-        return start is { } opened && terminal is { } closed ? new Run(opened, closed - opened) : null;
+        if (start is { } opened && terminal is { } closed)
+        {
+            runs.Add(new Run(opened, closed - opened));
+        }
+
+        return runs;
     }
+
+    /// <summary>Reads one leg's run at an index, when it recorded one there.</summary>
+    /// <param name="runs">That leg's runs.</param>
+    /// <param name="index">Which run.</param>
+    /// <returns>The run, or <see langword="null"/> when that leg ran fewer.</returns>
+    private static Run? At(IReadOnlyList<Run> runs, int index)
+        => index < runs.Count ? runs[index] : null;
 
     /// <summary>Reads a leg's declared transition duration for one node.</summary>
     /// <param name="styles">That leg's captured styles.</param>

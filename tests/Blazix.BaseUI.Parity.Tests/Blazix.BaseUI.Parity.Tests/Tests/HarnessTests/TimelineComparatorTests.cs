@@ -1,3 +1,4 @@
+using System.Globalization;
 using Blazix.BaseUI.Parity.Tests.Capture;
 using Blazix.BaseUI.Parity.Tests.Diff;
 using Shouldly;
@@ -494,7 +495,43 @@ public sealed class TimelineComparatorTests
         var gone = Compare(Context(Capture(reference, present: [Popup]), Capture(candidate)));
 
         Invariant(stillThere, "removed-after-transitionend").ShouldBeEmpty();
-        Invariant(gone, "removed-after-transitionend").ShouldHaveSingleItem();
+
+        // React's node is in the snapshot the step ended on and its recording holds no
+        // removal at all, which is evidence that it was not removed rather than an absence
+        // of evidence — so this is a decided difference and fails the run.
+        var finding = Invariant(gone, "removed-after-transitionend").ShouldHaveSingleItem();
+        finding.Severity.ShouldBe(Severity.Error);
+        finding.ReferenceValue.ShouldBe("satisfied");
+        finding.CandidateValue.ShouldBe("violated");
+    }
+
+    [Fact]
+    public void SaysSoRatherThanPassingWhenTheRemovalCarriesAnotherNodesTag()
+    {
+        // MutationObserver reports the root of a removed subtree and nothing under it
+        // (capture.js:284-287), so a popup unmounted with its portal container records the
+        // *ancestor's* tag and never the popup's. The node is provably gone — it is absent
+        // from the snapshot the step ended on — so something removed it, and "nothing that
+        // could be this node was removed" is the one answer the recording rules out.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(120, "transitionend", Popup),
+            Removed(121)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(10, "transitionend", Popup),
+            Removed(11, "section")
+        ];
+
+        var findings = Compare(Context(Capture(reference), Capture(candidate)));
+        var finding = Invariant(findings, "removed-after-transitionend").ShouldHaveSingleItem();
+
+        finding.Severity.ShouldBe(Severity.Info);
+        finding.ReferenceValue.ShouldBe("satisfied");
+        finding.CandidateValue.ShouldBe("not evaluated");
     }
 
     [Fact]
@@ -532,9 +569,12 @@ public sealed class TimelineComparatorTests
 
         finding.Property.ShouldBe("transition-duration");
         finding.NodePath.ShouldBe(Popup);
+        // The run's start is named as well as its length, because one step can hold several
+        // runs on one node and two of them breaking the same declaration by the same amount
+        // would otherwise produce two findings a reader cannot tell apart.
         finding.Message.ShouldBe(
             $"Animation duration differs from its own declaration at '{Popup}': " +
-            "Blazor ran for 900 ms against a declared '0.3s'.");
+            "Blazor ran for 900 ms starting at 0 ms against a declared '0.3s'.");
     }
 
     [Fact]
@@ -660,6 +700,127 @@ public sealed class TimelineComparatorTests
 
         Errors(findings).ShouldBeEmpty();
         findings.ShouldHaveSingleItem().Message.ShouldContain("React started at 0 ms and ran 300 ms");
+    }
+
+    [Fact]
+    public void MeasuresEachRunSeparatelyRatherThanOneSpanAcrossThemAll()
+    {
+        // One step, two runs on one node: a popup that opens and closes, a tooltip hovered
+        // in and out, or a reposition that cancels and restarts a transform mid-open. A
+        // span taken from the first start to the last terminal event swallows the idle gap
+        // between the runs, so two byte-identical timelines both read as breaking their own
+        // declaration and the run fails on no difference at all.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(200, "transitionend", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1200, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Theory]
+    // The first run overruns and the second is clean, then the other way round. Checking
+    // only the first run, or only the last, lets one of these two through.
+    [InlineData(1400, 2200, 1400, 0, "200")]
+    [InlineData(200, 3200, 1200, 2000, "250")]
+    public void ChecksEachRunAgainstTheDeclarationSeparately(
+        int firstEnd, int secondEnd, int length, int start, string reacted)
+    {
+        // React's two runs are 200 ms and 250 ms, both inside a 0.2s declaration's 50 ms
+        // floor, and different from each other — so the compared values pin that the
+        // finding carries the runs at *its own* index rather than whichever came first.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(200, "transitionend", Popup),
+            Run(2000, "transitionstart", Popup),
+            Run(2250, "transitionend", Popup)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(firstEnd, "transitionend", Popup),
+            Run(2000, "transitionstart", Popup),
+            Run(secondEnd, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        // Both of React's runs match its declaration, so only the one bad Blazor run fails,
+        // and the message says which of the two it was.
+        var finding = Errors(findings).ShouldHaveSingleItem();
+
+        finding.Message.ShouldBe(
+            $"Animation duration differs from its own declaration at '{Popup}': " +
+            $"Blazor ran for {length} ms starting at {start} ms against a declared '0.2s'.");
+        finding.ReferenceValue.ShouldBe(reacted);
+        finding.CandidateValue.ShouldBe(length.ToString(CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void KeepsASecondPropertyStartingMidRunInsideTheSameRun()
+    {
+        // `transition: opacity 1s, transform 0.3s 0.7s` starts transform seven tenths of a
+        // second into the run it belongs to, and does so again in the second run. Only a
+        // start that follows a *closed* run opens a new one: reading either later start as
+        // a run of its own would measure 300 ms against a declared second and fail both
+        // legs of an animation that behaved.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(700, "transitionstart", Popup, "transform"),
+            Run(1000, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionend", Popup, "transform"),
+            Run(3000, "transitionstart", Popup, "opacity"),
+            Run(3700, "transitionstart", Popup, "transform"),
+            Run(4000, "transitionend", Popup, "opacity"),
+            Run(4000, "transitionend", Popup, "transform")
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "1s", present: [Popup]),
+            Capture(timeline, declared: "1s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void RecordsTheCrossLegDeltaRunForRun()
+    {
+        // Both legs open and close, and only the close differs. Pairing the runs by index
+        // keeps the delta on the run that carries it instead of averaging it across both.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(200, "transitionend", Popup),
+            Run(2000, "transitionstart", Popup),
+            Run(2200, "transitionend", Popup)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(200, "transitionend", Popup),
+            Run(2000, "transitionstart", Popup),
+            Run(2280, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        Errors(findings).ShouldBeEmpty();
+        findings.ShouldHaveSingleItem().Message.ShouldBe(
+            $"Animation span at '{Popup}': React started at 2000 ms and ran 200 ms (declared '0.2s'); " +
+            "Blazor started at 2000 ms and ran 280 ms (declared '0.2s'); the spans differ by 80 ms.");
     }
 
     [Fact]
