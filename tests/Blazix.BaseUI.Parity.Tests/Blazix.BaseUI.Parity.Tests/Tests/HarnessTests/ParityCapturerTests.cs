@@ -41,6 +41,39 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         """;
 
     /// <summary>
+    /// Installs the same twenty-second animation as <see cref="DriftScript"/>, but only when
+    /// the probe's button is clicked.
+    /// </summary>
+    /// <remarks>
+    /// This is what lets one fixture hold an animation step with nothing to seek followed by
+    /// one with something to seek: the first step finds <c>getAnimations()</c> empty, the
+    /// second finds it populated. A step that has to wait for a click is the ordinary shape
+    /// of an animated fixture — a popup opens on a trigger — so this is the sequence the
+    /// corpus will actually produce, not a contrived one.
+    /// </remarks>
+    private const string DeferredDriftScript = """
+        (() => {
+          const install = () => {
+            const root = document.querySelector('[data-parity-root]');
+            const button = root?.querySelector('button');
+            if (!button) { requestAnimationFrame(install); return; }
+            const style = document.createElement('style');
+            style.textContent =
+              '@keyframes parity-drift { from { opacity: 0 } to { opacity: 1 } }' +
+              '#parity-drift { animation: parity-drift 20s linear; }';
+            document.head.appendChild(style);
+            button.addEventListener('click', () => {
+              const drift = document.createElement('div');
+              drift.id = 'parity-drift';
+              drift.textContent = 'drift';
+              root.appendChild(drift);
+            });
+          };
+          install();
+        })();
+        """;
+
+    /// <summary>
     /// Appends a body child with no size, which <c>capture.js</c> counts as a capture root
     /// and Playwright cannot photograph. Appended before Blazix moves its own portal
     /// container out, so this is <c>portal(1)</c> and the real one is <c>portal(2)</c>.
@@ -78,7 +111,8 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         await using var context = await playwright.Browser.NewContextAsync();
         var page = await context.NewPageAsync();
 
-        var bundle = await new ParityCapturer().CaptureAsync(page, fixture, ParityLeg.BlazorServer);
+        var bundle = await new ParityCapturer(screenshots)
+            .CaptureAsync(page, fixture, ParityLeg.BlazorServer);
 
         bundle.Steps.Count.ShouldBe(2);
         bundle.Steps[0].Styles.ShouldNotBeEmpty();
@@ -122,7 +156,8 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         await using var context = await playwright.Browser.NewContextAsync();
         var page = await context.NewPageAsync();
 
-        var bundle = await new ParityCapturer().CaptureAsync(page, fixture, ParityLeg.BlazorServer);
+        var bundle = await new ParityCapturer(screenshots)
+            .CaptureAsync(page, fixture, ParityLeg.BlazorServer);
 
         bundle.Steps[0].Focus.ShouldBeNull();
         bundle.Steps[1].Focus.ShouldBe("root > button");
@@ -140,12 +175,12 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
             .CaptureAsync(page, ProbeFixture(new StepEntry { Name = "initial" }), ParityLeg.BlazorServer);
 
         // The probe portals one container out to <body>, so the step is photographed twice:
-        // shot 0 is the fixture root and shot 1 is portal(1), the label capture.js gives
+        // shot 00 is the fixture root and shot 01 is portal(1), the label capture.js gives
         // that same element. A run that only photographed the root would compare every
         // popup in the corpus against nothing.
         bundle.Steps[0].Screenshots.ShouldBe([
-            "harness__capture-probe.BlazorServer.initial.0.png",
-            "harness__capture-probe.BlazorServer.initial.1.png"
+            "harness__capture-probe.BlazorServer.initial.00.png",
+            "harness__capture-probe.BlazorServer.initial.01.png"
         ]);
 
         foreach (var name in bundle.Steps[0].Screenshots)
@@ -169,8 +204,8 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // written turns a harness hiccup into a pixel finding on the next comparison, and
         // throwing would have ended the fixture over one empty div.
         bundle.Steps[0].Screenshots.ShouldBe([
-            "harness__capture-probe.BlazorServer.initial.0.png",
-            "harness__capture-probe.BlazorServer.initial.2.png"
+            "harness__capture-probe.BlazorServer.initial.00.png",
+            "harness__capture-probe.BlazorServer.initial.02.png"
         ]);
 
         foreach (var name in bundle.Steps[0].Screenshots)
@@ -193,8 +228,8 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // the settled shot would compare equal to the other leg's five real frames and
         // report parity where a whole animation is missing; an absent frame does not.
         bundle.Steps[0].Screenshots.ShouldBe([
-            "harness__capture-probe.BlazorServer.still.0.png",
-            "harness__capture-probe.BlazorServer.still.1.png"
+            "harness__capture-probe.BlazorServer.still.00.png",
+            "harness__capture-probe.BlazorServer.still.01.png"
         ]);
     }
 
@@ -213,20 +248,28 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
             .Where(name => name.Contains(".frame", StringComparison.Ordinal))
             .ToList();
 
-        // Five fractions across two roots, named by percentage so the ordering a reader
-        // sees in the report is the ordering of the animation.
+        // Five fractions across two roots, in the order the capturer took them. Both
+        // numbers are zero-padded so that this — the chronological order — is also the
+        // order an ordinal sort puts the names in, which is the order the comparator
+        // reports the shots in and therefore the order a reader meets them in. Unpadded,
+        // frame100 would be listed second, between frame0 and frame25.
         frames.ShouldBe([
-            "harness__capture-probe.BlazorServer.drifting.frame0.0.png",
-            "harness__capture-probe.BlazorServer.drifting.frame0.1.png",
-            "harness__capture-probe.BlazorServer.drifting.frame25.0.png",
-            "harness__capture-probe.BlazorServer.drifting.frame25.1.png",
-            "harness__capture-probe.BlazorServer.drifting.frame50.0.png",
-            "harness__capture-probe.BlazorServer.drifting.frame50.1.png",
-            "harness__capture-probe.BlazorServer.drifting.frame75.0.png",
-            "harness__capture-probe.BlazorServer.drifting.frame75.1.png",
-            "harness__capture-probe.BlazorServer.drifting.frame100.0.png",
-            "harness__capture-probe.BlazorServer.drifting.frame100.1.png"
+            "harness__capture-probe.BlazorServer.drifting.frame000.00.png",
+            "harness__capture-probe.BlazorServer.drifting.frame000.01.png",
+            "harness__capture-probe.BlazorServer.drifting.frame025.00.png",
+            "harness__capture-probe.BlazorServer.drifting.frame025.01.png",
+            "harness__capture-probe.BlazorServer.drifting.frame050.00.png",
+            "harness__capture-probe.BlazorServer.drifting.frame050.01.png",
+            "harness__capture-probe.BlazorServer.drifting.frame075.00.png",
+            "harness__capture-probe.BlazorServer.drifting.frame075.01.png",
+            "harness__capture-probe.BlazorServer.drifting.frame100.00.png",
+            "harness__capture-probe.BlazorServer.drifting.frame100.01.png"
         ]);
+
+        // The list above is the one the capturer built, which is chronological by
+        // construction and so cannot show that the names sort the same way. Sorted here
+        // with the comparison the comparator uses.
+        frames.Order(StringComparer.Ordinal).ShouldBe(frames);
 
         foreach (var name in frames)
         {
@@ -251,7 +294,7 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // Asserted first so nothing below can hold vacuously: the frames were taken, so
         // the animation really was paused and seeked to its end.
         bundle.Steps[0].Screenshots
-            .ShouldContain("harness__capture-probe.BlazorServer.drifting.frame100.0.png");
+            .ShouldContain("harness__capture-probe.BlazorServer.drifting.frame100.00.png");
 
         var after = Drift(bundle.Steps[1]);
 
@@ -266,13 +309,70 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
             "() => document.getAnimations().filter((a) => a.playState === 'paused').length");
         paused.ShouldBe(0);
 
-        // And nothing the frame loop did reached the record. Seeking an animation to its
-        // end and back is two phase transitions, which the browser reports as an
-        // animationend and an animationstart; recorded, they would attribute the harness's
-        // own bookkeeping to the component, on the one comparator whose entire subject is
-        // animation. (That this step's record is the previous step's at all is a separate,
-        // pre-existing matter: startTimeline() runs only for animation steps.)
+        // Nothing the frame loop did reached the record. Seeking an animation to its end
+        // and back is two phase transitions, which the browser reports as an animationend
+        // and an animationstart; recorded, they would attribute the harness's own
+        // bookkeeping to the component, on the one comparator whose entire subject is
+        // animation — and asymmetrically, since the two legs animate different numbers of
+        // things.
+        //
+        // The equality is not "this step is unaffected": it is stronger and lossier than
+        // that. startTimeline() runs only for animation steps, so this step never started
+        // a recording of its own and reports whatever has accumulated since the previous
+        // step started one. Before the seek was silenced, that meant its own events on top
+        // of the previous step's; now the recording is detached for the whole frame loop
+        // and never re-armed, so this step's record is a verbatim copy of the previous
+        // step's and carries no signal about this step at all. Both legs go equally quiet,
+        // so it raises no false finding — but a genuine difference occurring in a
+        // non-animation step that follows an animation step is now invisible. The fix is
+        // the deferred one: start a recording for every step, not only animation steps.
         bundle.Steps[1].Timeline.ShouldBe(bundle.Steps[0].Timeline);
+    }
+
+    [Fact]
+    public async Task TearsDownTheRecordingOfAnAnimationStepThatFollowsOneWithNothingToSeek()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await page.AddInitScriptAsync(DeferredDriftScript);
+
+        var fixture = ProbeFixture(
+            new StepEntry { Name = "still", Settle = "animation" },
+            new StepEntry
+            {
+                Name = "drifting",
+                Settle = "animation",
+                Do = [new StepAction { Click = "button" }]
+            },
+            new StepEntry { Name = "after" });
+
+        var bundle = await new ParityCapturer(screenshots)
+            .CaptureAsync(page, fixture, ParityLeg.BlazorServer);
+
+        // Asserted first, both of them, so nothing below can hold vacuously. The first step
+        // is an animation step that found nothing to seek — the case the whole test is about
+        // — and the second one really did seek, so the frame loop that follows it really did
+        // run.
+        bundle.Steps[0].Screenshots.ShouldNotContain(
+            name => name.Contains(".frame", StringComparison.Ordinal));
+        bundle.Steps[1].Screenshots
+            .ShouldContain("harness__capture-probe.BlazorServer.drifting.frame100.00.png");
+
+        // The signature of the leak, and the one event that cannot be the component's: the
+        // drift animation runs for twenty seconds and the fixture takes about one, so it
+        // never reaches its own end. The only thing that ends it is the frame loop seeking
+        // it to fraction 1, which the browser reports as an animationend — and the resume
+        // that follows reports an animationstart on the way back. Both belong to the
+        // harness, and both land in the NEXT step's record, because capture() has already
+        // read this step's.
+        //
+        // They are recorded at all only when the recording was never torn down: a step that
+        // finds nothing to seek must leave the resume state as it found it, or this step's
+        // seek believes the teardown has already happened and skips it. Asserted on
+        // animationend rather than on the two steps' timelines being equal, because a
+        // genuine animationstart from the click can legitimately land in the window between
+        // capture() and the seek, which is a race and not a leak.
+        bundle.Steps[2].Timeline.ShouldNotContain(e => e.Kind == "animationend");
     }
 
     private static double Drift(StepCapture step)

@@ -10,8 +10,8 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The two legs' shots are paired by shot id — <c>0</c> for the fixture root, <c>i</c> for
-/// <c>portal(i)</c>, <c>frame25.1</c> for one seeked animation frame — and never by
+/// The two legs' shots are paired by shot id — <c>00</c> for the fixture root, <c>0i</c>
+/// for <c>portal(i)</c>, <c>frame025.01</c> for one seeked animation frame — and never by
 /// position, so a popup one leg portals out and the other does not shifts nothing: the
 /// unpaired shot is reported rather than silently compared against the wrong image.
 /// </para>
@@ -59,6 +59,11 @@ public sealed class PixelComparator(string directory) : IComparator
         var reference = Index(context.Reference.Screenshots, context.Fixture, ParityLeg.React, context.Step);
         var candidate = Index(context.Candidate.Screenshots, context.Fixture, context.Leg, context.Step);
 
+        // This is the order the findings are reported in, so it is the order a reader meets
+        // the step's shots in. Ordinal is the right comparison only because the ids are
+        // zero-padded to a fixed width by ScreenshotSet: the roots ascend and the frames
+        // run from the start of the animation to its end, which is what a reader expects a
+        // list of animation frames to do.
         var shots = reference.Keys
             .Concat(candidate.Keys)
             .Distinct(StringComparer.Ordinal)
@@ -191,6 +196,19 @@ public sealed class PixelComparator(string directory) : IComparator
     private Finding? CompareOne(
         ComparisonContext context, string shot, string referenceName, string candidateName)
     {
+        // Cleared before anything is decided, so the overlay on disk is always this
+        // comparison's and never a previous run's. A diff is written only for a shot that
+        // failed, so one left behind by a run that has since been fixed sits beside a
+        // passing screenshot claiming a difference that no longer exists — and Task 13's
+        // report links diffs by name, so it would be published as this run's evidence.
+        var diffName = ScreenshotSet.DiffName(candidateName);
+        var diffPath = Path.Combine(directory, diffName);
+
+        if (File.Exists(diffPath))
+        {
+            File.Delete(diffPath);
+        }
+
         using var reference = Decode(Path.Combine(directory, referenceName));
         using var candidate = Decode(Path.Combine(directory, candidateName));
 
@@ -242,8 +260,7 @@ public sealed class PixelComparator(string directory) : IComparator
             return null;
         }
 
-        var diffName = ScreenshotSet.DiffName(candidateName);
-        WriteDiff(reference, mismatched, Path.Combine(directory, diffName));
+        WriteDiff(reference, mismatched, diffPath);
 
         return Report(
             context,

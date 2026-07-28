@@ -328,7 +328,16 @@
      * same step are recorded when they are first seen, so they are restored too. */
     seekAnimations(fraction) {
       const animations = document.getAnimations();
-      if (!state.seeked) {
+
+      // Gated on there being something to seek, not merely on this being the first seek of
+      // the step. A step whose animation has already finished by the time the settle
+      // protocol lets go — a short transition, which is most of them — reaches here with an
+      // empty list, and a caller that finds nothing to seek has no frames to take and so
+      // never reaches resumeAnimations(), the only thing that clears state.seeked. Arming
+      // it here would leave it armed for the life of the page, and the NEXT animation
+      // step's first seek would take the `state.seeked` branch, skip the teardown below,
+      // and record its own seeking into that step's timeline.
+      if (animations.length > 0 && !state.seeked) {
         state.seeked = new Map();
 
         // The step's timeline has already been read by capture(), so everything from here

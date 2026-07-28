@@ -8,9 +8,9 @@ namespace Blazix.BaseUI.Parity.Tests.Capture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A step is photographed once per capture root: shot <c>0</c> is the fixture root and
-/// shot <c>i</c> is <c>portal(i)</c>, matching the labels <c>shared/capture.js</c> gives
-/// the same elements, so a pixel finding on shot 2 and a geometry finding under
+/// A step is photographed once per capture root: shot <c>00</c> is the fixture root and
+/// shot <c>0i</c> is <c>portal(i)</c>, matching the labels <c>shared/capture.js</c> gives
+/// the same elements, so a pixel finding on shot <c>02</c> and a geometry finding under
 /// <c>portal(2)</c> name the same tree. Photographing the viewport instead would compare
 /// the two legs' page shells — which differ by construction, one being a Blazor host and
 /// the other a Vite bundle — and report that difference on every fixture.
@@ -19,6 +19,13 @@ namespace Blazix.BaseUI.Parity.Tests.Capture;
 /// A step whose settle mode is <c>animation</c> is photographed a second time at five
 /// points of its animation, each with the page's animations paused and seeked, so the
 /// frames are a function of the animation rather than of how fast the machine ran.
+/// </para>
+/// <para>
+/// Every number in a shot id is zero-padded to a fixed width, because the report lists
+/// shots in the order an ordinal sort puts their ids in and nothing re-sorts them
+/// numerically. Unpadded, <c>frame100</c> falls between <c>frame0</c> and <c>frame25</c>
+/// and the animation is presented ending before it has begun; a fixture with ten portals
+/// shows shot <c>10</c> ahead of shot <c>2</c>.
 /// </para>
 /// </remarks>
 public static class ScreenshotSet
@@ -85,7 +92,7 @@ public static class ScreenshotSet
     /// <param name="fixtureId">The fixture id.</param>
     /// <param name="leg">The leg the screenshot was taken on.</param>
     /// <param name="step">The manifest step name.</param>
-    /// <param name="shot">The shot id, for example <c>0</c> or <c>frame25.1</c>.</param>
+    /// <param name="shot">The shot id, for example <c>00</c> or <c>frame025.01</c>.</param>
     /// <returns>The file name.</returns>
     public static string Name(string fixtureId, ParityLeg leg, string step, string shot)
         => $"{Slug(fixtureId)}.{leg}.{step}.{shot}{Extension}";
@@ -158,6 +165,12 @@ public static class ScreenshotSet
         // point: if one leg animates and the other does not, the frames exist on one side
         // only and the pixel comparator reports each of them, which is exactly the finding
         // a run of five identical images would have hidden.
+        //
+        // Returning here without resuming is safe only because seekAnimations() arms
+        // nothing when it finds nothing to seek. If it armed its resume state regardless,
+        // this return would strand it — and the next animation step's seek would believe
+        // the recording had already been torn down and record its own seeking into that
+        // step's timeline.
         if (await SeekAsync(page, Fractions[0]) == 0)
         {
             return names;
@@ -180,7 +193,20 @@ public static class ScreenshotSet
             // In a finally because the page outlives the step: every remaining step of the
             // fixture runs on it, and one left with its animations paused would capture a
             // frozen popup and record no transition at all.
-            await page.EvaluateAsync($"() => {Api}.resumeAnimations()");
+            try
+            {
+                await page.EvaluateAsync($"() => {Api}.resumeAnimations()");
+            }
+            // Guarded because a finally that throws replaces whatever was already in
+            // flight. The case is precisely the one that matters: a screenshot fails with
+            // something this method does not filter, and the reason it failed — a closed
+            // page, a crashed browser — is also why the resume cannot run. Unguarded, the
+            // resume's exception is what the runner would report, and the original cause
+            // would be gone. There is nothing to recover here anyway: a page that cannot
+            // be evaluated has no animations left to put back.
+            catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+            {
+            }
         }
 
         return names;
@@ -189,8 +215,12 @@ public static class ScreenshotSet
     private static Task<int> SeekAsync(IPage page, double fraction)
         => page.EvaluateAsync<int>($"f => {Api}.seekAnimations(f)", fraction);
 
+    /// <summary>
+    /// The percentage, padded to three digits so <c>frame025</c> sorts before
+    /// <c>frame100</c> under the ordinal comparison the report lists shots by.
+    /// </summary>
     private static string FramePrefix(double fraction)
-        => $"frame{Math.Round(fraction * 100).ToString(CultureInfo.InvariantCulture)}";
+        => $"frame{Math.Round(fraction * 100).ToString("000", CultureInfo.InvariantCulture)}";
 
     private static async Task<List<string>> ShootAsync(
         IPage page,
@@ -213,9 +243,10 @@ public static class ScreenshotSet
 
         for (var index = 0; index < targets.Count; index++)
         {
-            var shot = framePrefix.Length == 0
-                ? index.ToString(CultureInfo.InvariantCulture)
-                : $"{framePrefix}.{index.ToString(CultureInfo.InvariantCulture)}";
+            // Padded for the same reason the percentage is: a fixture with ten capture
+            // roots would otherwise list shot 10 between shots 1 and 2.
+            var root = index.ToString("00", CultureInfo.InvariantCulture);
+            var shot = framePrefix.Length == 0 ? root : $"{framePrefix}.{root}";
             var name = Name(fixtureId, leg, step, shot);
 
             try
