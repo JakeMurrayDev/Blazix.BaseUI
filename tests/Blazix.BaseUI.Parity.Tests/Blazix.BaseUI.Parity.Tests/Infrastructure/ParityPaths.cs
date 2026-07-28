@@ -32,6 +32,19 @@ public static class ParityPaths
     /// <summary>Gets the report output directory.</summary>
     public static string ReportDir { get; } = ResolveReportDir();
 
+    /// <summary>
+    /// Gets the directory a run's screenshots and their diff overlays are written to.
+    /// </summary>
+    /// <remarks>
+    /// Under <see cref="ReportDir"/> rather than beside <see cref="Baselines"/>: these are
+    /// run output, not committed data, and putting them here gives them the
+    /// <c>PARITY_REPORT_DIR</c> override and the existing <c>parity-report/</c> gitignore
+    /// entry for free, so a fresh checkout needs no new directory and no new ignore rule.
+    /// Nothing creates the directory on startup — the capturer creates it on its first
+    /// write, and the comparator on its first diff.
+    /// </remarks>
+    public static string Screenshots => Path.Combine(ReportDir, "screenshots");
+
     private static string ResolveReportDir()
     {
         // On Unix an exported-but-empty variable reads back as "" rather than null,

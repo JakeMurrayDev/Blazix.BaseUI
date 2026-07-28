@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Blazix.BaseUI.Parity.Tests.Capture;
 using Blazix.BaseUI.Parity.Tests.Fixtures;
 using Blazix.BaseUI.Parity.Tests.Infrastructure;
@@ -161,6 +162,88 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
             """);
 
         recorded.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task SeekingPausesEveryAnimationAndResumingPutsItBackWhereItWas()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              const animation = root.animate(
+                [{ opacity: 1 }, { opacity: 0 }], { duration: 4000, easing: 'linear' });
+              await new Promise((resolve) => setTimeout(resolve, 120));
+
+              const before = animation.currentTime;
+              const seekedCount = api.seekAnimations(0.75);
+              const seekedTime = animation.currentTime;
+              const seekedState = animation.playState;
+
+              api.resumeAnimations();
+              const resumedTime = animation.currentTime;
+              const resumedState = animation.playState;
+
+              await new Promise((resolve) => setTimeout(resolve, 200));
+              const laterTime = animation.currentTime;
+              animation.cancel();
+
+              return {
+                before, seekedCount, seekedTime, seekedState,
+                resumedTime, resumedState, laterTime,
+              };
+            }
+            """);
+
+        // Paused and placed, which is what makes a mid-animation screenshot a function of
+        // the animation rather than of how fast the machine got there.
+        result.GetProperty("seekedCount").GetInt32().ShouldBeGreaterThan(0);
+        result.GetProperty("seekedState").GetString().ShouldBe("paused");
+        result.GetProperty("seekedTime").GetDouble().ShouldBe(3000);
+
+        // Put back where it was, not finished and not replayed. One runner drives every
+        // step of a fixture on one page: an animation left at its end would hold the popup
+        // in its final pose for every later step, and one rewound to zero would run the
+        // whole transition again in the middle of the next one.
+        result.GetProperty("resumedState").GetString().ShouldBe("running");
+        result.GetProperty("resumedTime").GetDouble()
+            .ShouldBe(result.GetProperty("before").GetDouble(), tolerance: 50);
+
+        // And running: a resume that restored the clock without releasing it would leave
+        // the page frozen at a value that never changes again.
+        result.GetProperty("laterTime").GetDouble()
+            .ShouldBeGreaterThan(result.GetProperty("resumedTime").GetDouble() + 100);
+    }
+
+    [Fact]
+    public async Task ResumingWithoutHavingSeekedTouchesNothing()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var state = await page.EvaluateAsync<string>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              const animation = root.animate(
+                [{ opacity: 1 }, { opacity: 0 }], { duration: 4000, easing: 'linear' });
+              await new Promise((resolve) => setTimeout(resolve, 60));
+
+              // A step with no animation to seek still reaches the resume, because the
+              // resume is what guarantees the seek is always undone.
+              api.resumeAnimations();
+              const playState = animation.playState;
+              animation.cancel();
+              return playState;
+            }
+            """);
+
+        state.ShouldBe("running");
     }
 
     private static async Task<IPage> OpenProbeAsync(IBrowserContext context)

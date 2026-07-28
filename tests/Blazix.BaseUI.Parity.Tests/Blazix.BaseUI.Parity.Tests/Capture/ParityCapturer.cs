@@ -7,7 +7,8 @@ namespace Blazix.BaseUI.Parity.Tests.Capture;
 /// <summary>
 /// Drives one fixture through its manifest steps on one leg and assembles the captures.
 /// </summary>
-public sealed class ParityCapturer
+/// <param name="screenshotDirectory">Where this run's screenshots are written.</param>
+public sealed class ParityCapturer(string screenshotDirectory)
 {
     // ParityOptions arrives in Task 12; until then the per-action budget is fixed here.
     // It bounds how long an unresolved selector costs, so it is generous enough for a
@@ -16,6 +17,14 @@ public sealed class ParityCapturer
     private const float ActionTimeoutMs = 5_000;
 
     private readonly AliasTable aliases = AliasTable.Load();
+
+    /// <summary>
+    /// Writes screenshots under the harness's own screenshot directory.
+    /// </summary>
+    public ParityCapturer()
+        : this(ParityPaths.Screenshots)
+    {
+    }
 
     /// <summary>
     /// Captures every manifest step for one fixture on one leg.
@@ -82,6 +91,18 @@ public sealed class ParityCapturer
 
                 var capture = await CaptureScript.CaptureAsync(page, step.Name);
 
+                // After the capture and never before it. An element screenshot scrolls its
+                // target into view, so photographing first would move the boxes the
+                // geometry comparator reads out from under it; and an animation step seeks
+                // the page's animations, which the capture has to see unmoved.
+                var screenshots = await ScreenshotSet.CaptureAsync(
+                    page,
+                    screenshotDirectory,
+                    fixture.Id,
+                    leg,
+                    step.Name,
+                    step.Settle == "animation");
+
                 steps.Add(capture with
                 {
                     // Snapshotted from <body>, not from the fixture root: a portalled popup
@@ -89,6 +110,7 @@ public sealed class ParityCapturer
                     // part of the accessibility tree the floating fixtures exist to check.
                     Aria = await page.Locator("body").AriaSnapshotAsync(),
                     Console = observed,
+                    Screenshots = screenshots,
                     UnresolvedSelectors = unresolved,
                     NonActionableSelectors = nonActionable
                 });

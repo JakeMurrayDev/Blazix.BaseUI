@@ -18,6 +18,12 @@
     <PackageReference Include="Microsoft.Playwright" Version="1.57.0" />
     <PackageReference Include="Microsoft.Playwright.Xunit.v3" Version="1.57.0" />
     <PackageReference Include="Shouldly" Version="4.3.0" />
+    <!-- System.Drawing decodes PNG on Windows only, so the pixel comparator decodes with
+         Skia. The native assets package is per-platform: this one covers macOS, and a
+         Linux or Windows run needs SkiaSharp.NativeAssets.Linux (Windows binaries ship
+         inside the SkiaSharp package itself). -->
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="3.119.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />

@@ -219,6 +219,8 @@
     observer: null,
     startedAt: 0,
     listeners: [],
+    // Animation -> { time, playState } as it was before the first seek of this step.
+    seeked: null,
   };
 
   function teardownTimeline() {
@@ -315,16 +317,72 @@
       return state.timeline.slice();
     },
 
-    /** Pauses every running animation on the page and seeks to `fraction` of its duration. */
+    /** Pauses every running animation on the page and seeks to `fraction` of its duration.
+     *
+     * Each animation's state is recorded the first time it is seen, because the page
+     * outlives the step: one runner drives every step of a fixture on the same page, and an
+     * animation left paused at the fraction the last frame asked for would hold the popup
+     * in that pose for every step that follows — the DOM, the styles, the geometry, and the
+     * screenshots of all of them. resumeAnimations() undoes it, and the recording is what
+     * lets it undo rather than guess. New animations that appear between two seeks of the
+     * same step are recorded when they are first seen, so they are restored too. */
     seekAnimations(fraction) {
       const animations = document.getAnimations();
+      if (!state.seeked) {
+        state.seeked = new Map();
+
+        // The step's timeline has already been read by capture(), so everything from here
+        // on is harness time and belongs in no step's record. It has to be silenced by
+        // detaching rather than by a flag: seeking an animation to its end and then back
+        // to where it was crosses two phase boundaries, the browser reports each as an
+        // animationend / animationstart, and the one caused by the resume is dispatched a
+        // frame AFTER resumeAnimations() has returned — past any flag the resume could
+        // clear. The next step's startTimeline() re-arms the recording.
+        teardownTimeline();
+      }
       for (const a of animations) {
+        if (!state.seeked.has(a)) {
+          state.seeked.set(a, { time: a.currentTime, playState: a.playState });
+        }
         const timing = a.effect?.getComputedTiming?.();
         const duration = typeof timing?.duration === 'number' ? timing.duration : 0;
         a.pause();
         a.currentTime = duration * fraction;
       }
       return animations.length;
+    },
+
+    /** Puts every animation seekAnimations() touched back where it was.
+     *
+     * The recorded time is restored rather than the animation being finished or replayed.
+     * Finishing would end a transition the component has not ended, which is a state the
+     * page would never have reached on its own; play() alone would rewind, because the spec
+     * makes play() on an animation sitting at its end seek back to zero, and the whole
+     * transition would then run again in the middle of the next step. Returns the number
+     * of animations restored, which is zero when the step never seeked. */
+    resumeAnimations() {
+      const seeked = state.seeked;
+      state.seeked = null;
+      if (!seeked) return 0;
+
+      for (const [a, before] of seeked) {
+        try {
+          if (before.playState === 'finished') {
+            a.finish();
+          } else if (before.playState === 'idle') {
+            // It was not running and had no time to restore; pausing it gave it one.
+            a.cancel();
+          } else {
+            if (typeof before.time === 'number') a.currentTime = before.time;
+            if (before.playState !== 'paused') a.play();
+          }
+        } catch {
+          // Cancelled, replaced, or detached while it was held. Nothing to put back, and
+          // throwing here would abandon every animation after it in the map.
+        }
+      }
+
+      return seeked.size;
     },
 
     settled() {
