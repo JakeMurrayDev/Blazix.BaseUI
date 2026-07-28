@@ -79,9 +79,9 @@ public sealed class GeometryComparator : IComparator
                     CandidateValue = hasCandidate ? Format(candidateValue) : null,
                     Message =
                         $"Geometry '{name}' differs at '{pair.Reference.Path}': " +
-                        $"React {Describe(hasReference, referenceValue)}, " +
-                        $"Blazor {Describe(hasCandidate, candidateValue)}." +
-                        RelaxedNote(pair)
+                        $"React {FindingText.Describe(hasReference, referenceValue)}, " +
+                        $"Blazor {FindingText.Describe(hasCandidate, candidateValue)}." +
+                        FindingText.RelaxedNote(pair)
                 };
             }
         }
@@ -92,17 +92,4 @@ public sealed class GeometryComparator : IComparator
     /// the same on another whose decimal separator differs.
     /// </summary>
     private static string Format(double value) => value.ToString(CultureInfo.InvariantCulture);
-
-    private static string Describe(bool present, double value)
-        => present ? $"'{Format(value)}'" : "absent";
-
-    /// <summary>
-    /// Says so when the two nodes only matched on their tag. A rectangle read across such a
-    /// pair is still worth reporting — it is the only thing that would name a layout
-    /// difference beneath the identity difference — but the operands may not correspond.
-    /// </summary>
-    private static string RelaxedNote(NodePair pair)
-        => pair.Relaxed
-            ? " The two nodes were paired on tag alone, so they may not be the same element."
-            : string.Empty;
 }

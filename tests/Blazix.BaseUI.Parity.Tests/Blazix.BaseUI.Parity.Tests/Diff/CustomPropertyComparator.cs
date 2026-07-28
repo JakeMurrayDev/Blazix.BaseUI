@@ -21,9 +21,13 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 public sealed class CustomPropertyComparator : IComparator
 {
     /// <summary>
-    /// Half a pixel. Custom properties published by a positioner carry the same sub-pixel
-    /// layout noise as the computed lengths they are derived from, and the ones that are not
-    /// lengths cannot differ by less than one.
+    /// Half a pixel. The lengths a positioner publishes — <c>--anchor-width</c>,
+    /// <c>--available-height</c>, the <c>--positioner-*</c> family — carry the same
+    /// sub-pixel layout noise as the computed lengths they are derived from, and so does
+    /// the percentage in <c>--transform-origin</c>. It reaches those and nothing else:
+    /// <see cref="ValueTolerance"/> compares every run that does not carry a length
+    /// exactly, including the <c>rem</c> values a demo's own stylesheet declares, where
+    /// half a unit would be eight pixels.
     /// </summary>
     private const double Epsilon = 0.5;
 
@@ -79,24 +83,11 @@ public sealed class CustomPropertyComparator : IComparator
                     CandidateValue = hasCandidate ? candidateValue : null,
                     Message =
                         $"Custom property '{name}' differs at '{pair.Reference.Path}': " +
-                        $"React {Describe(hasReference, referenceValue)}, " +
-                        $"Blazor {Describe(hasCandidate, candidateValue)}." +
-                        RelaxedNote(pair)
+                        $"React {FindingText.Describe(hasReference, referenceValue)}, " +
+                        $"Blazor {FindingText.Describe(hasCandidate, candidateValue)}." +
+                        FindingText.RelaxedNote(pair)
                 };
             }
         }
     }
-
-    private static string Describe(bool present, string? value)
-        => present ? $"'{value}'" : "absent";
-
-    /// <summary>
-    /// Says so when the two nodes only matched on their tag, so a reader knows the two
-    /// operands may not correspond. They are compared all the same: a published positioner
-    /// value that differs beneath an identity difference is a finding worth having.
-    /// </summary>
-    private static string RelaxedNote(NodePair pair)
-        => pair.Relaxed
-            ? " The two nodes were paired on tag alone, so they may not be the same element."
-            : string.Empty;
 }

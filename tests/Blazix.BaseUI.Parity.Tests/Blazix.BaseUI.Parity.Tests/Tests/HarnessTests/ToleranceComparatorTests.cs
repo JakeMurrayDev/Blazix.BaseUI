@@ -63,12 +63,71 @@ public sealed class ToleranceComparatorTests
     [InlineData("-8px", "-8.3px", true)]
     [InlineData("-8px", "8px", false)]
     // The sign belongs to the number rather than to the text run before it, which is only
-    // observable when the two values straddle zero: half a pixel below zero is half a pixel
-    // from a tenth above it, and the tolerance has to absorb that as it would anywhere else.
-    // Reading the sign as text instead splits this into a different number of runs, and the
-    // sub-pixel noise the tolerance exists for is reported as a difference.
-    [InlineData("-0.4px", "0.1px", true)]
+    // observable when the two values straddle zero: a fifth of a pixel below zero is three
+    // tenths from a tenth above it, and the tolerance has to absorb that as it would
+    // anywhere else. Reading the sign as text instead splits this into a different number
+    // of runs, and the sub-pixel noise the tolerance exists for is reported as a difference.
+    // Kept clear of the epsilon so that this row tests the sign and not the boundary.
+    [InlineData("-0.2px", "0.1px", true)]
+    // The epsilon itself is inclusive, which the row above used to be the only witness to.
+    [InlineData("10px", "10.5px", true)]
     public void ComparesTokenSequencesAndNotJustTheNumbersInThem(
+        string reference, string candidate, bool expected)
+    {
+        ValueTolerance.Equivalent(reference, candidate, 0.5).ShouldBe(expected);
+    }
+
+    [Theory]
+    // Most of the allowlist in shared/capture.js does not carry lengths, so a tolerance
+    // that reaches every number waves through the differences this harness exists to
+    // catch: no animation against a half-second one, a half-transparent popup against an
+    // opaque one, a scaled-up transform, and a shadow at five times the opacity.
+    [InlineData("1", "0.6")]
+    [InlineData("0", "0.5")]
+    [InlineData("0s", "0.5s")]
+    [InlineData("0.15s", "0.5s")]
+    [InlineData("100ms", "100.4ms")]
+    [InlineData("1.5", "1.2")]
+    [InlineData("scale(1)", "scale(1.4)")]
+    [InlineData("matrix(1, 0, 0, 1, 16, 0)", "matrix(1.4, 0, 0, 1, 16, 0)")]
+    [InlineData("rgba(0, 0, 0, 0.1) 0px 1px 2px 0px", "rgba(0, 0, 0, 0.5) 0px 1px 2px 0px")]
+    // A flex fraction is a share of the free space, not a length.
+    [InlineData("1fr 1fr", "1.4fr 1fr")]
+    // A computed style resolves font-relative lengths to pixels, so a rem only reaches a
+    // capture as a custom property a demo's own stylesheet declares. Both legs read that
+    // from the same file, and half a rem is eight pixels of difference.
+    [InlineData("3rem", "3.4rem")]
+    public void ReportsANumberThatCarriesNoLengthHoweverCloseItIs(
+        string reference, string candidate)
+    {
+        ValueTolerance.Equivalent(reference, candidate, 0.5).ShouldBeFalse();
+    }
+
+    [Theory]
+    // A percentage: the select popup publishes '--transform-origin' as one, computed from
+    // the measured offset of the selected item within the popup.
+    [InlineData("50% 40%", "50% 40.4%", true)]
+    [InlineData("50% 40%", "50% 40.6%", false)]
+    // A shadow's offsets are lengths even though its colour's channels are not.
+    [InlineData("rgba(0, 0, 0, 0.1) 0px 1px 2px 0px", "rgba(0, 0, 0, 0.1) 0px 1.4px 2px 0px", true)]
+    // The translation arguments of a transform matrix are pixel lengths written with the
+    // unit left off, and the only such runs a computed value produces. base-ui writes them
+    // through translate3d for the scroll-area thumb and the toast stack, which Chrome
+    // serializes as matrix3d, so both spellings have to be read the same way.
+    [InlineData(
+        "matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8, 16, 0, 1)",
+        "matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8.3, 16.3, 0, 1)",
+        true)]
+    [InlineData(
+        "matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8, 16, 0, 1)",
+        "matrix3d(1.4, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8, 16, 0, 1)",
+        false)]
+    // Arguments are counted from the function that opened them and not from the start of
+    // the value. A custom property holds whatever a stylesheet wrote into it, so a matrix
+    // there need not be the first thing in the value; counting from the start would put
+    // the tolerance on two numbers that are not the translation.
+    [InlineData("0 0 matrix(1, 0, 0, 1, 16, 0)", "0 0 matrix(1, 0, 0, 1, 16.3, 0)", true)]
+    public void AbsorbsAFractionOfAPixelWhereverALengthIsWritten(
         string reference, string candidate, bool expected)
     {
         ValueTolerance.Equivalent(reference, candidate, 0.5).ShouldBe(expected);
@@ -89,6 +148,10 @@ public sealed class ToleranceComparatorTests
         finding.Property.ShouldBe("color");
         finding.ReferenceValue.ShouldBe("rgb(0, 0, 0)");
         finding.CandidateValue.ShouldBe("rgb(255, 0, 0)");
+        // The pair matched on its full identity, so the note that says otherwise must not
+        // be here. Without this the note could be attached to every finding in a run and
+        // no test would notice, which would make the flag mean nothing.
+        finding.Message.ShouldNotContain("tag alone");
     }
 
     [Fact]
@@ -100,7 +163,7 @@ public sealed class ToleranceComparatorTests
     }
 
     [Fact]
-    public void ComputedStyleReportsAPropertyCapturedOnTheReferenceLegOnly()
+    public void ComputedStyleReportsPropertiesCapturedOnOneLegOnly()
     {
         var context = StyleContext(
             At(Button, ("display", "flex")),
@@ -114,6 +177,10 @@ public sealed class ToleranceComparatorTests
         findings[0].CandidateValue.ShouldBe("rgb(0, 0, 0)");
         findings[1].ReferenceValue.ShouldBe("flex");
         findings[1].CandidateValue.ShouldBeNull();
+        // The whole sentence, so the wording that names a missing value is pinned rather
+        // than left to whatever a later edit decides an absence should read as.
+        findings[1].Message.ShouldBe(
+            "Computed style 'display' differs at 'root > button': React 'flex', Blazor absent.");
     }
 
     [Fact]
@@ -251,7 +318,11 @@ public sealed class ToleranceComparatorTests
             At(Button, ("--anchor-width", "100px")),
             At(Button, ("--anchor-width", "100.8px")));
 
-        new CustomPropertyComparator().Compare(context).ShouldHaveSingleItem();
+        var finding = new CustomPropertyComparator().Compare(context).ShouldHaveSingleItem();
+
+        finding.Property.ShouldBe("--anchor-width");
+        finding.ReferenceValue.ShouldBe("100px");
+        finding.CandidateValue.ShouldBe("100.8px");
     }
 
     [Fact]

@@ -22,8 +22,12 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 public sealed class ComputedStyleComparator : IComparator
 {
     /// <summary>
-    /// Half a pixel: below what a colour channel, a keyword, or a step count can differ by,
-    /// and above the sub-pixel layout noise that otherwise makes nearly every element differ.
+    /// Half a pixel: above the sub-pixel layout noise that otherwise makes nearly every
+    /// element differ. It reaches only the runs <see cref="ValueTolerance"/> reads as
+    /// lengths, so the numbers in this allowlist that are not lengths — an
+    /// <c>opacity</c>, a <c>transition-duration</c>, a <c>line-height</c>, a
+    /// <c>z-index</c>, a colour channel, the scale in a <c>transform</c> — are compared
+    /// exactly and are not weakened by it.
     /// Kept private rather than shared: the custom property comparator's tolerance is the
     /// same number today for its own reasons, and a shared constant would tie the two.
     /// </summary>
@@ -79,24 +83,11 @@ public sealed class ComputedStyleComparator : IComparator
                     CandidateValue = hasCandidate ? candidateValue : null,
                     Message =
                         $"Computed style '{name}' differs at '{pair.Reference.Path}': " +
-                        $"React {Describe(hasReference, referenceValue)}, " +
-                        $"Blazor {Describe(hasCandidate, candidateValue)}." +
-                        RelaxedNote(pair)
+                        $"React {FindingText.Describe(hasReference, referenceValue)}, " +
+                        $"Blazor {FindingText.Describe(hasCandidate, candidateValue)}." +
+                        FindingText.RelaxedNote(pair)
                 };
             }
         }
     }
-
-    private static string Describe(bool present, string? value)
-        => present ? $"'{value}'" : "absent";
-
-    /// <summary>
-    /// Says so when the two nodes only matched on their tag. They are still compared —
-    /// suppressing them would lose the layout difference beneath an identity difference the
-    /// structural finding does not describe — but the two operands may not correspond.
-    /// </summary>
-    private static string RelaxedNote(NodePair pair)
-        => pair.Relaxed
-            ? " The two nodes were paired on tag alone, so they may not be the same element."
-            : string.Empty;
 }

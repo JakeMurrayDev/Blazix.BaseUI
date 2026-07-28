@@ -54,13 +54,10 @@ public sealed class AttributeComparator : IComparator
                     CandidateValue = hasCandidate ? candidateValue : null,
                     Message =
                         $"Attribute '{name}' differs at '{pair.Reference.Path}': " +
-                        $"React {Describe(hasReference, referenceValue)}, " +
-                        $"Blazor {Describe(hasCandidate, candidateValue)}."
+                        $"React {FindingText.Describe(hasReference, referenceValue)}, " +
+                        $"Blazor {FindingText.Describe(hasCandidate, candidateValue)}."
                 };
             }
         }
     }
-
-    private static string Describe(bool present, string? value)
-        => present ? $"'{value}'" : "absent";
 }
