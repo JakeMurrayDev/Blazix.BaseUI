@@ -136,6 +136,26 @@ What actually worked, and should be kept doing:
    repo CI is lint-only. Failure is loud (empty `dist/` serves nothing at `/react`;
    `SharedStylesheetTests` catches a stale stylesheet) but the message should be actionable.
 
+10. **L2 timeline invariants are derived over the whole step, not per run — mislabelled, never
+    silent.** `TimelineComparator.Evaluate` builds its `finished` set from every terminal event
+    anywhere in the step, so a terminal from run 1 satisfies a start in run 2, and
+    `lastTerminal` is the last terminal in the *step* rather than in the run a removal
+    interrupted. Two probed consequences: a step where the node leaves during its **second**
+    run emits no `present-at-transitionend` finding at all — run 1's `transitionend` carried
+    the same property name, so the leg reads `Satisfied`; and where both legs unmount mid-run
+    but only one completed an earlier run, the output states that leg **satisfied an obligation
+    it demonstrably broke**, sending a reader to the wrong leg. L1 fires in every such case —
+    `TimelineSequence.Normalize` drops and collapses no run/`added`/`removed` event, so legs
+    whose derived states differ cannot have equal signatures — which makes this a **mislabelled
+    positive, not a silent pass**, the same standing `Pairs` was given in item 5. Accepted
+    deliberately at Task 9's close rather than fixed; making L2 run-aware is a rewrite of
+    `Evaluate`. **Task 11 must not let a waiver keyed on an L2 invariant name imply the
+    invariant was measured on the run that broke it, and reporting should prefer L1's diff to
+    L2's naming where both fire on one step.** Smaller and related: L3 pairs runs by index, so
+    on a step where the legs ran unequal numbers of runs the values printed beside a real
+    finding come from a different run. Both limits are written up in `TimelineComparator`'s
+    class `<remarks>`; read them there.
+
 ## Invalidations
 
 - **Node paths were re-namespaced in `e1fbe534`** (`root > …`, `portal(N) > …`). Any capture

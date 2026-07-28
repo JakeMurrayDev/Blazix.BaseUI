@@ -794,6 +794,179 @@ public sealed class TimelineComparatorTests
     }
 
     [Fact]
+    public void ClosesARunOnItsTerminalEvenWhereTheNextRunAnimatesAnotherProperty()
+    {
+        // The open transitions opacity and the close transitions transform, so the two runs
+        // share no property. A terminal event closes a run on its own: waiting for a property
+        // to start twice would read the transform start as one joining the open and measure a
+        // single span from 0 ms across the idle gap to 1200 ms.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(200, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionstart", Popup, "transform"),
+            Run(1200, "transitionend", Popup, "transform")
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DoesNotMeasureARunACancellationCutShort()
+    {
+        // A cancelled run is shorter than its declaration by definition — cutting it short is
+        // what cancelling it means — so measuring it against that declaration fails both legs
+        // of two byte-identical timelines while naming no difference between them. Any cancel
+        // arriving before roughly half the declared duration produces that.
+        TimelineEvent[] timeline = [Run(0, "transitionstart", Popup), Run(80, "transitioncancel", Popup)];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DropsACancelledRunAndKeepsTheOneThatReplacedIt()
+    {
+        // A reposition that cancels a transform mid-open and restarts it. The cancelled run
+        // is not measurable; the run that replaced it is, and it matches its declaration.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(80, "transitioncancel", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1200, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void StillChecksTheRunThatFollowedACancellation()
+    {
+        // The skip covers the cancelled run alone. The run that replaced it is measured like
+        // any other, and the message names it by its own start rather than the cancelled
+        // run's — which is also what proves the cancelled run was dropped and not merged.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(80, "transitioncancel", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1200, "transitionend", Popup)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(80, "transitioncancel", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1900, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        Errors(findings).ShouldHaveSingleItem().Message.ShouldBe(
+            $"Animation duration differs from its own declaration at '{Popup}': " +
+            "Blazor ran for 900 ms starting at 1000 ms against a declared '0.2s'.");
+    }
+
+    [Fact]
+    public void StillRecordsTheCrossLegDeltaBetweenTwoCancelledRuns()
+    {
+        // Not measuring a cancelled run against a declaration must not silence the cross-leg
+        // record: a cancellation one leg took nearly four times as long to reach is exactly
+        // the number a reader wants, and stating it needs no declaration at all.
+        TimelineEvent[] reference = [Run(0, "transitionstart", Popup), Run(80, "transitioncancel", Popup)];
+        TimelineEvent[] candidate = [Run(0, "transitionstart", Popup), Run(300, "transitioncancel", Popup)];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        Errors(findings).ShouldBeEmpty();
+        findings.ShouldHaveSingleItem().Message.ShouldBe(
+            $"Animation span at '{Popup}': React started at 0 ms and ran 80 ms (declared '0.2s'); " +
+            "Blazor started at 0 ms and ran 300 ms (declared '0.2s'); the spans differ by 220 ms.");
+    }
+
+    [Fact]
+    public void LeavesACancellationWhereTheOtherLegEndedToTheSequenceDiff()
+    {
+        // One leg cancels at the millisecond the other ends. The two spans are the same two
+        // numbers, so L3 has no delta to state and states none — reporting spans that "differ
+        // by 0 ms" would be a second, emptier telling of a difference L1 already prints in
+        // full as transitionend against transitioncancel.
+        TimelineEvent[] reference = [Run(0, "transitionstart", Popup), Run(200, "transitionend", Popup)];
+        TimelineEvent[] candidate = [Run(0, "transitionstart", Popup), Run(200, "transitioncancel", Popup)];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        // The sequence diff alone, which is the finding whose Property is empty.
+        findings.ShouldHaveSingleItem().Property.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DropsAStartThatNeverReachedATerminalEvent()
+    {
+        // The same property cannot start twice inside one run, so a second start while the
+        // first is still open is proof that the first run ended without the recording seeing
+        // it end. Carrying its start forward joins it to the next run's terminal — 0 ms to
+        // 1200 ms as one span — and fails both legs of two byte-identical timelines.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1200, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MeasuresAStrandedStartsSuccessorFromItsOwnStart()
+    {
+        // The surviving run is the one with both ends, and it is measured from the start that
+        // opened it. Measuring from the stranded start instead would report 1900 ms here.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1200, "transitionend", Popup)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup),
+            Run(1000, "transitionstart", Popup),
+            Run(1900, "transitionend", Popup)
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+
+        Errors(findings).ShouldHaveSingleItem().Message.ShouldBe(
+            $"Animation duration differs from its own declaration at '{Popup}': " +
+            "Blazor ran for 900 ms starting at 1000 ms against a declared '0.2s'.");
+    }
+
+    [Fact]
     public void RecordsTheCrossLegDeltaRunForRun()
     {
         // Both legs open and close, and only the close differs. Pairing the runs by index

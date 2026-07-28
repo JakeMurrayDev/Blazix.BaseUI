@@ -46,6 +46,34 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// separately, because they name different obligations and a reader fixing one wants to see
 /// the other.
 /// </para>
+/// <para>
+/// <b>L2's four invariants are derived over the whole step, never per run, and are
+/// unreliable on any step that holds more than one run on a path.</b> The properties that
+/// reached a terminal event, the first insertion, the last terminal event and the removal
+/// index are each read from the step's entire timeline, so a step holding two runs is
+/// reasoned about as though it held one: a terminal event belonging to the first run
+/// satisfies a start belonging to the second, and a removal is ordered against the last
+/// terminal event anywhere in the step rather than against the run it interrupted. The
+/// consequence is not only that a difference can go unnamed. A leg can be reported as having
+/// <em>satisfied</em> an obligation it demonstrably broke — a node that completed one run and
+/// then left part way through a second reads as present at its <c>transitionend</c>, because
+/// the first run's end carried the same property name — which points a reader at the wrong
+/// leg when the other leg broke it too. This is a mislabelled positive and never a silent
+/// pass: <see cref="TimelineSequence.Normalize"/> neither drops nor collapses a run,
+/// <c>added</c> or <c>removed</c> event, so two legs whose derived states differ cannot have
+/// equal signatures, and L1 therefore fires on every step where this misreports. The
+/// difference is always reported; only the name put on it can be wrong. Read an L2 result as
+/// reliable only on a step with a single run per path, and prefer L1's diff to L2's naming
+/// where both fire.
+/// </para>
+/// <para>
+/// L3 pairs the two legs' runs by index, so the cross-leg record and the compared values
+/// carried alongside an overrun are meaningful only when both legs ran the same number of
+/// runs. Where they did not, one leg's open is compared against the other's close, and a real
+/// finding about one leg's run is printed next to a number lifted from a different run of the
+/// other's. The verdict is never wrong for this reason — a leg is failed only against its own
+/// declaration, measured on its own run — but the numbers beside it can be.
+/// </para>
 /// </remarks>
 public sealed class TimelineComparator : IComparator
 {
@@ -84,6 +112,13 @@ public sealed class TimelineComparator : IComparator
     /// </summary>
     private static readonly string[] TerminalKinds =
         ["transitionend", "animationend", "transitioncancel", "animationcancel"];
+
+    /// <summary>
+    /// The terminal events that cut a run short instead of completing it. L2 wants these —
+    /// they are proof the node was still in the tree — and L3 cannot use them, because a run
+    /// that was cancelled is shorter than its declaration for the reason it was cancelled.
+    /// </summary>
+    private static readonly string[] CancelKinds = ["transitioncancel", "animationcancel"];
 
     /// <summary>
     /// The four obligations L2 derives, in the order they are reported. The names are what a
@@ -278,13 +313,23 @@ public sealed class TimelineComparator : IComparator
     /// longest, because one run spans every property that ran within it.
     /// </para>
     /// <para>
+    /// A run a cancellation closed is not checked against a declaration at all. Cancelling a
+    /// transition is what makes it stop early, so such a run is shorter than its declaration
+    /// for the reason it was cancelled and never for the reason this layer exists to find —
+    /// and checking it would fail both legs of two identical timelines while naming no
+    /// difference between them. It is still compared across the legs, where the two lengths
+    /// are a fact about the cancellations and need no declaration to state.
+    /// </para>
+    /// <para>
     /// A leg that overran is reported even when the other leg overran identically, which is
     /// where this layer parts company with L2. An L2 obligation is a statement about what the
     /// component did, and one React breaks too is not a Blazix defect. An overrun is a
     /// statement about the measurement itself: a leg that contradicts the stylesheet it was
     /// measured against has no usable duration for that step, and the other leg's number came
     /// off the same clock. Silence there would leave the cross-leg record below as the only
-    /// output, reporting numbers from a basis known to be broken with nothing saying so.
+    /// output, reporting numbers from a basis known to be broken with nothing saying so. That
+    /// holds only because every run this reaches did complete against the declaration it is
+    /// measured against; the two shapes where that is not true are excluded above.
     /// </para>
     /// </remarks>
     /// <param name="context">The paired step.</param>
@@ -302,7 +347,9 @@ public sealed class TimelineComparator : IComparator
         // both would report the average of a run that was right and a run that was wrong.
         for (var i = 0; i < reference.Count; i++)
         {
-            if (referenceDeclared is { } declared && Overruns(reference[i], declared))
+            if (!reference[i].Cancelled
+                && referenceDeclared is { } declared
+                && Overruns(reference[i], declared))
             {
                 yield return Overrun(
                     context, path, "React", reference[i], declared, At(reference, i), At(candidate, i));
@@ -311,7 +358,9 @@ public sealed class TimelineComparator : IComparator
 
         for (var i = 0; i < candidate.Count; i++)
         {
-            if (candidateDeclared is { } declared && Overruns(candidate[i], declared))
+            if (!candidate[i].Cancelled
+                && candidateDeclared is { } declared
+                && Overruns(candidate[i], declared))
             {
                 yield return Overrun(
                     context, path, "Blazor", candidate[i], declared, At(reference, i), At(candidate, i));
@@ -321,8 +370,11 @@ public sealed class TimelineComparator : IComparator
         for (var i = 0; i < Math.Min(reference.Count, candidate.Count); i++)
         {
             // Two runs that started at the same millisecond and lasted the same time have no
-            // delta to carry, so nothing is recorded for them.
-            if (reference[i] == candidate[i])
+            // delta to carry, so nothing is recorded for them. Compared on the two numbers
+            // the message prints and not on the whole run: one leg cancelling where the other
+            // ended, at the same millisecond, is a difference L1 reports in full, and stating
+            // it here as spans that "differ by 0 ms" would say nothing twice.
+            if (reference[i].Start == candidate[i].Start && reference[i].Length == candidate[i].Length)
             {
                 continue;
             }
@@ -554,20 +606,28 @@ public sealed class TimelineComparator : IComparator
     /// One step can hold several runs on one node — a popup that opens and closes, a tooltip
     /// hovered in and out, a reposition that cancels and restarts a transform mid-open — and
     /// the idle time between two runs belongs to neither of them. A start reopens the
-    /// measurement only once the run in progress has closed; a start arriving while one is
-    /// still open is a second property joining it, which the run already spans.
+    /// measurement once the run in progress has closed, and also once that run has already
+    /// seen the same property start, which is the recording's only sign that a run ended
+    /// unobserved. A start of a property the open run has not seen is a second property
+    /// joining it, which the run already spans.
     /// </remarks>
     /// <param name="timeline">The leg's events.</param>
     /// <param name="path">The animating node.</param>
     /// <returns>
-    /// The runs in the order they happened. A start with no terminal event after it
-    /// contributes nothing — a step captured mid-run is not a measurement.
+    /// The runs in the order they happened, each carrying whether a cancellation closed it. A
+    /// start with no terminal event after it contributes nothing — a step captured mid-run is
+    /// not a measurement, and neither is a run the next one interrupted.
     /// </returns>
     private static List<Run> Spans(IReadOnlyList<TimelineEvent> timeline, string path)
     {
         var runs = new List<Run>();
+        var started = new HashSet<string>(StringComparer.Ordinal);
         int? start = null;
-        int? terminal = null;
+
+        // Whether a run was cancelled is a fact about the terminal event that closed it, so
+        // the two are carried as one value: held apart, the flag outlives the terminal it
+        // came from and has to be cleared in step with it everywhere the run is reset.
+        (int T, bool Cancelled)? terminal = null;
 
         foreach (var recorded in timeline)
         {
@@ -578,26 +638,41 @@ public sealed class TimelineComparator : IComparator
 
             if (StartKinds.Contains(recorded.Kind, StringComparer.Ordinal))
             {
-                if (start is { } reopened && terminal is { } reclosed)
+                // Two things close the run in progress. One is its terminal event, which
+                // makes it a measurement. The other is this same property starting again
+                // while the run is still open: a property cannot start twice inside one run,
+                // so the run it first started in ended without the recording seeing it end.
+                // That one is dropped rather than measured — carrying its start forward
+                // would run it on to the *next* run's terminal and report the two as one
+                // span, which is what the returns note above rules out. A start of a
+                // different property is the second property joining the run, which the run
+                // already spans.
+                if (start is { } reopened && (terminal is not null || started.Contains(Property(recorded))))
                 {
-                    runs.Add(new Run(reopened, reclosed - reopened));
+                    if (terminal is { } reclosed)
+                    {
+                        runs.Add(new Run(reopened, reclosed.T - reopened, reclosed.Cancelled));
+                    }
+
                     start = null;
                     terminal = null;
+                    started.Clear();
                 }
 
+                started.Add(Property(recorded));
                 start ??= recorded.T;
             }
             else if (start is not null && TerminalKinds.Contains(recorded.Kind, StringComparer.Ordinal))
             {
                 // The last one, so a node transitioning several properties is measured over
                 // all of them rather than to whichever finished first.
-                terminal = recorded.T;
+                terminal = (recorded.T, CancelKinds.Contains(recorded.Kind, StringComparer.Ordinal));
             }
         }
 
         if (start is { } opened && terminal is { } closed)
         {
-            runs.Add(new Run(opened, closed - opened));
+            runs.Add(new Run(opened, closed.T - opened, closed.Cancelled));
         }
 
         return runs;
@@ -874,7 +949,11 @@ public sealed class TimelineComparator : IComparator
     /// <summary>One measured run.</summary>
     /// <param name="Start">Milliseconds from the trigger action to the first start event.</param>
     /// <param name="Length">Milliseconds from that start to the last terminal event.</param>
-    private readonly record struct Run(int Start, int Length);
+    /// <param name="Cancelled">
+    /// Whether the terminal event that closed it was a cancellation, which is what makes its
+    /// length a fact about the interruption rather than about the declaration.
+    /// </param>
+    private readonly record struct Run(int Start, int Length, bool Cancelled);
 
     /// <summary>Which removal event an animating node's is.</summary>
     /// <param name="Kind">Whether it could be decided.</param>
