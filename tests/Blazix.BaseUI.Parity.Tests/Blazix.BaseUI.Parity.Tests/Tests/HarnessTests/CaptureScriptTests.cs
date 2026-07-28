@@ -118,7 +118,9 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
         var capture = await CaptureScript.CaptureAsync(page, "initial");
 
         // #roots is a synthetic wrapper, not a DOM node, and holds no keyed data.
-        var nodes = capture.Dom.Descendants().Where(n => n.Tag != "#roots").ToList();
+        var nodes = capture.Dom.Descendants()
+            .Where(n => n.Tag != CaptureNames.RootsWrapper)
+            .ToList();
 
         var inRoot = nodes.Single(n => n.Attributes.GetValueOrDefault("data-probe") == "in-root");
         var inPortal = nodes.Single(n => n.Attributes.GetValueOrDefault("data-probe") == "in-portal");

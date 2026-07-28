@@ -1,3 +1,5 @@
+using Blazix.BaseUI.Parity.Tests.Capture;
+
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
 /// <summary>

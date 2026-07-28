@@ -1,12 +1,14 @@
-namespace Blazix.BaseUI.Parity.Tests.Diff;
+namespace Blazix.BaseUI.Parity.Tests.Capture;
 
 /// <summary>
-/// The literal names <c>shared/capture.js</c> writes into a snapshot.
+/// Names that describe the shape of a snapshot rather than any one comparison.
 /// </summary>
 /// <remarks>
-/// These describe the capture format, not any one comparison, so they live apart from
-/// the comparators. Reaching into a sibling comparator for one would couple two files
-/// that are meant to be reviewed, tested, and rejected independently.
+/// Not every name here is written by <c>shared/capture.js</c> verbatim — see
+/// <see cref="MarkerPrefix"/>. They belong to the capture format all the same, so they sit
+/// beside <see cref="DomNode"/> rather than in <c>Diff/</c>: the capturer and its own tests
+/// need them as much as the comparators do, and a capture-layer file reaching into a
+/// comparator for a capture-format constant would have the dependency backwards.
 /// </remarks>
 public static class CaptureNames
 {

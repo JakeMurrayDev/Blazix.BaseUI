@@ -48,6 +48,67 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
+    public void PairsBeneathAnExtraWrapperWhenTheReferenceLeftoverAlsoHasOneChild()
+    {
+        // The canonical positioner/popup shape: React <div positioner><div popup><p/></div></div>
+        // against Blazor's extra <span wrapper> around the popup. Both leftovers have exactly
+        // one child, so stepping the two sides in lockstep reports the popup React *does*
+        // render as absent from Blazor and leaves the two popups unpaired for good — and the
+        // attribute comparator only walks pairs, so role, data-open, data-side, and every
+        // aria-* on the one element this harness exists to check would go uncompared.
+        var reference = Node("div", Node("div", Node("p")));
+        var candidate = Node("div", Node("span", Node("div", Node("p"))));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["span"]);
+        result.ReferenceOnly.ShouldBeEmpty();
+
+        // The positioner and the popup, not just the positioner.
+        result.Pairs.Count(p => p.Reference.Tag == "div").ShouldBe(2);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "p" && p.Candidate.Tag == "p");
+    }
+
+    [Fact]
+    public void PairsByTagWhenNothingAtALevelMatchesAndNoWrapperCanBeStepped()
+    {
+        // A role-only difference on a container. Dumping both subtrees would cost every
+        // attribute, style, and geometry comparison beneath them to report what is one
+        // attribute on one element.
+        var reference = Node("div", Role("ul", "menu", Node("li"), Node("li")));
+        var candidate = Node("div", Role("ul", "listbox", Node("li"), Node("li")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "ul" && p.Candidate.Tag == "ul");
+        result.Pairs.Count(p => p.Reference.Tag == "li").ShouldBe(2);
+
+        // Force-pairing must not make the difference vanish.
+        var relaxed = result.Relaxed.ShouldHaveSingleItem();
+        relaxed.Pair.Reference.Tag.ShouldBe("ul");
+        relaxed.ReferenceIdentity.ShouldContain("menu");
+        relaxed.CandidateIdentity.ShouldContain("listbox");
+    }
+
+    [Fact]
+    public void DoesNotForcePairAGenuinelyAbsentSubtree()
+    {
+        // Same trigger as above — nothing pairs and nothing can be stepped — but the tags
+        // differ too, so the last resort must decline and report both sides as one-sided.
+        var reference = Node("div", Node("ul", Node("li"), Node("li")));
+        var candidate = Node("div", Node("section", Node("p"), Node("p")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "ul");
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["ul", "li", "li"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["section", "p", "p"], ignoreOrder: true);
+    }
+
+    [Fact]
     public void ReportsAMissingNodeAndItsSubtreeAsReferenceOnly()
     {
         var reference = Node("div", Node("button"), Node("ul", Node("li")));
@@ -102,6 +163,22 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
+    public void ReportsNoReorderWhenAnExtraSameKeySiblingIsInsertedAhead()
+    {
+        // Blazor renders one extra leading item. Taking the earliest candidate of a key
+        // regardless of position pairs the <b> React renders second with the inserted one
+        // rendered first, so the indices step backwards and a move is reported. Nothing
+        // moved — a node was inserted, and the extra node is already reported on its own.
+        var reference = Node("div", Node("a"), Node("b"));
+        var candidate = Node("div", Node("b"), Node("a"), Node("b"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Reorders.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["b"]);
+    }
+
+    [Fact]
     public void ReportsAnExtraCaptureRootAsReferenceOnly()
     {
         // capture.js emits the root element itself when a fixture has one root and a
@@ -125,10 +202,31 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
+    public void ReportsAnExtraCaptureRootAsCandidateOnly()
+    {
+        // The mirror of the case above, and the likelier Blazix defect: Blazor portals
+        // where React renders inline. Root normalization is symmetric, so swapping the two
+        // legs must produce the same result with the sides exchanged.
+        var reference = Node("div", Node("button"));
+        var candidate = Node("#roots", Node("div", Node("button")), Node("div", Node("dialog")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "#roots" || p.Candidate.Tag == "#roots");
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["div", "dialog"], ignoreOrder: true);
+        result.ReferenceOnly.ShouldBeEmpty();
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && p.Candidate.Tag == "div");
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "button" && p.Candidate.Tag == "button");
+    }
+
+    [Fact]
     public void DoesNotPairSiblingsWithDifferentAccessibleNames()
     {
-        var reference = Node("div", Text("button", "Save"));
-        var candidate = Node("div", Text("button", "Cancel"));
+        // The <hr> pairs, which keeps the level off the last-resort tag pairing. This test
+        // is about the key itself, so it has to exercise the ordinary path.
+        var reference = Node("div", Node("hr"), Text("button", "Save"));
+        var candidate = Node("div", Node("hr"), Text("button", "Cancel"));
 
         var result = NodeMatcher.Match(reference, candidate);
 
@@ -139,13 +237,28 @@ public sealed class NodeMatcherTests
     [Fact]
     public void DoesNotPairAcrossDifferentRoles()
     {
-        var reference = Node("div", Role("li", "menuitem"));
-        var candidate = Node("div", Role("li", "option"));
+        var reference = Node("div", Node("hr"), Role("li", "menuitem"));
+        var candidate = Node("div", Node("hr"), Role("li", "option"));
 
         var result = NodeMatcher.Match(reference, candidate);
 
         result.ReferenceOnly.ShouldContain(n => n.Attributes["role"] == "menuitem");
         result.CandidateOnly.ShouldContain(n => n.Attributes["role"] == "option");
+    }
+
+    [Fact]
+    public void PairsAMismatchedLeafByTagOnceNothingElseAtTheLevelMatches()
+    {
+        // Without the sibling above, the same two nodes are all the level has. Reporting
+        // them as two unrelated elements loses the one fact worth reporting: they are the
+        // same element with a different role.
+        var reference = Node("div", Role("li", "menuitem"));
+        var candidate = Node("div", Role("li", "option"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "li" && p.Candidate.Tag == "li");
+        result.Relaxed.ShouldHaveSingleItem().ReferenceIdentity.ShouldContain("menuitem");
     }
 
     private static DomNode Node(string tag, params DomNode[] children) => new()
@@ -168,13 +281,13 @@ public sealed class NodeMatcherTests
         Children = []
     };
 
-    private static DomNode Role(string tag, string role) => new()
+    private static DomNode Role(string tag, string role, params DomNode[] children) => new()
     {
         Tag = tag,
         Path = tag,
         Attributes = new Dictionary<string, string> { ["role"] = role },
         Classes = [],
         Text = string.Empty,
-        Children = []
+        Children = children
     };
 }

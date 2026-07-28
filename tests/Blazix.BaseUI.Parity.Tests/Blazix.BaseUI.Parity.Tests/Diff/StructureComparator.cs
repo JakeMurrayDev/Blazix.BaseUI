@@ -49,6 +49,27 @@ public sealed class StructureComparator : IComparator
             };
         }
 
+        foreach (var relaxed in match.Relaxed)
+        {
+            yield return new Finding
+            {
+                Fixture = context.Fixture,
+                Leg = context.Leg,
+                Step = context.Step,
+                Kind = FindingKind.Structure,
+                Severity = Severity.Error,
+                NodePath = relaxed.Pair.Reference.Path,
+                ReferenceValue = relaxed.ReferenceIdentity,
+                CandidateValue = relaxed.CandidateIdentity,
+                Message =
+                    $"Node identity differs at '{relaxed.Pair.Reference.Path}': " +
+                    $"React renders {relaxed.ReferenceIdentity}; " +
+                    $"Blazor renders {relaxed.CandidateIdentity}. Nothing else at that " +
+                    "level matched, so the two were paired on tag alone to keep comparing " +
+                    "beneath them."
+            };
+        }
+
         foreach (var reorder in match.Reorders)
         {
             var referenceOrder = string.Join(", ", reorder.ReferenceOrder);

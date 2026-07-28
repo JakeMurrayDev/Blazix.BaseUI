@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Blazix.BaseUI.Parity.Tests.Capture;
 using Blazix.BaseUI.Parity.Tests.Infrastructure;
 
 namespace Blazix.BaseUI.Parity.Tests.Diff;
@@ -29,7 +30,13 @@ public sealed class MarkerComparator : IComparator
     /// <inheritdoc />
     public IEnumerable<Finding> Compare(ComparisonContext context)
     {
-        foreach (var node in context.Candidate.Dom.Descendants())
+        // Descendants() is self-inclusive, so a multi-root capture starts at the synthetic
+        // '#roots' wrapper. Its path is the empty string, so a finding from there would
+        // name an element in neither page.
+        var nodes = context.Candidate.Dom.Descendants()
+            .Where(node => node.Tag != CaptureNames.RootsWrapper);
+
+        foreach (var node in nodes)
         {
             var markers = node.Attributes.Keys
                 .Where(name => name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
