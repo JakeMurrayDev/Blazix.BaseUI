@@ -73,6 +73,58 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
+    public void ReportsSiblingsThatPairedOutOfOrder()
+    {
+        var reference = Node("div", Node("button"), Node("ul"));
+        var candidate = Node("div", Node("ul"), Node("button"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        // Both siblings pair — the difference is only where they sit.
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("div");
+        reorder.ReferenceOrder.ShouldBe(["button", "ul"]);
+        reorder.CandidateOrder.ShouldBe(["ul", "button"]);
+    }
+
+    [Fact]
+    public void ReportsNoReorderWhenPairedSiblingsKeepTheirOrder()
+    {
+        var reference = Node("div", Node("button"), Node("span"), Node("ul"));
+        var candidate = Node("div", Node("button"), Node("ul"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Reorders.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReportsAnExtraCaptureRootAsReferenceOnly()
+    {
+        // capture.js emits the root element itself when a fixture has one root and a
+        // synthetic '#roots' wrapper when content is portalled, so the two legs do not
+        // even agree on what the top of the tree is. React opening a portal while Blazor
+        // renders inline is a first-order parity defect; pairing '#roots' with the real
+        // root would compare the wrapper's empty attribute set against a live element and
+        // push every real root's children one level out of step.
+        var reference = Node("#roots", Node("div", Node("button")), Node("div", Node("dialog")));
+        var candidate = Node("div", Node("button"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "#roots" || p.Candidate.Tag == "#roots");
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["div", "dialog"], ignoreOrder: true);
+        result.CandidateOnly.ShouldBeEmpty();
+
+        // The root both legs do share still pairs, and still matches beneath itself.
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && p.Candidate.Tag == "div");
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "button" && p.Candidate.Tag == "button");
+    }
+
+    [Fact]
     public void DoesNotPairSiblingsWithDifferentAccessibleNames()
     {
         var reference = Node("div", Text("button", "Save"));

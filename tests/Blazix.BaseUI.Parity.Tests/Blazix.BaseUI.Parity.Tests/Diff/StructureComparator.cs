@@ -1,8 +1,14 @@
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
 /// <summary>
-/// Reports nodes one leg rendered and the other did not.
+/// Reports nodes one leg rendered and the other did not, and sibling lists the two legs
+/// ordered differently.
 /// </summary>
+/// <remarks>
+/// Ordering is reported because DOM sibling order is tab order and reading order: a
+/// reversed dialog footer or a reordered item list is a parity break even when every node
+/// is present on both legs and every attribute on them agrees.
+/// </remarks>
 public sealed class StructureComparator : IComparator
 {
     /// <inheritdoc />
@@ -40,6 +46,27 @@ public sealed class StructureComparator : IComparator
                 NodePath = node.Path,
                 CandidateValue = node.Tag,
                 Message = $"Blazor renders <{node.Tag}> at '{node.Path}'; React does not."
+            };
+        }
+
+        foreach (var reorder in match.Reorders)
+        {
+            var referenceOrder = string.Join(", ", reorder.ReferenceOrder);
+            var candidateOrder = string.Join(", ", reorder.CandidateOrder);
+
+            yield return new Finding
+            {
+                Fixture = context.Fixture,
+                Leg = context.Leg,
+                Step = context.Step,
+                Kind = FindingKind.Structure,
+                Severity = Severity.Error,
+                NodePath = reorder.ParentPath,
+                ReferenceValue = referenceOrder,
+                CandidateValue = candidateOrder,
+                Message =
+                    $"Sibling order differs under '{reorder.ParentPath}': " +
+                    $"React renders {referenceOrder}; Blazor renders {candidateOrder}."
             };
         }
     }

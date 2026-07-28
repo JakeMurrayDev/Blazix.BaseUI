@@ -16,9 +16,6 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </remarks>
 public sealed class MarkerComparator : IComparator
 {
-    /// <summary>The prefix an unnormalized Blazix marker attribute carries.</summary>
-    public const string MarkerPrefix = "data-blazix-";
-
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -35,7 +32,7 @@ public sealed class MarkerComparator : IComparator
         foreach (var node in context.Candidate.Dom.Descendants())
         {
             var markers = node.Attributes.Keys
-                .Where(name => name.StartsWith(MarkerPrefix, StringComparison.Ordinal))
+                .Where(name => name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
                 .OrderBy(name => name, StringComparer.Ordinal);
 
             foreach (var name in markers)

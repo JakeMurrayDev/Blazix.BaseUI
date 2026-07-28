@@ -34,6 +34,44 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
+    public void StructureReportsReorderedSiblings()
+    {
+        // DOM sibling order is tab order and reading order, so a reversed footer or a
+        // reordered item list is a real parity break. Key-based pairing matches these two
+        // across their positions, which is what makes the reorder invisible without an
+        // explicit check.
+        var context = Context(
+            Node("div", Node("button"), Node("ul")),
+            Node("div", Node("ul"), Node("button")));
+
+        var findings = new StructureComparator().Compare(context).ToList();
+
+        // One finding for the sibling list, not one per node that moved.
+        findings.Count.ShouldBe(1);
+        findings[0].Kind.ShouldBe(FindingKind.Structure);
+        findings[0].Severity.ShouldBe(Severity.Error);
+        findings[0].NodePath.ShouldBe("div");
+        findings[0].ReferenceValue.ShouldBe("button, ul");
+        findings[0].CandidateValue.ShouldBe("ul, button");
+    }
+
+    [Fact]
+    public void StructureReportsNoReorderWhenPairedSiblingsKeepTheirOrder()
+    {
+        // The span is missing on the candidate, which is a presence difference and
+        // nothing more. Only the siblings that paired are ordered against each other, so
+        // a dropped node must not also read as a move.
+        var context = Context(
+            Node("div", Node("button"), Node("span"), Node("ul")),
+            Node("div", Node("button"), Node("ul")));
+
+        var findings = new StructureComparator().Compare(context).ToList();
+
+        findings.Count.ShouldBe(1);
+        findings[0].NodePath.ShouldBe("span");
+    }
+
+    [Fact]
     public void StructureCarriesTheFixtureLegAndStep()
     {
         var context = Context(Node("div", Node("button")), Node("div"));
@@ -107,6 +145,19 @@ public sealed class StructuralComparatorTests
             Node("div", Attributed("input", ("data-blazix-otp-input", ""))));
 
         new AttributeComparator().Compare(context).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AttributeDoesNotDiffTheSyntheticRootsWrapperAgainstARealRoot()
+    {
+        // A portal on one leg only makes capture.js emit the '#roots' wrapper there and
+        // the root element itself on the other. Diffing the wrapper's empty attribute set
+        // against a live root reports every attribute on it as missing — findings about a
+        // node that exists in neither page.
+        var reference = Node("#roots", Attributed("div", ("data-parity-root", "")));
+        var candidate = Attributed("div", ("data-parity-root", ""));
+
+        new AttributeComparator().Compare(Context(reference, candidate)).ShouldBeEmpty();
     }
 
     [Fact]

@@ -25,7 +25,7 @@ public sealed class AttributeComparator : IComparator
                 // against manifest/markers.json. Reporting them here as well would both
                 // duplicate every marker and override an Info classification with an
                 // unexplained error.
-                .Where(name => !name.StartsWith(MarkerComparator.MarkerPrefix, StringComparison.Ordinal))
+                .Where(name => !name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal);
 
