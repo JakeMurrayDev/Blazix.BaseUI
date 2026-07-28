@@ -34,11 +34,19 @@ Helper scripts live in the superpowers plugin cache under
 | 6 | Finding model, `NodeMatcher`, structural comparators | complete (`cb3de37a..f66a28b9`), reviewed clean after **five** fix waves |
 | 7 | Style, custom property, geometry comparators | complete (`f66a28b9..2602bedb`), reviewed clean after 1 fix wave |
 | 8 | ARIA, focus, console comparators | complete (`2602bedb..360a00da`), reviewed clean after 1 fix wave |
+| 9 | Animation timeline comparator | complete (`360a00da..22e3a415`), reviewed clean after **three** fix waves |
+| 10 | Screenshots, pixel diff, frame seeking | complete (`22e3a415..9781d477`), reviewed clean after 2 fix waves |
 | 5b | Selector-resolution comparator | **not started — controller-added, see Open items 1** |
-| 9 | Animation timeline comparator | in progress |
-| 10–17 | Pixels, waivers, baselines, report, canary, fixtures, docs | not started |
+| 11–17 | Waivers, baselines, report, canary, fixtures, docs | not started |
 
-Suite at Task 8 close: **187/187**, clean build, 0 lint violations.
+Suite at Task 10 close: **294/294**, clean build, 0 lint violations.
+
+**All ten plan comparators now exist** — structure, attribute, marker, computed style, custom
+property, geometry, ARIA snapshot, focus, console, timeline, pixel. **None has ever run end to
+end.** No production code constructs a `ComparisonContext`, and there is no comparator registry;
+that is Task 14's runner. `ComparisonContext.PixelThreshold` is likewise not yet fed from
+`FixtureEntry.PixelThreshold`. Treat every comparator as unit-tested but never integrated, and
+expect the first end-to-end run to surface things no unit test could.
 
 ## The single most important lesson from this session
 
