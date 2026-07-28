@@ -31,9 +31,14 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // The step's selector is therefore addressable but not actionable, which is a
         // parity result and not a harness failure: it is recorded, the run continues,
         // and the state is captured unchanged. Task 15 replaces the placeholder with the
-        // React demo's class strings, at which point the click lands and these two
+        // React demo's class strings, at which point the click lands and these
         // assertions invert.
-        bundle.Steps[1].UnresolvedSelectors.ShouldBe(["[role=switch]"]);
+        bundle.Steps[1].NonActionableSelectors.ShouldBe(["[role=switch]"]);
+
+        // Asserted alongside, because separating the two is the point: the element is
+        // there, so a comparator reading this bundle must see a layout difference and not
+        // an addressing one.
+        bundle.Steps[1].UnresolvedSelectors.ShouldBeEmpty();
         Checked(bundle.Steps[1]).ShouldBe(Checked(bundle.Steps[0]));
     }
 
@@ -64,6 +69,7 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         bundle.Steps[0].Focus.ShouldBeNull();
         bundle.Steps[1].Focus.ShouldBe("root > button");
         bundle.Steps[1].UnresolvedSelectors.ShouldBeEmpty();
+        bundle.Steps[1].NonActionableSelectors.ShouldBeEmpty();
     }
 
     private static string Checked(StepCapture step)

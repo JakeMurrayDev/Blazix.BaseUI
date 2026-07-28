@@ -2,6 +2,7 @@ using Blazix.BaseUI.Parity.Tests.Capture;
 using Blazix.BaseUI.Parity.Tests.Fixtures;
 using Blazix.BaseUI.Parity.Tests.Infrastructure;
 using Blazix.BaseUI.Utilities;
+using Microsoft.Playwright;
 using Shouldly;
 
 namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
@@ -59,5 +60,43 @@ public sealed class SettleProtocolTests(PlaywrightFixture playwright)
             """);
 
         pending.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task FailsTheDeadlineWhenAnimationFramesStopBeingServiced()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await CaptureScript.InjectAsync(page);
+
+        await page.GotoAsync(
+            $"{ParityServerAssemblyFixture.ServerAddress}/fixture/harness/capture-probe/server");
+
+        // Settled first for two reasons: the quiesce phase is the part under test, so the
+        // page has to reach it, and Playwright's own waiting binds the page's native
+        // requestAnimationFrame when it first injects into this frame — which this call
+        // does, before the replacement below can be captured in its place.
+        await SettleProtocol.WaitAsync(page);
+
+        // A throttled or backgrounded tab stops servicing animation frames while its
+        // timers keep running. Playwright deliberately keeps its pages foregrounded and
+        // unthrottled, so the state is reached by replacing requestAnimationFrame with
+        // one that never calls back: fault injection, like the routed delay above, not a
+        // stand-in for the protocol's own behaviour.
+        await page.EvaluateAsync("() => { window.requestAnimationFrame = () => 0; }");
+
+        // Budgeted rather than awaited outright. When the deadline lived only inside the
+        // frame callback this call never completed at all — it neither resolved nor
+        // rejected — so an unbudgeted await would hang the suite instead of failing it,
+        // and hanging is the defect. Ten seconds is ten times the deadline being proven.
+        var settle = SettleProtocol.WaitAsync(page, 1_000);
+
+        var failure = await Should.ThrowAsync<PlaywrightException>(
+            () => settle.WaitAsync(TimeSpan.FromSeconds(10)));
+
+        // Matched on the quiesce script's own wording, not merely on the exception type:
+        // Playwright's TimeoutException derives from PlaywrightException, so a settle that
+        // failed one phase earlier would otherwise satisfy this test.
+        failure.Message.ShouldContain("Timed out after 1000ms waiting for the page to settle");
     }
 }

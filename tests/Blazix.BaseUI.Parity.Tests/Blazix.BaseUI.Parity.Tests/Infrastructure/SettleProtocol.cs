@@ -48,10 +48,16 @@ public static class SettleProtocol
     /// <c>display: none</c> are deliberately not treated as pending: a container that is
     /// never moved would otherwise hold the settle open until the deadline.
     /// </para>
+    /// <para>
+    /// The deadline is armed on a timer rather than checked inside the frame callback.
+    /// A throttled or backgrounded page stops servicing animation frames, and a deadline
+    /// only the frame callback enforces cannot fire there: the promise would neither
+    /// resolve nor reject and the awaiting evaluate would hang with no diagnostic, which
+    /// is the failure the deadline exists to prevent.
+    /// </para>
     /// </remarks>
     private const string QuiesceScript = """
         (timeoutMs) => new Promise((resolve, reject) => {
-          const deadline = performance.now() + timeoutMs;
           let quiet = 0;
           const observer = new MutationObserver(() => { quiet = 0; });
           observer.observe(document.body, { attributes: true, subtree: true, childList: true });
@@ -59,14 +65,20 @@ public static class SettleProtocol
           const portalPending = () => [...document.querySelectorAll('[data-blazix-base-ui-portal]')]
             .some((el) => el.style.display === 'none');
 
+          let deadline = 0;
+          const stop = () => { observer.disconnect(); clearTimeout(deadline); };
+
+          deadline = setTimeout(() => {
+            const pending = portalPending();
+            stop();
+            reject(new Error(
+              `Timed out after ${timeoutMs}ms waiting for the page to settle ` +
+              `(quiet frames: ${quiet}, portal mid-mount: ${pending}).`));
+          }, timeoutMs);
+
           const tick = () => {
-            if (performance.now() > deadline) {
-              observer.disconnect();
-              reject(new Error('Timed out waiting for the page to settle.'));
-              return;
-            }
             if (portalPending()) { quiet = 0; requestAnimationFrame(tick); return; }
-            if (++quiet >= 2) { observer.disconnect(); resolve(); return; }
+            if (++quiet >= 2) { stop(); resolve(); return; }
             requestAnimationFrame(tick);
           };
           requestAnimationFrame(tick);

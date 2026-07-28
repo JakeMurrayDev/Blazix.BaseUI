@@ -56,6 +56,7 @@ public sealed class ParityCapturer
             foreach (var step in fixture.Steps)
             {
                 var unresolved = new List<string>();
+                var nonActionable = new List<string>();
 
                 if (step.Settle == "animation")
                 {
@@ -67,7 +68,7 @@ public sealed class ParityCapturer
 
                 foreach (var action in step.Do)
                 {
-                    await PerformAsync(page, fixture.Component, action, unresolved);
+                    await PerformAsync(page, fixture.Component, action, unresolved, nonActionable);
                 }
 
                 await SettleProtocol.WaitAsync(page);
@@ -88,7 +89,8 @@ public sealed class ParityCapturer
                     // part of the accessibility tree the floating fixtures exist to check.
                     Aria = await page.Locator("body").AriaSnapshotAsync(),
                     Console = observed,
-                    UnresolvedSelectors = unresolved
+                    UnresolvedSelectors = unresolved,
+                    NonActionableSelectors = nonActionable
                 });
             }
 
@@ -122,7 +124,8 @@ public sealed class ParityCapturer
         IPage page,
         string component,
         StepAction action,
-        List<string> unresolved)
+        List<string> unresolved,
+        List<string> nonActionable)
     {
         if (action.Key is { } key)
         {
@@ -146,7 +149,25 @@ public sealed class ParityCapturer
                 State = WaitForSelectorState.Attached,
                 Timeout = ActionTimeoutMs
             });
+        }
+        catch (TimeoutException)
+        {
+            // Not a harness error. The selector is a role contract both implementations
+            // are obliged to honour, so one leg failing to expose the element at all is
+            // the result, recorded for the comparators rather than thrown. Anything else,
+            // a malformed selector in particular, still propagates.
+            unresolved.Add(expanded);
+            return;
+        }
 
+        // Scoped apart from the probe above on purpose. A timeout here means the element
+        // resolved and could not be driven — zero-size, covered, pointer-events: none —
+        // which is a layout or interaction difference, not an addressing one. Recording
+        // both in the same list would mislabel it and, worse, let two legs that are
+        // non-actionable for unrelated reasons produce identical lists and cancel out
+        // into a false report of parity.
+        try
+        {
             switch (verb)
             {
                 case "click":
@@ -176,12 +197,10 @@ public sealed class ParityCapturer
         }
         catch (TimeoutException)
         {
-            // Not a harness error. The selector is a role contract both implementations
-            // are obliged to honour, so failing to reach the element — or reaching one
-            // that cannot be driven, which is the same addressing failure seen a step
-            // later — is the result, recorded for the comparators rather than thrown.
-            // Anything else, a malformed selector in particular, still propagates.
-            unresolved.Add(expanded);
+            // Skipped rather than thrown, exactly as an unresolved selector is: the run
+            // continues and the step is captured in whatever state the failed action
+            // left it.
+            nonActionable.Add(expanded);
         }
     }
 

@@ -143,6 +143,22 @@ public sealed record StepCapture
     /// </remarks>
     [JsonPropertyName("unresolvedSelectors")]
     public IReadOnlyList<string> UnresolvedSelectors { get; init; } = [];
+
+    /// <summary>
+    /// Gets the expanded step selectors that resolved to an element the action could not
+    /// be driven against on this leg.
+    /// </summary>
+    /// <remarks>
+    /// The element is present and not driveable — zero-size, covered, or
+    /// <c>pointer-events: none</c> — which is a different parity result from a selector
+    /// that matched nothing, and is kept out of
+    /// <see cref="UnresolvedSelectors"/> for that reason. Folding the two together also
+    /// lets them cancel: two legs whose elements are non-actionable for unrelated reasons
+    /// would report identical lists and no difference at all. The capturer records the
+    /// selector here and skips the action instead of throwing.
+    /// </remarks>
+    [JsonPropertyName("nonActionableSelectors")]
+    public IReadOnlyList<string> NonActionableSelectors { get; init; } = [];
 }
 
 /// <summary>All steps captured for one fixture on one leg.</summary>
