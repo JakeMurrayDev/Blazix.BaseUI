@@ -74,6 +74,21 @@ public sealed class PixelComparator(string directory) : IComparator
             var hasReference = reference.TryGetValue(shot, out var referenceName);
             var hasCandidate = candidate.TryGetValue(shot, out var candidateName);
 
+            // Cleared for every shot the candidate leg produced, not only for the ones that
+            // reach the comparison below. A shot that was two-sided and failing on one run
+            // and is one-sided on the next — the React leg stopped portalling a popup out —
+            // is reported without ever being decoded, and an overlay left beside it claims a
+            // pixel difference that was measured against an image no longer in the run.
+            //
+            // The one case this cannot reach is the shot the CANDIDATE leg stopped
+            // producing: its overlay is named after a candidate screenshot this run has no
+            // name for. That finding carries a null CandidateValue, so a report that links
+            // diffs by candidate name will not surface the stale file either.
+            if (hasCandidate)
+            {
+                ClearDiff(candidateName!);
+            }
+
             var finding = hasReference && hasCandidate
                 ? CompareOne(context, shot, referenceName!, candidateName!)
                 : Report(
@@ -193,21 +208,31 @@ public sealed class PixelComparator(string directory) : IComparator
         data.SaveTo(stream);
     }
 
-    private Finding? CompareOne(
-        ComparisonContext context, string shot, string referenceName, string candidateName)
+    /// <summary>
+    /// Removes a shot's overlay from a previous run, before anything about this run is
+    /// decided.
+    /// </summary>
+    /// <remarks>
+    /// A diff is written only for a shot that failed, so one left behind by a run that has
+    /// since been fixed sits beside a passing screenshot claiming a difference that no
+    /// longer exists — and Task 13's report links diffs by name, so it would be published
+    /// as this run's evidence.
+    /// </remarks>
+    private void ClearDiff(string candidateName)
     {
-        // Cleared before anything is decided, so the overlay on disk is always this
-        // comparison's and never a previous run's. A diff is written only for a shot that
-        // failed, so one left behind by a run that has since been fixed sits beside a
-        // passing screenshot claiming a difference that no longer exists — and Task 13's
-        // report links diffs by name, so it would be published as this run's evidence.
-        var diffName = ScreenshotSet.DiffName(candidateName);
-        var diffPath = Path.Combine(directory, diffName);
+        var diffPath = Path.Combine(directory, ScreenshotSet.DiffName(candidateName));
 
         if (File.Exists(diffPath))
         {
             File.Delete(diffPath);
         }
+    }
+
+    private Finding? CompareOne(
+        ComparisonContext context, string shot, string referenceName, string candidateName)
+    {
+        var diffName = ScreenshotSet.DiffName(candidateName);
+        var diffPath = Path.Combine(directory, diffName);
 
         using var reference = Decode(Path.Combine(directory, referenceName));
         using var candidate = Decode(Path.Combine(directory, candidateName));

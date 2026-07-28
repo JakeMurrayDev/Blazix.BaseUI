@@ -321,8 +321,11 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // a recording of its own and reports whatever has accumulated since the previous
         // step started one. Before the seek was silenced, that meant its own events on top
         // of the previous step's; now the recording is detached for the whole frame loop
-        // and never re-armed, so this step's record is a verbatim copy of the previous
-        // step's and carries no signal about this step at all. Both legs go equally quiet,
+        // and never re-armed, so this step's record is a copy of the previous step's, plus
+        // anything that occurred between the capture and the seek — the teardown happens at
+        // the seek, not at capture() — and carries no signal about this step at all. The
+        // probe does nothing in that window, which is why the equality below holds here and
+        // is not the general shape. Both legs go equally quiet,
         // so it raises no false finding — but a genuine difference occurring in a
         // non-animation step that follows an animation step is now invisible. The fix is
         // the deferred one: start a recording for every step, not only animation steps.
@@ -373,6 +376,44 @@ public sealed class ParityCapturerTests(PlaywrightFixture playwright)
         // genuine animationstart from the click can legitimately land in the window between
         // capture() and the seek, which is a race and not a leak.
         bundle.Steps[2].Timeline.ShouldNotContain(e => e.Kind == "animationend");
+    }
+
+    [Fact]
+    public async Task KeepsItsOwnResumeOutOfTheNextAnimationStepsRecord()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await page.AddInitScriptAsync(DeferredDriftScript);
+
+        // Two consecutive animation steps is the canonical popup shape — one opens it, one
+        // closes it — so this is the sequence the corpus will actually produce. The second
+        // starts nothing of its own, which is what makes the assertion below exact.
+        var fixture = ProbeFixture(
+            new StepEntry
+            {
+                Name = "drifting",
+                Settle = "animation",
+                Do = [new StepAction { Click = "button" }]
+            },
+            new StepEntry { Name = "quiet", Settle = "animation" });
+
+        var bundle = await new ParityCapturer(screenshots)
+            .CaptureAsync(page, fixture, ParityLeg.BlazorServer);
+
+        // Asserted first so nothing below can hold vacuously: the frames were taken, so the
+        // frame loop really did seek the drift to its end and really did resume it.
+        bundle.Steps[0].Screenshots
+            .ShouldContain("harness__capture-probe.BlazorServer.drifting.frame100.00.png");
+
+        // The quiet step drives nothing and the drift it inherits started in the previous
+        // step, so the only thing that can start an animation inside its recording is the
+        // previous step's resume putting the drift back from the end the frame loop seeked
+        // it to — a phase crossing the browser reports as an animationstart. Recorded, it
+        // attributes the harness's own bookkeeping to the component, on the one comparator
+        // whose entire subject is animation, and asymmetrically: the two legs seek
+        // different numbers of animations whenever one uses two keyframe animations where
+        // the other uses one.
+        bundle.Steps[1].Timeline.ShouldNotContain(e => e.Kind == "animationstart");
     }
 
     private static double Drift(StepCapture step)

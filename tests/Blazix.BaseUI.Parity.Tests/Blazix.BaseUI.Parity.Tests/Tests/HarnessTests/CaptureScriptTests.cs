@@ -220,6 +220,72 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
     }
 
     [Fact]
+    public async Task ResumingDoesNotResolveUntilThePhaseCrossingItCausesHasBeenDispatched()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              const style = document.createElement('style');
+              style.textContent =
+                '@keyframes parity-resume { from { opacity: 1 } to { opacity: 0 } }' +
+                '#parity-resume { animation: parity-resume 20s linear; }';
+              document.head.appendChild(style);
+              const el = document.createElement('div');
+              el.id = 'parity-resume';
+              root.appendChild(el);
+
+              // Counted outside the harness's own recording, which the seek below detaches:
+              // this has to observe what the browser dispatches, not what the timeline kept.
+              let starts = 0;
+              document.addEventListener('animationstart', () => { starts += 1; }, true);
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              const own = starts;
+
+              // A frame between the seeks, because the capturer takes a screenshot between
+              // them and the browser decides an animation's phase once per frame update. Run
+              // back to back in one task the end is never observed, no event is queued for
+              // it, and the resume crosses back from a phase the page was never in.
+              const frame = () =>
+                new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+              api.seekAnimations(0);
+              await frame();
+              api.seekAnimations(1);
+              await frame();
+
+              const pending = api.resumeAnimations();
+              const atReturn = starts;
+              await pending;
+              const atResolve = starts;
+
+              el.remove();
+              style.remove();
+              return { own, atReturn, atResolve };
+            }
+            """);
+
+        // The animation's own start, and nothing else on the probe page animating.
+        result.GetProperty("own").GetInt32().ShouldBe(1);
+
+        // Restoring the clock crosses back into the active phase from the end the seek put
+        // the animation at, and the browser reports that a frame later — not synchronously.
+        // This is why a flag the resume could clear cannot silence it, and why a resume that
+        // returned as soon as the clocks were set filed its own animationstart in the next
+        // step's timeline: the capturer re-arms the recording after one round trip, which is
+        // shorter than a frame.
+        result.GetProperty("atReturn").GetInt32().ShouldBe(1);
+
+        // Awaited, the crossing is dispatched before the resume resolves, so it lands while
+        // the recording seekAnimations() detached is still detached and is recorded nowhere.
+        result.GetProperty("atResolve").GetInt32().ShouldBe(2);
+    }
+
+    [Fact]
     public async Task ResumingWithoutHavingSeekedTouchesNothing()
     {
         await using var context = await playwright.Browser.NewContextAsync();

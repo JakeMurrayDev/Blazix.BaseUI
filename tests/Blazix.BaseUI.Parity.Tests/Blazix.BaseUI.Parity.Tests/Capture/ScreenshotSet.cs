@@ -230,7 +230,13 @@ public static class ScreenshotSet
         string step,
         string framePrefix)
     {
-        var targets = new List<ILocator> { page.Locator(RootSelector) };
+        // .First for the same reason every action locator in ParityCapturer carries it. A
+        // page with two [data-parity-root] elements resolves this to both, and a strict-mode
+        // violation surfaces as a PlaywrightException the loop below swallows — so the root
+        // shot would not merely be joined by a second, it would be lost outright, and the
+        // step compared against nothing. First is also the element roots() resolves by
+        // querySelector, so shot 00 stays the tree capture.js labels `root`.
+        var targets = new List<ILocator> { page.Locator(RootSelector).First };
         var portals = page.Locator(PortalSelector);
         var portalCount = await portals.CountAsync();
 

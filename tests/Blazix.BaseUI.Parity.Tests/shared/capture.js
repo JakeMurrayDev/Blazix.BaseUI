@@ -345,11 +345,26 @@
         // detaching rather than by a flag: seeking an animation to its end and then back
         // to where it was crosses two phase boundaries, the browser reports each as an
         // animationend / animationstart, and the one caused by the resume is dispatched a
-        // frame AFTER resumeAnimations() has returned — past any flag the resume could
-        // clear. The next step's startTimeline() re-arms the recording.
+        // frame AFTER resumeAnimations() has restored the clocks — past any flag the resume
+        // could clear.
+        //
+        // Detaching alone does not finish the job, because the recording does not stay
+        // detached: the next step's startTimeline() re-arms it, and the capturer reaches
+        // that after one aria-snapshot round trip — shorter than the frame the resume's
+        // event waits for. The event was therefore recorded after all, one step downstream
+        // rather than in place, which two consecutive animation steps (a popup that opens
+        // and then closes) produce as a matter of course. What actually closes it is
+        // resumeAnimations() holding its promise open for two animation frames, so the
+        // event is dispatched while the recording is still detached and lands nowhere.
         teardownTimeline();
       }
       for (const a of animations) {
+        // Armed here as well as above, so that the null check below rests on this loop and
+        // not on a condition thirteen lines away. Nothing can reach it unarmed today — the
+        // loop body runs only when animations.length > 0, which is half of the arming
+        // condition — but that couples the two halves, and an edit to either would break
+        // the other silently.
+        state.seeked ??= new Map();
         if (!state.seeked.has(a)) {
           state.seeked.set(a, { time: a.currentTime, playState: a.playState });
         }
@@ -367,9 +382,9 @@
      * Finishing would end a transition the component has not ended, which is a state the
      * page would never have reached on its own; play() alone would rewind, because the spec
      * makes play() on an animation sitting at its end seek back to zero, and the whole
-     * transition would then run again in the middle of the next step. Returns the number
+     * transition would then run again in the middle of the next step. Resolves to the number
      * of animations restored, which is zero when the step never seeked. */
-    resumeAnimations() {
+    async resumeAnimations() {
       const seeked = state.seeked;
       state.seeked = null;
       if (!seeked) return 0;
@@ -390,6 +405,23 @@
           // throwing here would abandon every animation after it in the map.
         }
       }
+
+      // Held open past the restoration rather than returning as soon as the clocks are set.
+      // The phase crossing the restoration causes is reported a frame later, and the caller
+      // re-arms the recording after one round trip, which is shorter than that frame — so
+      // returning here would file the harness's own animationstart in the next step's
+      // timeline, on the one comparator whose entire subject is animation. Awaited, the
+      // event is dispatched while the recording is still detached and is recorded nowhere.
+      //
+      // The timer is the guard SettleProtocol's quiesce loop carries and for the same
+      // reason: a throttled or backgrounded page stops servicing animation frames, and a
+      // promise only a frame callback can settle would hang the awaiting evaluate with no
+      // diagnostic.
+      await new Promise((resolve) => {
+        const done = () => { clearTimeout(deadline); resolve(); };
+        const deadline = setTimeout(done, 250);
+        requestAnimationFrame(() => requestAnimationFrame(done));
+      });
 
       return seeked.size;
     },

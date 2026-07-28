@@ -310,6 +310,33 @@ public sealed class PixelComparatorTests : IDisposable
     }
 
     [Fact]
+    public void RemovesTheDiffOfAShotThatIsNoLongerCapturedOnBothLegs()
+    {
+        Write(Name(ParityLeg.React, "00"), 4, 4);
+        Write(Name(ParityLeg.BlazorServer, "00"), 4, 4, (2, 1, SKColors.Black));
+
+        Compare(threshold: 0.01).ShouldHaveSingleItem();
+
+        var diff = Path.Combine(directory, ScreenshotSet.DiffName(Name(ParityLeg.BlazorServer, "00")));
+        File.Exists(diff).ShouldBeTrue();
+
+        // The next run captures the shot on the Blazor leg only, as it would once React
+        // stopped portalling the popup out. A one-sided shot is reported without ever being
+        // decoded, so nothing on that path rewrites the overlay — and one left on disk
+        // claims a pixel difference measured against an image this run does not contain.
+        var context = Context(
+            threshold: 0.01,
+            reference: [],
+            candidate: [Name(ParityLeg.BlazorServer, "00")]);
+
+        new PixelComparator(directory).Compare(context)
+            .ShouldHaveSingleItem()
+            .Message.ShouldContain("Blazor leg only");
+
+        File.Exists(diff).ShouldBeFalse();
+    }
+
+    [Fact]
     public void OwnsOnlyThePixelKind()
     {
         new PixelComparator(directory).Kind.ShouldBe(FindingKind.Pixel);

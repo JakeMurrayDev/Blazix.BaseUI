@@ -190,6 +190,39 @@ What actually worked, and should be kept doing:
     negative one has always done the same to a transition run. Add `animation-delay` to
     `STYLE_PROPS` and subtract a negative delay in the same pass as the iteration count.
 
+    **The deferred `startTimeline()` work, briefed here because this is the only item holding
+    `capture.js` open.** `startTimeline()` runs for `settle: animation` steps only, so every
+    other step reports whatever has accumulated since the last animation step armed a
+    recording. The fix is to record per step — call `startTimeline()` for every step, and give
+    `stopTimeline()`, which still has no caller, one. Three facts whoever takes it must carry,
+    all established by probe rather than by reading:
+
+    - **The teardown is leg-dependent.** `seekAnimations()` detaches the recording only when it
+      finds something to seek, so on a step where one leg animates and the other does not, the
+      *following* non-animation step's timelines differ by construction: the animating leg's is
+      frozen at the previous step's contents while the other's keeps accumulating. It is a
+      derivative of a difference the pixel/frame comparator already reports loudly — the frames
+      exist on one leg only — so it hides nothing, and it disappears the moment a per-step
+      recording lands.
+    - **An animation step's timeline carries more than the step.** The teardown happens at the
+      first *seek*, not at `capture()`, so the record the next step inherits is the previous
+      step's plus whatever fell in the `capture()` → first-seek window, which is where the
+      settled screenshots are taken. `ParityCapturerTests.LeavesTheStepAfterAnAnimationStep…`
+      asserts the two steps' timelines equal; that holds for the probe, whose window is empty,
+      and is not the general shape. The comment on the assertion now says so.
+    - **The resume artifact is closed** (Task 10: `resumeAnimations()` holds its promise for two
+      animation frames before resolving, so the phase crossing it causes is dispatched while the
+      recording is still detached). Before that it was dispatched a frame after the resume
+      returned, and the capturer re-arms after one aria-snapshot round trip — shorter than a
+      frame — so it was recorded in the *next* step, which two consecutive animation steps (a
+      popup that opens and then closes) produce as a matter of course. Pinned by
+      `CaptureScriptTests.ResumingDoesNotResolveUntilThePhaseCrossingItCausesHasBeenDispatched`
+      and end to end by `ParityCapturerTests.KeepsItsOwnResumeOutOfTheNextAnimationStepsRecord`.
+      One residue, never observed in 15 consecutive runs: the two-frame wait carries a 250 ms
+      fallback timer — the guard `SettleProtocol`'s quiesce loop carries, against the same hang
+      — so a page not servicing animation frames would resolve early and the artifact would
+      return. Such a page fails `SettleProtocol` first.
+
 ## Invalidations
 
 - **Node paths were re-namespaced in `e1fbe534`** (`root > …`, `portal(N) > …`). Any capture
