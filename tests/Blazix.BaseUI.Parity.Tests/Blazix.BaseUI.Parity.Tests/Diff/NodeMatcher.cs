@@ -7,7 +7,15 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </summary>
 /// <param name="Reference">The node from the React snapshot.</param>
 /// <param name="Candidate">The node from the Blazor snapshot.</param>
-public sealed record NodePair(DomNode Reference, DomNode Candidate);
+/// <param name="Relaxed">
+/// Whether the two only matched once the key was relaxed to the tag name alone, so the
+/// matcher does not itself hold them to be the same element. Carried here, and not only on
+/// <see cref="NodeMatchResult.Relaxed"/>, because <see cref="NodeMatchResult.Pairs"/> is
+/// what a comparator iterates: a style or geometry difference read across a relaxed pair is
+/// a difference between two elements that may not correspond, and nothing else on the list
+/// says so.
+/// </param>
+public sealed record NodePair(DomNode Reference, DomNode Candidate, bool Relaxed = false);
 
 /// <summary>
 /// One sibling list whose matched nodes sit in a different relative order on the two legs.
@@ -30,9 +38,10 @@ public sealed record SiblingReorder(
 /// </summary>
 /// <remarks>
 /// The pair is in <see cref="NodeMatchResult.Pairs"/> like any other, so everything beneath
-/// it is still compared. It is listed here as well because the two nodes are not the same
-/// element by the matcher's own definition, and a degrade that let that difference vanish
-/// would be worse than reporting the two subtrees as unrelated.
+/// it is still compared, and it carries <see cref="NodePair.Relaxed"/> there. It is listed
+/// here as well because the two nodes are not the same element by the matcher's own
+/// definition, and a degrade that let that difference vanish would be worse than reporting
+/// the two subtrees as unrelated.
 /// </remarks>
 /// <param name="Pair">The matched nodes.</param>
 /// <param name="ReferenceIdentity">The reference node's tag, role, and accessible name.</param>
@@ -42,17 +51,31 @@ public sealed record RelaxedPair(NodePair Pair, string ReferenceIdentity, string
 /// <summary>
 /// The outcome of matching two DOM snapshots.
 /// </summary>
-/// <param name="Pairs">The nodes that matched, including any roots that matched.</param>
-/// <param name="ReferenceOnly">The nodes React rendered that Blazor did not.</param>
-/// <param name="CandidateOnly">The nodes Blazor rendered that React did not.</param>
-/// <param name="Reorders">The sibling lists the two legs ordered differently.</param>
-/// <param name="Relaxed">The pairs that only matched on tag, listed also in <paramref name="Pairs"/>.</param>
-public sealed record NodeMatchResult(
-    IReadOnlyList<NodePair> Pairs,
-    IReadOnlyList<DomNode> ReferenceOnly,
-    IReadOnlyList<DomNode> CandidateOnly,
-    IReadOnlyList<SiblingReorder> Reorders,
-    IReadOnlyList<RelaxedPair> Relaxed);
+/// <remarks>
+/// Init-only rather than positional: every comparator built on this primitive names the
+/// member it reads, so a member added later is an additive change instead of a break on
+/// each of them.
+/// </remarks>
+public sealed record NodeMatchResult
+{
+    /// <summary>Gets the nodes that matched, including any roots that matched.</summary>
+    public required IReadOnlyList<NodePair> Pairs { get; init; }
+
+    /// <summary>Gets the nodes React rendered that Blazor did not.</summary>
+    public required IReadOnlyList<DomNode> ReferenceOnly { get; init; }
+
+    /// <summary>Gets the nodes Blazor rendered that React did not.</summary>
+    public required IReadOnlyList<DomNode> CandidateOnly { get; init; }
+
+    /// <summary>Gets the sibling lists the two legs ordered differently.</summary>
+    public required IReadOnlyList<SiblingReorder> Reorders { get; init; }
+
+    /// <summary>
+    /// Gets the pairs that only matched on tag. They are in <see cref="Pairs"/> as well,
+    /// flagged by <see cref="NodePair.Relaxed"/>.
+    /// </summary>
+    public required IReadOnlyList<RelaxedPair> Relaxed { get; init; }
+}
 
 /// <summary>
 /// Pairs the nodes of two DOM snapshots so the other comparators have something to
@@ -81,8 +104,14 @@ public static class NodeMatcher
         // element, and pairing those puts every root's children one level out of step.
         MatchChildren(Roots(reference), Roots(candidate), CaptureNames.RootsWrapper, state);
 
-        return new NodeMatchResult(
-            state.Pairs, state.ReferenceOnly, state.CandidateOnly, state.Reorders, state.Relaxed);
+        return new NodeMatchResult
+        {
+            Pairs = state.Pairs,
+            ReferenceOnly = state.ReferenceOnly,
+            CandidateOnly = state.CandidateOnly,
+            Reorders = state.Reorders,
+            Relaxed = state.Relaxed
+        };
     }
 
     /// <summary>
@@ -97,146 +126,7 @@ public static class NodeMatcher
         IReadOnlyList<DomNode> candidateChildren,
         string parentPath,
         MatchState state)
-    {
-        var references = referenceChildren.ToList();
-        var candidates = candidateChildren.ToList();
-        var firstPass = true;
-        var pairedHere = 0;
-
-        while (references.Count > 0 && candidates.Count > 0)
-        {
-            PairBy(references, candidates, Key, out var matched);
-
-            if (firstPass)
-            {
-                // Only the first pass sees the two sibling lists as the two pages ordered
-                // them. After an unwrap the candidate indices count positions in a list
-                // that exists in neither DOM, so ordering read off it means nothing.
-                RecordReorder(parentPath, matched, state.Reorders);
-                firstPass = false;
-            }
-
-            pairedHere += matched.Count;
-            Accept(matched, state);
-
-            if (references.Count == 0 || candidates.Count == 0)
-            {
-                break;
-            }
-
-            if (StepIntoWrappers(references, candidates, state))
-            {
-                continue;
-            }
-
-            // Nothing at this level pairs and there is no wrapper left to step through.
-            // If nothing here paired at all, the two lists are far more likely to be the
-            // same elements differing in role or name than two unrelated subtrees, so try
-            // them on tag alone before giving up: dumping both subtrees costs every
-            // attribute, style, and geometry comparison beneath them in order to report
-            // what is usually one attribute on one element. Guarded on `pairedHere` so
-            // this stays a last resort and never becomes a general relaxation of the key.
-            if (pairedHere == 0)
-            {
-                PairByTag(references, candidates, state);
-            }
-
-            break;
-        }
-
-        foreach (var node in references)
-        {
-            state.ReferenceOnly.AddRange(node.Descendants());
-        }
-
-        foreach (var node in candidates)
-        {
-            state.CandidateOnly.AddRange(node.Descendants());
-        }
-    }
-
-    /// <summary>
-    /// Records each pair and matches the two subtrees beneath it.
-    /// </summary>
-    private static void Accept(List<MatchedPair> matched, MatchState state)
-    {
-        foreach (var (pair, _) in matched)
-        {
-            state.Pairs.Add(pair);
-            MatchChildren(
-                pair.Reference.Children, pair.Candidate.Children, pair.Reference.Path, state);
-        }
-    }
-
-    /// <summary>
-    /// Pairs whatever shares a tag name, as the last resort before both subtrees are
-    /// reported as unrelated. Nodes without a counterpart of the same tag are left in place
-    /// for the caller to report one-sided.
-    /// </summary>
-    private static void PairByTag(List<DomNode> references, List<DomNode> candidates, MatchState state)
-    {
-        PairBy(references, candidates, static node => node.Tag, out var matched);
-
-        foreach (var (pair, _) in matched)
-        {
-            state.Relaxed.Add(
-                new RelaxedPair(pair, Identity(pair.Reference), Identity(pair.Candidate)));
-        }
-
-        Accept(matched, state);
-    }
-
-    /// <summary>
-    /// Replaces single-child leftovers with their child so pairing can be retried one level
-    /// in, reporting each element stepped through as one-sided.
-    /// </summary>
-    /// <remarks>
-    /// One side is tried at a time first. Stepping both in the same pass reports a wrapper
-    /// on the leg that never had one whenever only one leg carries the extra element and
-    /// both leftovers happen to have a single child — React
-    /// <c>&lt;div positioner&gt;&lt;div popup&gt;</c> against Blazor's extra wrapper around
-    /// the popup is exactly that shape — and it leaves the two popups permanently unpaired,
-    /// so every attribute on them goes uncompared.
-    /// </remarks>
-    /// <returns><see langword="true"/> if either list was stepped.</returns>
-    private static bool StepIntoWrappers(
-        List<DomNode> references,
-        List<DomNode> candidates,
-        MatchState state)
-    {
-        var steppedReferences = StepThrough(references);
-        var steppedCandidates = StepThrough(candidates);
-
-        if (steppedCandidates is { } candidateStep && SharesAKey(references, candidateStep.Nodes))
-        {
-            Commit(candidates, candidateStep, state.CandidateOnly);
-            return true;
-        }
-
-        if (steppedReferences is { } referenceStep && SharesAKey(referenceStep.Nodes, candidates))
-        {
-            Commit(references, referenceStep, state.ReferenceOnly);
-            return true;
-        }
-
-        if (steppedReferences is null && steppedCandidates is null)
-        {
-            return false;
-        }
-
-        // Neither side alone unblocks pairing, so step both and look again one level in.
-        if (steppedReferences is { } bothReferences)
-        {
-            Commit(references, bothReferences, state.ReferenceOnly);
-        }
-
-        if (steppedCandidates is { } bothCandidates)
-        {
-            Commit(candidates, bothCandidates, state.CandidateOnly);
-        }
-
-        return true;
-    }
+        => new Level(referenceChildren, candidateChildren, parentPath, state).Match();
 
     /// <summary>
     /// Builds the list that replacing every single-child node with its child would produce,
@@ -334,6 +224,7 @@ public static class NodeMatcher
         List<DomNode> references,
         List<DomNode> candidates,
         Func<DomNode, string> key,
+        bool relaxed,
         out List<MatchedPair> matched)
     {
         var available = new Dictionary<string, List<int>>(StringComparer.Ordinal);
@@ -378,7 +269,8 @@ public static class NodeMatcher
             indices.RemoveAt(slot);
             taken[chosen] = true;
             lastMatched = chosen;
-            matched.Add(new MatchedPair(new NodePair(reference, candidates[chosen]), chosen));
+            matched.Add(
+                new MatchedPair(new NodePair(reference, candidates[chosen], relaxed), chosen));
         }
 
         var candidateLeftovers = new List<DomNode>();
@@ -432,6 +324,215 @@ public static class NodeMatcher
         }
 
         return string.Join(' ', parts);
+    }
+
+    /// <summary>
+    /// One sibling level: the two lists being paired against each other, and the passes
+    /// over them.
+    /// </summary>
+    /// <param name="referenceChildren">The reference siblings.</param>
+    /// <param name="candidateChildren">The candidate siblings.</param>
+    /// <param name="parentPath">The reference path of the parent, for reorder reporting.</param>
+    /// <param name="state">The result being collected across the whole walk.</param>
+    private sealed class Level(
+        IReadOnlyList<DomNode> referenceChildren,
+        IReadOnlyList<DomNode> candidateChildren,
+        string parentPath,
+        MatchState state)
+    {
+        private readonly List<DomNode> references = [.. referenceChildren];
+        private readonly List<DomNode> candidates = [.. candidateChildren];
+        private bool firstPass = true;
+        private int pairedHere;
+
+        /// <summary>
+        /// Gets a value indicating whether nothing at this level has paired on the full key.
+        /// </summary>
+        /// <remarks>
+        /// The one guard on the tag degrade, and what keeps it a last resort rather than a
+        /// general relaxation of the key: once anything at a level has paired, the two
+        /// lists are taken to be the same list, so a leftover in it reads as the presence
+        /// difference it usually is. The cost is real and worth stating — an identity
+        /// difference on a node whose sibling paired is <em>not</em> degraded, so it is
+        /// reported as two one-sided subtrees with no attribute finding for the role that
+        /// differs. `DoesNotPairAcrossDifferentRoles` pins that as the intended trade.
+        /// </remarks>
+        private bool NothingPaired => pairedHere == 0;
+
+        /// <summary>
+        /// Pairs this level, recursing into every pair, and reports whatever is left over
+        /// on either side as one-sided along with its subtree.
+        /// </summary>
+        /// <remarks>
+        /// The order of the passes is the algorithm, and each earns its place ahead of the
+        /// next:
+        /// <list type="number">
+        /// <item>
+        /// Step one side alone, and only where doing so unblocks pairing. An extra wrapper
+        /// on one leg is the common shape — React
+        /// <c>&lt;div positioner&gt;&lt;div popup&gt;</c> against Blazor's extra wrapper
+        /// around the popup — and stepping both sides there reports a wrapper on the leg
+        /// that never had one and leaves the two popups unpaired for good.
+        /// </item>
+        /// <item>
+        /// Degrade to the tag alone, when nothing at this level paired. This runs
+        /// <em>before</em> the lockstep step, because a single-child node on either side
+        /// would otherwise pre-empt it: a popup with one child on both legs is exactly that
+        /// shape, and stepping first walks past the two elements whose differing identity
+        /// is the one finding worth reporting, leaving each of them one-sided and every
+        /// attribute on them uncompared.
+        /// </item>
+        /// <item>
+        /// Step whatever is still steppable in lockstep, as the last way to reach a level
+        /// where something might pair.
+        /// </item>
+        /// </list>
+        /// </remarks>
+        public void Match()
+        {
+            while (references.Count > 0 && candidates.Count > 0)
+            {
+                PairOnKey();
+
+                if (references.Count == 0 || candidates.Count == 0)
+                {
+                    break;
+                }
+
+                if (TryStepCandidatesOnly() || TryStepReferencesOnly())
+                {
+                    continue;
+                }
+
+                if (NothingPaired && TryPairByTag())
+                {
+                    break;
+                }
+
+                if (TryStepBoth())
+                {
+                    continue;
+                }
+
+                break;
+            }
+
+            foreach (var node in references)
+            {
+                state.ReferenceOnly.AddRange(node.Descendants());
+            }
+
+            foreach (var node in candidates)
+            {
+                state.CandidateOnly.AddRange(node.Descendants());
+            }
+        }
+
+        /// <summary>Pairs on the full key: tag, role, and accessible name.</summary>
+        private void PairOnKey()
+        {
+            PairBy(references, candidates, Key, relaxed: false, out var matched);
+
+            if (firstPass)
+            {
+                // Only the first pass sees the two sibling lists as the two pages ordered
+                // them. After an unwrap the candidate indices count positions in a list
+                // that exists in neither DOM, so ordering read off it means nothing.
+                RecordReorder(parentPath, matched, state.Reorders);
+                firstPass = false;
+            }
+
+            pairedHere += matched.Count;
+            Accept(matched);
+        }
+
+        /// <summary>
+        /// Pairs whatever shares a tag name, as the last resort before both subtrees are
+        /// reported as unrelated. Dumping them instead costs every attribute, style, and
+        /// geometry comparison beneath them in order to report what is usually one
+        /// attribute on one element. Nodes without a counterpart of the same tag are left
+        /// in place to be reported one-sided.
+        /// </summary>
+        /// <returns><see langword="true"/> if anything paired.</returns>
+        private bool TryPairByTag()
+        {
+            PairBy(references, candidates, static node => node.Tag, relaxed: true, out var matched);
+
+            foreach (var (pair, _) in matched)
+            {
+                state.Relaxed.Add(
+                    new RelaxedPair(pair, Identity(pair.Reference), Identity(pair.Candidate)));
+            }
+
+            Accept(matched);
+
+            return matched.Count > 0;
+        }
+
+        /// <summary>
+        /// Replaces single-child candidates with their child, if that makes something pair.
+        /// </summary>
+        /// <returns><see langword="true"/> if the candidates were stepped.</returns>
+        private bool TryStepCandidatesOnly()
+        {
+            if (StepThrough(candidates) is not { } step || !SharesAKey(references, step.Nodes))
+            {
+                return false;
+            }
+
+            Commit(candidates, step, state.CandidateOnly);
+
+            return true;
+        }
+
+        /// <summary>The mirror of <see cref="TryStepCandidatesOnly"/>.</summary>
+        /// <returns><see langword="true"/> if the references were stepped.</returns>
+        private bool TryStepReferencesOnly()
+        {
+            if (StepThrough(references) is not { } step || !SharesAKey(step.Nodes, candidates))
+            {
+                return false;
+            }
+
+            Commit(references, step, state.ReferenceOnly);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Steps every side that has a single-child node, whether or not doing so unblocks
+        /// pairing, so that a level neither one-sided step nor the tag degrade could reach
+        /// is at least retried one level in.
+        /// </summary>
+        /// <returns><see langword="true"/> if either list was stepped.</returns>
+        private bool TryStepBoth()
+        {
+            var steppedReferences = StepThrough(references);
+            var steppedCandidates = StepThrough(candidates);
+
+            if (steppedReferences is { } referenceStep)
+            {
+                Commit(references, referenceStep, state.ReferenceOnly);
+            }
+
+            if (steppedCandidates is { } candidateStep)
+            {
+                Commit(candidates, candidateStep, state.CandidateOnly);
+            }
+
+            return steppedReferences is not null || steppedCandidates is not null;
+        }
+
+        /// <summary>Records each pair and matches the two subtrees beneath it.</summary>
+        private void Accept(List<MatchedPair> matched)
+        {
+            foreach (var (pair, _) in matched)
+            {
+                state.Pairs.Add(pair);
+                MatchChildren(
+                    pair.Reference.Children, pair.Candidate.Children, pair.Reference.Path, state);
+            }
+        }
     }
 
     /// <summary>A pair together with the candidate's position among its siblings.</summary>

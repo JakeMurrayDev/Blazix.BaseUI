@@ -107,6 +107,73 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
+    public void StructureReportsARoleDifferenceOnContainersThatEachHoldOneChild()
+    {
+        // The popup shape this harness exists to check: one child on both legs, so every
+        // leftover at the level is unwrappable. Reporting the popup as React-only *and* as
+        // Blazor-only is two findings that contradict each other and are both false.
+        var context = Context(
+            Node("div", Popup("dialog", Text("p", "hi"))),
+            Node("div", Popup(role: null, Text("p", "hi"))));
+
+        var findings = new StructureComparator().Compare(context).ToList();
+
+        findings.Count.ShouldBe(1);
+        findings[0].Kind.ShouldBe(FindingKind.Structure);
+        findings[0].NodePath.ShouldBe("div");
+        findings[0].Message.ShouldContain("dialog");
+    }
+
+    [Fact]
+    public void AttributeReportsTheMissingRoleOnContainersThatEachHoldOneChild()
+    {
+        // The finding the whole degrade exists to produce. Without the pair there is no
+        // attribute comparison at all, and the likeliest Blazix popup defect — a dropped
+        // role — leaves no attribute finding anywhere in the run.
+        var context = Context(
+            Node("div", Popup("dialog", Text("p", "hi"))),
+            Node("div", Popup(role: null, Text("p", "hi"))));
+
+        var findings = new AttributeComparator().Compare(context).ToList();
+
+        // data-open agrees on both legs, so the role is the only difference.
+        findings.Select(f => f.Property).ShouldBe(["role"]);
+        findings[0].ReferenceValue.ShouldBe("dialog");
+        findings[0].CandidateValue.ShouldBeNull();
+    }
+
+    [Fact]
+    public void StructureReportsOnlyTheIdentityAndTheExtraChildWhenChildCountsDiffer()
+    {
+        // Asymmetric child counts: one <li> against two. Stepping the one side that can be
+        // stepped unblocks nothing and leaves the <li> compared against the <ul>, which
+        // dumps both subtrees — five findings for one role difference plus one extra node.
+        var context = Context(
+            Node("div", Role("ul", "menu", Node("li"))),
+            Node("div", Role("ul", "listbox", Node("li"), Node("li"))));
+
+        var findings = new StructureComparator().Compare(context).ToList();
+
+        findings.Count.ShouldBe(2);
+        findings.ShouldContain(f => f.Message.Contains("menu") && f.Message.Contains("listbox"));
+        findings.ShouldContain(f => f.CandidateValue == "li" && f.NodePath == "li");
+    }
+
+    [Fact]
+    public void AttributeReportsTheRoleDifferenceWhenChildCountsDiffer()
+    {
+        var context = Context(
+            Node("div", Role("ul", "menu", Node("li"))),
+            Node("div", Role("ul", "listbox", Node("li"), Node("li"))));
+
+        var findings = new AttributeComparator().Compare(context).ToList();
+
+        findings.Select(f => f.Property).ShouldBe(["role"]);
+        findings[0].ReferenceValue.ShouldBe("menu");
+        findings[0].CandidateValue.ShouldBe("listbox");
+    }
+
+    [Fact]
     public void StructureCarriesTheFixtureLegAndStep()
     {
         var context = Context(Node("div", Node("button")), Node("div"));
@@ -317,6 +384,39 @@ public sealed class StructuralComparatorTests
         Classes = [],
         Text = string.Empty,
         Children = children
+    };
+
+    /// <summary>
+    /// Builds the popup shape: a div carrying <c>data-open</c>, which both legs agree on,
+    /// and optionally the role, which is the only thing they differ by.
+    /// </summary>
+    private static DomNode Popup(string? role, params DomNode[] children)
+    {
+        var attributes = new Dictionary<string, string> { ["data-open"] = string.Empty };
+        if (role is not null)
+        {
+            attributes["role"] = role;
+        }
+
+        return new DomNode
+        {
+            Tag = "div",
+            Path = "div",
+            Attributes = attributes,
+            Classes = [],
+            Text = string.Empty,
+            Children = children
+        };
+    }
+
+    private static DomNode Text(string tag, string text) => new()
+    {
+        Tag = tag,
+        Path = tag,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = text,
+        Children = []
     };
 
     private static DomNode Attributed(string tag, params (string Name, string Value)[] attributes) => new()

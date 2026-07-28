@@ -70,7 +70,7 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
-    public void PairsByTagWhenNothingAtALevelMatchesAndNoWrapperCanBeStepped()
+    public void PairsAContainerWhoseRoleDiffersAndKeepsComparingBeneathIt()
     {
         // A role-only difference on a container. Dumping both subtrees would cost every
         // attribute, style, and geometry comparison beneath them to report what is one
@@ -90,6 +90,70 @@ public sealed class NodeMatcherTests
         relaxed.Pair.Reference.Tag.ShouldBe("ul");
         relaxed.ReferenceIdentity.ShouldContain("menu");
         relaxed.CandidateIdentity.ShouldContain("listbox");
+    }
+
+    [Fact]
+    public void PairsAContainerWhoseRoleDiffersWhenEachSideHasExactlyOneChild()
+    {
+        // The dominant real-world shape and the one the degrade above could not reach: a
+        // popup carrying a single child on both legs. Every leftover at the level has
+        // exactly one child, so a matcher that unwraps before it degrades steps straight
+        // past the two popups and reports each of them as one-sided — two Structure
+        // findings that contradict each other, and *no* attribute finding for the missing
+        // role, because only pairs are ever diffed attribute by attribute.
+        var reference = Node("div", Popup("dialog", Text("p", "hi")));
+        var candidate = Node("div", Popup(role: null, Text("p", "hi")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+
+        // The outer div and the popup, and the paragraph beneath the popup.
+        result.Pairs.Count(p => p.Reference.Tag == "div").ShouldBe(2);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "p" && p.Candidate.Tag == "p");
+
+        var relaxed = result.Relaxed.ShouldHaveSingleItem();
+        relaxed.ReferenceIdentity.ShouldContain("dialog");
+        relaxed.CandidateIdentity.ShouldBe("<div>");
+    }
+
+    [Fact]
+    public void PairsAContainerWhoseRoleDiffersWhenTheTwoSidesHoldDifferentChildCounts()
+    {
+        // Asymmetric child counts, which is what makes only one side steppable. A matcher
+        // that unwraps before it degrades commits that one-sided step even though it
+        // unblocks nothing, and then compares the <li> against the <ul> — five one-sided
+        // nodes and no attribute finding, for one role difference plus one extra <li>.
+        var reference = Node("div", Role("ul", "menu", Node("li")));
+        var candidate = Node("div", Role("ul", "listbox", Node("li"), Node("li")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["li"]);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "ul" && p.Candidate.Tag == "ul");
+        result.Pairs.Count(p => p.Reference.Tag == "li").ShouldBe(1);
+
+        var relaxed = result.Relaxed.ShouldHaveSingleItem();
+        relaxed.ReferenceIdentity.ShouldContain("menu");
+        relaxed.CandidateIdentity.ShouldContain("listbox");
+    }
+
+    [Fact]
+    public void FlagsARelaxedPairOnThePairListItself()
+    {
+        // Later comparators iterate Pairs and diff styles and geometry across it. A pair
+        // the matcher does not itself hold to be the same element has to say so there, not
+        // only on a side list a consumer has to remember to cross-reference.
+        var reference = Node("div", Role("li", "menuitem"));
+        var candidate = Node("div", Role("li", "option"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "li" && p.Relaxed);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && !p.Relaxed);
+        result.Relaxed.ShouldHaveSingleItem().Pair.Relaxed.ShouldBeTrue();
     }
 
     [Fact]
@@ -230,8 +294,8 @@ public sealed class NodeMatcherTests
 
         var result = NodeMatcher.Match(reference, candidate);
 
-        result.ReferenceOnly.ShouldContain(n => n.Text == "Save");
-        result.CandidateOnly.ShouldContain(n => n.Text == "Cancel");
+        result.ReferenceOnly.Select(n => n.Text).ShouldBe(["Save"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Text).ShouldBe(["Cancel"], ignoreOrder: true);
     }
 
     [Fact]
@@ -242,8 +306,8 @@ public sealed class NodeMatcherTests
 
         var result = NodeMatcher.Match(reference, candidate);
 
-        result.ReferenceOnly.ShouldContain(n => n.Attributes["role"] == "menuitem");
-        result.CandidateOnly.ShouldContain(n => n.Attributes["role"] == "option");
+        result.ReferenceOnly.Select(n => n.Attributes["role"]).ShouldBe(["menuitem"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Attributes["role"]).ShouldBe(["option"], ignoreOrder: true);
     }
 
     [Fact]
@@ -290,4 +354,27 @@ public sealed class NodeMatcherTests
         Text = string.Empty,
         Children = children
     };
+
+    /// <summary>
+    /// Builds the popup shape: a div carrying <c>data-open</c>, which both legs agree on,
+    /// and optionally the role, which is the only thing they differ by.
+    /// </summary>
+    private static DomNode Popup(string? role, params DomNode[] children)
+    {
+        var attributes = new Dictionary<string, string> { ["data-open"] = string.Empty };
+        if (role is not null)
+        {
+            attributes["role"] = role;
+        }
+
+        return new DomNode
+        {
+            Tag = "div",
+            Path = "div",
+            Attributes = attributes,
+            Classes = [],
+            Text = string.Empty,
+            Children = children
+        };
+    }
 }
