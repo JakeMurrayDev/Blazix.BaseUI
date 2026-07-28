@@ -70,6 +70,131 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
+    public void PairsBeneathAnExtraWrapperWhoseKeyCollidesWithASibling()
+    {
+        // The commonest extra-wrapper shape, and the one every earlier wrapper test missed
+        // by having a single child at the level. A wrapper carries no role and no text of
+        // its own, so its key is `div||` — identical to the plain <div> sibling beside it.
+        // Taking the earliest same-key candidate consumes the wrapper as if it were the
+        // body, pairs a real element against a wrapper, marks the level as having paired,
+        // and so stops the one-sided step from ever running. Nothing in this tree has an
+        // identity difference: the only variable is the wrapper.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body", At("p", "dlg>wrap>body>p"), At("p", "dlg>wrap>body>q"))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>body~dlg>wrap>body",
+                "dlg>body>p~dlg>wrap>body>p",
+                "dlg>body>q~dlg>wrap>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+
+        // Tasks 8-10 diff computed styles and geometry across Pairs. A real element paired
+        // with a wrapper carries Relaxed == false, so nothing on the list would say so.
+        result.Pairs.ShouldAllBe(p => !p.Relaxed);
+    }
+
+    [Fact]
+    public void PairsBeneathAnExtraWrapperWhoseKeyCollidesWithASiblingOnTheReferenceLeg()
+    {
+        // The mirror. Nothing in the matcher is symmetric by construction — references and
+        // candidates run through different methods — so the leg that carries the wrapper has
+        // to be exercised on both sides.
+        var reference = At("div", "dlg",
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body", At("p", "dlg>wrap>body>p"), At("p", "dlg>wrap>body>q"))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.ShouldBeEmpty();
+        result.ReferenceOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>wrap>body~dlg>body",
+                "dlg>wrap>body>p~dlg>body>p",
+                "dlg>wrap>body>q~dlg>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void PairsBeneathTwoNestedWrappersWhoseKeysCollideWithASibling()
+    {
+        // Two nested layout wrappers are as ordinary as one, and a lookahead that steps once
+        // sees only the outer wrapper's child — another wrapper, which corroborates nothing,
+        // so the body is consumed as the outer wrapper again and the whole subtree is
+        // reported twice over. Walking the single-child chain is what reaches the body.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>w1",
+                At("div", "dlg>w1>w2",
+                    At("div", "dlg>w1>w2>body",
+                        At("p", "dlg>w1>w2>body>p"),
+                        At("p", "dlg>w1>w2>body>q")))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>w1", "dlg>w1>w2"], ignoreOrder: true);
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>body~dlg>w1>w2>body",
+                "dlg>body>p~dlg>w1>w2>body>p",
+                "dlg>body>q~dlg>w1>w2>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void StillMispairsAWrapperAroundAnElementWithNoChildren()
+    {
+        // The shape that defeats the fix above, pinned rather than left for the next probe
+        // to find. Unpicking a colliding wrapper needs evidence, and the only evidence
+        // outside the node itself is its children: the wrapper's child has to share a child
+        // key with the reference. Wrap an element that has no children and there is nothing
+        // to share, so the wrapper is still consumed as if it were the body. Only the
+        // attributes tell these two apart, and attributes are outside the key on purpose —
+        // they are what AttributeComparator exists to diff.
+        var reference = At("div", "dlg", At("div", "dlg>body"), At("div", "dlg>foot"));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>wrap", At("div", "dlg>wrap>body")),
+            At("div", "dlg>foot"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldContain(p => p.Reference.Path == "dlg>body" && p.Candidate.Path == "dlg>wrap");
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap>body"]);
+    }
+
+    [Fact]
     public void PairsAContainerWhoseRoleDiffersAndKeepsComparingBeneathIt()
     {
         // A role-only difference on a container. Dumping both subtrees would cost every
@@ -299,8 +424,12 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
-    public void DoesNotPairAcrossDifferentRoles()
+    public void DoesNotPairSiblingsWithDifferentRolesWhenAnotherSiblingPaired()
     {
+        // Named for what it pins, which is narrower than "does not pair across roles": the
+        // matcher *does* pair across roles whenever nothing else at the level pairs, which
+        // is what PairsAMismatchedLeafByTagOnceNothingElseAtTheLevelMatches covers. The <hr>
+        // here is what keeps the level off that degrade.
         var reference = Node("div", Node("hr"), Role("li", "menuitem"));
         var candidate = Node("div", Node("hr"), Role("li", "option"));
 
@@ -324,6 +453,20 @@ public sealed class NodeMatcherTests
         result.Pairs.ShouldContain(p => p.Reference.Tag == "li" && p.Candidate.Tag == "li");
         result.Relaxed.ShouldHaveSingleItem().ReferenceIdentity.ShouldContain("menuitem");
     }
+
+    /// <summary>
+    /// Builds a node with a path of its own, for the trees whose projections are asserted by
+    /// path rather than by tag.
+    /// </summary>
+    private static DomNode At(string tag, string path, params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
 
     private static DomNode Node(string tag, params DomNode[] children) => new()
     {

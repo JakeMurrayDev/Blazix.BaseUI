@@ -174,6 +174,64 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
+    public void StructureReportsOnlyTheWrapperWhenItsKeyCollidesWithASibling()
+    {
+        var findings = new StructureComparator().Compare(WrapperContext()).ToList();
+
+        // One extra element, one finding. Before the tiebreak the body was consumed as if it
+        // were the wrapper, which produced five findings — two claiming React renders a <p>
+        // Blazor does not, three claiming the reverse of nodes both legs render.
+        findings.Count.ShouldBe(1);
+        findings[0].NodePath.ShouldBe("dlg>wrap");
+        findings[0].Message.ShouldBe("Blazor renders <div> at 'dlg>wrap'; React does not.");
+    }
+
+    [Fact]
+    public void AttributeReportsNothingWhenAnExtraWrapperKeyCollidesWithASibling()
+    {
+        // The body's attributes were being diffed against the wrapper's empty set, so
+        // 'data-body' read as missing from Blazor. Blazor renders it — on the element one
+        // level in. A fabricated attribute finding is worse than a missed one: it sends a
+        // reader to an element that is not the one that differs.
+        new AttributeComparator().Compare(WrapperContext()).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void StructureReconcilesTwoLeftoversAtOnePathIntoOneTruthfulFinding()
+    {
+        // React <ul>(<li role=menuitem>A, ...) against Blazor with A's role as 'option'. The
+        // second <li> pairs, which keeps the level off the tag degrade, so both <li> A nodes
+        // are left over. "React renders <li> at 'ul>li(1)'; Blazor does not" and its mirror
+        // are each false and they contradict each other — Blazor renders an <li> at exactly
+        // that path. The pairing here is the plan working as designed; only the wording was
+        // wrong, and both sides are knowable at report time.
+        var findings = new StructureComparator().Compare(ListContext()).ToList();
+
+        var finding = findings.Where(f => f.NodePath == "ul>li(1)").ShouldHaveSingleItem();
+        finding.ReferenceValue.ShouldBe("<li> role 'menuitem' named 'A'");
+        finding.CandidateValue.ShouldBe("<li> role 'option' named 'A'");
+        finding.Message.ShouldBe(
+            "React renders <li> role 'menuitem' named 'A' at 'ul>li(1)'; Blazor renders " +
+            "<li> role 'option' named 'A' there. The two did not pair, so nothing beneath " +
+            "them was compared.");
+    }
+
+    [Fact]
+    public void StructureStillReportsAGenuinelyAbsentNodeAsAbsent()
+    {
+        // The other half of the reconciliation. The third <li> has no counterpart at its
+        // path on either leg, so it must keep reading as absent — otherwise the fix for the
+        // contradictory pair costs the finding this comparator exists for.
+        var findings = new StructureComparator().Compare(ListContext()).ToList();
+
+        findings.Count.ShouldBe(2);
+        var finding = findings.Where(f => f.NodePath == "ul>li(3)").ShouldHaveSingleItem();
+        finding.ReferenceValue.ShouldBe("li");
+        finding.CandidateValue.ShouldBeNull();
+        finding.Message.ShouldBe("React renders <li> at 'ul>li(3)'; Blazor does not.");
+    }
+
+    [Fact]
     public void StructureCarriesTheFixtureLegAndStep()
     {
         var context = Context(Node("div", Node("button")), Node("div"));
@@ -348,6 +406,72 @@ public sealed class StructuralComparatorTests
         new AttributeComparator().Kind.ShouldBe(FindingKind.Attribute);
         new MarkerComparator().Kind.ShouldBe(FindingKind.Marker);
     }
+
+    /// <summary>
+    /// The dialog with one extra wrapper around its body on the Blazor leg. No node in it
+    /// has an identity difference, and the wrapper's key is the body's key.
+    /// </summary>
+    private static ComparisonContext WrapperContext() => Context(
+        AtRole("div", "dlg", "dialog",
+            AtMarked("div", "dlg>body", "data-body",
+                At("p", "dlg>body>p"),
+                At("p", "dlg>body>q")),
+            AtMarked("div", "dlg>foot", "data-footer",
+                At("button", "dlg>foot>ok"))),
+        AtRole("div", "dlg", "dialog",
+            At("div", "dlg>wrap",
+                AtMarked("div", "dlg>wrap>body", "data-body",
+                    At("p", "dlg>wrap>body>p"),
+                    At("p", "dlg>wrap>body>q"))),
+            AtMarked("div", "dlg>foot", "data-footer",
+                At("button", "dlg>foot>ok"))));
+
+    /// <summary>
+    /// A list whose first item's role differs and whose second item pairs, plus a third item
+    /// Blazor does not render at all.
+    /// </summary>
+    private static ComparisonContext ListContext() => Context(
+        At("ul", "ul",
+            Item("ul>li(1)", "menuitem", "A"),
+            Item("ul>li(2)", "menuitem", "B"),
+            Item("ul>li(3)", "menuitem", "C")),
+        At("ul", "ul",
+            Item("ul>li(1)", "option", "A"),
+            Item("ul>li(2)", "menuitem", "B")));
+
+    private static DomNode At(string tag, string path, params DomNode[] children)
+        => At(tag, path, [], children);
+
+    private static DomNode AtRole(string tag, string path, string role, params DomNode[] children)
+        => At(tag, path, new Dictionary<string, string> { ["role"] = role }, children);
+
+    private static DomNode AtMarked(
+        string tag, string path, string attribute, params DomNode[] children)
+        => At(tag, path, new Dictionary<string, string> { [attribute] = string.Empty }, children);
+
+    private static DomNode At(
+        string tag,
+        string path,
+        Dictionary<string, string> attributes,
+        DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = attributes,
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    private static DomNode Item(string path, string role, string text) => new()
+    {
+        Tag = "li",
+        Path = path,
+        Attributes = new Dictionary<string, string> { ["role"] = role },
+        Classes = [],
+        Text = text,
+        Children = []
+    };
 
     private static ComparisonContext Context(DomNode reference, DomNode candidate) => new(
         "switch/hero",

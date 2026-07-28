@@ -90,6 +90,54 @@ public static class NodeMatcher
     /// <summary>
     /// Matches two snapshots, walking both trees in parallel.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Three shapes are known to defeat this matcher, and every one of them ends with real
+    /// elements left unpaired or paired with the wrong counterpart. They are named here
+    /// rather than only in the task report because Tasks 8-10 read
+    /// <see cref="NodeMatchResult.Pairs"/> to diff computed styles and geometry, and a
+    /// consumer of that list has to know what it cannot assume.
+    /// </para>
+    /// <list type="number">
+    /// <item>
+    /// <b>An identity difference on a node whose sibling paired.</b> Accepted. React
+    /// <c>&lt;div&gt;(&lt;button/&gt;, &lt;ul role=menu&gt;)</c> against Blazor
+    /// <c>&lt;div&gt;(&lt;button/&gt;, &lt;ul role=listbox&gt;)</c> pairs the buttons, which
+    /// makes <c>pairedHere</c> non-zero and so skips the tag degrade that would otherwise
+    /// pair the two lists. Both <c>&lt;ul&gt;</c> nodes are reported one-sided and no
+    /// Attribute finding names <c>role</c> — whether the subtree beneath them still pairs
+    /// depends on whether the lockstep step happens to reach it. Removing the guard would
+    /// turn the degrade into a general relaxation of the key, so this is a trade rather than
+    /// an oversight; it is nonetheless the commonest of the three, because a popup usually
+    /// has a sibling arrow or backdrop that pairs. <see cref="StructureComparator"/>
+    /// reconciles the two leftovers into one truthful finding naming both identities, but
+    /// there is still no pair, so nothing on the pair list covers those elements.
+    /// </item>
+    /// <item>
+    /// <b>An extra wrapper on one leg <em>and</em> an identity difference beneath it at the
+    /// same level.</b> Accepted. React <c>&lt;div&gt;&lt;div role=dialog&gt;&lt;p/&gt;</c>
+    /// against Blazor <c>&lt;div&gt;&lt;span&gt;&lt;div&gt;&lt;p/&gt;</c>: the one-sided step
+    /// requires the key to match <em>after</em> stepping, so it declines, and the tag degrade
+    /// compares <c>&lt;div&gt;</c> against <c>&lt;span&gt;</c> and correctly declines too. The
+    /// lockstep step then separates the two popups for good. Closing it needs a search over
+    /// step-then-degrade combinations rather than one try of each, which is an algorithmic
+    /// extension and its own task.
+    /// </item>
+    /// <item>
+    /// <b>A wrapper around an element that has no children of its own.</b> A limit of the
+    /// tiebreak rather than of the pass order, and it needs no identity difference anywhere.
+    /// A wrapper's key is <c>tag||</c>, identical to any plain sibling of the same tag, so a
+    /// colliding wrapper is only unpicked when something inside it corroborates the reference
+    /// — which means sharing a child key (see <see cref="Corroboration"/>). Wrap an element
+    /// with no children and there is nothing to share, so React
+    /// <c>&lt;div&gt;(&lt;div data-body/&gt;, &lt;div data-footer/&gt;)</c> against Blazor
+    /// with a bare <c>&lt;div&gt;</c> around the empty body still pairs the body with the
+    /// wrapper, and the body's attributes are then diffed against the wrapper's. Only the
+    /// attributes tell those two apart, and attributes are outside the key on purpose,
+    /// because they are what <see cref="AttributeComparator"/> exists to diff.
+    /// </item>
+    /// </list>
+    /// </remarks>
     /// <param name="reference">The React snapshot root.</param>
     /// <param name="candidate">The Blazor snapshot root.</param>
     /// <returns>The pairs, the nodes left over on either side, and the reordered levels.</returns>
@@ -209,9 +257,19 @@ public static class NodeMatcher
         }
     }
 
+    /// <summary>Which pass is pairing, which fixes both the key and how ties are broken.</summary>
+    private enum Pass
+    {
+        /// <summary>Tag, role, and accessible name must all agree.</summary>
+        FullKey,
+
+        /// <summary>The tag alone, as the last resort before both subtrees are dumped.</summary>
+        TagDegrade
+    }
+
     /// <summary>
-    /// Pairs as many nodes as possible on <paramref name="key"/>, removing every paired
-    /// node from <paramref name="references"/> and <paramref name="candidates"/>.
+    /// Pairs as many nodes as possible on the key <paramref name="pass"/> selects, removing
+    /// every paired node from <paramref name="references"/> and <paramref name="candidates"/>.
     /// </summary>
     /// <remarks>
     /// Pairing is by index rather than by set membership because <see cref="DomNode"/> is a
@@ -223,10 +281,12 @@ public static class NodeMatcher
     private static void PairBy(
         List<DomNode> references,
         List<DomNode> candidates,
-        Func<DomNode, string> key,
-        bool relaxed,
+        Pass pass,
         out List<MatchedPair> matched)
     {
+        Func<DomNode, string> key = pass == Pass.FullKey ? Key : static node => node.Tag;
+        var relaxed = pass == Pass.TagDegrade;
+
         var available = new Dictionary<string, List<int>>(StringComparer.Ordinal);
         for (var i = 0; i < candidates.Count; i++)
         {
@@ -253,19 +313,23 @@ public static class NodeMatcher
                 continue;
             }
 
-            // Prefer the earliest candidate at or after the one that last matched. Taking
-            // the globally earliest instead reports a reorder whenever an extra same-key
-            // sibling was inserted ahead of the real counterpart — the indices step
-            // backwards even though nothing moved, and the inserted node is already
-            // reported on its own. Falling back to the earliest available keeps a genuine
-            // swap detectable.
-            var slot = indices.FindIndex(index => index >= lastMatched);
-            if (slot < 0)
+            var slot = Choose(reference, candidates, indices, lastMatched, pass);
+            var chosen = indices[slot];
+
+            if (pass == Pass.FullKey
+                && Corroboration(reference, candidates[chosen]) == 0
+                && StepUnblocks(reference, candidates, taken))
             {
-                slot = 0;
+                // Nothing about this candidate says it is the reference, and something
+                // about a wrapper still on the list says the reference's counterpart is one
+                // level inside it. Leaving the reference for the step pass is the whole
+                // point: a wrapper's key is `tag||`, identical to any plain sibling of the
+                // same tag, so taking it here consumes the wrapper as if it were that
+                // sibling and the step pass never runs.
+                referenceLeftovers.Add(reference);
+                continue;
             }
 
-            var chosen = indices[slot];
             indices.RemoveAt(slot);
             taken[chosen] = true;
             lastMatched = chosen;
@@ -289,6 +353,152 @@ public static class NodeMatcher
     }
 
     /// <summary>
+    /// Picks which of the same-key candidates in <paramref name="indices"/> a reference
+    /// takes, and returns its slot within that list.
+    /// </summary>
+    /// <remarks>
+    /// The full key is <c>tag|role|name</c>, so an element carrying neither a role nor its
+    /// own text keys as <c>tag||</c> — indistinguishable from every plain sibling of the same
+    /// tag, and from every layout wrapper. Position alone cannot separate them: in the
+    /// dialog-with-an-extra-wrapper shape the wrapper sits at exactly the index the element
+    /// it wraps would have. The children are the one piece of evidence left that does not
+    /// come from the node itself, so <see cref="Corroboration"/> chooses and position only
+    /// breaks its ties — which keeps the inserted-sibling case reading as an insertion.
+    /// </remarks>
+    private static int Choose(
+        DomNode reference,
+        List<DomNode> candidates,
+        List<int> indices,
+        int lastMatched,
+        Pass pass)
+    {
+        // Prefer the earliest candidate at or after the one that last matched. Taking the
+        // globally earliest instead reports a reorder whenever an extra same-key sibling was
+        // inserted ahead of the real counterpart — the indices step backwards even though
+        // nothing moved, and the inserted node is already reported on its own. Falling back
+        // to the earliest available keeps a genuine swap detectable.
+        var positional = indices.FindIndex(index => index >= lastMatched);
+        if (positional < 0)
+        {
+            positional = 0;
+        }
+
+        if (pass != Pass.FullKey || indices.Count == 1)
+        {
+            return positional;
+        }
+
+        var best = positional;
+        var bestScore = Corroboration(reference, candidates[indices[positional]]);
+
+        for (var slot = 0; slot < indices.Count; slot++)
+        {
+            var score = Corroboration(reference, candidates[indices[slot]]);
+            if (score > bestScore)
+            {
+                best = slot;
+                bestScore = score;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Counts how many children the two nodes have in common by key, comparing multisets so
+    /// that two of a kind on one leg and one on the other scores one rather than two.
+    /// </summary>
+    private static int Corroboration(DomNode reference, DomNode candidate)
+    {
+        if (reference.Children.Count == 0 || candidate.Children.Count == 0)
+        {
+            return 0;
+        }
+
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var child in candidate.Children)
+        {
+            var childKey = Key(child);
+            counts[childKey] = counts.TryGetValue(childKey, out var count) ? count + 1 : 1;
+        }
+
+        var shared = 0;
+        foreach (var child in reference.Children)
+        {
+            var childKey = Key(child);
+            if (counts.TryGetValue(childKey, out var count) && count > 0)
+            {
+                counts[childKey] = count - 1;
+                shared++;
+            }
+        }
+
+        return shared;
+    }
+
+    /// <summary>
+    /// Reports whether stepping through a wrapper on either leg would put a better-evidenced
+    /// counterpart in front of the reference than the candidate it is about to take.
+    /// </summary>
+    /// <remarks>
+    /// Both directions are needed because nothing in this matcher is symmetric by
+    /// construction: <see cref="PairBy"/> walks the references and looks candidates up, so a
+    /// wrapper on the reference leg is invisible to the candidate-side test.
+    /// </remarks>
+    private static bool StepUnblocks(DomNode reference, List<DomNode> candidates, bool[] taken)
+    {
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            // The candidate is the wrapper and the reference's counterpart is inside it, or
+            // the mirror: the reference is the wrapper and this candidate's counterpart is
+            // inside that.
+            if (!taken[i]
+                && (Wraps(reference, candidates[i]) || Wraps(candidates[i], reference)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reports whether <paramref name="wrapper"/> holds <paramref name="node"/>'s real
+    /// counterpart somewhere down its chain of single-child descendants.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The whole chain rather than one step, because two nested layout wrappers are as
+    /// ordinary as one and a one-step lookahead sees only the outer one's child — another
+    /// wrapper, which corroborates nothing. The walk stops at the first node with no children
+    /// or with several, so it is bounded by the chain's length.
+    /// </para>
+    /// <para>
+    /// Both halves of the test are load-bearing. Without the key test, a plain container is
+    /// unpicked from its counterpart whenever that counterpart holds one child — the
+    /// positioner/popup shape, where the two containers must pair. Without the corroboration
+    /// test, any two elements sharing a tag look like a wrapping, and the popup whose role
+    /// differs from its counterpart's is stepped past instead of degraded onto.
+    /// </para>
+    /// </remarks>
+    private static bool Wraps(DomNode node, DomNode wrapper)
+    {
+        var key = Key(node);
+
+        for (var inner = wrapper; inner.Children.Count == 1; inner = inner.Children[0])
+        {
+            var child = inner.Children[0];
+            if (string.Equals(Key(child), key, StringComparison.Ordinal)
+                && Corroboration(node, child) > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Builds the key two nodes must share to pair: tag, role, and accessible name.
     /// </summary>
     /// <remarks>
@@ -305,10 +515,12 @@ public static class NodeMatcher
     }
 
     /// <summary>
-    /// Spells the parts of <see cref="Key"/> out for a reader, so a pair that only matched
-    /// on tag can say which part of the identity the two legs disagreed on.
+    /// Spells the parts of the pairing key out for a reader, so a report can say which part
+    /// of the identity the two legs disagreed on.
     /// </summary>
-    private static string Identity(DomNode node)
+    /// <param name="node">The node to describe.</param>
+    /// <returns>The tag, and the role and accessible name when the node carries them.</returns>
+    public static string Identity(DomNode node)
     {
         var parts = new List<string> { $"<{node.Tag}>" };
 
@@ -355,7 +567,8 @@ public static class NodeMatcher
         /// difference it usually is. The cost is real and worth stating — an identity
         /// difference on a node whose sibling paired is <em>not</em> degraded, so it is
         /// reported as two one-sided subtrees with no attribute finding for the role that
-        /// differs. `DoesNotPairAcrossDifferentRoles` pins that as the intended trade.
+        /// differs. <see cref="Match"/> states that limit in full;
+        /// `DoesNotPairSiblingsWithDifferentRolesWhenAnotherSiblingPaired` pins it.
         /// </remarks>
         private bool NothingPaired => pairedHere == 0;
 
@@ -431,7 +644,7 @@ public static class NodeMatcher
         /// <summary>Pairs on the full key: tag, role, and accessible name.</summary>
         private void PairOnKey()
         {
-            PairBy(references, candidates, Key, relaxed: false, out var matched);
+            PairBy(references, candidates, Pass.FullKey, out var matched);
 
             if (firstPass)
             {
@@ -456,7 +669,7 @@ public static class NodeMatcher
         /// <returns><see langword="true"/> if anything paired.</returns>
         private bool TryPairByTag()
         {
-            PairBy(references, candidates, static node => node.Tag, relaxed: true, out var matched);
+            PairBy(references, candidates, Pass.TagDegrade, out var matched);
 
             foreach (var (pair, _) in matched)
             {

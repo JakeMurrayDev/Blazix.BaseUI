@@ -1,3 +1,5 @@
+using Blazix.BaseUI.Parity.Tests.Capture;
+
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
 /// <summary>
@@ -19,8 +21,58 @@ public sealed class StructureComparator : IComparator
     {
         var match = NodeMatcher.Match(context.Reference.Dom, context.Candidate.Dom);
 
+        // A leftover on each side at the same path and tag is one element both legs render,
+        // left unpaired because their identities disagree or because an ancestor did not
+        // pair. Reporting it as "React renders <li> here; Blazor does not" *and* as its
+        // mirror is two statements that are each false and that contradict each other. What
+        // each leg renders at that path is knowable from these two lists alone, so it is
+        // said instead. The pairing is untouched: role is in the key on purpose, so a role
+        // difference is meant to surface structurally — only the wording was ever wrong.
+        var counterparts = new Dictionary<(string Path, string Tag), List<int>>();
+        for (var i = 0; i < match.CandidateOnly.Count; i++)
+        {
+            var node = match.CandidateOnly[i];
+            if (!counterparts.TryGetValue((node.Path, node.Tag), out var indices))
+            {
+                indices = [];
+                counterparts[(node.Path, node.Tag)] = indices;
+            }
+
+            indices.Add(i);
+        }
+
+        var reconciled = new bool[match.CandidateOnly.Count];
+
         foreach (var node in match.ReferenceOnly)
         {
+            if (counterparts.TryGetValue((node.Path, node.Tag), out var indices) && indices.Count > 0)
+            {
+                var counterpart = match.CandidateOnly[indices[0]];
+                reconciled[indices[0]] = true;
+                indices.RemoveAt(0);
+
+                var referenceIdentity = NodeMatcher.Identity(node);
+                var candidateIdentity = NodeMatcher.Identity(counterpart);
+
+                yield return new Finding
+                {
+                    Fixture = context.Fixture,
+                    Leg = context.Leg,
+                    Step = context.Step,
+                    Kind = FindingKind.Structure,
+                    Severity = Severity.Error,
+                    NodePath = node.Path,
+                    ReferenceValue = referenceIdentity,
+                    CandidateValue = candidateIdentity,
+                    Message =
+                        $"React renders {referenceIdentity} at '{node.Path}'; " +
+                        $"Blazor renders {candidateIdentity} there. The two did not pair, " +
+                        "so nothing beneath them was compared."
+                };
+
+                continue;
+            }
+
             yield return new Finding
             {
                 Fixture = context.Fixture,
@@ -34,8 +86,15 @@ public sealed class StructureComparator : IComparator
             };
         }
 
-        foreach (var node in match.CandidateOnly)
+        for (var i = 0; i < match.CandidateOnly.Count; i++)
         {
+            if (reconciled[i])
+            {
+                continue;
+            }
+
+            var node = match.CandidateOnly[i];
+
             yield return new Finding
             {
                 Fixture = context.Fixture,
