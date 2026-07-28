@@ -143,11 +143,16 @@ What actually worked, and should be kept doing:
     interrupted. Two probed consequences: a step where the node leaves during its **second**
     run emits no `present-at-transitionend` finding at all — run 1's `transitionend` carried
     the same property name, so the leg reads `Satisfied`; and where both legs unmount mid-run
-    but only one completed an earlier run, the output states that leg **satisfied an obligation
-    it demonstrably broke**, sending a reader to the wrong leg. L1 fires in every such case —
-    `TimelineSequence.Normalize` drops and collapses no run/`added`/`removed` event, so legs
-    whose derived states differ cannot have equal signatures — which makes this a **mislabelled
-    positive, not a silent pass**, the same standing `Pairs` was given in item 5. Accepted
+    but only one completed an earlier run, the output states that leg **satisfied two
+    obligations it demonstrably broke** — `present-at-transitionend` via the `finished` set and
+    `removed-after-transitionend` via `lastTerminal` — sending a reader to the wrong leg. L1
+    fires in every such case — `TimelineSequence.Normalize` drops and collapses no
+    run/`added`/`removed` event, so legs whose **timelines** differ cannot have equal
+    signatures — which makes this a **mislabelled positive, not a silent pass**, the same
+    standing `Pairs` was given in item 5. (Equal signatures leave one way for the derived states
+    still to differ, and it is not a timeline difference: `AttributeRemoval` also reads the
+    step's final snapshot, which `Normalize` never sees, and a difference in that snapshot is
+    what the structure comparator reports.) Accepted
     deliberately at Task 9's close rather than fixed; making L2 run-aware is a rewrite of
     `Evaluate`. **Task 11 must not let a waiver keyed on an L2 invariant name imply the
     invariant was measured on the run that broke it, and reporting should prefer L1's diff to
@@ -155,6 +160,21 @@ What actually worked, and should be kept doing:
     on a step where the legs ran unequal numbers of runs the values printed beside a real
     finding come from a different run. Both limits are written up in `TimelineComparator`'s
     class `<remarks>`; read them there.
+
+11. **L3 measures a keyframe run against `animation-duration`, which declares one iteration
+    rather than the whole run.** `TimelineComparator.Families` now measures each kind of run
+    against its own declaration — a transition against `transition-duration`, a keyframe
+    animation against `animation-duration` — and separates the two runs, so a node that
+    transitions and animates over one window is two spans rather than one. The residual:
+    `animation-iteration-count` is **not** in `capture.js`'s `STYLE_PROPS` allowlist, so a
+    keyframe animation set to repeat a fixed number of times runs to a multiple of what it
+    declares and is reported as breaking its own declaration **on both legs alike** — the
+    symmetric-overrun shape this layer has twice been fixed to remove. One iteration is assumed,
+    which is what a component's enter and exit animation is, and the endlessly repeating kind
+    (a spinner) never reaches `animationend` and so closes no run and is never measured.
+    **Whoever next touches `capture.js` should add `animation-iteration-count` to `STYLE_PROPS`
+    and teach `Duration` to multiply**, at which point this residual closes; the `stopTimeline()`
+    leak already has that file open. Written up on `TimelineComparator.Duration`'s `<remarks>`.
 
 ## Invalidations
 

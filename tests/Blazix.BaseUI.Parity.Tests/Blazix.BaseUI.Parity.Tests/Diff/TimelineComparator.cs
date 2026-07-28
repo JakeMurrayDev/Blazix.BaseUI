@@ -55,16 +55,20 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// satisfies a start belonging to the second, and a removal is ordered against the last
 /// terminal event anywhere in the step rather than against the run it interrupted. The
 /// consequence is not only that a difference can go unnamed. A leg can be reported as having
-/// <em>satisfied</em> an obligation it demonstrably broke — a node that completed one run and
+/// <em>satisfied</em> obligations it demonstrably broke — a node that completed one run and
 /// then left part way through a second reads as present at its <c>transitionend</c>, because
-/// the first run's end carried the same property name — which points a reader at the wrong
-/// leg when the other leg broke it too. This is a mislabelled positive and never a silent
-/// pass: <see cref="TimelineSequence.Normalize"/> neither drops nor collapses a run,
-/// <c>added</c> or <c>removed</c> event, so two legs whose derived states differ cannot have
-/// equal signatures, and L1 therefore fires on every step where this misreports. The
-/// difference is always reported; only the name put on it can be wrong. Read an L2 result as
-/// reliable only on a step with a single run per path, and prefer L1's diff to L2's naming
-/// where both fire.
+/// the first run's end carried the same property name, and as removed after one, because that
+/// same earlier end is the last terminal the removal is ordered against — which points a
+/// reader at the wrong leg when the other leg broke them too. This is a mislabelled positive
+/// and never a silent pass: <see cref="TimelineSequence.Normalize"/> neither drops nor
+/// collapses a run, <c>added</c> or <c>removed</c> event, so two legs whose <em>timelines</em>
+/// differ cannot have equal signatures, and L1 therefore fires on every step where this
+/// misreports. Equal signatures leave exactly one way for the derived states still to differ,
+/// and it is not a timeline difference: <see cref="AttributeRemoval"/> also reads the snapshot
+/// the step ended on, which <c>Normalize</c> never sees — and a difference in that snapshot is
+/// what the structure comparator reports. The difference is always reported; only the name put
+/// on it can be wrong. Read an L2 result as reliable only on a step with a single run per
+/// path, and prefer L1's diff to L2's naming where both fire.
 /// </para>
 /// <para>
 /// L3 pairs the two legs' runs by index, so the cross-leg record and the compared values
@@ -96,22 +100,45 @@ public sealed class TimelineComparator : IComparator
     /// </summary>
     private const int MaxDiffLines = 40;
 
-    /// <summary>The style property L3 measures a transition against.</summary>
-    private const string DurationProperty = "transition-duration";
-
     private const string AttributeKind = "attribute";
     private const string AddedKind = "added";
     private const string RemovedKind = "removed";
 
-    /// <summary>The events that open a run.</summary>
-    private static readonly string[] StartKinds = ["transitionstart", "animationstart"];
+    /// <summary>
+    /// The two kinds of run, each carrying the events that open one, the events that close
+    /// one, and the style property L3 measures a run of that kind against.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A transition and a keyframe animation are separate runs, and stay separate even where
+    /// they overlap on one node. Measuring both in one bucket does two wrong things at once:
+    /// it reads an overlapping pair as a single span from the first start to the last terminal
+    /// event, and it measures a keyframe run against a <c>transition-duration</c> that says
+    /// nothing about it.
+    /// </para>
+    /// <para>
+    /// An element that declares a transition it is not currently running is the ordinary case
+    /// rather than a corner one — a Tailwind <c>transition duration-150</c> utility puts a
+    /// non-zero <c>transition-duration</c> on the element whatever else animates it — so a
+    /// keyframe run measured against that declaration fails both legs of two byte-identical
+    /// timelines while naming no difference between them.
+    /// </para>
+    /// </remarks>
+    private static readonly RunFamily[] Families =
+    [
+        new(["transitionstart"], ["transitionend", "transitioncancel"], "transition-duration"),
+        new(["animationstart"], ["animationend", "animationcancel"], "animation-duration")
+    ];
+
+    /// <summary>The events that open a run, of either kind.</summary>
+    private static readonly string[] StartKinds = [.. Families.SelectMany(family => family.Starts)];
 
     /// <summary>
-    /// The events that close one. A cancellation counts: it is dispatched to the element, so
-    /// observing one is as much proof that the node was still in the tree as an end is.
+    /// The events that close one, of either kind. A cancellation counts: it is dispatched to
+    /// the element, so observing one is as much proof that the node was still in the tree as
+    /// an end is.
     /// </summary>
-    private static readonly string[] TerminalKinds =
-        ["transitionend", "animationend", "transitioncancel", "animationcancel"];
+    private static readonly string[] TerminalKinds = [.. Families.SelectMany(family => family.Terminals)];
 
     /// <summary>
     /// The terminal events that cut a run short instead of completing it. L2 wants these —
@@ -305,12 +332,19 @@ public sealed class TimelineComparator : IComparator
     /// </summary>
     /// <remarks>
     /// <para>
+    /// Each kind of run is measured against its own declaration and never against the other
+    /// kind's: a transition against <c>transition-duration</c>, a keyframe animation against
+    /// <c>animation-duration</c>. The runs are separated the same way, so a node that
+    /// transitions and animates over one window is two runs here rather than one span across
+    /// both. See <see cref="Families"/>.
+    /// </para>
+    /// <para>
     /// A declaration that is missing or zero is not checked. The step is captured once the
     /// animation is over, by which time the markers that switched the transition on are gone
-    /// and the element may compute a <c>transition-duration</c> that says nothing about the
-    /// run that happened; failing on that would report a defect where there is only a
-    /// stylesheet whose transition is conditional. A comma-separated list is read at its
-    /// longest, because one run spans every property that ran within it.
+    /// and the element may compute a duration that says nothing about the run that happened;
+    /// failing on that would report a defect where there is only a stylesheet whose
+    /// transition is conditional. A comma-separated list is read at its longest, because one
+    /// run spans every property that ran within it.
     /// </para>
     /// <para>
     /// A run a cancellation closed is not checked against a declaration at all. Cancelling a
@@ -329,7 +363,11 @@ public sealed class TimelineComparator : IComparator
     /// off the same clock. Silence there would leave the cross-leg record below as the only
     /// output, reporting numbers from a basis known to be broken with nothing saying so. That
     /// holds only because every run this reaches did complete against the declaration it is
-    /// measured against; the two shapes where that is not true are excluded above.
+    /// measured against: a cancelled run and a run whose end was never observed are excluded
+    /// above, and a run is measured against its own kind's declaration rather than against
+    /// whatever else the element happens to declare. The one gap left in it is written up on
+    /// <see cref="Duration"/> — a keyframe animation that repeats runs to a multiple of what
+    /// it declares, and the iteration count is not captured.
     /// </para>
     /// </remarks>
     /// <param name="context">The paired step.</param>
@@ -337,10 +375,27 @@ public sealed class TimelineComparator : IComparator
     /// <returns>One finding per overrunning run per leg, plus the cross-leg records.</returns>
     private static IEnumerable<Finding> CompareSpans(ComparisonContext context, string path)
     {
-        var reference = Spans(context.Reference.Timeline, path);
-        var candidate = Spans(context.Candidate.Timeline, path);
-        var referenceDeclared = Declared(context.Reference.Styles, path);
-        var candidateDeclared = Declared(context.Candidate.Styles, path);
+        foreach (var family in Families)
+        {
+            foreach (var finding in CompareSpans(context, path, family))
+            {
+                yield return finding;
+            }
+        }
+    }
+
+    /// <summary>Runs <see cref="CompareSpans(ComparisonContext, string)"/> for one kind of run.</summary>
+    /// <param name="context">The paired step.</param>
+    /// <param name="path">The animating node.</param>
+    /// <param name="family">Which kind of run to measure, and what to measure it against.</param>
+    /// <returns>One finding per overrunning run per leg, plus the cross-leg records.</returns>
+    private static IEnumerable<Finding> CompareSpans(
+        ComparisonContext context, string path, RunFamily family)
+    {
+        var reference = Spans(context.Reference.Timeline, path, family);
+        var candidate = Spans(context.Candidate.Timeline, path, family);
+        var referenceDeclared = Declared(context.Reference.Styles, path, family.Duration);
+        var candidateDeclared = Declared(context.Candidate.Styles, path, family.Duration);
 
         // Every run, not merely the first or the last: a step that opens cleanly and closes
         // in triple the declared time is a defect in the close, and one measurement covering
@@ -352,7 +407,8 @@ public sealed class TimelineComparator : IComparator
                 && Overruns(reference[i], declared))
             {
                 yield return Overrun(
-                    context, path, "React", reference[i], declared, At(reference, i), At(candidate, i));
+                    context, path, "React", reference[i], declared, family.Duration,
+                    At(reference, i), At(candidate, i));
             }
         }
 
@@ -363,7 +419,8 @@ public sealed class TimelineComparator : IComparator
                 && Overruns(candidate[i], declared))
             {
                 yield return Overrun(
-                    context, path, "Blazor", candidate[i], declared, At(reference, i), At(candidate, i));
+                    context, path, "Blazor", candidate[i], declared, family.Duration,
+                    At(reference, i), At(candidate, i));
             }
         }
 
@@ -393,7 +450,7 @@ public sealed class TimelineComparator : IComparator
                 // must not decide a verdict.
                 Severity = Severity.Info,
                 NodePath = path,
-                Property = DurationProperty,
+                Property = family.Duration,
                 ReferenceValue = Milliseconds(left.Length),
                 CandidateValue = Milliseconds(right.Length),
                 Message =
@@ -413,6 +470,7 @@ public sealed class TimelineComparator : IComparator
     /// <param name="leg">Which leg overran, named as the messages name it.</param>
     /// <param name="run">That leg's measured run.</param>
     /// <param name="declared">That leg's declared duration, as the capture spelled it.</param>
+    /// <param name="property">The style property that declaration was read from.</param>
     /// <param name="reference">React's run at the same index, for the compared values.</param>
     /// <param name="candidate">Blazor's run at the same index, for the compared values.</param>
     /// <returns>The finding.</returns>
@@ -422,6 +480,7 @@ public sealed class TimelineComparator : IComparator
         string leg,
         Run run,
         string declared,
+        string property,
         Run? reference,
         Run? candidate) => new()
         {
@@ -431,7 +490,7 @@ public sealed class TimelineComparator : IComparator
             Kind = FindingKind.Timeline,
             Severity = Severity.Error,
             NodePath = path,
-            Property = DurationProperty,
+            Property = property,
             ReferenceValue = reference is { } left ? Milliseconds(left.Length) : null,
             CandidateValue = candidate is { } right ? Milliseconds(right.Length) : null,
             // The start is named because one step can hold several runs on one node, and two
@@ -601,8 +660,9 @@ public sealed class TimelineComparator : IComparator
         return qualifier < 0 ? segment : segment[..qualifier];
     }
 
-    /// <summary>Measures each of one leg's runs on one node.</summary>
+    /// <summary>Measures each of one leg's runs of one kind on one node.</summary>
     /// <remarks>
+    /// <para>
     /// One step can hold several runs on one node — a popup that opens and closes, a tooltip
     /// hovered in and out, a reposition that cancels and restarts a transform mid-open — and
     /// the idle time between two runs belongs to neither of them. A start reopens the
@@ -610,15 +670,23 @@ public sealed class TimelineComparator : IComparator
     /// seen the same property start, which is the recording's only sign that a run ended
     /// unobserved. A start of a property the open run has not seen is a second property
     /// joining it, which the run already spans.
+    /// </para>
+    /// <para>
+    /// Only one kind of run at a time, because a transition and a keyframe animation on one
+    /// node are two runs however much they overlap: walked in one pass they would open on
+    /// whichever started first and close on whichever ended last, reporting one span where
+    /// there were two. See <see cref="Families"/>.
+    /// </para>
     /// </remarks>
     /// <param name="timeline">The leg's events.</param>
     /// <param name="path">The animating node.</param>
+    /// <param name="family">Which kind of run to measure.</param>
     /// <returns>
     /// The runs in the order they happened, each carrying whether a cancellation closed it. A
     /// start with no terminal event after it contributes nothing — a step captured mid-run is
     /// not a measurement, and neither is a run the next one interrupted.
     /// </returns>
-    private static List<Run> Spans(IReadOnlyList<TimelineEvent> timeline, string path)
+    private static List<Run> Spans(IReadOnlyList<TimelineEvent> timeline, string path, RunFamily family)
     {
         var runs = new List<Run>();
         var started = new HashSet<string>(StringComparer.Ordinal);
@@ -636,7 +704,7 @@ public sealed class TimelineComparator : IComparator
                 continue;
             }
 
-            if (StartKinds.Contains(recorded.Kind, StringComparer.Ordinal))
+            if (family.Starts.Contains(recorded.Kind, StringComparer.Ordinal))
             {
                 // Two things close the run in progress. One is its terminal event, which
                 // makes it a measurement. The other is this same property starting again
@@ -662,7 +730,7 @@ public sealed class TimelineComparator : IComparator
                 started.Add(Property(recorded));
                 start ??= recorded.T;
             }
-            else if (start is not null && TerminalKinds.Contains(recorded.Kind, StringComparer.Ordinal))
+            else if (start is not null && family.Terminals.Contains(recorded.Kind, StringComparer.Ordinal))
             {
                 // The last one, so a node transitioning several properties is measured over
                 // all of them rather than to whichever finished first.
@@ -685,13 +753,16 @@ public sealed class TimelineComparator : IComparator
     private static Run? At(IReadOnlyList<Run> runs, int index)
         => index < runs.Count ? runs[index] : null;
 
-    /// <summary>Reads a leg's declared transition duration for one node.</summary>
+    /// <summary>Reads a leg's declared duration for one node and one kind of run.</summary>
     /// <param name="styles">That leg's captured styles.</param>
     /// <param name="path">The animating node.</param>
+    /// <param name="property">The style property that kind of run is measured against.</param>
     /// <returns>The declaration as captured, or <see langword="null"/> when there is none.</returns>
     private static string? Declared(
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> styles, string path)
-        => styles.TryGetValue(path, out var node) && node.TryGetValue(DurationProperty, out var declared)
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> styles,
+        string path,
+        string property)
+        => styles.TryGetValue(path, out var node) && node.TryGetValue(property, out var declared)
             ? declared
             : null;
 
@@ -707,13 +778,24 @@ public sealed class TimelineComparator : IComparator
             && Math.Abs(run.Length - expected) > Math.Max(ToleranceFloorMs, RelativeTolerance * expected);
 
     /// <summary>
-    /// Reads a <c>transition-duration</c> declaration as milliseconds.
+    /// Reads a duration declaration as milliseconds.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A list is read at its longest. Anything that does not parse whole — a value with no
     /// unit, an empty declaration, a list with one part this does not understand — reads as
     /// no declaration at all, so a value this cannot measure is left unchecked rather than
     /// checked against a number it guessed.
+    /// </para>
+    /// <para>
+    /// <c>animation-duration</c> declares one iteration and not the whole run, so a keyframe
+    /// animation set to repeat a fixed number of times runs to a multiple of what this
+    /// returns and is reported as breaking its own declaration on both legs alike.
+    /// <c>animation-iteration-count</c> is not in <c>capture.js</c>'s style allowlist, so the
+    /// count cannot be read and one iteration is assumed — which is what a component's enter
+    /// and exit animation is. The endlessly repeating kind, a spinner, never reaches
+    /// <c>animationend</c>, so it closes no run and is never measured here at all.
+    /// </para>
     /// </remarks>
     /// <param name="declared">The declaration.</param>
     /// <returns>The longest duration in milliseconds, or <see langword="null"/>.</returns>
@@ -959,6 +1041,13 @@ public sealed class TimelineComparator : IComparator
     /// <param name="Kind">Whether it could be decided.</param>
     /// <param name="Index">Where it sits in the timeline, when it could.</param>
     private readonly record struct Removal(RemovalKind Kind, int Index);
+
+    /// <summary>One kind of run: how it opens, how it closes, what it is measured against.</summary>
+    /// <param name="Starts">The events that open a run of this kind.</param>
+    /// <param name="Terminals">The events that close one, cancellations included.</param>
+    /// <param name="Duration">The style property a run of this kind is measured against.</param>
+    private sealed record RunFamily(
+        IReadOnlyList<string> Starts, IReadOnlyList<string> Terminals, string Duration);
 
     /// <summary>What one leg's capture contributes to the phase and duration layers.</summary>
     /// <param name="Timeline">The recorded events.</param>

@@ -996,6 +996,143 @@ public sealed class TimelineComparatorTests
             "Blazor started at 2000 ms and ran 280 ms (declared '0.2s'); the spans differ by 80 ms.");
     }
 
+    [Theory]
+    // The declaration that made this fire, and the one that did not. A keyframe run is not a
+    // transition, so a `transition-duration` on the same element says nothing about it — and
+    // a Tailwind `transition duration-150` utility puts one on the element unconditionally,
+    // which is why the first row is the ordinary case rather than a contrived one.
+    [InlineData("0.2s")]
+    [InlineData("0s")]
+    public void DoesNotMeasureAKeyframeRunAgainstATransitionsDeclaration(string transition)
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(500, "animationend", Popup, "fade-in")
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: transition, present: [Popup]),
+            Capture(timeline, declared: transition, present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FlagsAKeyframeRunThatOverranItsOwnAnimationDuration()
+    {
+        // Not measuring a keyframe run against a *transition's* declaration must not become a
+        // blanket suppression: a keyframe run has a declaration of its own, and a leg that
+        // contradicts it is reported exactly as a transition leg is.
+        TimelineEvent[] reference =
+        [
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(500, "animationend", Popup, "fade-in")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(1500, "animationend", Popup, "fade-in")
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, animation: "0.5s", present: [Popup]),
+            Capture(candidate, animation: "0.5s", present: [Popup])));
+        var finding = Errors(findings).ShouldHaveSingleItem();
+
+        finding.Property.ShouldBe("animation-duration");
+        finding.NodePath.ShouldBe(Popup);
+        finding.Message.ShouldBe(
+            $"Animation duration differs from its own declaration at '{Popup}': " +
+            "Blazor ran for 1500 ms starting at 0 ms against a declared '0.5s'.");
+
+        // The cross-leg record names the same declaration, so a reader is never shown a
+        // keyframe span beside the transition duration it was not measured against.
+        var record = findings.Where(f => f.Severity == Severity.Info).ShouldHaveSingleItem();
+
+        record.Property.ShouldBe("animation-duration");
+        record.Message.ShouldBe(
+            $"Animation span at '{Popup}': React started at 0 ms and ran 500 ms (declared '0.5s'); " +
+            "Blazor started at 0 ms and ran 1500 ms (declared '0.5s'); the spans differ by 1000 ms.");
+    }
+
+    [Fact]
+    public void JudgesThePhaseInvariantsOnAKeyframeRunToo()
+    {
+        // Separating the two kinds of run for the duration check leaves the phase layer
+        // covering both: a node that left part way through a keyframe animation broke the same
+        // two obligations as one that left part way through a transition.
+        TimelineEvent[] reference =
+        [
+            Run(0, "animationstart", Popup, "fade-out"),
+            Run(500, "animationend", Popup, "fade-out"),
+            Removed(501)
+        ];
+        TimelineEvent[] candidate = [Run(0, "animationstart", Popup, "fade-out"), Removed(10)];
+
+        var findings = Compare(Context(Capture(reference), Capture(candidate)));
+
+        Invariant(findings, "present-at-transitionend").ShouldHaveSingleItem()
+            .Severity.ShouldBe(Severity.Error);
+        Invariant(findings, "removed-after-transitionend").ShouldHaveSingleItem()
+            .Severity.ShouldBe(Severity.Error);
+    }
+
+    [Fact]
+    public void KeepsATransitionRunAndAKeyframeRunOnOneNodeApart()
+    {
+        // One node transitions opacity for 200 ms and plays a 500 ms keyframe animation over
+        // the same window. Measuring both in one bucket reads them as a single 0-to-500 ms
+        // run and fails both legs of two byte-identical timelines against a declaration only
+        // the transition half answers to.
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(200, "transitionend", Popup, "opacity"),
+            Run(500, "animationend", Popup, "fade-in")
+        ];
+
+        var findings = Compare(Context(
+            Capture(timeline, declared: "0.2s", present: [Popup]),
+            Capture(timeline, declared: "0.2s", present: [Popup])));
+
+        findings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void StillMeasuresTheTransitionRunOnANodeThatAlsoRanAKeyframe()
+    {
+        // Keeping the two apart is not keeping quiet about either: the transition half is
+        // measured against its own declaration, on its own span, with the keyframe run
+        // overlapping it. The event order is the same on both legs, so the sequence diff is
+        // silent and the duration check is the only thing that can speak.
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(200, "transitionend", Popup, "opacity"),
+            Run(500, "animationend", Popup, "fade-in")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(0, "animationstart", Popup, "fade-in"),
+            Run(400, "transitionend", Popup, "opacity"),
+            Run(500, "animationend", Popup, "fade-in")
+        ];
+
+        var findings = Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup])));
+        var finding = Errors(findings).ShouldHaveSingleItem();
+
+        finding.Property.ShouldBe("transition-duration");
+        finding.Message.ShouldBe(
+            $"Animation duration differs from its own declaration at '{Popup}': " +
+            "Blazor ran for 400 ms starting at 0 ms against a declared '0.2s'.");
+    }
+
     [Fact]
     public void ReportsAPropertyThatStartedAndNeverEndedAsAPresenceBreak()
     {
@@ -1148,16 +1285,26 @@ public sealed class TimelineComparatorTests
     private static StepCapture Capture(
         IReadOnlyList<TimelineEvent> timeline,
         string? declared = null,
-        IReadOnlyList<string>? present = null)
+        IReadOnlyList<string>? present = null,
+        string? animation = null)
     {
         var styles = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
 
-        if (declared is not null)
+        if (declared is not null || animation is not null)
         {
-            styles[Popup] = new Dictionary<string, string>(StringComparer.Ordinal)
+            var node = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            if (declared is not null)
             {
-                ["transition-duration"] = declared
-            };
+                node["transition-duration"] = declared;
+            }
+
+            if (animation is not null)
+            {
+                node["animation-duration"] = animation;
+            }
+
+            styles[Popup] = node;
         }
 
         return new StepCapture
