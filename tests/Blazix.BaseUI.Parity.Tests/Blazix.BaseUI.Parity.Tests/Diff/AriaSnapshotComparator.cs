@@ -223,7 +223,7 @@ public sealed class AriaSnapshotComparator : IComparator
 
         return lines.Count <= MaxDiffLines
             ? lines
-            : [.. lines.Take(MaxDiffLines), $"... {lines.Count - MaxDiffLines} more diff lines omitted."];
+            : [.. lines.Take(MaxDiffLines), $"... {Count(lines.Count - MaxDiffLines)} of the diff omitted."];
     }
 
     /// <summary>

@@ -85,19 +85,32 @@ public sealed partial class ConsoleComparator : IComparator
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Two things are folded away. The origin a stack frame names, because the parity
-    /// server binds a free port per run, so a committed React baseline and a live Blazor
-    /// run disagree about it while agreeing about everything that matters. And the line
-    /// and column a frame ends with, because those follow the bundler's output rather than
-    /// the component.
+    /// Three things are folded away. A URL's port, because the parity server binds a free
+    /// one per run, so a committed React baseline and a live Blazor run disagree about it
+    /// while agreeing about everything that matters. The line and column a stack frame
+    /// ends with, because those follow the bundler's output rather than the component.
+    /// And an ISO-8601 instant, because Blazor's client logging stamps one on every line
+    /// it writes.
     /// </para>
     /// <para>
-    /// What is deliberately kept is everything else, the URL's path included. Replacing a
-    /// whole URL would fold <c>/assets/logo.png</c> and <c>/assets/icon.png</c> into one
-    /// message and report parity between two different failures; a comparator that
-    /// over-strips passes everything and is worse than no comparator. For the same reason
-    /// the position rule is anchored to a file extension, so that a time of day such as
-    /// <c>12:30:45</c> keeps its digits.
+    /// The instant matters more than its noisiness suggests. A stamped message is a
+    /// different message on every attempt, so a Blazor-only error carrying one differs
+    /// between a leg's two retry attempts by construction and is demoted to
+    /// <see cref="Severity.Flaky"/>, which is reported and never fails — and the runs that
+    /// retry are exactly the runs that log this kind of error. A waiver naming a stamped
+    /// message could never match a second time either, and would land in the unused
+    /// waivers instead.
+    /// </para>
+    /// <para>
+    /// What is deliberately kept is everything else: a URL's scheme, its host and its path
+    /// included. Replacing a whole URL would fold <c>/assets/logo.png</c> and
+    /// <c>/assets/icon.png</c> into one message and report parity between two different
+    /// failures; a comparator that over-strips passes everything and is worse than no
+    /// comparator. Each rule is therefore anchored on the narrowest thing that identifies
+    /// it: the port rule needs a scheme and <c>://</c> ahead of the digits, the instant
+    /// rule needs a full date and a <c>T</c> ahead of the time, so that neither a bare
+    /// time of day such as <c>12:30:45</c> nor a dotted version such as <c>1.2.3</c> is
+    /// within reach of either.
     /// </para>
     /// <para>
     /// The level prefix the capturer writes survives, so an error on one leg and a warning
@@ -107,14 +120,29 @@ public sealed partial class ConsoleComparator : IComparator
     /// <param name="message">The captured message.</param>
     /// <returns>The comparable form of the message.</returns>
     private static string Normalize(string message)
-        => PositionRegex().Replace(OriginRegex().Replace(message, "<origin>"), "$1:<pos>");
-
-    /// <summary>Matches a URL's scheme and authority, stopping at the path.</summary>
-    [GeneratedRegex(@"[a-zA-Z][a-zA-Z0-9+.\-]*://[^/\s]*", RegexOptions.CultureInvariant)]
-    private static partial Regex OriginRegex();
+        => PositionRegex().Replace(
+            PortRegex().Replace(InstantRegex().Replace(message, "<time>"), "$1:<port>"),
+            "$1:<pos>");
 
     /// <summary>
-    /// Matches a line and column pair, but only where a file extension precedes it.
+    /// Matches an ISO-8601 instant: a calendar date, a <c>T</c>, a time, and optionally a
+    /// fractional second and a <c>Z</c>.
+    /// </summary>
+    [GeneratedRegex(
+        @"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z?",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex InstantRegex();
+
+    /// <summary>
+    /// Matches the port of a URL's authority, keeping the scheme and host that precede it.
+    /// </summary>
+    [GeneratedRegex(@"([a-zA-Z][a-zA-Z0-9+.\-]*://[^/?#\s]*?):[0-9]+", RegexOptions.CultureInvariant)]
+    private static partial Regex PortRegex();
+
+    /// <summary>
+    /// Matches a line and column pair, but only where a dot and one to eight alphanumerics
+    /// precede it. In a stack frame that is the file extension; nothing checks that it
+    /// names a real one, so <c>Module.render:10:20</c> is folded as well.
     /// </summary>
     [GeneratedRegex(@"(\.[a-zA-Z][a-zA-Z0-9]{0,7}):[0-9]+:[0-9]+", RegexOptions.CultureInvariant)]
     private static partial Regex PositionRegex();

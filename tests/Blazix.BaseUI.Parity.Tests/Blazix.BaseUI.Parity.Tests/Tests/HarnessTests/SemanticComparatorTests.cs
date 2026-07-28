@@ -136,6 +136,21 @@ public sealed class SemanticComparatorTests
     }
 
     [Fact]
+    public void AriaHeadsAHunkWithTheLengthEachSideReallyHas()
+    {
+        // A line inserted mid-snapshot: the hunk spans six reference lines and seven
+        // candidate lines, and the header has to count each side for itself rather than
+        // assume they match. Pinned against `diff -U3` on the same two inputs.
+        var candidate = Numbered("l", 1, 10).Replace("l6", "X\nl6", StringComparison.Ordinal);
+
+        var finding = new AriaSnapshotComparator()
+            .Compare(AriaContext(Numbered("l", 1, 10), candidate))
+            .ShouldHaveSingleItem();
+
+        Hunks(finding.Message).ShouldBe(["@@ -3,6 +3,7 @@"]);
+    }
+
+    [Fact]
     public void AriaSaysWhenTheReactLegCapturedNothing()
     {
         // A capture that failed on one leg is a real signal. The diff alone would say it
@@ -178,7 +193,19 @@ public sealed class SemanticComparatorTests
 
         lines[0].ShouldBe("ARIA snapshot differs: 200 lines added, 200 lines removed.");
         lines.Length.ShouldBe(42);
-        lines[^1].ShouldBe("... 361 more diff lines omitted.");
+        lines[^1].ShouldBe("... 361 lines of the diff omitted.");
+    }
+
+    [Fact]
+    public void AriaCountsASingleOmittedDiffLineInTheSingular()
+    {
+        // Twenty lines against twenty with nothing in common renders one header and forty
+        // body lines: forty-one, one over the cap, so exactly one line is omitted.
+        var context = AriaContext(Numbered("react", 1, 20), Numbered("blazor", 1, 20));
+
+        var finding = new AriaSnapshotComparator().Compare(context).ShouldHaveSingleItem();
+
+        finding.Message.Split('\n')[^1].ShouldBe("... 1 line of the diff omitted.");
     }
 
     [Fact]
@@ -331,9 +358,9 @@ public sealed class SemanticComparatorTests
     }
 
     [Fact]
-    public void ConsoleIgnoresTheOriginAndPositionAMessageWasLoggedFrom()
+    public void ConsoleIgnoresThePortAndPositionAMessageWasLoggedFrom()
     {
-        // The parity server binds a free port per run, so the origin in a stack frame
+        // The parity server binds a free port per run, so the port in a stack frame
         // differs between the committed React baseline and a live Blazor run. The line
         // and column differ with the bundle. Neither is a parity result.
         var context = ConsoleContext(
@@ -360,8 +387,8 @@ public sealed class SemanticComparatorTests
 
         var blazorOnly = findings.Single(f => f.Severity == Severity.Error);
         // The comparison is made on the normalized text, and a reader still needs the
-        // origin the message really carried, so the finding holds both.
-        blazorOnly.Property.ShouldBe("error: failed to load <origin>/assets/icon.png");
+        // port the message really carried, so the finding holds both.
+        blazorOnly.Property.ShouldBe("error: failed to load http://127.0.0.1:<port>/assets/icon.png");
         blazorOnly.CandidateValue.ShouldBe("error: failed to load http://127.0.0.1:5157/assets/icon.png");
         blazorOnly.ReferenceValue.ShouldBeNull();
     }
@@ -385,6 +412,85 @@ public sealed class SemanticComparatorTests
         var context = ConsoleContext(
             ["error: connection lost at 12:30:45"],
             ["error: connection lost at 12:30:46"]);
+
+        new ConsoleComparator().Compare(context).ToList().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ConsoleCountsOneStampedMessageTwiceRatherThanReportingItTwice()
+    {
+        // Blazor's client logging stamps every line it writes with an ISO instant. Left
+        // in, one error logged on two render passes is two messages, so it is a finding
+        // whose Property differs between a leg's two attempts — which the retry demotes
+        // to Flaky, and a Flaky finding never fails the run. A waiver naming one of them
+        // could never match twice either.
+        var context = ConsoleContext(
+            [],
+            [
+                "error: [2026-07-28T12:30:45.123Z] Error: circuit failed",
+                "error: [2026-07-28T12:31:02.004Z] Error: circuit failed"
+            ]);
+
+        var finding = new ConsoleComparator().Compare(context).ShouldHaveSingleItem();
+
+        finding.Severity.ShouldBe(Severity.Error);
+        finding.Property.ShouldBe("error: [<time>] Error: circuit failed");
+        finding.Message.ShouldBe(
+            "Console message count differs: React 0, Blazor 2: " +
+            "'error: [<time>] Error: circuit failed'.");
+    }
+
+    [Theory]
+    // Sub-second precision is the logger's choice, not the format's.
+    [InlineData("2026-07-28T12:30:45Z", "2026-07-28T12:30:46Z")]
+    // And so is the trailing 'Z': a stamp written in local time carries none.
+    [InlineData("2026-07-28T12:30:45.123", "2026-07-28T12:31:02.004")]
+    // Neither part is there to key on, so the rule cannot require either.
+    [InlineData("2026-07-28T12:30:45", "2026-07-28T12:31:02")]
+    public void ConsoleFoldsAnInstantHoweverItsOptionalPartsAreSpelled(string first, string second)
+    {
+        var context = ConsoleContext(
+            [], [$"error: reconnecting at {first}", $"error: reconnecting at {second}"]);
+
+        new ConsoleComparator().Compare(context).ShouldHaveSingleItem()
+            .Property.ShouldBe("error: reconnecting at <time>");
+    }
+
+    [Theory]
+    // A bare time of day: no date and no 'T' in front of it, so the instant rule must not
+    // reach it. This is the same text the position rule already has to leave alone.
+    [InlineData("error: connection lost at 12:30:45", "error: connection lost at 12:30:46")]
+    // A dotted version: the optional fractional-second tail must not be what a rule keys
+    // on, or every version number in a message becomes a timestamp.
+    [InlineData("error: bundle 1.2.3 failed to parse", "error: bundle 1.2.4 failed to parse")]
+    // A calendar date with no time is not an instant. Nothing seen so far shows a date
+    // alone being volatile between legs, so it stays in the compared text.
+    [InlineData("error: certificate expired 2026-07-28", "error: certificate expired 2026-07-29")]
+    public void ConsoleKeepsApartTextThatOnlyLooksLikeAnInstant(string reference, string candidate)
+    {
+        new ConsoleComparator().Compare(ConsoleContext([reference], [candidate])).ToList().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ConsoleKeepsMessagesApartWhenOnlyTheHostDiffers()
+    {
+        // Only the port is volatile — the parity server binds a free one per run. Two
+        // hosts are two origins, and folding the whole authority would report parity
+        // between an asset that loaded and one that did not.
+        var context = ConsoleContext(
+            ["error: failed to load https://cdn-a.example.com/lib.js"],
+            ["error: failed to load https://cdn-b.example.com/lib.js"]);
+
+        new ConsoleComparator().Compare(context).ToList().Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void ConsoleKeepsMessagesApartWhenOnlyTheSchemeDiffers()
+    {
+        // A socket that fell back to long polling and one that did not are two results.
+        var context = ConsoleContext(
+            ["error: closed ws://127.0.0.1:5157/_blazor"],
+            ["error: closed http://127.0.0.1:5157/_blazor"]);
 
         new ConsoleComparator().Compare(context).ToList().Count.ShouldBe(2);
     }
@@ -434,9 +540,16 @@ public sealed class SemanticComparatorTests
     public void EachComparatorReadsOnlyItsOwnPartOfTheCapture()
     {
         // One file, one kind: a console difference must not also surface as a focus or an
-        // ARIA finding, or a waiver written for one silences the others.
-        var context = ConsoleContext([], ["error: boom"]);
+        // ARIA finding, or a waiver written for one silences the others. The snapshot and
+        // the focus path are non-empty and equal on both legs, so the two empty results
+        // are those comparators reading their own part and agreeing — not a context in
+        // which they had nothing to read at all.
+        var aria = Lines("- button \"Toggle\":", "  - text: Off");
+        var context = Context(
+            Capture(aria: aria, focus: Button),
+            Capture(aria: aria, focus: Button, console: ["error: boom"]));
 
+        new ConsoleComparator().Compare(context).ShouldHaveSingleItem();
         new AriaSnapshotComparator().Compare(context).ShouldBeEmpty();
         new FocusComparator().Compare(context).ShouldBeEmpty();
     }
