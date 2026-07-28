@@ -92,49 +92,102 @@ public static class NodeMatcher
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Three shapes are known to defeat this matcher, and every one of them ends with real
-    /// elements left unpaired or paired with the wrong counterpart. They are named here
-    /// rather than only in the task report because Tasks 8-10 read
-    /// <see cref="NodeMatchResult.Pairs"/> to diff computed styles and geometry, and a
-    /// consumer of that list has to know what it cannot assume.
+    /// The shapes below are known to defeat this matcher. They are named here rather than
+    /// only in the task report because Tasks 8-10 read <see cref="NodeMatchResult.Pairs"/>
+    /// to diff computed styles and geometry, and a consumer of that list has to know what
+    /// it cannot assume. The list deliberately carries no count: it grew at every review,
+    /// and a number that stops matching invites the next person to leave the text stale.
+    /// Across 27 probe trees no real difference produced zero findings — every shape here
+    /// still fails the run, just not always for the right reason.
+    /// </para>
+    /// <para>
+    /// Read this part even if you skip the rest. <see cref="NodeMatchResult.Pairs"/> can
+    /// hold a real element paired with a layout wrapper, or with the wrong same-key sibling.
+    /// In both cases the pair carries <see cref="NodePair.Relaxed"/> as
+    /// <see langword="false"/> and appears nowhere in <see cref="NodeMatchResult.Relaxed"/>:
+    /// those two members flag the deliberate tag degrade and nothing else, so nothing in the
+    /// result flags a mispairing. A pair is this matcher's best guess, not an assertion that
+    /// the two nodes are the same element.
     /// </para>
     /// <list type="number">
     /// <item>
-    /// <b>An identity difference on a node whose sibling paired.</b> Accepted. React
-    /// <c>&lt;div&gt;(&lt;button/&gt;, &lt;ul role=menu&gt;)</c> against Blazor
+    /// <b>A childless same-key sibling swallows a wrapper.</b> Loud but mislabelled. An
+    /// element carrying neither a role nor its own text keys as <c>tag||</c>, which is also
+    /// every layout wrapper's key. <see cref="StepUnblocks"/> is what normally unpicks that
+    /// collision: it asks <see cref="Wraps"/> whether the reference is corroborated by
+    /// something inside the wrapper, and <see cref="Wraps"/> requires
+    /// <see cref="Corroboration"/> above zero — which a reference with no children can never
+    /// reach. So the childless sibling takes the wrapper. React
+    /// <c>&lt;div&gt;(&lt;div data-popup&gt;&lt;p/&gt;, &lt;div data-arrow/&gt;)</c> against
+    /// the same tree with one extra wrapper around the popup and nothing else changed pairs
+    /// the arrow with the wrapper, and emits five Structure findings — two of them false
+    /// about both legs — plus a fabricated <c>data-arrow</c> Attribute finding. Give the
+    /// arrow a single child of its own and the same tree collapses to one correct finding,
+    /// so the trigger is precisely "the colliding sibling is childless" and not the wrapper.
+    /// <c>StillMispairsAWrapperAroundAnElementWithNoChildren</c> pins it.
+    /// </item>
+    /// <item>
+    /// <b>The corroboration tiebreak cross-pairs same-key siblings.</b> Loud but
+    /// mislabelled, and it needs no childless node anywhere. <see cref="Choose"/> maximises
+    /// <see cref="Corroboration"/> over the flat list of same-key candidates, and the wrapper
+    /// lookahead in <see cref="PairBy"/> is consulted only when the chosen candidate scores
+    /// exactly zero. A wrapper holds one child — the real element — so it corroborates the
+    /// reference at zero, and any sibling sharing even one child key with the reference
+    /// outscores it; the guard short-circuits and the lookahead never runs, even when the
+    /// node inside the wrapper is a perfect match. On a probe of one extra wrapper plus a
+    /// genuine sibling reorder this pairs <c>dlg&gt;body</c> with <c>dlg&gt;foot</c> and then
+    /// <c>dlg&gt;foot</c> with <c>dlg&gt;wrap&gt;body</c>, emitting four fabricated Attribute
+    /// findings and never reporting the reorder.
+    /// </item>
+    /// <item>
+    /// <b>What 1 and 2 cost: the wrapped subtree is reported one-sided on both legs.</b> The
+    /// real element and its descendants land in <see cref="NodeMatchResult.ReferenceOnly"/>
+    /// and the wrapped copy and its descendants in
+    /// <see cref="NodeMatchResult.CandidateOnly"/>, or the mirror. Nothing in
+    /// <see cref="NodeMatchResult.Pairs"/> covers them, so no Attribute, ComputedStyle, or
+    /// Geometry finding will ever name them: an ARIA attribute React renders and Blazor drops
+    /// inside that subtree produces no finding at all. Add <c>aria-labelledby</c> to the
+    /// popup of the probe in 1 and nothing is emitted for the dropped attribute, while the
+    /// one Attribute finding that is emitted points at an element that is fine. The run still
+    /// fails, on the Structure findings for the one-sided nodes, so this is a mislabelled
+    /// positive rather than a silent pass — which is the whole reason it is shippable. Never
+    /// read "no Attribute finding here" as "these attributes agree".
+    /// </item>
+    /// <item>
+    /// <b>An identity difference on a node whose sibling paired.</b> Accepted; loud but
+    /// coarse. React <c>&lt;div&gt;(&lt;button/&gt;, &lt;ul role=menu&gt;)</c> against Blazor
     /// <c>&lt;div&gt;(&lt;button/&gt;, &lt;ul role=listbox&gt;)</c> pairs the buttons, which
     /// makes <c>pairedHere</c> non-zero and so skips the tag degrade that would otherwise
     /// pair the two lists. Both <c>&lt;ul&gt;</c> nodes are reported one-sided and no
     /// Attribute finding names <c>role</c> — whether the subtree beneath them still pairs
     /// depends on whether the lockstep step happens to reach it. Removing the guard would
     /// turn the degrade into a general relaxation of the key, so this is a trade rather than
-    /// an oversight; it is nonetheless the commonest of the three, because a popup usually
-    /// has a sibling arrow or backdrop that pairs. <see cref="StructureComparator"/>
-    /// reconciles the two leftovers into one truthful finding naming both identities, but
-    /// there is still no pair, so nothing on the pair list covers those elements.
+    /// an oversight; it is nonetheless the commonest shape here, because a popup usually has
+    /// a sibling arrow or backdrop that pairs. <see cref="StructureComparator"/> reconciles
+    /// the two leftovers into one truthful finding naming both identities, but there is still
+    /// no pair, so nothing on the pair list covers those elements.
     /// </item>
     /// <item>
     /// <b>An extra wrapper on one leg <em>and</em> an identity difference beneath it at the
-    /// same level.</b> Accepted. React <c>&lt;div&gt;&lt;div role=dialog&gt;&lt;p/&gt;</c>
-    /// against Blazor <c>&lt;div&gt;&lt;span&gt;&lt;div&gt;&lt;p/&gt;</c>: the one-sided step
-    /// requires the key to match <em>after</em> stepping, so it declines, and the tag degrade
-    /// compares <c>&lt;div&gt;</c> against <c>&lt;span&gt;</c> and correctly declines too. The
-    /// lockstep step then separates the two popups for good. Closing it needs a search over
-    /// step-then-degrade combinations rather than one try of each, which is an algorithmic
-    /// extension and its own task.
+    /// same level.</b> Accepted; loud but mislabelled. React
+    /// <c>&lt;div&gt;&lt;div role=dialog&gt;&lt;p/&gt;</c> against Blazor
+    /// <c>&lt;div&gt;&lt;span&gt;&lt;div&gt;&lt;p/&gt;</c>: the one-sided step requires the
+    /// key to match <em>after</em> stepping, so it declines, and the tag degrade compares
+    /// <c>&lt;div&gt;</c> against <c>&lt;span&gt;</c> and correctly declines too. The lockstep
+    /// step then separates the two popups for good, so they and everything beneath them fall
+    /// under 3. Closing it needs a search over step-then-degrade combinations rather than one
+    /// try of each, which is an algorithmic extension and its own task.
     /// </item>
     /// <item>
-    /// <b>A wrapper around an element that has no children of its own.</b> A limit of the
-    /// tiebreak rather than of the pass order, and it needs no identity difference anywhere.
-    /// A wrapper's key is <c>tag||</c>, identical to any plain sibling of the same tag, so a
-    /// colliding wrapper is only unpicked when something inside it corroborates the reference
-    /// — which means sharing a child key (see <see cref="Corroboration"/>). Wrap an element
-    /// with no children and there is nothing to share, so React
-    /// <c>&lt;div&gt;(&lt;div data-body/&gt;, &lt;div data-footer/&gt;)</c> against Blazor
-    /// with a bare <c>&lt;div&gt;</c> around the empty body still pairs the body with the
-    /// wrapper, and the body's attributes are then diffed against the wrapper's. Only the
-    /// attributes tell those two apart, and attributes are outside the key on purpose,
-    /// because they are what <see cref="AttributeComparator"/> exists to diff.
+    /// <b><see cref="NodeMatchResult.Reorders"/> is recorded for the first pairing pass at a
+    /// level only.</b> The quiet one — this loses information rather than mislabelling it.
+    /// <see cref="RecordReorder"/> runs once per level, before any wrapper there has been
+    /// stepped through, because after a step the candidate indices count positions in a list
+    /// that exists in neither DOM and ordering read off them means nothing. That local
+    /// reasoning is sound; the consequence is that a genuine sibling reorder below any
+    /// stepped level is never reported. Such a level does carry a Structure finding for the
+    /// wrapper it stepped, so the run fails, but nothing in the output says the order
+    /// differs. Shape 2 above is a worked example.
     /// </item>
     /// </list>
     /// </remarks>
