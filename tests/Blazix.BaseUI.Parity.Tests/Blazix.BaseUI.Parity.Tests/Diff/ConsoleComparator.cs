@@ -113,6 +113,28 @@ public sealed partial class ConsoleComparator : IComparator
     /// within reach of either.
     /// </para>
     /// <para>
+    /// Restraint has a residual cost, and it is written here rather than left to be
+    /// rediscovered. Only the three tokens above have been observed varying in a captured
+    /// message, and only those three are folded; every other per-attempt-varying token
+    /// survives into the compared text. A query string does — the port rule stops at the
+    /// authority, so the circuit id in <c>ws://127.0.0.1:5157/_blazor?id=…</c> is compared,
+    /// and Blazor's circuit ids arrive exactly that way. A GUID does; no rule touches one.
+    /// Vite's <c>?t=</c> cache-busting parameter does, and it additionally puts a dev-server
+    /// stack frame out of the position rule's reach, because that rule needs the colons to
+    /// follow the dotted suffix immediately and <c>/src/App.jsx?t=111:12:34</c> interposes
+    /// the query.
+    /// </para>
+    /// <para>
+    /// Each survivor costs exactly what the instant used to cost: a Blazor-only message
+    /// carrying one differs between a leg's two retry attempts by construction, so the retry
+    /// demotes the finding to <see cref="Severity.Flaky"/>, which is reported and never
+    /// fails, and a waiver naming it cannot match a second time. The answer is not to widen
+    /// these rules against text nobody has captured — a rule guessed too wide folds two real
+    /// failures into one and passes silently, which is worse than the demotion it was meant
+    /// to avoid. The structural fix belongs in the retry and waiver policy (Task 11), not in
+    /// this regex.
+    /// </para>
+    /// <para>
     /// The level prefix the capturer writes survives, so an error on one leg and a warning
     /// with the same text on the other are two messages rather than one.
     /// </para>
@@ -136,6 +158,16 @@ public sealed partial class ConsoleComparator : IComparator
     /// <summary>
     /// Matches the port of a URL's authority, keeping the scheme and host that precede it.
     /// </summary>
+    /// <remarks>
+    /// The authority is matched lazily, so the rule anchors on the first colon-digits it can
+    /// reach, and an IPv6 literal mis-anchors it: <c>http://[::1]:5157/app.js:1:1</c>
+    /// normalizes to <c>http://[::&lt;port&gt;]:5157/app.js:&lt;pos&gt;</c>, folding the
+    /// <c>1</c> inside the address and leaving the volatile <c>5157</c> in the compared text.
+    /// Recorded rather than fixed, because it is unreachable here:
+    /// <c>Fixtures/ParityServerAssemblyFixture.cs</c> pins the parity origin to
+    /// <c>http://127.0.0.1:{port}</c>, so the one origin whose port is volatile is never
+    /// written as a bracketed address.
+    /// </remarks>
     [GeneratedRegex(@"([a-zA-Z][a-zA-Z0-9+.\-]*://[^/?#\s]*?):[0-9]+", RegexOptions.CultureInvariant)]
     private static partial Regex PortRegex();
 
@@ -144,6 +176,14 @@ public sealed partial class ConsoleComparator : IComparator
     /// precede it. In a stack frame that is the file extension; nothing checks that it
     /// names a real one, so <c>Module.render:10:20</c> is folded as well.
     /// </summary>
+    /// <remarks>
+    /// That over-fold is intended, not an oversight. Requiring a path segment ahead of the
+    /// dot would leave the volatile position in <c>main.js:12:34</c> in the compared text,
+    /// and a bare bundle name is how a stack frame usually arrives — a real under-fold traded
+    /// away for a harmless over-fold on a member name. The dotted suffix must also sit
+    /// immediately before the colons, which is what puts a Vite dev URL such as
+    /// <c>/src/App.jsx?t=111:12:34</c> out of reach.
+    /// </remarks>
     [GeneratedRegex(@"(\.[a-zA-Z][a-zA-Z0-9]{0,7}):[0-9]+:[0-9]+", RegexOptions.CultureInvariant)]
     private static partial Regex PositionRegex();
 }
