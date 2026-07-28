@@ -145,14 +145,19 @@ What actually worked, and should be kept doing:
     the same property name, so the leg reads `Satisfied`; and where both legs unmount mid-run
     but only one completed an earlier run, the output states that leg **satisfied two
     obligations it demonstrably broke** — `present-at-transitionend` via the `finished` set and
-    `removed-after-transitionend` via `lastTerminal` — sending a reader to the wrong leg. L1
-    fires in every such case — `TimelineSequence.Normalize` drops and collapses no
-    run/`added`/`removed` event, so legs whose **timelines** differ cannot have equal
-    signatures — which makes this a **mislabelled positive, not a silent pass**, the same
-    standing `Pairs` was given in item 5. (Equal signatures leave one way for the derived states
-    still to differ, and it is not a timeline difference: `AttributeRemoval` also reads the
-    step's final snapshot, which `Normalize` never sees, and a difference in that snapshot is
-    what the structure comparator reports.) Accepted
+    `removed-after-transitionend` via `lastTerminal` — sending a reader to the wrong leg. A run,
+    an insertion or a removal that one leg recorded and the other did not always reaches L1 —
+    what `TimelineSequence.Normalize` never drops or collapses is a run/`added`/`removed` event,
+    not the timeline, which it also strips of untracked attribute mutations, of a consecutive
+    duplicate attribute signature and of every `from` but a removal's — which makes this a
+    **mislabelled positive, not a silent pass**, the same standing `Pairs` was given in item 5.
+    (Equal signatures leave **two** ways for the derived states still to differ: the step's final
+    snapshot, which `AttributeRemoval` reads and `Normalize` never sees, and an attribute
+    mutation's `from`, which `data-open-flipped-before-starting-style-cleared` reads and
+    `Normalize` drops. The second is closed to the two invariants above — neither reads a `from`
+    but a removal's, which the signature does carry — so for them the snapshot is the whole of
+    the enumeration, and a difference in that snapshot is what the structure comparator
+    reports.) Accepted
     deliberately at Task 9's close rather than fixed; making L2 run-aware is a rewrite of
     `Evaluate`. **Task 11 must not let a waiver keyed on an L2 invariant name imply the
     invariant was measured on the run that broke it, and reporting should prefer L1's diff to
@@ -175,6 +180,15 @@ What actually worked, and should be kept doing:
     **Whoever next touches `capture.js` should add `animation-iteration-count` to `STYLE_PROPS`
     and teach `Duration` to multiply**, at which point this residual closes; the `stopTimeline()`
     leak already has that file open. Written up on `TimelineComparator.Duration`'s `<remarks>`.
+
+    **A second route to the same signature, rarer, same mitigation:** `animation-delay` is not in
+    `STYLE_PROPS` either. A **negative** `animation-delay` starts the animation already part way
+    through, so `animationstart` fires at once and the measured span is the declared duration
+    less the delay; `Overruns` compares an absolute distance, so that reads as a symmetric
+    **under**run `Error` on byte-identical legs. **Not introduced by any recent change, so there
+    is no regression to hunt for** — `transition-delay` *is* captured but is never read, so a
+    negative one has always done the same to a transition run. Add `animation-delay` to
+    `STYLE_PROPS` and subtract a negative delay in the same pass as the iteration count.
 
 ## Invalidations
 

@@ -60,13 +60,20 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// the first run's end carried the same property name, and as removed after one, because that
 /// same earlier end is the last terminal the removal is ordered against — which points a
 /// reader at the wrong leg when the other leg broke them too. This is a mislabelled positive
-/// and never a silent pass: <see cref="TimelineSequence.Normalize"/> neither drops nor
-/// collapses a run, <c>added</c> or <c>removed</c> event, so two legs whose <em>timelines</em>
-/// differ cannot have equal signatures, and L1 therefore fires on every step where this
-/// misreports. Equal signatures leave exactly one way for the derived states still to differ,
-/// and it is not a timeline difference: <see cref="AttributeRemoval"/> also reads the snapshot
-/// the step ended on, which <c>Normalize</c> never sees — and a difference in that snapshot is
-/// what the structure comparator reports. The difference is always reported; only the name put
+/// and never a silent pass. What <see cref="TimelineSequence.Normalize"/> never drops or
+/// collapses is a run, <c>added</c> or <c>removed</c> event — not the timeline, which it also
+/// strips of untracked attribute mutations, of a consecutive duplicate attribute signature and
+/// of every <c>from</c> but a removal's — so a run, an insertion or a removal that one leg
+/// recorded and the other did not always reaches L1. Equal signatures leave two ways for the
+/// derived states still to differ: the snapshot the step ended on, which
+/// <see cref="AttributeRemoval"/> reads and <c>Normalize</c> never sees; and the <c>from</c> of
+/// an attribute mutation, which <c>data-open-flipped-before-starting-style-cleared</c> reads to
+/// tell a write that changed something from one that did not, and which <c>Normalize</c> drops.
+/// The second is closed to the two invariants this paragraph is about:
+/// <c>present-at-transitionend</c> and <c>removed-after-transitionend</c> read no <c>from</c>
+/// but a removal's, which a signature does carry, so for them the snapshot is the whole of the
+/// enumeration — and a difference in that snapshot is what the structure comparator reports.
+/// The difference is always reported, by L1 or by the structure comparator; only the name put
 /// on it can be wrong. Read an L2 result as reliable only on a step with a single run per
 /// path, and prefer L1's diff to L2's naming where both fire.
 /// </para>
@@ -795,6 +802,16 @@ public sealed class TimelineComparator : IComparator
     /// count cannot be read and one iteration is assumed — which is what a component's enter
     /// and exit animation is. The endlessly repeating kind, a spinner, never reaches
     /// <c>animationend</c>, so it closes no run and is never measured here at all.
+    /// </para>
+    /// <para>
+    /// A second, rarer route to that same signature, with the same mitigation:
+    /// <c>animation-delay</c> is not in the allowlist either. A <em>negative</em> delay starts a
+    /// keyframe animation already part way through, so <c>animationstart</c> fires at once and
+    /// the run spans the declared duration less the delay — which <see cref="Overruns"/>,
+    /// comparing an absolute distance, reports as a symmetric <em>under</em>run on two
+    /// byte-identical legs. No recent change introduced this and there is no regression to hunt
+    /// for: <c>transition-delay</c> <em>is</em> captured but is never read here, so a negative
+    /// one has always done the same to a transition run.
     /// </para>
     /// </remarks>
     /// <param name="declared">The declaration.</param>
