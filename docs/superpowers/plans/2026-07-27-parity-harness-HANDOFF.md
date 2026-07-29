@@ -85,27 +85,40 @@ What actually worked, and should be kept doing:
    its own `FindingKind` or reuses `SelectorUnresolved` with a distinct message is a question
    for the human.
 
-2. **`markers.json` reachability — needs the human, blocks Task 11.**
-   `shared/capture.js:109-110` rewrites every `data-blazix-base-ui-*` attribute to
-   `data-base-ui-*` *before capture*, so **12 of the 15 committed `markers.json` entries can
-   never reach `MarkerComparator`** — only the 3 `data-blazix-otp-*` entries survive. The 12
-   will instead surface as generic `AttributeComparator` **errors** needing waivers, rather
-   than the `Severity.Info` classification their written justifications exist to provide.
-   Worse, `MarkerComparator`'s own doc tells a reader that a surviving prefix means "no
-   upstream counterpart", which the manifest contradicts. Three options:
-   (i) key `blazorOnly` on the normalized `data-base-ui-*` spelling and classify normalized
-   names with no upstream counterpart; (ii) narrow `capture.js`'s rewrite to names that have
-   an upstream counterpart; (iii) cut `markers.json` to the 3 reachable entries and move the
-   12 to the waiver file. **Recommendation: (i)** — it keeps normalization doing its real job
-   (making the 8 genuinely-equivalent markers compare equal) while making classification
-   reachable. Resolve before Task 11.
+2. ~~**`markers.json` reachability**~~ **SETTLED 2026-07-29 — option (i) implemented**
+   (`9ad2f926`, seam closed in `1ea7f679`). `manifest/markers.json` is now keyed on the
+   **post-normalization** spelling: 12 `data-base-ui-*` entries plus the 3 `data-blazix-otp-*`
+   ones normalization never touches. `MarkerComparator` classifies a candidate attribute that
+   is either listed (→ `Info` with its reason) or `data-blazix-`-prefixed and unlisted
+   (→ `Error`). An unlisted `data-base-ui-*` name is deliberately *not* claimed — it falls to
+   `AttributeComparator` as a one-sided finding, which is right, because a Blazor-only
+   attribute wearing an upstream name is a parity defect rather than a marker.
 
-3. **Task 7 epsilon deviation — reversible, flag if unintended.** The brief's Step 3 mandates
-   one flat epsilon on every numeric run. That was changed to tolerance **only on
-   length-carrying runs** (`px`, `%`, and `matrix()`/`matrix3d()` translation arguments),
-   exact equality otherwise, because the flat rule silently reported `opacity: 1` equal to
-   `0.6`. Basis: the plan's own prescribed commit message says the tolerance exists so
-   "sub-pixel layout noise is absorbed **without weakening colour or keyword equality**".
+   **The partition this rests on was verified independently and is exactly true:** `src/`
+   renders 20 distinct `data-blazix-base-ui-*` names, `.base-ui` renders 11 distinct
+   `data-base-ui-*` names, and the 12 listed entries are precisely the Blazix names with no
+   upstream counterpart while the 8 unlisted are precisely those that have one. That is what
+   lets the comparator classify without consulting the React leg — and therefore without
+   taking a `NodeMatcher` dependency and its untrustworthy-`Pairs` caveat.
+
+   **Known residual:** a listed name that the React leg also carries produces a `Marker/Info`
+   beside the `Attribute` finding, and the `Info`'s text ("Blazor-only marker…") is wrong for
+   that case. Unreachable at today's upstream. The clean fix needs `MarkerComparator` to read
+   the reference leg, i.e. the `NodeMatcher` dependency deliberately declined. Revisit only if
+   upstream ever adopts one of the 12 names — `data-base-ui-focus-guard` sits one word from
+   the listed `data-base-ui-focus-guard-type`.
+
+3. ~~**Task 7 epsilon deviation**~~ **SETTLED 2026-07-29 — the length-scoped rule stands**
+   (rationale corrected in `ebb704a8`/`1ea7f679`; no behaviour change). Tolerance applies only
+   to length-carrying runs (`px`, `%`, and `matrix()`/`matrix3d()` translation arguments);
+   everything else requires exact equality. The brief's flat epsilon reported `opacity: 1`
+   equal to `0.6` and `animation-duration: 0s` equal to `0.5s`, while the plan's own prescribed
+   commit message says the tolerance exists so "sub-pixel layout noise is absorbed **without
+   weakening colour or keyword equality**" — the mandated mechanism defeated the mandated
+   purpose. Note the tolerance is half a *unit*, not half a pixel, so a percentage gets half a
+   percent (~1.5px on a 300px `--transform-origin`); `background-image` gradient stops and
+   `flex-basis` were both read back from headless Chromium as retaining authored percentages
+   in the computed value, while `grid-template-columns` resolves to px and does not.
 
 4. **Round-trip settle gap (unsolved, deliberately unmasked).** Click → Blazor render batch is
    not synchronised. No `Task.Delay` was added to hide it. Proposed fix: a render-generation
