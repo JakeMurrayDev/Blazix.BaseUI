@@ -28,6 +28,13 @@ public sealed class ComputedStyleComparator : IComparator
     /// <c>opacity</c>, a <c>transition-duration</c>, a <c>line-height</c>, a
     /// <c>z-index</c>, a colour channel, the scale in a <c>transform</c> — are compared
     /// exactly and are not weakened by it.
+    /// A percentage counts as a length, and the epsilon is spent as half a <em>unit</em>,
+    /// so a percentage gets half a percent rather than half a pixel — about a pixel and a
+    /// half of a 300px box. This allowlist carries percentages the layout never measured:
+    /// the colour stops of a <c>background-image</c> gradient, and the percentage a
+    /// <c>flex-basis</c> keeps into its computed value. Both are authored, read from the
+    /// same stylesheet by both legs, so they have nothing to differ by and the slack
+    /// absorbs nothing that was ever going to be reported.
     /// Kept private rather than shared: the custom property comparator's tolerance is the
     /// same number today for its own reasons, and a shared constant would tie the two.
     /// </summary>

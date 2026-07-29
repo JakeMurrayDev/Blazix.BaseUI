@@ -1,8 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Blazix.BaseUI.Parity.Tests.Infrastructure;
 
-namespace Blazix.BaseUI.Parity.Tests.Diff;
+namespace Blazix.BaseUI.Parity.Tests.Infrastructure;
 
 /// <summary>
 /// Reads <c>manifest/markers.json</c>, the list of marker attributes Blazix renders that
@@ -10,9 +9,13 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </summary>
 /// <remarks>
 /// A neutral home rather than a member of either comparator that reads it.
-/// <see cref="MarkerComparator"/> classifies a listed name and
-/// <see cref="AttributeComparator"/> skips one, and neither may depend on the other:
-/// a comparator has to be reviewable, testable, and rejectable on its own.
+/// <see cref="Diff.MarkerComparator"/> classifies a listed name and
+/// <see cref="Diff.AttributeComparator"/> cedes one the candidate alone carries, and
+/// neither may depend on the other:
+/// a comparator has to be reviewable, testable, and rejectable on its own. It sits here
+/// rather than beside them for the same reason <see cref="FixtureManifest"/> and
+/// <see cref="AliasTable"/> do — it is a manifest reader, and reading a manifest is not
+/// a comparison.
 /// </remarks>
 public static class MarkerCatalog
 {

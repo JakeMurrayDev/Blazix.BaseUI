@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Parity.Tests.Capture;
+using Blazix.BaseUI.Parity.Tests.Infrastructure;
 
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
@@ -26,6 +27,16 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// distinguishes it from an attribute Blazix renders and React does not, and that is a
 /// parity defect rather than a marker, so it falls through to
 /// <see cref="AttributeComparator"/> and is reported one-sided.
+/// </para>
+/// <para>
+/// That bounds the advice the unclassified message gives, and the bound is worth stating.
+/// <c>capture.js</c> renames the <c>data-blazix-base-ui-</c> family only, so a marker newly
+/// invented in that family arrives here unlisted and upstream-spelled, is not claimed, and
+/// fails the run as a plain attribute error — never as the unclassified marker whose
+/// message asks for a manifest entry. What keying on the normalized spelling bought is that
+/// adding that name to <c>manifest/markers.json</c> now classifies it; the message itself is
+/// only ever printed for a name normalization left alone, which today is the
+/// <c>data-blazix-otp-</c> family.
 /// </para>
 /// </remarks>
 public sealed class MarkerComparator : IComparator

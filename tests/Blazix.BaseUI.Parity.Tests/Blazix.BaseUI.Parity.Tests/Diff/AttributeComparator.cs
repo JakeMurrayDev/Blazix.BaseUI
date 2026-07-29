@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Parity.Tests.Capture;
+using Blazix.BaseUI.Parity.Tests.Infrastructure;
 
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
@@ -32,7 +33,24 @@ public sealed class AttributeComparator : IComparator
                 // every marker that carries it, so the prefix alone no longer identifies
                 // the set: a listed name is skipped whatever it is spelled. An unlisted
                 // upstream-spelled name is nobody's marker and is reported here.
-                .Where(name => !markers.ContainsKey(name)
+                //
+                // A listed name the reference leg also carries is not ceded, because
+                // MarkerComparator walks the candidate alone and would never claim it.
+                // Without the second clause a listed name React renders produces no
+                // finding at all when Blazor drops it, and when both legs carry it with
+                // different values the difference is replaced by an Info reading
+                // "Blazor-only marker" about an attribute React demonstrably rendered.
+                // The listed names share a namespace upstream actively occupies, so the
+                // collision is a rename away even though nothing upstream renders one
+                // today, and the failure mode on drift is silent and inverted.
+                //
+                // The residual: a both-legs listed name now yields a Marker/Info beside
+                // this Attribute finding, and the Info's text is wrong for that case. The
+                // clean version needs MarkerComparator to consult the reference leg, which
+                // is the NodeMatcher dependency it was deliberately built without — a
+                // comparator has to be reviewable and rejectable on its own.
+                .Where(name => (!markers.ContainsKey(name)
+                        || pair.Reference.Attributes.ContainsKey(name))
                     && !name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal);

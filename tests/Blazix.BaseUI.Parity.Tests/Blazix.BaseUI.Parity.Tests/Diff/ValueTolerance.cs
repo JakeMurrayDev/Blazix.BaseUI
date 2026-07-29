@@ -38,14 +38,16 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// measured offset of the selected item — but the rule cannot tell that percentage from an
 /// authored one, and does not try: every <c>%</c> run gets the same half a unit, whichever
 /// property it came from and whoever wrote it — a gradient colour stop that reaches the
-/// capture through <c>background-image</c>, or a percentage that survives into a computed
-/// <c>flex-basis</c> or <c>grid-template-columns</c> track, as much as
-/// <c>--transform-origin</c>. That is wider than the noise it exists to absorb, and it is
-/// accepted for two reasons. An authored percentage is read from the same stylesheet by both
-/// legs, so it has nothing to differ by and the slack absorbs nothing that was ever going to
-/// be reported. And the slack is small in the unit it is spent in: half a percent of a 300px
-/// box is a pixel and a half, which is the same order as the <c>px</c> epsilon it sits
-/// beside rather than a difference a reader would want reported.
+/// capture through <c>background-image</c>, or the percentage a <c>flex-basis</c> keeps
+/// into its computed value, as much as <c>--transform-origin</c>. Both of those were read
+/// back from the engine rather than assumed; a laid-out <c>grid-template-columns</c> was
+/// too, and resolves to pixel tracks, so it is not one of these. That is wider than the
+/// noise it exists to absorb, and it is accepted for two reasons. An authored percentage is
+/// read from the same stylesheet by both legs, so it has nothing to differ by and the slack
+/// absorbs nothing that was ever going to be reported. And the slack is small in the unit it
+/// is spent in: half a percent of a 300px box is a pixel and a half, which is the same order
+/// as the <c>px</c> epsilon it sits beside rather than a difference a reader would want
+/// reported.
 /// </para>
 /// <para>
 /// <c>rem</c> and <c>em</c> are deliberately not lengths for this purpose, and neither is

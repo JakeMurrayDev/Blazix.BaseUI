@@ -412,6 +412,12 @@ public sealed class StructuralComparatorTests
         // React renders no data-base-ui-positioner, so the name is one-sided and
         // AttributeComparator would otherwise report it too — an unexplained Error beside
         // the Info that explains it, for one attribute.
+        //
+        // This holds for the right reason only in company: if NodeMatcher stopped pairing
+        // the two <span>s, AttributeComparator would return empty and the single Info
+        // below would still be found. AttributeReportsAnUnlistedUpstreamName builds the
+        // identical shape and requires an Attribute finding from it, which is what proves
+        // the pair forms. Edit either and check the other.
         var context = Context(
             Node("div", Node("span")),
             Node("div", Attributed("span", ("data-base-ui-positioner", ""))));
@@ -442,7 +448,9 @@ public sealed class StructuralComparatorTests
     public void AttributeReportsAnUnlistedUpstreamName()
     {
         // The other half: leaving it to AttributeComparator is only correct if
-        // AttributeComparator actually reports it.
+        // AttributeComparator actually reports it. It is also the pairing control for
+        // ListedMarkerIsReportedOnceAcrossBothComparators, which shares this shape and
+        // cannot tell an absent finding from an absent pair on its own.
         var context = Context(
             Node("div", Node("span")),
             Node("div", Attributed("span", ("data-base-ui-inert", ""))));
@@ -454,6 +462,46 @@ public sealed class StructuralComparatorTests
         finding.Property.ShouldBe("data-base-ui-inert");
         finding.ReferenceValue.ShouldBeNull();
         finding.CandidateValue.ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public void AttributeReportsAListedNameOnlyReactRenders()
+    {
+        // MarkerComparator walks the candidate alone, so a listed name React renders and
+        // Blazor does not is never claimed there. Skipping it here as well drops the
+        // difference from the run entirely — no finding of any kind, which is the one
+        // outcome a drift harness must never produce.
+        var context = Context(
+            Node("div", Attributed("span", ("data-base-ui-positioner", ""))),
+            Node("div", Node("span")));
+
+        var finding = new AttributeComparator().Compare(context).Single();
+
+        finding.Kind.ShouldBe(FindingKind.Attribute);
+        finding.Severity.ShouldBe(Severity.Error);
+        finding.Property.ShouldBe("data-base-ui-positioner");
+        finding.ReferenceValue.ShouldBe(string.Empty);
+        finding.CandidateValue.ShouldBeNull();
+    }
+
+    [Fact]
+    public void AttributeReportsAListedNameBothLegsRenderWithDifferingValues()
+    {
+        // Skipping the name unconditionally left only MarkerComparator's Info, which says
+        // "Blazor-only marker ... React passes it in props" about an attribute React
+        // demonstrably rendered, and carries the candidate's value alone. The difference
+        // vanished and the surviving finding asserted the opposite of what happened.
+        var context = Context(
+            Node("div", Attributed("span", ("data-base-ui-label", "React label"))),
+            Node("div", Attributed("span", ("data-base-ui-label", "Blazor label"))));
+
+        var finding = new AttributeComparator().Compare(context).Single();
+
+        finding.Kind.ShouldBe(FindingKind.Attribute);
+        finding.Severity.ShouldBe(Severity.Error);
+        finding.Property.ShouldBe("data-base-ui-label");
+        finding.ReferenceValue.ShouldBe("React label");
+        finding.CandidateValue.ShouldBe("Blazor label");
     }
 
     [Fact]
