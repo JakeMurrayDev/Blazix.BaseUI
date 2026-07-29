@@ -24,10 +24,14 @@ public sealed class CustomPropertyComparator : IComparator
     /// Half a pixel. The lengths a positioner publishes — <c>--anchor-width</c>,
     /// <c>--available-height</c>, the <c>--positioner-*</c> family — carry the same
     /// sub-pixel layout noise as the computed lengths they are derived from, and so does
-    /// the percentage in <c>--transform-origin</c>. It reaches those and nothing else:
-    /// <see cref="ValueTolerance"/> compares every run that does not carry a length
-    /// exactly, including the <c>rem</c> values a demo's own stylesheet declares, where
-    /// half a unit would be eight pixels.
+    /// the percentage in <c>--transform-origin</c>. It is spent as half a <em>unit</em>,
+    /// so a percentage gets half a percent rather than half a pixel — about a pixel and a
+    /// half of a 300px box — and it is spent on every percentage
+    /// <see cref="ValueTolerance"/> finds, an authored one as much as a measured one. That
+    /// costs nothing in practice: an authored value is read from the same stylesheet by
+    /// both legs and has nothing to differ by. What the epsilon does not reach is every run
+    /// carrying no length at all, which is compared exactly — including the <c>rem</c>
+    /// values a demo's own stylesheet declares, where half a unit would be eight pixels.
     /// </summary>
     private const double Epsilon = 0.5;
 
