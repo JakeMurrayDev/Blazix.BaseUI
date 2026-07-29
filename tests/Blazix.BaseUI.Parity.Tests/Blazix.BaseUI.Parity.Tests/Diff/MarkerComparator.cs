@@ -1,28 +1,36 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Blazix.BaseUI.Parity.Tests.Capture;
-using Blazix.BaseUI.Parity.Tests.Infrastructure;
 
 namespace Blazix.BaseUI.Parity.Tests.Diff;
 
 /// <summary>
-/// Classifies the Blazix marker attributes that survive capture normalization.
+/// Classifies the marker attributes Blazix renders that base-ui has no counterpart for.
 /// </summary>
 /// <remarks>
-/// <c>capture.js</c> renames every <c>data-blazix-base-ui-*</c> attribute to its
-/// upstream <c>data-base-ui-*</c> spelling, so a name still carrying the Blazix prefix
-/// is one base-ui has no counterpart for. Each such name has to be listed in
-/// <c>manifest/markers.json</c> with a reason; an unlisted one fails the run rather
-/// than being quietly tolerated.
+/// <para>
+/// <c>capture.js</c> renames every <c>data-blazix-base-ui-*</c> attribute to its upstream
+/// <c>data-base-ui-*</c> spelling before the snapshot is written, so most Blazix markers
+/// reach this comparator already wearing an upstream name and the Blazix prefix is not what
+/// identifies them. <c>manifest/markers.json</c> is therefore keyed on the spelling a
+/// capture holds, not the one the Razor source writes.
+/// </para>
+/// <para>
+/// Two families are classified here. A name listed in the manifest is reported
+/// <see cref="Severity.Info"/> carrying its written reason — listing it is the assertion
+/// that base-ui has no counterpart for it, which is what makes a Blazix-invented name safe
+/// to key on its normalized spelling. A name still carrying the <c>data-blazix-</c> prefix
+/// and not listed is unclassified: normalization left it alone, so no upstream name is
+/// even in play, and it fails the run rather than being quietly tolerated.
+/// </para>
+/// <para>
+/// An unlisted name wearing an upstream spelling is not claimed here at all. Nothing here
+/// distinguishes it from an attribute Blazix renders and React does not, and that is a
+/// parity defect rather than a marker, so it falls through to
+/// <see cref="AttributeComparator"/> and is reported one-sided.
+/// </para>
 /// </remarks>
 public sealed class MarkerComparator : IComparator
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    private static readonly IReadOnlyDictionary<string, string> BlazorOnly = LoadBlazorOnly();
+    private readonly IReadOnlyDictionary<string, string> blazorOnly = MarkerCatalog.Load();
 
     /// <inheritdoc />
     public FindingKind Kind => FindingKind.Marker;
@@ -39,12 +47,13 @@ public sealed class MarkerComparator : IComparator
         foreach (var node in nodes)
         {
             var markers = node.Attributes.Keys
-                .Where(name => name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
+                .Where(name => blazorOnly.ContainsKey(name)
+                    || name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
                 .OrderBy(name => name, StringComparer.Ordinal);
 
             foreach (var name in markers)
             {
-                var listed = BlazorOnly.TryGetValue(name, out var reason);
+                var listed = blazorOnly.TryGetValue(name, out var reason);
 
                 yield return new Finding
                 {
@@ -64,18 +73,5 @@ public sealed class MarkerComparator : IComparator
                 };
             }
         }
-    }
-
-    private static IReadOnlyDictionary<string, string> LoadBlazorOnly()
-    {
-        var path = Path.Combine(ParityPaths.Manifest, "markers.json");
-        var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<MarkerManifest>(json, SerializerOptions)!.BlazorOnly;
-    }
-
-    private sealed record MarkerManifest
-    {
-        [JsonPropertyName("blazorOnly")]
-        public Dictionary<string, string> BlazorOnly { get; init; } = [];
     }
 }

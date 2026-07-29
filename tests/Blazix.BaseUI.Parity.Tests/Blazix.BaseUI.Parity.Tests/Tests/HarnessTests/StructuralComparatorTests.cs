@@ -388,15 +388,72 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
-    public void MarkerIgnoresNormalizedAndUnmarkedAttributes()
+    public void MarkerReportsAListedNormalizedMarkerAsInfo()
     {
-        // capture.js already rewrites data-blazix-base-ui-* to its upstream spelling,
-        // so only markers with no upstream counterpart reach this comparator.
+        // The shape capture.js actually delivers: Blazix renders
+        // data-blazix-base-ui-positioner and the capture renames it before the comparator
+        // ever sees it. Keying markers.json on the Blazix spelling made every entry of this
+        // family unreachable, so the classification the manifest was written for never ran.
         var context = Context(
-            Node("div"),
+            Node("div", Node("span")),
+            Node("div", Attributed("span", ("data-base-ui-positioner", ""))));
+
+        var finding = new MarkerComparator().Compare(context).Single();
+
+        finding.Kind.ShouldBe(FindingKind.Marker);
+        finding.Severity.ShouldBe(Severity.Info);
+        finding.Property.ShouldBe("data-base-ui-positioner");
+        finding.Message.ShouldContain("Positioner element lookup for the JS floating module.");
+    }
+
+    [Fact]
+    public void ListedMarkerIsReportedOnceAcrossBothComparators()
+    {
+        // React renders no data-base-ui-positioner, so the name is one-sided and
+        // AttributeComparator would otherwise report it too — an unexplained Error beside
+        // the Info that explains it, for one attribute.
+        var context = Context(
+            Node("div", Node("span")),
+            Node("div", Attributed("span", ("data-base-ui-positioner", ""))));
+
+        var findings = new MarkerComparator().Compare(context)
+            .Concat(new AttributeComparator().Compare(context))
+            .ToList();
+
+        var finding = findings.ShouldHaveSingleItem();
+        finding.Kind.ShouldBe(FindingKind.Marker);
+        finding.Severity.ShouldBe(Severity.Info);
+    }
+
+    [Fact]
+    public void MarkerLeavesAnUnlistedUpstreamNameAlone()
+    {
+        // Nothing tells this comparator that an unlisted data-base-ui-* name is a marker
+        // rather than an attribute Blazor renders and React does not, and the second is a
+        // parity defect. Claiming it here would classify a defect as an intentional marker.
+        var context = Context(
+            Node("div", Node("span")),
             Node("div", Attributed("span", ("data-base-ui-inert", ""), ("aria-hidden", "true"))));
 
         new MarkerComparator().Compare(context).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AttributeReportsAnUnlistedUpstreamName()
+    {
+        // The other half: leaving it to AttributeComparator is only correct if
+        // AttributeComparator actually reports it.
+        var context = Context(
+            Node("div", Node("span")),
+            Node("div", Attributed("span", ("data-base-ui-inert", ""))));
+
+        var finding = new AttributeComparator().Compare(context).Single();
+
+        finding.Kind.ShouldBe(FindingKind.Attribute);
+        finding.Severity.ShouldBe(Severity.Error);
+        finding.Property.ShouldBe("data-base-ui-inert");
+        finding.ReferenceValue.ShouldBeNull();
+        finding.CandidateValue.ShouldBe(string.Empty);
     }
 
     [Fact]

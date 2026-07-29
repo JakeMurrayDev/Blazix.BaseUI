@@ -11,6 +11,8 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </remarks>
 public sealed class AttributeComparator : IComparator
 {
+    private readonly IReadOnlyDictionary<string, string> markers = MarkerCatalog.Load();
+
     /// <inheritdoc />
     public FindingKind Kind => FindingKind.Attribute;
 
@@ -26,8 +28,12 @@ public sealed class AttributeComparator : IComparator
                 // Blazix markers belong to MarkerComparator, which classifies them
                 // against manifest/markers.json. Reporting them here as well would both
                 // duplicate every marker and override an Info classification with an
-                // unexplained error.
-                .Where(name => !name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
+                // unexplained error. Capture normalization strips the Blazix prefix from
+                // every marker that carries it, so the prefix alone no longer identifies
+                // the set: a listed name is skipped whatever it is spelled. An unlisted
+                // upstream-spelled name is nobody's marker and is reported here.
+                .Where(name => !markers.ContainsKey(name)
+                    && !name.StartsWith(CaptureNames.MarkerPrefix, StringComparison.Ordinal))
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal);
 
