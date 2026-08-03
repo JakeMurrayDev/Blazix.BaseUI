@@ -1,0 +1,267 @@
+# React-Specificity Classification Rubric — DRAFT
+
+> **Status: DRAFT — pending ratification (grilling ticket #150).**
+> Produced for wayfinder research ticket #148. Nothing in this document is
+> binding until it survives the ratification grilling. Mined exclusively from
+> this repository's audit precedent: `docs/audits/drawer-upstream-delta-2026-07.md`
+> (PR #130), `docs/audits/menu-functional-audit.md` (PR #124),
+> `docs/audits/popover-functional-audit.md` (PR #122),
+> `docs/audits/dialog-functional-audit.md` (PR #123), the context-menu repair
+> (PR #125), and the PR #130 inline review discussion. Upstream commits are
+> cited as recorded (and re-verified) in those audits against the vendored
+> `.base-ui` clone.
+
+## Purpose
+
+Every upstream-delta audit walks a window of Base UI (React) commits and must
+disposition each one. Past audits converged on four dispositions — the drawer
+delta names them **PORTED / ALREADY-PRESENT / VERIFIED-N/A** (with PORTED
+splitting by destination layer). This rubric makes the implicit decision
+procedure explicit so future audits classify consistently and record the same
+evidence.
+
+The four classes:
+
+| Class | Audit-doc vocabulary | Meaning |
+| --- | --- | --- |
+| **(a) Skip — React-specific** | VERIFIED-N/A, "React module mechanics", "React store mechanics", TEST/CLEANUP/DX | The change exists only to serve React's runtime/tooling; the observable contract is unchanged, and the Blazor-native equivalent is identified. |
+| **(b) Transfer to C#/Razor** | PORTED / Repaired (component files) | Structural DOM output, ARIA attributes, roving tabindex values, component parameters, event args, context wiring — behavior that lives in `.razor`/`.cs`. |
+| **(c) Transfer to JS module** | PORTED / Repaired (`wwwroot/*.js` + regenerated `.min.js`) | Behavior living in the ported JS layer: positioning, focus management, observers, gestures/high-frequency events, typeahead visibility, dismissal listeners. |
+| **(d) No-op — already fixed / architecturally moot** | ALREADY-PRESENT, "Present (inherited)", "Architecturally moot", "Accounted for" | The behavior is already correct locally (often inherited from a prior audit's shared-module port), or the local architecture cannot reproduce the defect the fix repairs. |
+
+---
+
+## The Draft Rubric — ordered decision questions
+
+Apply the questions in order to each upstream commit (or, per Q6, to each
+independent hunk of a commit).
+
+### Q1. Does the change alter any observable contract?
+
+Observable contract = DOM structure, attributes/ARIA, data-attributes, CSS
+variables, focus order/visibility, keyboard/pointer behavior, timing constants,
+animation/transition semantics, or the public API surface.
+
+- **No** — typings/JSDoc text, test-only changes, lint conformance, bundle
+  restructures, dead-code removal, internal refactors whose output is verified
+  identical → **(a) Skip**. *Precedent requires verification, not assumption*:
+  the drawer delta marked `43d11ebcf` (#5233, popup bundle-size restructure)
+  VERIFIED-N/A only after "prop wiring verified identical", and out-of-path
+  commits were dispositioned "with per-commit justification retained".
+- **Yes, or unclear** → continue.
+
+### Q2. Is the *mechanism* React-internal? Then restate the fix as its user-observable symptom.
+
+React-internal mechanisms: store ownership, ref lifecycles, re-render
+suppression/dedup, hook ordering, synthetic-event quirks, kept-mounted effect
+guards, `useEffect` cleanup races.
+
+Do **not** classify on the mechanism. Restate the commit as the symptom it
+fixes ("closed kept-mounted menu retains `tabindex=0` on a stale item") and ask
+whether the Blazor port shares the state shape that produces that symptom:
+
+- **Symptom cannot arise locally** (no equivalent stale state, no equivalent
+  code path) → **(d) Architecturally moot** — but the determination must cite
+  the exact local mechanism inspected (see Evidence bar below).
+- **Symptom can arise locally** → the "React fix" has a structural root cause
+  Blazor shares; continue to Q3–Q5. This is the most important gray zone the
+  precedent reveals (see Gray zones, G1).
+
+### Q3. Is the behavior already present locally?
+
+Check (i) whether a prior audit's shared-module port already delivered it —
+shared `blazix-baseui-floating.js` / popups fixes propagate to every consumer —
+and (ii) whether the local port predates the commit with an equivalent design.
+
+- **Yes** → **(d) Already-present / inherited**. Cite file:line or a passing
+  test, as the menu audit did for `e6dc73dfa` (#5093): "Present (inherited).
+  `blazix-baseui-floating.js:3401-3404` … No change."
+- **No** → continue.
+
+*Corollary (the shared-utility lesson, recorded in the menu, dialog, and drawer
+audits): the delta must always be diffed against the shared
+floating/popups/composite infrastructure, not only the component directory —
+the first-pass Popover audit missed four shared fixes.*
+
+### Q4. Does the fixed behavior live in the ported JS layer?
+
+Per `.claude/rules/js-interop-rules.md`, the JS layer owns high-frequency
+events (drag, swipe, scroll), native browser APIs (observers, visualViewport,
+CloseWatcher), event suppression, and focus management. If the upstream change
+touches `floating-ui-react`, dismissal listeners, gesture math, typeahead
+element visibility, or per-frame visual writes:
+
+- → **(c) Transfer to JS module**, into the matching `wwwroot/blazix-baseui-*.js`
+  (+ regenerate `.min.js` with the vendored terser). Precedent standard is a
+  **1:1 port with upstream constants preserved** (drawer swipe engine: "all
+  constants (40/10/1/50/16/80 px·ms) … 1:1 closure port of `useSwipeDismiss.ts`"),
+  and per-frame JS→.NET interop is eliminated rather than mirrored (#4980
+  analog: ".NET receives edge-triggered notifications only").
+
+### Q5. Otherwise it is structural — transfer to C#/Razor.
+
+Render output, ARIA/`aria-*` wiring, roving `tabindex` values, cascading
+context, component parameters, `EventArgs` surfaces, controlled-state
+reconciliation:
+
+- → **(b) Transfer to C#/Razor**, matching React's attribute ordering where
+  observable (menu popup `aria-labelledby` "placed after `id` to mirror React's
+  popupProps order").
+
+### Q6. Cross-cutting annotations (apply to any class)
+
+1. **Split dispositions.** A commit may decompose into per-hunk verdicts:
+   `bf831b754` (#4920) was "PORTED (gate) / ALREADY-PRESENT (detection)";
+   `fe2101a31` (#5034) was a React-tree refactor (N/A) with a "portable nugget"
+   (touch initial focus) verified present.
+2. **Approximation.** A behavioral port may deliberately approximate upstream's
+   timing model when the exact mechanism doesn't map — recorded as "accounted
+   for (approximation)" with the divergence named (#4990 `restMs` submenu
+   hover).
+3. **Deferral with spec.** A valid behavioral gap may be deferred when a
+   faithful port would mutate a shared, fragile system without adequate
+   validation — but only with the exact upstream mechanism written down
+   (menu audit Residual Risk records the full #4231/#4723
+   `blockPointerEvents` implementation spec for a future contained port).
+4. **Breaking-API deferral.** Upstream removal of public API (e.g. #4891
+   `SubmenuRoot` prop `Omit`s) is deferred to an API pass rather than ported,
+   because parameter removal is a breaking change; the forwarded params are
+   verified inert.
+5. **Blazor-only hazards.** The JS↔.NET boundary can require code with **no
+   upstream analog**: PR #130 review accepted exactly one CodeRabbit finding —
+   serializing `OnSwipeOpen`/`OnSwipeClose` — *because* "upstream's `setOpen`
+   is synchronous" while Blazor Server interop is async. Conversely, two
+   findings were rejected (and withdrawn) because upstream has the identical
+   code and 1:1 parity trumps local "improvements". The rubric cuts both ways:
+   parity is the default defense, and asynchrony/circuit timing is the one
+   place extra code is legitimate.
+
+### Evidence bar (all classes)
+
+- **(a)/(d) require positive verification**, not absence of evidence: identify
+  the Blazor-native equivalent (file:line), or demonstrate the symptom cannot
+  reproduce. The menu audit's "Rejected Findings" table exists because three
+  sub-agent claims failed this bar in *both* directions.
+- **(b)/(c) require red/green or parity tests** where feasible (Playwright
+  Server + WASM; bUnit for attribute output), and JS ports regenerate the
+  minified module.
+- **Classification is per-consumer and revisitable** — see Gray zones G2/G3.
+
+---
+
+## Gray zones the precedent reveals
+
+### G1. "React re-render fix" with a structural root cause Blazor shares
+
+`992c52b78` (#4931, "Remove kept-mounted tabIndex workaround") reads as React
+kept-mounted effect mechanics, but the symptom — a closed kept-mounted menu's
+stale-highlighted item retaining `tabindex=0` — is a DOM-contract bug the
+Blazor port had too. The menu audit ported it to the four `.razor` item
+families as `tabindex = (open && highlighted) ? 0 : -1`. Mechanism-based
+classification would have wrongly skipped it. Q2's symptom restatement is the
+guard.
+
+### G2. The same commit earns different dispositions per component
+
+`e0c111994` (#5110, rendered trigger id ownership) is the canonical case:
+
+- **Popover** — **(b/c) PORTED**: `resolveRenderedTriggerId(...)` added in
+  `blazix-baseui-popover.js` + `PopoverRoot.razor` reassociation, with
+  Playwright regression (popover audit).
+- **Dialog** — **(d) moot**: the trigger's registration key *is* its rendered
+  DOM id, so the rendered-vs-internal divergence "cannot arise as it does in
+  React"; flagged, not patched speculatively (dialog audit).
+- **Drawer** — **(a) VERIFIED-N/A**: "React store mechanics; the Blazor trigger
+  registration path … already yields rendered-trigger precedence" (drawer
+  delta).
+
+A rubric verdict therefore attaches to a *(commit, component)* pair, never to
+the commit alone.
+
+### G3. "Moot" calls are revisitable when a later consumer exercises the path
+
+`ea3818dec` (#5096, dialog `touchend` outside-press): the dialog audit
+(2026-06-30) dispositioned it "Accounted for — architecturally moot" because
+the Blazor JS dismissal path never had React's touch-count guard. Three weeks
+later the drawer delta **PORTED** it into `blazix-baseui-dialog.js` ("touch
+pointer events excluded from the pointerdown path; `touchend` path added with
+upstream's event-target resolution") because the Drawer's swipe/touch pipeline
+made the difference observable. A (d) verdict must therefore record exactly
+which mechanism was inspected, so a later audit can cheaply re-open it.
+
+### G4. Stale planning-phase claims
+
+The drawer delta found that a planning-phase gap claim for `d4ee8ae78` (#5024)
+was stale — the fix was already present in `blazix-baseui-floating.js` from the
+Popover audit. Claims made before the code sweep must be re-verified against
+current HEAD before landing in a disposition table.
+
+---
+
+## Evidence catalog — concrete precedent per class
+
+### (a) Skip — React-specific
+
+| Upstream | What it was | Precedent citation |
+| --- | --- | --- |
+| `43d11ebcf` #5233 — Popup bundle-size restructure | React module mechanics; "prop wiring verified identical" | drawer-upstream-delta-2026-07.md, delta table |
+| `4cc8e31ca` #5151, `a47b1df37` #5036, `7a0fd2f84` #5165 — JSDoc / published-types text only | No runtime content | drawer-upstream-delta-2026-07.md |
+| `ccfe02679` #5101 — ESLint `mui/no-floating-cleanup` `void` prefixes | Lint conformance; "No runtime behavior change. Blazix `enqueueFocus` callers already do not retain the rAF-cancel handle" | popover-functional-audit.md, second-pass table |
+| `db574a044` #4970 — menu focus flake | Test-only change in `DialogRoot.test.tsx`; "No production code changed upstream; nothing to port" | dialog-functional-audit.md |
+| `16685b208` #5109 — Root owns the store | "store ownership is a React mechanic whose Blazor equivalent (`DialogRootContext` owned by `DialogRoot`) predates the window" | drawer-upstream-delta-2026-07.md |
+
+### (b) Transfer to C#/Razor — structural DOM/ARIA/state
+
+| Upstream | What was ported | Precedent citation |
+| --- | --- | --- |
+| `5e0f3e73e` #4826 — group labels in radio groups | `MenuRadioGroup.razor`: `CascadingValue<IMenuGroupContext>` + `SetLabelId` + emitted `aria-labelledby` | menu-functional-audit.md, Repairs §1 |
+| `992c52b78` #4931 — kept-mounted roving tabindex | Four item `.razor` families: `tabindex = (open && highlighted) ? 0 : -1` | menu-functional-audit.md, Repairs §3 (also gray zone G1) |
+| `e0c111994` #5110 — rendered trigger id ownership (Popover) | `PopoverRoot.razor` reassociation + `resolveRenderedTriggerId` (mixed b/c port) | popover-functional-audit.md, delta table |
+| (current-state parity) `onOpenChange` event details | `PopoverOpenChangeEventArgs` extended with `Event`, `Trigger`, `TriggerId`, `InteractionType` — React event-detail surface translated to Blazor `EventArgs` | popover-functional-audit.md |
+
+### (c) Transfer to JS module
+
+| Upstream | What was ported | Precedent citation |
+| --- | --- | --- |
+| `21b199703` #4867 + #5105/#5057/#5181 — swipe dismiss engine | 1:1 closure port of `useSwipeDismiss.ts` in `blazix-baseui-drawer.js`; all constants preserved; per-frame JS→.NET interop eliminated | drawer-upstream-delta-2026-07.md |
+| `e6dc73dfa` #5093 — keyboard-close visible focus | `enqueueFocus` gains `focusVisible` in shared `blazix-baseui-floating.js`; inherited by Menu/Dialog/Drawer in later audits | popover-functional-audit.md (port); menu/dialog audits (inheritance) |
+| `7a5019998` #4195 — typeahead skips CSS-hidden items | `isMenuItemVisible` in `blazix-baseui-menu.js`, applied to typeahead only (arrow-nav intentionally unchanged, matching upstream scope) | menu-functional-audit.md, Repairs §4 |
+| `c9c90dce2` #4838 — modifier-preserving keyboard clicks | `dispatchClickWithModifiers` in `blazix-baseui-button.js`, incl. Space-keyup `defaultPrevented` guard | drawer-upstream-delta-2026-07.md |
+| (repair, PR #125) context-menu repeated right-click reposition + native-menu suppression + `button === 2` activation gate | `blazix-baseui-context-menu.js` + `ContextMenuTrigger.razor` (mixed b/c) | PR #125, commit `f0d874e9` |
+
+### (d) No-op — already fixed locally / architecturally moot
+
+| Upstream | Determination | Precedent citation |
+| --- | --- | --- |
+| `d4ee8ae78` #5024 — confirmation return focus | ALREADY-PRESENT for Menu/Dialog/Drawer — inherited from the Popover audit's shared `blazix-baseui-floating.js` port; drawer delta also corrected a stale planning-phase gap claim (G4) | menu/dialog audits ("Present (inherited)"); drawer-upstream-delta-2026-07.md |
+| `4292cfaa6` #5030, pointer-down-reset half | Moot: "Blazix instantiates a fresh focus-manager closure per open … `isPointerDown` is closure-local and cannot leak across opens" | popover-functional-audit.md, second-pass; dialog-functional-audit.md |
+| `205a9a05a`/`fe05694f2` #4125/#4581 — preserve dialog focus on pointer leave | "Architecturally moot. Blazor never force-focuses the popup on pointer-leave … so the focus-stealing the React fix repairs cannot arise" | menu-functional-audit.md (also Rejected Findings) |
+| `802a5ba86` #5010 — kept-mounted viewport morph reset | Moot for Popover ("no persistent `lastHandled` guard that survives a close"); N/A for Dialog (viewport performs no morph) | popover-functional-audit.md; dialog-functional-audit.md |
+
+---
+
+## Where the rubric should live once ratified
+
+Three placements observed in this repo; trade-offs only, no recommendation:
+
+1. **AGENTS.md section.** Read by every coding agent (including Codex sessions,
+   which read AGENTS.md rather than `.claude/rules/`) and by humans landing on
+   the repo root; the PR-review workflow already cross-references "the
+   AGENTS.md coding guidelines". Cost: AGENTS.md is broad project guidance —
+   a full rubric with evidence tables would bloat it; likely only a condensed
+   version fits there.
+2. **`.claude/rules/` file.** Auto-loaded into Claude context every session
+   alongside the existing per-topic rules (`js-interop-rules.md`,
+   `pr-review-workflow.md`), so audits can't forget it. Cost: invisible to
+   non-Claude tooling and to contributors browsing `docs/`; adds permanent
+   context weight to sessions that never run audits.
+3. **`docs/` (e.g. `docs/audits/METHODOLOGY.md`).** Sits next to the audit docs
+   that cite it, discoverable by humans, and can grow the evidence catalog
+   without context-budget concerns. Cost: not auto-loaded — agents must be
+   pointed at it (mitigable with a one-line pointer from AGENTS.md and/or a
+   `.claude/rules/` stub).
+
+A hybrid (full rubric in `docs/`, one-paragraph pointer in AGENTS.md and
+`.claude/rules/`) is the pattern the repo already uses for testing
+instructions vs. `docs/audits` evidence, and is worth putting to the
+ratification grilling (#150).
