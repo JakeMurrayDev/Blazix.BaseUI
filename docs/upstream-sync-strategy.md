@@ -60,9 +60,10 @@ it; sweeps follow METHODOLOGY.md directly.
 
 1. **Shared popup/positioning/focus layer first**, as its own sweep ticket. It blocks sweeps of
    components sitting on the floating/popup layer, and only those — non-popup sweeps run in
-   parallel. Shared commits are dispositioned once instead of per-component, and component sweeps
-   then diff against an already-fixed shared base (the structural fix for the Popover audit's missed
-   shared fixes).
+   parallel. Shared commits are dispositioned in this one ticket instead of re-litigated across a
+   dozen component sweeps — record granularity is unchanged: one disposition row per applicable
+   (commit, component) pair, per the rubric — and component sweeps then diff against an
+   already-fixed shared base (the structural fix for the Popover audit's missed shared fixes).
 2. **Tranche 1 — delta-first**: the named framework-neutral fixes from the inventory, largest family
    first. Known, concrete bugs with commits already identified — highest value per effort.
 3. **Tranche 2 — staleness refreshes** for the stalest audit corners only.
