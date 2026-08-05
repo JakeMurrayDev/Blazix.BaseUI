@@ -52,6 +52,7 @@ Blazix.BaseUI/
 - Before committing documentation or audit artifacts, review them for sensitive information. Do not commit secrets, tokens, credentials, absolute local paths, user names, personal emails, machine-specific paths, or other personal information.
 - Temporary/generated run output belongs in `output/` only while work is in progress and should not be committed unless explicitly requested.
 - Framework-agnostic behavioral specs belong in `../base-ui-specs/<component>/`. Keep those specs updated when an audit discovers reusable behavior or pitfalls, while repository-specific documentation and audits may live in `docs/`.
+- Upstream-delta audits must classify every upstream commit per `docs/audits/METHODOLOGY.md`: four verdict classes — skip (React-specific), transfer to C#/Razor, transfer to JS module, no-op (sub-labeled `(d:already-present)` or `(d:moot)`). Verdicts attach to (commit, component) pairs; skip/no-op verdicts require positive verification and — whenever runtime content exists — a user-observable symptom restatement, never a mechanism name alone (Q1 skips with no runtime content record "no runtime content"); uncertain cases default to port. Record the standard disposition row (SHA + PR, verdict, symptom, evidence, local HEAD + pin + date) in the component's audit doc.
 - Do not commit `.DS_Store` files or other local filesystem metadata.
 
 ---
