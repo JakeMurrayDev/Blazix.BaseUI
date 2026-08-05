@@ -93,9 +93,10 @@ animation/transition semantics, or the public API surface.
 - **No** — JSDoc/typings text that leaves the upstream API surface unchanged
   (an API-affecting type change *is* a contract change per the "public API
   surface" clause above), test-only changes, lint conformance, dead-code
-  removal, and bundle restructures or internal refactors whose observable
-  output is verified identical → **(a) Skip**. *Precedent requires
-  verification, not assumption*:
+  removal verified unreachable with no observable side effect (a removal that
+  drops part of the API surface is a contract change), and bundle restructures
+  or internal refactors whose observable output is verified identical →
+  **(a) Skip**. *Precedent requires verification, not assumption*:
   the drawer delta marked `43d11ebcf` (#5233, popup bundle-size restructure)
   VERIFIED-N/A only after "prop wiring verified identical", and out-of-path
   commits were dispositioned "with per-commit justification retained".
