@@ -5,7 +5,9 @@
 > [#144](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/144)).
 > This is the canonical rubric for upstream-delta audits. A condensed pointer
 > lives in `AGENTS.md` ("Documentation and Audit Artifact Placement") and a
-> session stub in `.claude/rules/upstream-classification.md`. Mined from this
+> session stub in `.claude/rules/upstream-classification.md` (optional local
+> tooling — untracked, since `.claude` is gitignored; every normative
+> requirement lives in this file and the `AGENTS.md` pointer). Mined from this
 > repository's audit precedent: `docs/audits/drawer-upstream-delta-2026-07.md`
 > (PR #130), `docs/audits/menu-functional-audit.md` (PR #124),
 > `docs/audits/popover-functional-audit.md` (PR #122),
@@ -88,9 +90,12 @@ Observable contract = DOM structure, attributes/ARIA, data-attributes, CSS
 variables, focus order/visibility, keyboard/pointer behavior, timing constants,
 animation/transition semantics, or the public API surface.
 
-- **No** — typings/JSDoc text, test-only changes, lint conformance, bundle
-  restructures, dead-code removal, internal refactors whose output is verified
-  identical → **(a) Skip**. *Precedent requires verification, not assumption*:
+- **No** — JSDoc/typings text that leaves the upstream API surface unchanged
+  (an API-affecting type change *is* a contract change per the "public API
+  surface" clause above), test-only changes, lint conformance, dead-code
+  removal, and bundle restructures or internal refactors whose observable
+  output is verified identical → **(a) Skip**. *Precedent requires
+  verification, not assumption*:
   the drawer delta marked `43d11ebcf` (#5233, popup bundle-size restructure)
   VERIFIED-N/A only after "prop wiring verified identical", and out-of-path
   commits were dispositioned "with per-commit justification retained".
@@ -162,7 +167,11 @@ reconciliation:
 2. **Approximation.** A behavioral port may deliberately approximate
    upstream's timing model when the exact mechanism doesn't map — recorded as
    "accounted for (approximation)" with the divergence named (#4990 `restMs`
-   submenu hover).
+   submenu hover). Approximation is an *annotation on a (b)/(c) port verdict*,
+   never a third (d) sub-label — a (d) verdict still requires
+   `already-present` or `moot`. (The historical "Accounted for" phrasing in
+   old audit docs maps to (d) or to this annotation depending on context; new
+   records use the explicit forms.)
 3. **Deferral with spec.** See Resolving uncertainty, tier 2.
 4. **Breaking-API deferral.** Upstream removal of public API (e.g. #4891
    `SubmenuRoot` prop `Omit`s) is deferred to an API pass rather than ported,
