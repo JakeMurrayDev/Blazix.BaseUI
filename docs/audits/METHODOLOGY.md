@@ -193,9 +193,10 @@ reconciliation:
   the Blazor-native equivalent (file:line), or demonstrate the symptom cannot
   reproduce. The menu audit's "Rejected Findings" table exists because three
   sub-agent claims failed this bar in *both* directions.
-- **(b)/(c) require red/green or parity tests** where feasible (Playwright
-  Server + WASM; bUnit for attribute output), and JS ports regenerate the
-  minified module.
+- **(b)/(c) must account for test coverage**: every port row names its
+  covering test (Playwright Server + WASM for behavior; bUnit for attribute
+  output) or records a one-line reason a test is infeasible (e.g. requires
+  real touch hardware). JS ports regenerate the minified module.
 - **Classification is per-consumer and revisitable** — see Gray zones G2/G3.
 - **Stale claims:** dispositions made in a planning phase must be re-verified
   against current local HEAD before landing in a disposition table (G4).
