@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-27-component-parity-harness-design.md`
 
-**Out of scope for this plan:** the API-surface diff (spec sequencing step 4) is an independent subsystem with its own plan; the remaining 85 fixtures beyond the first-milestone 29.
+**Out of scope for this plan:** implementation of the API-surface diff remains an independent
+subsystem (its committed snapshot is a Task 18 CI dependency); issue #176 owns expansion beyond the
+first-milestone 29 and begins by recounting the exact remainder at the then-pinned upstream SHA.
 
 ## Global Constraints
 
@@ -2591,522 +2593,533 @@ Animations API rather than racing screenshots against a live transition."
 ```
 
 ---
+## Wayfinder consolidation: authoritative remaining order
 
-### Task 11: Waivers
+Tasks 1–10 above are complete at unit/component level. They have not run as a production comparison
+pipeline. The remaining work must execute in this order:
+
+```text
+5b selector semantics
+ -> 5c action completion and per-step recording
+ -> 10b/14a unwaived live integration core
+ -> 10c comparator trust repair
+ -> 11 exact waivers and retry identity
+ -> 12 committed baselines
+ -> 13 reports
+ -> 14b public runner surface
+ -> 18 required CI and freshness canary
+ -> 15 calibration fixtures
+ -> 16 remaining first-29 fixtures
+ -> 17 limitations and bounded milestone documentation
+ -> issue #176 corpus expansion
+```
+
+Task 14a is allowed to expose unwaived integrated findings before Task 10c. It is discovery evidence,
+not parity certification. No waiver, accepted baseline verdict, or final report may precede Task 10c.
+
+---
+
+### Task 5b: Separate selector-resolution and actionability findings
 
 **Files:**
+
+- Modify: `.../Diff/Finding.cs` (add `SelectorNonActionable`)
+- Create: `.../Diff/{SelectorUnresolvedComparator,SelectorNonActionableComparator}.cs`
+- Create: `.../Tests/HarnessTests/SelectorComparatorTests.cs`
+
+**Contract:**
+
+- compare `StepCapture.UnresolvedSelectors` and `NonActionableSelectors` separately as ordinal
+  multisets; never merge or deduplicate them;
+- emit `SelectorUnresolved/Error` only for absent attached elements and
+  `SelectorNonActionable/Error` only for elements that resolved but could not be driven;
+- use exact expanded selector as `Property`, empty `NodePath`, and invariant decimal occurrence
+  counts including `0` as values;
+- emit both kinds when one leg is unresolved and the other is non-actionable;
+- keep `Message` out of grouping, retry, and waiver identity;
+- retain one `IComparator` per `FindingKind`.
+
+- [ ] Write tests for equal multisets, both directions, repeated selectors, and cross-category
+  unresolved/non-actionable input.
+- [ ] Mutation-check that merging or set-deduplicating the inputs fails those tests.
+- [ ] Run:
+
+```bash
+dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "SelectorComparatorTests|ParityCapturerTests"
+```
+
+- [ ] Commit the two typed selector comparators.
+
+**Exit:** both kinds carry stable, distinct machine identities and are ready for the Task 10b
+registry. This task does not decide fixture validity when both legs fail identically.
+
+---
+
+### Task 5c: Observable per-action completion contracts
+
+**Files:**
+
+- Modify: `.../Infrastructure/FixtureManifest.cs`
+- Modify: `.../Capture/{ParityCapturer,CaptureBundle}.cs`
+- Modify: `.../shared/capture.js`
+- Create: `.../Capture/ActionCompletionFailure.cs`
+- Create: `.../Tests/HarnessTests/ActionCompletionTests.cs`
+- Modify: `manifest/fixtures.json`
+
+**Manifest schema:** every action declares exactly one of:
+
+```jsonc
+{
+  "click": "@trigger",
+  "complete": [
+    { "selector": "@popup", "state": "visible" },
+    { "selector": "@trigger", "attribute": "aria-expanded", "equals": "true" }
+  ]
+}
+```
+
+or:
+
+```jsonc
+{
+  "click": "[data-no-op]",
+  "actionOnly": {
+    "reason": "Purpose-built probe intentionally changes no observable state."
+  }
+}
+```
+
+`complete` is a non-empty all-of list. Supported predicates are selector state
+(`attached|detached|visible|hidden`), attribute/property equality, input value equality, and focus
+equality/inequality. Alias expansion is identical to action expansion. Reject missing/both contracts,
+empty lists, unknown fields/predicates, missing selector/value data, and blank action-only reasons at
+manifest load with entry/step/action coordinates.
+
+`actionOnly` is legal only for an intentional no-render/browser-only action with no stronger common
+predicate. Focus must use focus equality. Ordinary clicks, keys, typing, selection, open/close, and
+validation actions need observable predicates.
+
+**Capture order:**
+
+1. start a fresh timeline for every step, before actions;
+2. dispatch action N;
+3. wait for all completion predicates on the same leg;
+4. begin action N+1 only after N completes;
+5. after all actions, run the existing portal gate and mutation quiescence;
+6. stop the timeline and capture the step.
+
+Do not implement the rejected fixture-host generation counter, a fixture token, private Blazor APIs,
+a fixed delay, or a global quiet horizon.
+
+On deadline, create `ActionCompletionFailure` with fixture, actual leg, step, zero-based action index,
+verb, expanded selector, predicate/expected value, and bounded observed state. Stop later actions in
+that step, then quiesce and capture all diagnostic dimensions. Task 10b maps it to non-waivable
+`ActionCompletionUnmet/Error`. It is distinct from unresolved and non-actionable selectors.
+
+- [ ] Write manifest schema tests and browser tests for synchronous state, a descendant async handler
+  with a 250 ms quiet gap, no-op, focus, portal open/close, missing consequence, and two dependent
+  actions.
+- [ ] Run each browser case on Server and WASM with at least 20 samples for the delayed and dependent
+  paths; assert zero false-early returns and correct per-step timeline ownership.
+- [ ] Assert a missing consequence stops action 2 but still captures the resulting state.
+- [ ] Add completion contracts to the current `switch/hero` action and any harness action entries.
+- [ ] Run:
+
+```bash
+dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "ActionCompletionTests|SettleProtocolTests|ParityCapturerTests"
+```
+
+- [ ] Commit the completion contract and per-step recording.
+
+**Exit:** interactive capture has a supported, symmetric action-to-observable-state fence on React,
+Server, and WASM. A deadline bounds a declared failure; it is never used as successful settling.
+
+---
+
+### Task 10b / 14a: Unwaived live integration core
+
+**Files:**
+
+- Create: `.../Diff/ComparatorRegistry.cs`
+- Create: `.../Infrastructure/ParityRunner.cs`
+- Create: `.../Client/Fixtures/Harness/Canary.razor`
+- Create: `react-fixtures/src/canary.tsx`
+- Create: `.../Tests/HarnessTests/{ComparatorRegistry,LiveIntegration,Canary}Tests.cs`
+- Modify: `react-fixtures/src/fixtures.ts`, `manifest/fixtures.json`
+
+**Registry and context:**
+
+- register every comparison `FindingKind` exactly once, including both selector kinds;
+- test enum/registry exhaustiveness and reject duplicate ownership;
+- build one `ComparisonContext` per paired step with fixture id, candidate leg, step name, captures,
+  and `FixtureEntry.PixelThreshold`;
+- map capture-side completion failures to `ActionCompletionUnmet/Error` with their actual leg before
+  comparator output is returned;
+- treat completion failures and execution/configuration failures as non-waivable blocking evidence.
+
+**Live orchestration:**
+
+- run React live plus Server and WASM without depending on waiver, baseline, or report types;
+- before navigation, fail actionably if `react-fixtures/dist/` is missing or unreadable and print the
+  exact `pnpm parity:build` command;
+- use the same capture and comparator composition the final runner will use.
+
+**Canary:** keep the three independent known differences: missing `aria-expanded`, wrong colour, and
+wrong transition duration. Assert all three in both Server and WASM through the production registry.
+The canary never enters ordinary passing fixture data.
+
+**Real smoke:** run the current manifest `switch/hero` on Server and WASM, including its completion
+contract. Its parity result need not be green; the test proves navigation, action completion,
+pairing, context construction, registry execution, and pixel-threshold propagation. Record the first
+integrated finding shapes for Task 10c/11 design tests.
+
+- [ ] Write registry/context/bundle-precondition tests first.
+- [ ] Run canary and smoke with a locally built pinned React bundle.
+- [ ] Assert the canary's exact known findings in both modes and that a missing required leg fails.
+- [ ] Commit the unwaived integration core.
+
+**Exit:** comparison composition has run end to end, but cannot certify parity or apply waivers until
+Task 10c repairs the trust boundary.
+
+---
+
+### Task 10c: Repair comparator trust boundaries
+
+**Files:**
+
+- Modify: `.../Diff/{NodeMatcher,TimelineComparator}.cs`
+- Modify: `.../shared/capture.js`
+- Modify: `.../Tests/HarnessTests/{NodeMatcher,TimelineComparator}Tests.cs`
+
+**Node correspondence:** every pair consumed by Attribute, ARIA, style, custom-property, and geometry
+comparators must be correspondence-backed or represented by a stable explicit uncertainty finding.
+Extend the adversarial corpus for:
+
+- childless same-key sibling swallowing a wrapper;
+- corroboration tiebreak cross-pair;
+- wrapper plus identity change;
+- reorder below a stepped level.
+
+Acceptance is truthful Structure output plus surviving downstream coverage of the real corresponding
+nodes. “Some error exists” is insufficient. Absence of pair-dependent findings must not be interpreted
+as subtree equality.
+
+**Timeline:** rewrite L2 around explicit runs so insertion, start, terminal, attributed removal, and
+phase obligations belong to the same run. Add clean-first/interrupted-second tests on one leg and on
+both legs. Encode the owning run in `Finding.Property` as
+`{invariant}@{family}:{runProperty}#{zeroBasedOrdinal}` so exact waivers remain six-field and two runs
+cannot share an identity.
+
+Repair L3 index pairing or omit the opposite leg's cross-run value when run counts differ. A valid
+per-leg declaration overrun may remain; a report may not print a value from another run beside it.
+Add `animation-iteration-count` and `animation-delay` to captured styles, multiply finite keyframe
+duration by its iteration count, and account for negative animation and transition delay. Add
+byte-identical repeated-animation and negative-delay tests so neither leg reports a symmetric false
+Error. Infinite animation still has no terminal run to measure.
+
+Preserve presentation precedence as a contract: Structure before pair-dependent findings; L1 before
+subordinate L2 whenever both fire.
+
+- [ ] Re-run the Task 14a canary and real smoke after repairs.
+- [ ] Mutation-check the wrapper and second-run cases.
+- [ ] Run all comparator tests plus live integration tests.
+- [ ] Commit the trust-boundary repair.
+
+**Exit:** findings have stable enough element/run identity for exact waivers. Pre-repair Structure
+wrapper/mispair and multi-run L2 findings were non-waivable and must never be grandfathered.
+
+---
+
+### Task 11: Exact waivers and conservative retry identity
+
+**Files:**
+
 - Create: `.../Waivers/{Waiver,WaiverFile,WaiverMatcher,WaiverVerdict}.cs`
-- Create: `tests/Blazix.BaseUI.Parity.Tests/waivers/waivers.json`
-- Create: `.../Tests/HarnessTests/WaiverMatcherTests.cs`
+- Create: `.../Infrastructure/RetryClassifier.cs`
+- Create: `.../Tests/HarnessTests/{WaiverMatcher,RetryClassifier}Tests.cs`
+- Create: `waivers/waivers.json` containing `[]`
 
-**Interfaces:**
-- Consumes: `Finding` (Task 6).
-- Produces: `WaiverMatcher.Apply(IReadOnlyList<Finding>) → WaiverVerdict { Failing, Waived, UnusedWaivers, ExpiredWaivers }`.
+**Waiver schema:**
 
-- [ ] **Step 1: Write the failing tests**
+| Field | Rule |
+| --- | --- |
+| `fixture`, `leg`, `step`, `nodePath`, `kind`, `property` | Required exact six-field identity; no wildcard, glob, regex, arrays, or omission-as-wildcard |
+| `propertyMatch` | `exact` by default; `prefix` only for the console exception below |
+| `reason` | Required non-whitespace human explanation |
+| `disposition` | `accepted-limitation` or `deferred-defect` |
+| `docLink` | Repository-relative audit/spec for accepted limitation; open GitHub issue for deferred defect |
+| `expires` | Required ISO date later than review date; no grace period |
 
-Assert: an exact-match waiver moves a finding from `Failing` to `Waived`; a `"*"` wildcard on `leg` matches every leg; a waiver matching nothing appears in `UnusedWaivers`; a waiver whose `expires` is in the past appears in `ExpiredWaivers`; and `WaiverFile.Load()` throws `FormatException` when any waiver has a missing or whitespace `reason`.
+Match paths/properties ordinally and case-sensitively. One entry consumes exactly one distinct Error
+identity and never cascades to descendants, siblings, kinds, legs, steps, runs, or reporting groups.
+If duplicate findings can share the six fields, encode a documented stable occurrence discriminator
+in that comparator's `Property` before they become waiverable (L2 uses the Task 10c run format). An
+entry matching multiple distinct findings is ambiguous and blocks.
 
-Dates must be injectable — take an `IReadOnlyList<Waiver>` and a `DateOnly today` parameter rather than reading the clock, so the expiry test is deterministic.
+Strict loading rejects unknown fields, missing/whitespace values, invalid enum/date/link/match mode,
+duplicates, and non-future expiry with entry index and field name. Unused and expired entries block.
+`Info` and `Flaky` never require or consume waivers. `ActionCompletionUnmet`, execution failure,
+harness uncertainty, comparator defect, missing evidence, and incomplete capture are never waiverable.
 
-- [ ] **Step 2: Run them to verify they fail**
+**Console exception:** `propertyMatch: prefix` is allowed only for `Console`, with a non-empty level
+plus stable semantic stem, a reason naming the observed volatile suffix, `deferred-defect`, an open
+tracking issue containing at least two captured attempts, short expiry, and exactly one match. Forbid
+substring/suffix/regex and bare `error:`/`warning:` prefixes. Zero matches are unused; multiple are
+ambiguous. Exact remains preferred.
 
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "WaiverMatcherTests"
-```
+**Retry:** correlate attempts on the same machine identity as waivers, never message or values. The
+same identity is stable despite presentation changes. An Error present once and clean in the same
+scope on retry may become `Flaky`. Different Error identities in the same scope remain blocking.
+Stable Structure and L1 do not demote when subordinate labels vary. Timeout, exception, browser/host
+failure, missing leg, incomplete capture, or failed retry is execution failure, never Flaky.
 
-Expected: FAIL.
-
-- [ ] **Step 3: Implement the waiver types**
-
-`Waiver` is a record with `Fixture`, `Leg`, `Step`, `NodePath`, `Kind`, `Property` (each defaulting to `"*"`), plus required `Reason` and optional `DocLink` and `Expires`. `WaiverFile.Load()` deserializes `waivers/waivers.json` and throws `FormatException` naming the offending index when `Reason` is null or whitespace.
-
-`WaiverMatcher.Apply` partitions findings, tracks which waivers matched at least once, and returns unmatched ones in `UnusedWaivers`. `Severity.Info` and `Severity.Flaky` findings never reach `Failing` and never consume a waiver.
-
-Seed `waivers/waivers.json` as `[]`.
-
-- [ ] **Step 4: Run the tests to verify they pass**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "WaiverMatcherTests"
-```
-
-Expected: PASS, 5 tests.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests
-git commit -m "Add the waiver registry
-
-A waiver requires a written reason, and a waiver that stops matching
-fails the run, so the file cannot silently accumulate stale entries."
-```
+- [ ] Test exact matching, separate legs/steps/kinds, no cascading, duplicates, ambiguity, unused,
+  expiry, strict JSON, disposition/link rules, and Info/Flaky non-consumption.
+- [ ] Test allowed/forbidden console prefixes with timestamp, GUID, query-token, and Vite cache-token
+  examples across at least two attempts.
+- [ ] Test Structure/L1 non-demotion and incomplete retry blocking.
+- [ ] Mutation-check wildcard acceptance, message-based identity, and “changed token means flaky.”
+- [ ] Run `WaiverMatcherTests|RetryClassifierTests` and commit.
 
 ---
 
-### Task 12: Baselines and invocation modes
+### Task 12: Committed baselines, provenance, and invocation modes
 
 **Files:**
-- Create: `.../Infrastructure/{ParityOptions,BaselineStore}.cs`
+
+- Create: `.../Baselines/{BaselineMetadata,BaselineStore}.cs`
+- Create/modify: `.../Infrastructure/ParityOptions.cs`, `ParityRunner.cs`
 - Create: `.../Tests/HarnessTests/BaselineStoreTests.cs`
-- Create: `tests/Blazix.BaseUI.Parity.Tests/react-fixtures/scripts/source-hash.mjs`
+- Create: `baselines/` metadata/captures/screenshots
+- Modify: `package.json`, `.gitignore`
 
-**Interfaces:**
-- Consumes: `CaptureBundle`, `ParityPaths`, `BaseUiLocator`.
-- Produces: `ParityOptions.FromEnvironment()` → `{ Live, WriteBaselines, FixtureFilter, ReportDir }`; `BaselineStore.Load(fixtureId)` → `CaptureBundle?`; `BaselineStore.Save(CaptureBundle, screenshots)`; `BaselineStore.AssertFresh(currentSourceHash)`.
+Baseline metadata records upstream SHA, declared repository pin, demo/source content hash, fixture and
+step scope, capture schema version, generated time, and browser/OS pixel provenance. Baseline mode
+loads React captures without Node, `.base-ui`, or `react-fixtures/dist`. Live/write mode requires the
+local bundle and validates source hashes before writing.
 
-- [ ] **Step 1: Write the failing test**
+Choose and test Linux-captured or per-OS pixel baseline storage; required Linux CI may not silently
+waive Pixel findings. A PR that edits pin/provenance inconsistently is a blocking configuration error.
 
-Assert: `Save` then `Load` round-trips a bundle with equal step count and DOM; `AssertFresh` throws `InvalidOperationException` whose message contains `pnpm parity:baseline` when the stored `SourceHash` differs; `ParityOptions.FromEnvironment()` returns `Live == true` when `PARITY_LIVE=1`, and `Live == true` when only `PARITY_WRITE_BASELINES=1` is set (writing implies live capture).
-
-- [ ] **Step 2: Run it to verify it fails**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "BaselineStoreTests"
-```
-
-Expected: FAIL.
-
-- [ ] **Step 3: Implement the source hash script**
-
-`react-fixtures/scripts/source-hash.mjs` walks every `*/demos/*/tailwind/index.tsx` under the located base-ui docs components directory, hashes `path + contents` into a single SHA-256, and writes it to `react-fixtures/dist/source-hash.txt`. Call it from `parity:build` after `vite build`.
-
-- [ ] **Step 4: Implement `ParityOptions` and `BaselineStore`**
-
-`BaselineStore` writes `baselines/{fixture}/bundle.json` plus `baselines/{fixture}/{step}.png` files, with `JsonSerializerOptions { WriteIndented = true }` so baseline changes produce readable git diffs. `AssertFresh` compares the stored `SourceHash` against `dist/source-hash.txt` and throws with the refresh instruction on mismatch.
-
-- [ ] **Step 5: Run the test to verify it passes**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "BaselineStoreTests"
-```
-
-Expected: PASS.
-
-- [ ] **Step 6: Add the `parity:baseline` script**
-
-In `react-fixtures/package.json`:
-
-```json
-    "parity:baseline": "pnpm parity:css && pnpm parity:build && cd ../Blazix.BaseUI.Parity.Tests && PARITY_WRITE_BASELINES=1 dotnet test"
-```
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests
-git commit -m "Add baseline storage and environment-driven invocation
-
-Baselines record the base-ui source hash, so a stale baseline fails with
-a refresh instruction instead of silently diffing against old output."
-```
+- [ ] Test environment option matrix, read/write roundtrip, corrupt/missing data, schema mismatch,
+  stale source hash, pin/provenance inconsistency, and OS pixel selection.
+- [ ] Keep `pnpm parity:baseline` as the local build-and-write command.
+- [ ] Prove baseline mode runs with `.base-ui` and `react-fixtures/dist` unavailable.
+- [ ] Commit baseline storage and the current manifest's generated baseline evidence.
 
 ---
 
-### Task 13: Report generation
+### Task 13: Scope-complete HTML and JSON reports
 
 **Files:**
+
 - Create: `.../Report/{ReportModel,JsonReportWriter,HtmlReportWriter}.cs`
-- Create: `.../Report/report.source.css` (Tailwind input: `@import "tailwindcss"; @source "./";`)
-- Create: `.../Report/report.css` (Tailwind-generated, committed)
+- Create: `.../Report/{report.source.css,report.css}`
 - Create: `.../Tests/HarnessTests/ReportWriterTests.cs`
 
-**Interfaces:**
-- Consumes: `WaiverVerdict`, `CaptureBundle`.
-- Produces: `parity-report/index.html`, `parity-report/assets/*`, `parity-result.json`.
+Reports consume real captures and `WaiverVerdict` from the integrated core. Both formats include:
 
-- [ ] **Step 1: Write the failing test**
+- exact upstream SHA, fixed denominator, executed count, named fixtures/steps/modes/comparators,
+  exclusions, thresholds, retries/Flaky outcomes, and applied waivers;
+- counts by component, kind, severity, leg, fixture, and disposition;
+- `ActionCompletionUnmet` and skipped dependent actions;
+- Structure one-sided/reorder evidence before pair-dependent findings;
+- L1 timeline evidence before subordinate L2 when both fire;
+- exact waived evidence, values, reason, disposition, link, expiry, and status;
+- unused, expired, malformed, and ambiguous waiver diagnostics;
+- screenshots/diffs, DOM/attribute trees, style tables, and per-step timelines.
 
-Assert `HtmlReportWriter.Write` on a verdict containing one failing and one waived finding produces an `index.html` that contains both fixture ids, the waived finding's reason text, and exactly one element carrying `data-severity="error"`.
+Never turn absence of pair-dependent findings under uncertain Structure output into an equality label.
+Filtered runs are labelled diagnostic, retain the fixed denominator, and cannot generate a milestone
+claim or overwrite the full limitations document.
 
-- [ ] **Step 2: Run it to verify it fails**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "ReportWriterTests"
-```
-
-Expected: FAIL.
-
-- [ ] **Step 3: Implement the writers**
-
-`JsonReportWriter` serializes the verdict plus fixture metadata. `HtmlReportWriter` emits a single `index.html` referencing `assets/report.css` and copies every screenshot and diff PNG into `assets/`. Sections, per the spec: summary counts by component / kind / leg; filter chips; per fixture a three-up screenshot row with diff overlay tabbed by step; a two-column attribute tree; a computed-style table listing only differing properties; the timeline as a three-track gantt built from `<div>` bars positioned by percentage; waived findings in a collapsed `<details>` showing the reason; markers listed as info.
-
-Generate `report.css` with the Tailwind CLI from a `report.source.css` that has `@source "./Report/";`, and commit it — the report must render with no network access.
-
-- [ ] **Step 4: Run the test to verify it passes**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "ReportWriterTests"
-```
-
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests
-git commit -m "Add the HTML and JSON parity reports"
-```
+- [ ] Write report tests using real integrated finding shapes, including a waived primary finding,
+  completion failure, L1+L2 pair, unused waiver, and `<executed>/29` scope.
+- [ ] Generate offline Tailwind CSS and verify all asset links resolve with no network.
+- [ ] Run report tests and commit.
 
 ---
 
-### Task 14: Test entry point and the canary
+### Task 14b: Public test surface, retry, verdict, and accumulation
 
 **Files:**
+
 - Create: `.../Tests/ParityTests.cs`
-- Create: `.../Infrastructure/ParityRunner.cs`
-- Create: `.../Blazix.BaseUI.Parity.Tests.Client/Fixtures/Harness/Canary.razor`
-- Create: `.../Tests/HarnessTests/CanaryTests.cs`
-- Modify: `manifest/fixtures.json`
+- Modify: `.../Infrastructure/ParityRunner.cs`
+- Create: `.../Infrastructure/ParityRunAccumulator.cs`
+- Modify: assembly fixture/collection definitions
+- Modify: `.../Tests/HarnessTests/CanaryTests.cs`
 
-**Interfaces:**
-- Consumes: everything above.
-- Produces: `ParityRunner.RunAsync(FixtureEntry, ParityLeg)` → `IReadOnlyList<Finding>`; the xUnit theory that is the suite's public surface.
+Expose Server and WASM theory cases for every selected fixture. Timing cases run in a disabled-
+parallelization collection; static cases may use the existing four threads. Construct the runner
+directly from the browser fixture.
 
-The canary is the guard against the failure mode where capture silently returns nothing and the run reports zero findings.
+For each candidate leg:
 
-- [ ] **Step 1: Write the canary fixture and its React counterpart**
+1. obtain committed or live React capture;
+2. capture candidate, preserving completion/execution failures;
+3. retry once under Task 11 rules;
+4. apply exact waivers only after stable identity classification;
+5. fail on unwaived stable Errors, invalid waiver state, completion/execution failure, or missing leg;
+6. accumulate all evidence for one report emitted at assembly completion.
 
-`Client/Fixtures/Harness/Canary.razor` — deliberately wrong in three independent ways:
+The canary runs separately and must emit its exact attribute, colour, and transition-duration findings
+in both modes through this composition. Canary success means defects were found, never that the
+fixture matched.
 
-```razor
-@* CANARY FIXTURE — intentionally broken. The suite MUST report findings for
-   this fixture. If it ever passes, the harness itself is broken. *@
-<div data-parity-canary>
-    @* 1. Missing aria-expanded that the React counterpart has. *@
-    <button class="px-3 py-1 bg-neutral-950 text-white">Toggle</button>
-
-    @* 2. Wrong colour: React uses text-neutral-950, this uses text-red-500. *@
-    <span class="text-red-500">Label</span>
-
-    @* 3. Suppressed animation: React declares duration-150, this declares duration-0. *@
-    <div class="transition-opacity duration-0 opacity-100">Panel</div>
-</div>
-```
-
-Its React counterpart lives in the parity harness rather than base-ui, at `react-fixtures/src/canary.tsx`, and is registered in `fixtures.ts` under the id `harness/canary`:
-
-```tsx
-export default function Canary() {
-  return (
-    <div data-parity-canary>
-      <button className="px-3 py-1 bg-neutral-950 text-white" aria-expanded="false">
-        Toggle
-      </button>
-      <span className="text-neutral-950">Label</span>
-      <div className="transition-opacity duration-150 opacity-100">Panel</div>
-    </div>
-  );
-}
-```
-
-Add to `fixtures.ts` after the glob:
-
-```ts
-import Canary from './canary';
-
-fixtures.push({ id: 'harness/canary', Component: Canary });
-fixtureById.set('harness/canary', { id: 'harness/canary', Component: Canary });
-```
-
-- [ ] **Step 2: Write the failing canary test**
-
-```csharp
-using Blazix.BaseUI.Parity.Tests.Capture;
-using Blazix.BaseUI.Parity.Tests.Diff;
-using Blazix.BaseUI.Parity.Tests.Infrastructure;
-using Shouldly;
-
-namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
-
-[Collection("ParityStatic")]
-public sealed class CanaryTests(PlaywrightFixture playwright)
-{
-    [Fact]
-    public async Task CanaryFixtureIsFlagged()
-    {
-        var runner = new ParityRunner(playwright.Browser, ParityOptions.FromEnvironment());
-        var fixture = FixtureManifest.Load().Single(f => f.Id == "harness/canary");
-
-        var findings = await runner.RunAsync(fixture, ParityLeg.BlazorServer);
-
-        findings.ShouldNotBeEmpty();
-        findings.ShouldContain(f => f.Kind == FindingKind.Attribute && f.Property == "aria-expanded");
-        findings.ShouldContain(f => f.Kind == FindingKind.ComputedStyle && f.Property == "color");
-        findings.ShouldContain(f => f.Kind == FindingKind.ComputedStyle && f.Property == "transition-duration");
-    }
-}
-```
-
-- [ ] **Step 3: Run it to verify it fails**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "CanaryTests"
-```
-
-Expected: FAIL — `ParityRunner` does not exist.
-
-- [ ] **Step 4: Implement `ParityRunner` and `ParityTests`**
-
-`ParityRunner.RunAsync` obtains the React bundle (baseline or live per `ParityOptions`), captures the requested Blazor leg, runs every comparator over each step pair, and returns the concatenated findings. A leg that throws is retried once; findings differing between attempts are re-emitted with `Severity.Flaky`.
-
-`ParityTests` exposes two theories over the manifest, in two collections so timing work runs
-serially. `[CollectionDefinition]` must live on a **separate marker class** — putting it on the
-test class itself does not register the collection:
-
-```csharp
-/// <summary>Groups comparators that tolerate parallel execution.</summary>
-[CollectionDefinition("ParityStatic")]
-public sealed class ParityStaticCollection;
-
-/// <summary>
-/// Groups timing-sensitive comparators. CPU contention skews the durations the
-/// L3 timeline check measures, so this collection never runs in parallel.
-/// </summary>
-[CollectionDefinition("ParityTiming", DisableParallelization = true)]
-public sealed class ParityTimingCollection;
-
-[Collection("ParityStatic")]
-public sealed class ParityStaticTests(PlaywrightFixture playwright)
-{
-    public static TheoryData<string, ParityLeg> Cases => ParityTestData.Static();
-
-    [Theory]
-    [MemberData(nameof(Cases))]
-    public async Task MatchesUpstream(string fixtureId, ParityLeg leg) { /* … */ }
-}
-
-[Collection("ParityTiming")]
-public sealed class ParityTimingTests(PlaywrightFixture playwright) { /* animation steps only */ }
-```
-
-`ParityRunner` is **not** an xUnit fixture — xUnit only injects registered class or collection
-fixtures. Each test constructs it directly: `new ParityRunner(playwright.Browser, ParityOptions.FromEnvironment())`.
-`PlaywrightFixture` is supplied by adding it to each `[CollectionDefinition]` class via
-`ICollectionFixture<PlaywrightFixture>`.
-
-Each test applies `WaiverMatcher`, asserts `verdict.Failing.ShouldBeEmpty()` with a message listing each finding as `{kind} {nodePath} {property}: {react} vs {blazor}`, and accumulates findings for the report. Report writing happens in the assembly fixture's `DisposeAsync`, so one report covers the whole run.
-
-Add the canary to `manifest/fixtures.json`:
-
-```json
-  {
-    "id": "harness/canary",
-    "component": "harness",
-    "react": "internal:canary",
-    "blazor": "Harness/Canary",
-    "themes": ["light"],
-    "pixelThreshold": 0.001,
-    "steps": [{ "name": "initial" }]
-  }
-```
-
-Exclude `harness/canary` from `ParityTestData.Static()` — it is asserted by `CanaryTests`, and would otherwise fail the suite by design.
-
-- [ ] **Step 5: Run the canary test to verify it passes**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "CanaryTests"
-```
-
-Expected: PASS — meaning all three deliberate defects were detected.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests
-git commit -m "Add the parity runner, test entry point, and canary fixture
-
-The canary is deliberately broken in three ways and must be flagged; if
-it ever passes, capture has silently stopped working."
-```
+- [ ] Test both-leg data generation, timing/static partition, missing leg, retry classification,
+  waiver application, failure messages, cross-run accumulation, and report emission.
+- [ ] Run the canary and current manifest in live and baseline modes.
+- [ ] Record first integrated corpus timing for Task 18 timeout/cache decisions.
+- [ ] Commit the production test surface.
 
 ---
 
-### Task 15: Calibration fixtures
+### Task 18: Required baseline-mode PR CI and daily freshness canary
 
 **Files:**
-- Create: `.../Client/Fixtures/{Collapsible/Hero,Popover/Hero,Select/Grouped,Field/Hero}.razor`
-- Modify: `.../Client/Fixtures/Switch/Hero.razor`
-- Modify: `manifest/fixtures.json`
-- Modify: `waivers/waivers.json`
 
-**Interfaces:**
-- Consumes: `FixtureRegistry` naming convention (Task 1).
-- Produces: five passing or explicitly waived fixtures.
+- Create/modify: `.github/workflows/parity.yml`
+- Create: a metadata-only provenance check under `scripts/` or the harness infrastructure
+- Create: focused tests for provenance comparison and deduplicated issue payload
+- Update: repository branch-protection documentation
 
-**Fixture authoring recipe** — apply per fixture:
+Activation is after Task 14b, not before. The pull-request job:
 
-0. **Regenerate `parity.css` after adding or changing any fixture markup** and commit it alongside the fixture: `cd tests/Blazix.BaseUI.Parity.Tests/react-fixtures && pnpm parity:css`. Every new class string a fixture introduces must exist in the generated stylesheet, or its computed styles will silently fall back to browser defaults on both sides — producing a fixture that passes while testing nothing.
-1. Read the React demo at `<base-ui>/docs/src/app/(docs)/react/components/<component>/demos/<demo>/tailwind/index.tsx`.
-2. Read the existing Blazor Tailwind port at `docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/<Component>/<Demo>/Tailwind/*.razor`. It has correct structure and component usage.
-3. Copy that port into `Client/Fixtures/<Component>/<Demo>.razor`, then **replace every `class` value with the exact string from the React demo**. Do not paraphrase: `ease-[ease]` stays `ease-[ease]`, `size-3.5` stays `size-3.5`. This is what keeps a surviving style difference attributable to the component.
-4. Add the manifest entry with interaction steps covering the demo's states.
-5. Run that fixture alone, triage every finding as a component fix or a waiver with a written reason.
+- triggers for changes that can affect library, harness, fixtures, manifests, waivers, baselines, or
+  the committed API snapshot; begin broad and optimize path filters only from measured evidence;
+- runs baseline mode only, with neither live/write environment variable;
+- does not clone Base UI or install pnpm;
+- installs Chromium and Linux Skia native assets;
+- executes both Server and WASM against the same Linux-compatible committed React baseline;
+- invokes the separately planned committed-snapshot API-surface check;
+- validates baseline provenance and the declared upstream pin.
 
-- [ ] **Step 1: Author `switch/hero`**
+It blocks on any unwaived stable Error, execution/configuration failure, malformed/unused/expired/
+ambiguous waiver, missing/unreadable baseline, API failure, inconsistent metadata introduced by the
+PR, or failure to execute either leg. Info/proven Flaky report without blocking. Timeouts, crashes,
+and missing legs are not Flaky.
 
-Replace the Task 1 placeholder using the recipe. The React demo's `Switch.Root` class string ends `focus-visible:outline-white`; the Blazor port currently differs at `ease-in-out` (should be `ease-[ease]`) and `h-3.5 w-3.5` (should be `size-3.5`).
+The scheduled job runs daily and by manual dispatch. It compares committed baseline provenance and
+the declared pin with the tracked upstream revision using git/GitHub metadata only. Drift fails the
+schedule and creates or updates one deduplicated issue containing recorded and observed revisions,
+baseline age, and local refresh command. It is not a branch-protection check.
 
-- [ ] **Step 2: Run the fixture and triage**
-
-```bash
-PARITY_FIXTURES='switch/hero' dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests
-```
-
-Expected: PASS, or a finding list to triage. Every finding is either fixed in `src/Blazix.BaseUI/` or waived with a reason.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests
-git commit -m "Add the switch/hero parity fixture"
-```
-
-- [ ] **Step 4: Author the four calibration fixtures**
-
-Repeat the recipe for `collapsible/hero` (animation), `popover/hero` (portal, floating, custom properties), `select/grouped` (composite, keyboard), and `field/hero` (validation). Manifest steps:
-
-```json
-  { "id": "collapsible/hero", "component": "collapsible", "react": "collapsible/demos/hero/tailwind/index.tsx", "blazor": "Collapsible/Hero", "themes": ["light"], "pixelThreshold": 0.001,
-    "steps": [{ "name": "initial" },
-              { "name": "open",  "do": [{ "click": "@trigger" }], "settle": "animation" },
-              { "name": "close", "do": [{ "click": "@trigger" }], "settle": "animation" }] },
-  { "id": "popover/hero", "component": "popover", "react": "popover/demos/hero/tailwind/index.tsx", "blazor": "Popover/Hero", "themes": ["light"], "pixelThreshold": 0.001,
-    "steps": [{ "name": "initial" },
-              { "name": "open",   "do": [{ "click": "@trigger" }], "settle": "animation" },
-              { "name": "escape", "do": [{ "key": "Escape" }],     "settle": "animation" }] },
-  { "id": "select/grouped", "component": "select", "react": "select/demos/grouped/tailwind/index.tsx", "blazor": "Select/Grouped", "themes": ["light"], "pixelThreshold": 0.001,
-    "steps": [{ "name": "initial" },
-              { "name": "open",      "do": [{ "click": "@trigger" }], "settle": "animation" },
-              { "name": "arrow-down","do": [{ "key": "ArrowDown" }] },
-              { "name": "arrow-down-2","do": [{ "key": "ArrowDown" }] },
-              { "name": "select",    "do": [{ "key": "Enter" }], "settle": "animation" }] },
-  { "id": "field/hero", "component": "field", "react": "field/demos/hero/tailwind/index.tsx", "blazor": "Field/Hero", "themes": ["light"], "pixelThreshold": 0.001,
-    "steps": [{ "name": "initial" },
-              { "name": "focus",   "do": [{ "focus": "@input" }] },
-              { "name": "type",    "do": [{ "type": "a", "into": "@input" }] },
-              { "name": "blur",    "do": [{ "blur": "@input" }] }] }
-```
-
-- [ ] **Step 5: Calibrate tolerances**
-
-Run all five in both legs:
-
-```bash
-PARITY_FIXTURES='switch/hero,collapsible/hero,popover/hero,select/grouped,field/hero' dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests
-```
-
-Open `parity-report/index.html`. For any `Pixel` finding whose diff overlay shows only text antialiasing, raise that fixture's `pixelThreshold` and note the value in the manifest. For any finding that is a genuine Blazor limitation, add a waiver with a reason. For anything else, fix the component.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests src/Blazix.BaseUI
-git commit -m "Add the four calibration parity fixtures
-
-Animation, floating, composite, and validation fixtures exercise every
-comparator against real components and set the tolerance baseline."
-```
+- [ ] Use the Task 14b timing to set initial timeout and caching; do not treat prior estimates as
+  measurements. Add sharding only when measured need exists.
+- [ ] Test PR metadata inconsistency, ordinary upstream drift, issue deduplication, and no-live-mode
+  environment.
+- [ ] Run the workflow-equivalent commands locally, then enable the required check only after both
+  legs, pixels, provenance, and API snapshot execute successfully.
+- [ ] Commit the workflow and canary.
 
 ---
 
-### Task 16: Remaining 24 fixtures
+### Task 15: Five calibration fixtures
 
-**Files:**
-- Create: 24 files under `.../Client/Fixtures/<Component>/<Demo>.razor`
-- Modify: `manifest/fixtures.json`, `waivers/waivers.json`
+**Files:** create/update `switch/hero`, `collapsible/hero`, `popover/hero`, `select/grouped`, and
+`field/hero`; update manifest, exact waivers, baselines, and generated `parity.css`.
 
-Apply the Task 15 recipe to each batch, running and triaging batch by batch. Commit after each batch so a regression is bisectable to five fixtures rather than twenty-four.
+For each fixture, copy the existing Blazor Tailwind port, synchronize React class strings exactly,
+declare state-covering actions and completion contracts, regenerate CSS, refresh baselines locally,
+run both modes, and dispose every finding as component fix, exact reviewed waiver, harness fix, or
+explicit blocker.
 
-- [ ] **Step 1: Sanity batch** — `avatar/hero`, `separator/hero`, `progress/hero`, `meter/hero`. Single `initial` step each; no interactions. These should be clean, and any finding here indicates a harness problem rather than a component problem.
+Minimum completion contracts:
 
-- [ ] **Step 2: Commit** — `git commit -m "Add sanity parity fixtures"`
+- `switch/hero`: click completes at exact `aria-checked` state;
+- `collapsible/hero`: open/close completes at expanded state plus content visible/detached;
+- `popover/hero`: open completes at popup visible plus trigger expanded; Escape completes at popup
+  detached;
+- `select/grouped`: open at listbox visible; arrows at exact highlighted/active item; Enter at popup
+  detached plus selected trigger value;
+- `field/hero`: focus equality, typed input value, and blur/expected validation state.
 
-- [ ] **Step 3: Animation batch** — `accordion/multiple`, `dialog/hero`, `drawer/hero`, `toast/hero`. Each gets `initial`, an open step, and a close step, all with `"settle": "animation"`.
-
-- [ ] **Step 4: Commit** — `git commit -m "Add animation parity fixtures"`
-
-- [ ] **Step 5: Floating batch** — `tooltip/hero` (`hover` on `@trigger`), `preview-card/hero` (`hover`), `menu/arrow`, `select/hero`.
-
-- [ ] **Step 6: Commit** — `git commit -m "Add floating parity fixtures"`
-
-- [ ] **Step 7: Composite batch** — `menu/checkbox-items`, `menubar/hero`, `tabs/hero`, `toolbar/hero`. Each gets an open step then `ArrowDown`/`ArrowRight`/`Home`/`End` steps.
-
-- [ ] **Step 8: Commit** — `git commit -m "Add composite navigation parity fixtures"`
-
-- [ ] **Step 9: Form batch** — `form/hero`, `number-field/hero`, `checkbox/hero`, `otp-field/hero`. Include a submit step for `form/hero` and per-slot typing for `otp-field/hero`.
-
-- [ ] **Step 10: Commit** — `git commit -m "Add form parity fixtures"`
-
-- [ ] **Step 11: High-risk batch** — `popover/detached-triggers-simple`, `navigation-menu/hero`, `scroll-area/hero`, `combobox/hero`. Expect the most findings here; triage each as fix or waiver.
-
-- [ ] **Step 12: Commit** — `git commit -m "Add high-risk parity fixtures"`
-
-- [ ] **Step 13: Run the full suite in both legs**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests
-```
-
-Expected: PASS across all 29 fixtures × 2 Blazor legs, with every difference either fixed or waived.
+- [ ] Run each fixture first, then all five × Server/WASM through the production baseline pipeline.
+- [ ] Ensure completion failures cannot be waived and filtered runs are labelled diagnostic.
+- [ ] Commit in reviewable fixture batches.
 
 ---
 
-### Task 17: Generated limitation documentation
+### Task 16: Remaining 24 Milestone 1 fixtures
+
+Add the remaining named fixtures in the existing sanity, animation, floating, composite, form, and
+high-risk batches. Every action receives an observable completion contract; `actionOnly` requires a
+reviewed non-empty reason and is exceptional. Regenerate CSS and baselines per batch, run both modes,
+and dispose all findings before moving on.
+
+The full run must execute exactly 29 declared milestone fixtures × both Blazor modes. Do not count
+the canary as one of 29. A missing fixture, filtered run, completion failure, missing leg, or execution
+failure lowers `<executed>` and leaves the milestone incomplete; it never shrinks the denominator.
+A tracked unresolved blocker records disposition but does not permit completion while a required
+Error or execution path remains outstanding.
+
+- [ ] Run the canary through the same comparison composition in both modes.
+- [ ] Run all 29 in baseline mode and assert no unwaived Error remains.
+- [ ] Record every finding disposition and preserve retry/Flaky evidence.
+- [ ] Emit a report with exact upstream SHA, `29/29`, ids, steps, modes, dimensions, thresholds, and
+  applied waivers.
+- [ ] Time the full run and update Task 18 cache/timeout/sharding only from that evidence.
+- [ ] Commit each mechanism batch and final evidence refresh.
+
+The permitted statement is the bounded claim in the design spec. Do not write “Blazix has Base UI
+parity,” repository-wide parity, or component-wide parity for the 20 touched components.
+
+Issue #176 begins only after every first-29 finding has a recorded disposition. It does not wait for
+an arbitrary green cadence. Its first action is to recount upstream at the then-pinned SHA and replace
+the nominal 85 with the exact remainder.
+
+---
+
+### Task 17: Generated limitations and bounded milestone documentation
 
 **Files:**
+
 - Create: `.../Report/LimitationsWriter.cs`
 - Create: `.../Tests/HarnessTests/LimitationsWriterTests.cs`
-- Create: `docs/audits/parity-limitations.md` (generated)
+- Create: `docs/audits/parity-limitations.md`
+- Update: durable parity documentation/README with the bounded claim and #176 link
 
-**Interfaces:**
-- Consumes: `WaiverFile.Load()`.
-- Produces: `docs/audits/parity-limitations.md`, grouped by component.
+Generate limitations from active waiver records. Group by component and include exact fixture, leg,
+step, node/run identity, kind, property, observed values, reason, disposition, link, expiry, and
+status. Include both accepted limitations and deferred defects. The run report—not the limitations
+list—must retain unused/expired/malformed/ambiguous diagnostics because those states block generation.
 
-- [ ] **Step 1: Write the failing test**
+Do not regenerate the full document from `PARITY_FIXTURES` output. Test the generated banner/source,
+ordering, exact scopes, dispositions, expiry, and links.
 
-Assert that given two waivers for different components, the generated markdown contains a `## ` heading per component, each waiver's reason, and a "generated file — do not edit" banner naming the source path.
+Document the exact milestone claim from the spec with upstream SHA, `<executed>/29`, both modes,
+dimensions, thresholds, retries, and waivers. Link #176 as the owned expansion milestone and state
+that 29 proves only the method and named evidence.
 
-- [ ] **Step 2: Run it to verify it fails**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "LimitationsWriterTests"
-```
-
-Expected: FAIL.
-
-- [ ] **Step 3: Implement `LimitationsWriter` and wire it into the run**
-
-Group waivers by the component segment of `Fixture`, emit a table of `Fixture | Step | Node | Property | Reason | Doc`, and write the file at the end of a full run (skipped when `PARITY_FIXTURES` is set, since a filtered run would truncate the document).
-
-- [ ] **Step 4: Run the test, then generate the document**
-
-```bash
-dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests --filter "LimitationsWriterTests" && dotnet test tests/Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests
-```
-
-Expected: PASS, and `docs/audits/parity-limitations.md` exists.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/Blazix.BaseUI.Parity.Tests docs/audits/parity-limitations.md
-git commit -m "Generate the parity limitation document from waivers
-
-The documented limitation list is generated, so it cannot drift from
-what the suite actually tolerates."
-```
+- [ ] Run writer/link tests.
+- [ ] Run the unfiltered 29-fixture baseline suite and generate documentation only from a complete,
+  valid verdict.
+- [ ] Commit the generated limitations and bounded evidence documentation.
 
 ---
 
-## Self-Review
+## Completion checklist
 
-**Spec coverage.** Architecture → Tasks 1–3. Determinism knobs → Tasks 2, 4 (launch args), 5. Manifest and addressing → Task 5. Capture contract and style allowlist → Task 4. Normalization, id symbolization, marker rule → Task 4 (capture.js) and Task 6 (`markers.json`, `MarkerComparator`). Comparator table → Tasks 6–10 (`ApiSurface` is the separate plan, stated in the header). Animation three layers and frame seeking → Tasks 9–10. Visual comparison and portal screenshots → Task 10. Waivers → Task 11. Baselines and staleness → Task 12. Report → Task 13. Reliability, settle protocol, split parallelism, retry → Tasks 4, 14. Harness self-tests and canary → Task 14 plus per-task unit tests. First-milestone corpus → Tasks 15–16. Generated limitations → Task 17.
+- [ ] Task 5b selector kinds are distinct and registry-complete.
+- [ ] Task 5c postconditions fence dependent actions and emit non-waivable typed failures.
+- [ ] Task 14a has produced real unwaived Server/WASM integration evidence.
+- [ ] Task 10c makes node/run identities trustworthy before waivers.
+- [ ] Task 11 implements exact, reviewed, expiring waivers and conservative retry.
+- [ ] Task 12 baseline mode is independent of Node/`.base-ui` and carries CI pixel provenance.
+- [ ] Task 13 reports primary evidence and falsifiable scope.
+- [ ] Task 14b runs every selected fixture in both modes and preserves execution failures.
+- [ ] Task 18 required PR CI and daily freshness canary are active under their distinct blocking rules.
+- [ ] Tasks 15–16 produce a complete `29/29` bounded evidence run.
+- [ ] Task 17 publishes generated limitations and the exact bounded claim.
+- [ ] #176 owns the recounted remainder; Tasks 15–17 do not absorb it.
 
-**Gap found and fixed:** the spec's `themes` field is defined but no task consumed it. Task 5's `FixtureEntry` carries it and `ParityCapturer` applies `prefers-color-scheme` per theme; every first-milestone fixture uses `["light"]`, so the multi-theme loop runs exactly once per fixture and is exercised but not relied upon.
+## Self-review
 
-**Type consistency.** `CaptureBundle`/`StepCapture`/`DomNode`/`TimelineEvent` (Task 4) are consumed unchanged by Tasks 6–10. `Finding`/`FindingKind`/`Severity` (Task 6) are produced by every comparator and consumed by `WaiverMatcher` (Task 11) and both report writers (Task 13). `ParityLeg` (Task 4) is used by Tasks 5, 6, 12, 14. `FixtureEntry.PixelThreshold` (Task 5) is read by `PixelComparator` (Task 10) and adjusted in Task 15. `ParityPaths` (Task 3) is used by Tasks 4, 5, 11, 12, 13.
-
-**Placeholder scan:** no TBD/TODO entries; every code step carries the code, and the four steps that describe an implementation in prose (Task 6 Step 4, Task 7 Step 4, Task 8 Step 3, Task 13 Step 3) each specify exact type names, exact algorithms, and exact tolerances rather than deferring decisions.
+The remaining plan now maps selector semantics to Task 5b, action completion to 5c, integration-first
+ordering to 14a, comparator trust to 10c, waiver/retry policy to 11, baselines to 12, evidence
+presentation to 13, final test composition to 14b, unattended execution to 18, the fixed 29 corpus to
+15–16, and generated documentation to 17. The API-surface implementation remains a separate plan,
+but its committed-snapshot check is an explicit Task 18 activation dependency. No remaining step
+asks an implementer to choose wildcard policy, selector kind, settle fence, trigger, milestone scope,
+or corpus-expansion gate.

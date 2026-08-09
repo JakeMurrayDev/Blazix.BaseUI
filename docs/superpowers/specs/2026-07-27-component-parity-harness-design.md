@@ -1,457 +1,386 @@
 # Component Parity Harness — Design
 
 **Date:** 2026-07-27
-**Status:** Approved (design); implementation plan pending
+
+**Decision consolidation:** 2026-08-09
+
+**Status:** Approved; Wayfinder decisions resolved; remaining implementation follows the pipeline plan
 
 ## Purpose
 
-Automate the comparison currently done by hand in `docs/audits/*-parity-matrix.md`: for every base-ui
-component demo, capture what React renders and what the Blazix port renders, diff them across several
-dimensions, and either fail the build or record the difference as a documented, justified deviation.
+Automate the comparison currently done by hand in `docs/audits/*-parity-matrix.md`: capture the
+upstream React demo and the Blazix port, compare their observable behavior, and either fail or record
+one precise, reviewed deviation.
 
 The suite answers three questions:
 
-1. Does the Blazix implementation lack functionality the upstream component has?
-2. Where the two differ, is the difference a defect or an accepted Blazor limitation?
-3. Has an accepted limitation silently become a regression, or silently been fixed?
+1. Does a named Blazix fixture lack behavior its paired upstream fixture exposes?
+2. Is each observed difference a defect or a reviewed limitation?
+3. Has a reviewed limitation regressed, disappeared, or changed identity?
+
+It does not infer repository-wide parity from a partial corpus.
 
 ## Context and constraints
 
-Facts established while exploring the repo, all of which shape the design:
-
 | Fact | Consequence |
 | --- | --- |
-| `.base-ui` is a gitignored local checkout at the main repo root (`.gitignore:373`), absent from worktrees | The React side cannot run in CI; anything derived from it must be snapshotted and committed |
-| CI is lint-only (`.github/workflows/lint.yml`) — no test job exists | The suite is a local/developer tool first; a CI job is a later, separate decision |
-| base-ui ships 114 `tailwind/` demo variants across 38 components under `docs/src/app/(docs)/react/components/<c>/demos/<demo>/tailwind/index.tsx` | These are the React fixtures; no React authoring required |
-| Those demos are plain React with no Next.js coupling | They are standalone Vite-buildable (base-ui's own `test/regressions` uses this pattern) |
-| base-ui uses Tailwind v4.2.4, CSS-first | One Tailwind build can scan both `.tsx` and `.razor` via `@source`, giving both sides one stylesheet |
-| The Blazix docs site already ports demos 1:1 by name (`Demos/Select/{Hero,Grouped,Multiple,ObjectValues}`) but styles them with plain CSS | Blazor fixtures are a restyle of existing ports, not new authoring |
-| base-ui emits 11 `data-base-ui-*` attributes; Blazix emits 23 `data-blazix-*` attributes, 20 of them `data-blazix-base-ui-*` | The marker relationship is a prefix rename, not a bespoke mapping table |
-| Blazix emits both forms inconsistently — `PopoverPopup.razor:200` uses `data-base-ui-focusable`, `DrawerPopup.razor:375` uses `data-blazix-base-ui-focusable` | A known-shaped defect the suite should catch on day one |
-| `xunit.runner.json` runs `maxParallelThreads: 4` | Timing-sensitive comparators must be isolated into a serial collection |
+| `.base-ui` is gitignored and absent from worktrees and CI | Live React capture is local/manual; committed React baselines make PR CI independent of Node and `.base-ui` |
+| Upstream currently has 114 Tailwind demos across 38 components | Milestone 1 deliberately validates 29 named fixtures; issue #176 owns expansion to the then-current remainder |
+| React fixtures are upstream demos, not forks | Actions and completion checks address common ARIA/role/browser-observable state rather than added React hooks |
+| Server and WASM have different scheduling and transport | Both legs are required; elapsed time may differ, but the completion contract and verdict do not |
+| No supported public browser API exposes descendant Blazor render-batch completion in both modes | Each action declares its observable consequence; private renderer APIs, fixed settle delays, host generation counters, and global quiet horizons are forbidden |
+| Timing tests share a four-thread test process | Timing comparators run in a non-parallel collection |
 
-## Decisions
+## Ratified decisions
 
 | Decision | Choice |
 | --- | --- |
-| React baseline strategy | Committed baselines by default; `PARITY_LIVE=1` recaptures |
-| Fixture corpus | First milestone: 29 fixtures (a quarter of the 114); remainder follows once findings are triaged |
-| Verdict model | Waiver file with a required `reason`; unwaived diffs fail |
-| Output | Tailwind-styled HTML report + machine-readable JSON |
-| Render modes | Blazor Server and WASM (plus a free Server-vs-WASM cross-check) |
-| Extra dimensions | ARIA snapshot, keyboard/focus path, API surface, CSS custom properties + floating geometry |
-| Architecture | One C# runner; React side pre-built to a static bundle |
+| React source | Committed baseline by default; `PARITY_LIVE=1` and baseline writes are local/manual |
+| Milestone corpus | Fixed denominator of 29 named fixtures; validates the method and only the evidence named in the report |
+| Remaining corpus | #176 starts after all first-29 findings have dispositions; recount at the then-pinned SHA |
+| Render modes | React reference plus required Blazor Server and WASM candidates |
+| Action completion | Required per-action observable postconditions; typed, non-waivable failure when unmet |
+| Selector findings | `SelectorUnresolved` and `SelectorNonActionable` are distinct exact identities |
+| Comparator trust | Repair node correspondence and run-aware timeline evaluation before waivers |
+| Waivers | Exact, expiring, reviewed finding records; no wildcard/quarantine semantics |
+| Reporting | HTML and JSON retain primary evidence, exact scope, retries, waivers, and milestone denominator |
+| Unattended trigger | Required baseline-only PR check plus daily metadata-only staleness canary |
+| Architecture | One C# Playwright runner; one capture script; explicit exhaustive comparator registry |
 
-### Why one C# runner
+## Architecture and run flow
 
-Both sides are captured by the same C# Playwright driver, in the same browser context, with the same
-injected `capture.js`. This is what makes a pixel diff meaningful: two Playwright installs would mean
-two browser revisions, and screenshots would then differ for reasons unrelated to the components.
-Node is required only to rebuild the React bundle when base-ui is bumped, never at test time.
-
-Rejected alternatives: two native runners sharing a capture script (gives up browser-build parity,
-and requires keeping two drivers in lockstep on viewport, DPR, reduced-motion, fonts, and settle
-timing); an all-Node pipeline (puts parity results outside `dotnet test` in a .NET-first repo, and
-moves the waiver registry away from the components it describes).
-
-## Architecture
-
-```
-tests/Blazix.BaseUI.Parity.Tests/
-├─ Blazix.BaseUI.Parity.Tests/          xUnit v3 + Playwright driver, diff engine, report
-│    Infrastructure/  Capture/  Diff/  Waivers/  Report/  Tests/
-├─ Blazix.BaseUI.Parity.Fixtures/       Blazor Web App hosting the 114 Tailwind fixtures
-│    …Fixtures/ (server host)  …Fixtures.Client/ (Server + WASM routes per fixture)
-├─ react-fixtures/                      Vite app; globs base-ui tailwind demos into routes
-│    vite.config.mts  src/  dist/ (gitignored)
-├─ shared/
-│    capture.js                         injected into both sides by the same runner
-├─ react-fixtures/src/parity.css        Tailwind input, scanning .tsx AND .razor
-│  …/Blazix.BaseUI.Parity.Tests/wwwroot/parity.css   generated output, loaded by both sides
-├─ manifest/fixtures.json               the 114 pairs + interaction scripts
-├─ manifest/markers.json                data-blazix-* classification
-├─ manifest/naming.json                 React prop → Blazor parameter conventions
-├─ baselines/                           committed React capture bundles, screenshots, api/
-└─ waivers/waivers.json
+```text
+manifest + committed React baseline
+              |
+              v
+      action dispatch on one leg
+              |
+              v
+   declared completion postcondition
+              |
+              v
+ portal gate + mutation quiescence
+              |
+              v
+ capture -> comparator registry -> findings
+              |
+              v
+ retry correlation -> exact waivers -> HTML/JSON verdict
 ```
 
-### Why a dedicated Blazor fixtures app
+The live integration core constructs one `ComparisonContext` for every paired step and passes
+`FixtureEntry.PixelThreshold` through to the pixel comparator. The registry names every supported
+`FindingKind` exactly once and fails an exhaustiveness test when a kind is added without a comparator.
 
-The fixture host must load **only** `parity.css`. Site chrome, layout CSS, or a Bootstrap reset
-carried by the existing `Blazix.BaseUI.Playwright.Tests.Client` would appear in `getComputedStyle`
-output and read as a component discrepancy. Stylesheet isolation is a correctness requirement, and
-it is what rules out reusing the existing test app.
+In live mode, missing `react-fixtures/dist/` fails before navigation with the exact build command.
+Baseline mode never needs that bundle. The deliberately broken canary traverses the same capture,
+context construction, registry, and comparison composition as real fixtures in both Server and WASM.
 
-### Run flow
-
-1. `pnpm --dir tests/Blazix.BaseUI.Parity.Tests/react-fixtures build` → static `dist/`
-   *(only when base-ui changes)*
-2. `dotnet test` — an assembly fixture starts a Kestrel static-file server for `dist/` and the Blazor
-   fixtures app
-3. For each manifest entry × `{react, blazor-server, blazor-wasm}`: navigate → settle → inject
-   `capture.js` → replay the interaction script → collect a `CaptureBundle`. The React leg is skipped
-   when baselines are current and `PARITY_LIVE` is unset.
-
-### Invocation
-
-Modes are selected by environment variable, following the repo's existing `PLAYWRIGHT_*` convention:
+## Invocation and baselines
 
 | Variable | Effect |
 | --- | --- |
-| `PARITY_LIVE=1` | Recapture the React leg in-process instead of loading committed baselines |
-| `PARITY_WRITE_BASELINES=1` | Persist the captured React leg to `baselines/` (implies `PARITY_LIVE`) |
-| `PARITY_FIXTURES=<glob>` | Restrict the run to matching fixture ids, e.g. `popover/*` |
-| `PARITY_REPORT_DIR=<path>` | Override the report output folder |
+| `PARITY_LIVE=1` | Capture React in-process from the locally built bundle |
+| `PARITY_WRITE_BASELINES=1` | Persist the live React captures; implies live mode |
+| `PARITY_FIXTURES=<glob>` | Diagnostic subset only; never satisfies the 29-fixture milestone |
+| `PARITY_REPORT_DIR=<path>` | Override report output |
 
-`pnpm parity:baseline` is a thin wrapper that rebuilds the React bundle and runs
-`dotnet test` with `PARITY_WRITE_BASELINES=1`.
-4. Diff bundles → apply waivers → one xUnit assertion per fixture × mode
-5. Emit `parity-report/` and `parity-result.json`
+Each committed baseline records the pinned upstream SHA, source/demo content hash, fixture/step
+scope, capture schema version, browser/OS pixel provenance, and generated time. A local live/write run
+fails on a source-hash mismatch with the refresh command.
 
-### Baseline staleness
+PR CI uses baseline mode only: no `PARITY_LIVE`, `.base-ui` clone, pnpm install, or React build. A PR
+that changes the declared upstream pin or baseline provenance inconsistently fails. Upstream movement
+outside the repository is detected by a separate daily metadata-only canary, which creates or updates
+one deduplicated tracking issue but does not freeze unrelated pull requests.
 
-Each baseline records the base-ui git SHA and a content hash of the demo files it derives from. If
-the built bundle's hashes do not match the baselines, the run **fails** with
-`baselines stale — run pnpm parity:baseline`, rather than diffing against stale output.
+Pixel baselines used by required CI are Linux-captured or explicitly per-OS. The required job installs
+Chromium and Linux Skia native assets; pixel comparison is not silently waived.
 
-### Determinism knobs
+## Fixture manifest and action completion
 
-Applied identically to both sides: viewport 1000×700, DPR 1, `--font-render-hinting=none`, a pinned
-local font, `timezoneId: UTC`, `prefers-color-scheme: light`. `reducedMotion: reduce` is applied for
-visual and style captures and **deliberately not** for animation captures, which run in a separate
-browser context with motion enabled.
-
-Dark mode is a per-fixture `themes` field defaulting to `["light"]` — opt-in per fixture rather than
-tripling every run.
-
-## Fixture manifest
+Every action has exactly one completion contract: either a non-empty `complete` list, all of whose
+predicates must hold, or `actionOnly` with a non-empty reason. This supports one load-bearing predicate
+without preventing a high-value open/select action from requiring a conjunction.
 
 ```jsonc
 {
   "id": "popover/hero",
-  "component": "Popover",
+  "component": "popover",
   "react": "popover/demos/hero/tailwind/index.tsx",
   "blazor": "Popover/Hero",
   "themes": ["light"],
   "pixelThreshold": 0.001,
   "steps": [
     { "name": "initial" },
-    { "name": "open",   "do": [{ "click": "@trigger" }], "settle": "animation" },
-    { "name": "escape", "do": [{ "key": "Escape" }],     "settle": "animation" }
+    {
+      "name": "open",
+      "do": [{
+        "click": "@trigger",
+        "complete": [
+          { "selector": "@popup", "state": "visible" },
+          { "selector": "@trigger", "attribute": "aria-expanded", "equals": "true" }
+        ]
+      }],
+      "settle": "animation"
+    },
+    {
+      "name": "escape",
+      "do": [{ "key": "Escape", "complete": [{ "selector": "@popup", "state": "detached" }] }],
+      "settle": "animation"
+    }
   ]
 }
 ```
 
-### First-milestone corpus
+Supported predicates are:
 
-29 of the 114 demos. Selected to maximize **distinct mechanism coverage** rather than even spread —
-the purpose of the first quarter is to surface discrepancies and calibrate tolerances, not to be
-uniformly representative. 20 of 38 components are touched, and every mechanism class appears.
+- alias-backed selector state: `attached`, `detached`, `visible`, or `hidden`;
+- DOM attribute or property equality;
+- input value equality;
+- focus equality or inequality.
 
-| Class | Fixtures |
+Aliases are expanded before waiting and before recording finding identity. Manifest loading rejects a
+missing contract, both contract forms on one action, an empty predicate list, an unknown predicate,
+or a blank `actionOnly.reason`.
+
+`actionOnly` is legal only for an intentionally no-render/browser-only action with no stronger
+common predicate. It is not a convenience escape. Focus uses focus equality; clicks, keys, typing,
+selection, open/close, and validation ordinarily require state predicates. The reason is report
+metadata, not a waiver.
+
+For every step, the capturer:
+
+1. starts a fresh timeline recording before the first action;
+2. dispatches an action;
+3. waits for every declared predicate on that same leg;
+4. begins the next action only after the current contract completes;
+5. after all actions, runs the portal gate and two-frame mutation quiescence;
+6. stops that step's timeline and captures the final state.
+
+The fixture-host generation counter rejected by #142 is not part of this design. A fixture-specific
+token is also absent: the #177 prototype showed it arrived with the meaningful DOM predicate and
+added no capability.
+
+### Completion failure
+
+If a declared consequence misses its configurable deadline, emit non-waivable
+`ActionCompletionUnmet/Error` with fixture, leg, step, zero-based action index, verb, expanded
+selector, predicate/expected value, and bounded observed state. Stop later actions in that step, then
+quiesce and capture DOM, ARIA, console, timeline, and screenshots for diagnosis. Do not throw away
+the parity evidence and do not treat temporary quiet as success.
+
+Selector absence, selector non-actionability, and completion failure remain three different typed
+facts. A failure on both legs is still an invalid action contract/shared fixture failure.
+
+## First-milestone scope and claim
+
+The first milestone contains 29 named fixtures across 20 components and all designed mechanism
+classes. Its denominator never shrinks because of filters, failures, missing legs, exclusions, or
+completion failures.
+
+Milestone completion requires:
+
+1. the production runner executes all 29 fixtures in both Server and WASM;
+2. every action completes or has a valid `actionOnly` declaration;
+3. the canary produces its known findings through the same composition in both modes;
+4. every finding has a component fix, justified waiver, harness fix, or explicit unresolved blocker;
+5. no unwaived Error remains, and retry/Flaky results remain visible;
+6. baseline metadata and the report record the full evidence scope.
+
+The only permitted claim is:
+
+> At upstream Base UI SHA `<sha>`, the parity harness executed `<executed>/29` declared Milestone 1
+> fixtures against both Blazor Server and WebAssembly through the production capture, comparison,
+> waiver, and reporting pipeline. The corpus spans 20 components and every designed mechanism class.
+> All findings have recorded dispositions and no unwaived errors remain. This validates the parity
+> method and establishes parity evidence only for the named fixtures, steps, modes, capture
+> dimensions, tolerances, retries, and waivers in the report; it is not evidence of repository-wide
+> or component-wide parity.
+
+If `<executed>` is less than 29, or a tracked blocker still leaves a required Error undisposed, the
+milestone is incomplete. A unit suite, canary, filtered run, or green CI cadence cannot satisfy it.
+
+Issue #176 owns corpus expansion. It begins after all first-29 findings have dispositions, not after
+an arbitrary green period. Its first action is to recount upstream demos at the then-pinned SHA and
+reconcile the exact remainder. Every upstream Tailwind demo at that SHA ultimately needs an
+executable two-mode fixture or an explicit reasoned exclusion.
+
+## Selector comparison
+
+`UnresolvedSelectors` and `NonActionableSelectors` are compared separately as ordinal multisets, so
+repeated failures preserve multiplicity and categories never cancel:
+
+- `SelectorUnresolved`: the expanded selector matched no attached element;
+- `SelectorNonActionable`: an attached element could not be driven.
+
+Each difference is `Error` in either direction. `Property` is the exact expanded selector,
+`NodePath` is empty, and `ReferenceValue`/`CandidateValue` are invariant decimal counts including
+zero. Message text is presentation only. Two separate `IComparator` implementations own the two
+kinds, and the registry must include both.
+
+## Node correspondence and comparator trust
+
+Node correspondence is a prerequisite to waivers. Before Task 10c, the integration core is discovery
+only: no waiver, baseline certification, or equality claim may be derived from one-sided Structure
+output. Task 10c must make every downstream pair correspondence-backed or emit a stable explicit
+uncertainty finding. Its adversarial acceptance corpus includes childless same-key wrapper collision,
+corroboration cross-pair, wrapper plus identity change, and reorder below a stepped level. Truthful
+Structure output and downstream Attribute, ARIA, style, and geometry coverage must survive.
+
+A Structure waiver never cascades to descendants and absence of pair-dependent findings never means
+the subtree agrees.
+
+## Findings and comparators
+
+Findings carry `{ kind, severity, fixture, leg, step, nodePath, property, referenceValue,
+candidateValue }`. `Message` is presentation only.
+
+| Kind | Contract |
 | --- | --- |
-| Sanity (no floating, no animation) | `switch/hero`, `avatar/hero`, `separator/hero`, `progress/hero`, `meter/hero` |
-| Animation and mount/unmount | `collapsible/hero`, `accordion/multiple`, `dialog/hero`, `drawer/hero`, `toast/hero` |
-| Floating and positioning | `popover/hero`, `tooltip/hero`, `preview-card/hero`, `menu/arrow`, `select/hero` |
-| Composite and keyboard nav | `select/grouped`, `menu/checkbox-items`, `menubar/hero`, `tabs/hero`, `toolbar/hero` |
-| Form and validation | `field/hero`, `form/hero`, `number-field/hero`, `checkbox/hero`, `otp-field/hero` |
-| High-risk | `popover/detached-triggers-simple`, `navigation-menu/hero`, `scroll-area/hero`, `combobox/hero` |
+| `Structure`, `Attribute`, `AriaSnapshot`, `ComputedStyle`, `CustomProperty`, `Geometry`, `Focus`, `Console`, `Marker`, `Pixel` | Existing exact/tolerance contracts from Tasks 6–10 |
+| `SelectorUnresolved` | Ordinal-multiset difference in absent expanded selectors |
+| `SelectorNonActionable` | Ordinal-multiset difference in attached-but-undriveable selectors |
+| `ActionCompletionUnmet` | Non-waivable per-leg action consequence failure |
+| `Timeline` | L1 sequence, run-aware L2 phase obligations, and L3 duration evidence |
+| `ApiSurface` | Separate committed-snapshot subsystem; required by CI activation |
 
-`accordion/multiple` is preferred over `accordion/hero` because it exercises independent open state;
-`menu/arrow` over `menu/hero` because it adds arrow positioning geometry.
+## Animation comparison and reporting precedence
 
-**All 29 already have Blazor Tailwind ports** under
-`docs/Blazix.BaseUI.Docs/Blazix.BaseUI.Docs.Client/Components/Demos/<Component>/<Demo>/Tailwind/`
-(90 such ports exist repo-wide). Fixture authoring is therefore neither new component work nor a
-restyle from CSS — the structure and component usage are already correct, and the task is to
-**sync the class strings verbatim from the React demo**.
+Timeline capture is per step, armed before actions and stopped after completion plus quiescence.
 
-That sync is load-bearing, not cosmetic. The existing ports paraphrase: `Switch/Hero/Tailwind` uses
-`ease-in-out` where base-ui uses `ease-[ease]`, and `h-3.5 w-3.5` where base-ui uses `size-3.5`.
-Transplanting base-ui's exact strings ensures any surviving computed-style difference is attributable
-to the **component** — a missing `data-checked` attribute means `data-checked:bg-white` never
-applies — rather than to how the demo was written.
+- **L1 sequence** is strict and primary. It retains run, insertion, and removal differences.
+- **L2 phase ordering** is evaluated per explicit run. Its stable `Property` encodes invariant,
+  family/property, and zero-based run ordinal (for example
+  `present-at-transitionend@transition:opacity#1`) before becoming waiver-eligible. This keeps the
+  exact six-field waiver identity without hiding duplicate runs.
+- **L3 duration** judges each leg against its own declaration. When run counts differ, do not print
+  index-cross-paired values; a valid per-leg overrun may remain without a misleading opposite value.
+  Keyframe declarations account for finite iteration count and negative animation/transition delay;
+  byte-identical repeated-animation or negative-delay runs must not become symmetric false Errors.
 
-### Element addressing
-
-The React demos are upstream files and are **not** forked, so `data-parity` hooks cannot be added to
-them — forking would forfeit the guarantee that the React side is known-correct upstream usage.
-
-Steps therefore address elements through **ARIA/role selectors**, expanded from a per-component alias
-table: `@trigger` → `[aria-haspopup],[aria-expanded]`, `@popup` → `[role=dialog],[role=menu],[role=listbox]`,
-`@item(n)`, `@input`.
-
-Roles are the one contract both implementations are obliged to honour. When a selector resolves on
-React but not on Blazor, the harness records a `SelectorUnresolved` **finding** rather than erroring —
-the addressing scheme doubles as a parity check.
-
-### Step action vocabulary
-
-`click`, `hover`, `key`, `type` (with `into`), `focus`, `blur`, `scroll`, `wait`. `settle` is one of
-`render` (default: quiescence) or `animation` (quiescence plus timeline capture).
-
-## Capture contract
-
-`shared/capture.js` is injected via `AddInitScriptAsync` into both hosts by the same C# runner —
-literally the same bytes, so DOM walking, path computation, and the style allowlist cannot drift
-between legs. It exposes `window.__parity.capture(step)` and `startTimeline()` / `stopTimeline()`.
-
-`CaptureBundle` per step:
-
-| Field | Content |
-| --- | --- |
-| `dom` | normalized tree (tag, attributes, text) |
-| `aria` | Playwright `AriaSnapshotAsync()` — same C# call for both legs |
-| `styles` | allowlisted computed properties, keyed by node path |
-| `customProps` | `--*` values, keyed by node path |
-| `geometry` | bounding rect, plus rect-relative-to-anchor for floating parts |
-| `focus` | node path of `activeElement` |
-| `console` | errors and warnings |
-| `timeline` | attribute/transition/animation events (animation steps only) |
-| `screenshot` | captured by the runner: fixture root plus each portal container |
-
-### Style allowlist
-
-Approximately 60 properties, not all ~340: box model, flex/grid, typography, colour/background/
-opacity/shadow, transform, transition/animation, overflow, visibility, pointer-events, cursor,
-outline, z-index. Diffing everything drowns real findings in vendor-prefixed noise.
-
-## Normalization
-
-Applied to both sides:
-
-- Comment nodes dropped, including Blazor's `<!--Blazor:…-->` markers.
-- **Generated ids are symbolized, not stripped.** React `useId` values and Blazor GUIDs differ for the
-  same concept, so each id becomes `#id1`, `#id2`… in document order, and every reference
-  (`aria-labelledby`, `aria-controls`, `aria-describedby`, `aria-activedescendant`, `for`) is rewritten
-  through the same table. The relationship is preserved and diffed; the arbitrary string is not. A
-  popup whose `aria-controls` points at the wrong node still fails.
-- `class` is **excluded from the attribute diff and reported as `Info` only**. Tailwind admits
-  multiple spellings of the same result — `size-3.5` and `h-3.5 w-3.5` are computed-style identical
-  but class-set different — so class-set equality produces false positives. `ComputedStyle` is the
-  real assertion; the `Info` entry exists so an author can see class drift when triaging a style
-  finding.
-- Text nodes whitespace-normalized.
-- The `style` attribute is excluded from the attribute diff; inline positioning styles are covered by
-  the computed-style and geometry comparators, which apply numeric tolerance rather than string
-  equality.
-
-### Node matching
-
-Normalize, then match greedily on `(tag, role, accessible-name, ordinal)`. Leftovers on either side
-become `NodeAdded` / `NodeRemoved` findings — which is how an extra Blazor wrapper element surfaces.
-Paths render as `div[role=presentation] > button[role=combobox]`.
-
-### `data-blazix-*` handling
-
-1. **Rename, don't exclude.** `data-blazix-base-ui-X` → `data-base-ui-X` during normalization, then
-   diff normally. This resolves 8 of the 20 prefixed markers against their upstream counterparts for
-   free (`click-trigger`, `focus-guard`, `focusable`, `inert`, `navigation-menu-trigger`, `portal`,
-   `scroll-locked`, `swipe-ignore`), and makes a *missing* Blazor marker a genuine finding rather
-   than a silent pass.
-2. **Exception list** (`manifest/markers.json`) for markers with no upstream counterpart —
-   `positioner`, `composite-item`, `list-item`, `toast-root`, `accordion-root`, `active`,
-   `disable-scrollbar`, `focus-guard-type`, `label`, `navigation-menu-viewport-target`,
-   `popover-arrow`, `scroll-area-disable-scrollbar`, and the `data-blazix-otp-*` set. Each declares
-   `blazorOnly: true` plus a reason, and is dropped from the diff.
-3. **Ratchet:** any `data-blazix-*` in a capture that neither matches after renaming nor appears in
-   `markers.json` fails the run. New markers must be classified when they are added.
-
-The remaining three upstream markers — `data-base-ui-slider-control`, `-slider-indicator`,
-`-tooltip-trigger` — are already emitted by Blazix in **unprefixed** form (`SliderControl.razor:193`,
-`SliderIndicator.razor:112`, `TooltipTypedTrigger.razor:22`), so they match upstream directly and need
-no rename. This is the same inconsistency noted in the context table: Blazix uses both the prefixed
-and unprefixed conventions across different components. The rename rule is deliberately one-way and
-idempotent — an already-unprefixed marker passes through untouched — so it handles both conventions
-without the suite having to care which a given component chose.
-
-## Comparators
-
-Each emits typed findings: `{ kind, severity, fixture, leg, step, nodePath, property, reactValue, blazorValue }`.
-Severity is `Error` (unwaived → fail), `Info`, or `Flaky`.
-
-| Comparator | Checks | Tolerance |
-| --- | --- | --- |
-| `Structure` | node presence, ordering, depth | exact |
-| `Attribute` | all attributes except `style` and `class`, post-normalization | exact |
-| `AriaSnapshot` | role + accessible name + state tree | exact |
-| `ComputedStyle` | allowlisted properties per matched node | ±0.5px numeric |
-| `CustomProperty` | `--*` values | ±0.5px numeric |
-| `Geometry` | bounding rect, rect-relative-to-anchor | ±1px |
-| `Focus` | `activeElement` path per step and per key | exact |
-| `Console` | errors/warnings present on one side only | exact |
-| `Marker` | `data-blazix-*` classification ratchet | exact |
-| `Timeline` | animation sequence and phase ordering | see below |
-| `Pixel` | screenshot mismatch ratio | `pixelThreshold`, default 0.1% |
-| `ApiSurface` | `types.md` props vs `[Parameter]` properties | exact |
-
-## Animation comparison
-
-`startTimeline()` installs a `MutationObserver` (`attributes`, `attributeOldValue`, `subtree`,
-`childList`) plus capture-phase listeners for `transitionstart/end/cancel` and
-`animationstart/end/cancel`, timestamped from `performance.now()` relative to the trigger dispatch,
-running until quiescent.
-
-Raw millisecond comparison across React, Blazor Server (round-trip latency) and WASM (3× timeouts)
-would be pure flake. The timeline is therefore compared in three layers:
-
-**L1 — Sequence (strict, primary assertion).** The ordered event list with timestamps erased:
-`data-starting-style` added → removed → `transitionstart` → `transitionend`; on close
-`data-ending-style` added → `transitionend` → node removed. An element that vanishes instantly
-instead of animating out has a structurally different sequence.
-
-**L2 — Phase ordering (strict).** Invariants derived from the timeline: did the node mount before the
-transition started; was it still in the DOM at `transitionend`; did `data-open` flip before or after
-`data-starting-style` cleared.
-
-**L3 — Duration (advisory).** Each side's observed duration is checked against *its own* declared CSS
-duration, not against the other side. Server latency delays the animation's start without failing
-anything, while a transition that ran 0ms or 3× its declared length still fails. Cross-side duration
-deltas are reported as `Info`, never `Error`.
-
-### Deterministic mid-animation frames
-
-Rather than racing screenshots against a running transition, the capture pauses and seeks:
-`getAnimations()` on the animating subtree, then `pause()` and set `currentTime` to 0/25/50/75/100%
-of the declared duration, screenshotting each. Fully deterministic, and it catches wrong easing,
-wrong direction, and wrong transform origin — which a start/end comparison misses entirely.
-
-## Visual comparison
-
-Same browser build, viewport, DPR, stylesheet, and pinned font on both sides. Per step: screenshot
-the fixture root **plus each portal container separately** — popups render to `document.body`, outside
-the root, so a root-only screenshot would silently miss every floating component.
-
-Compared per-pixel with a colour tolerance and a total-mismatch threshold (`pixelThreshold`, default
-0.1%, per-fixture). A red-overlay diff PNG goes into the report.
-
-A literal 0.0% diff is unlikely on text-heavy fixtures even within one browser. The threshold is
-calibrated per fixture, not waived wholesale.
-
-**LLM comparison is deliberately out of the pipeline.** The report is structured and LLM-readable, so
-triage-by-paste remains available. An automated `--explain` pass classifying unwaived findings as
-defect-vs-limitation is a possible follow-up, but the suite must not depend on a non-deterministic
-step.
+Reports present L1 before and above L2 whenever both fire. L2 is subordinate diagnostic detail, not
+the headline determination of which leg broke the step. Structure one-sided/reorder evidence appears
+before pair-dependent findings, and uncertain correspondence is explicit.
 
 ## Waivers
 
+A waiver is a reviewed record for exactly one stable finding identity, never a suppression language.
+
 ```jsonc
 {
-  "fixture": "drawer/hero",   "leg": "*",   "step": "*",
-  "nodePath": "div[role=dialog]",
-  "kind": "ComputedStyle",    "property": "transition-duration",
-  "reason": "Blazor render batching defers the starting-style removal by one frame.",
+  "fixture": "drawer/hero",
+  "leg": "Server",
+  "step": "close",
+  "nodePath": "portal(1) > div[role=dialog]",
+  "kind": "ComputedStyle",
+  "property": "transition-duration",
+  "propertyMatch": "exact",
+  "reason": "The accepted product-specific divergence is documented in the linked audit.",
+  "disposition": "accepted-limitation",
   "docLink": "docs/audits/drawer-parity-matrix.md#animation",
   "expires": "2026-12-31"
 }
 ```
 
-Keyed on `(fixture, leg, step, nodePath, kind, property)` with `*` wildcards. Three rules keep the
-file honest:
+The six identity fields are exact `fixture`, `leg`, `step`, `nodePath`, `kind`, and `property`.
+No field accepts `*`, glob, regex, arrays, or omission-as-wildcard. Case-sensitive ordinal matching
+is used for paths and properties. One entry consumes one distinct Error identity and never cascades
+to descendants, siblings, kinds, legs, steps, runs, or report groups. If one identity can occur more
+than once, add a stable discriminator before allowing it to be waived.
 
-- **`reason` is required and non-empty**, enforced by a schema test. This is what turns "accepted
-  Blazor limitation" into documentation.
-- **Unused waivers fail the run.** A waiver that no longer matches means the discrepancy was fixed and
-  the waiver is stale. base-ui applies the same rule to its regression blacklist
-  (`unusedBlacklistPatterns`).
-- **`expires`** warns, then fails, so temporary waivers get revisited.
+`propertyMatch` defaults to `exact`. `prefix` is legal only for `Console`, must include the level and
+a stable semantic stem, must describe an observed volatile suffix, must be a short-lived
+`deferred-defect` linked to an issue with examples from at least two attempts, and must match exactly
+one finding. Substring, suffix, regex, and bare-level prefixes are forbidden.
 
-A fixture-level waiver with `kind: "*"` **is** the quarantine mechanism; no second mechanism exists.
+Every entry requires a non-whitespace reason, `accepted-limitation` or `deferred-defect` disposition,
+an appropriate repository audit/spec link or open issue URL, and an ISO expiry later than review.
+Unknown fields, duplicates, malformed links/dates/enums, illegal match modes, zero-match entries,
+ambiguous matches, and expired entries block before parity verdicting. There is no expiry grace
+period. `Info` and `Flaky` neither require nor consume waivers.
 
-`docs/audits/parity-limitations.md` is **generated** from the waiver file, so the documented
-limitation list cannot drift from what the suite tolerates.
+Accepted limitations link durable documentation. Deferred defects link an open owned issue with
+acceptance criteria and use a short expiry. Waivers are never allowed for harness uncertainty,
+missing evidence, infrastructure failure, comparator defects, incomplete captures, or
+`ActionCompletionUnmet`.
 
-## Report
+Waived primary evidence remains visible in HTML, JSON, and generated limitations with exact scope,
+values, reason, disposition, link, expiry, and status. Unused or expired diagnostics cannot be omitted.
 
-Output folder `parity-report/` (`index.html` + `assets/`) — not one self-contained file, since 114
-fixtures × 3 legs × N steps of base64 PNGs would be unusable. Tailwind-styled, containing:
+## Retry and failure semantics
 
-- summary counts by component, kind, and leg
-- filter chips (kind, severity, component, leg)
-- per fixture: three-up screenshots (React | Server | WASM) with diff overlay, tabbed by step
-- DOM/attribute diff as a two-column tree
-- computed-style table showing only differing properties
-- animation timeline as a three-track gantt
-- waived findings collapsed, reason visible
-- Blazor-only markers listed as `Info`
+Retry once to confirm a parity finding, not to erase an error. Correlate attempts with the same
+machine identity used by waivers; messages and values do not determine identity.
 
-`parity-result.json` carries the same data machine-readably.
+- The same identity on both attempts is stable even when presentation values change.
+- An Error present in one attempt and clean in the corresponding scope in the other may be `Flaky`.
+- Errors in the same scope with different identities remain blocking unless a legal exact/console
+  prefix waiver resolves them.
+- Stable Structure and authoritative L1 errors never demote because subordinate labels vary.
+- Timeouts, exceptions, browser/host failures, missing legs, incomplete capture, and failed retries
+  are execution failures, never `Flaky`.
 
-## API surface diff
+## Reports
 
-`types.md` is autogenerated markdown with a `| Prop | Type | Default | Description |` table per part
-under `### Root` / `### Thumb` headings — parseable in C# with no TypeScript tooling.
+`parity-result.json` and the offline HTML report include:
 
-Parse into `{ part → props }`, reflect the Blazix assembly for `[Parameter]` properties, and diff.
-`manifest/naming.json` carries the conventions (`onCheckedChange` → `OnCheckedChange`, `className` →
-`ClassValue`, `render` → `Render`, `style` → `StyleValue`) plus per-prop overrides.
+- counts by component, kind, severity, leg, fixture, and disposition;
+- exact upstream SHA, fixed denominator, executed count, fixture ids, steps, modes, comparator
+  dimensions, exclusions, thresholds, retry/Flaky results, and applied waivers;
+- three-up React/Server/WASM screenshots and diff overlays;
+- Structure before pair-dependent details; L1 before subordinate L2;
+- completion failures and skipped dependent actions;
+- waived evidence with full review metadata;
+- unused, expired, malformed, and ambiguous waiver diagnostics.
 
-Findings: `PropMissing` (upstream prop with no Blazor equivalent — the direct answer to "is a function
-lacking?"), `PropExtra`, and `TypeMismatch` as advisory.
+Filtered runs are clearly labelled diagnostic and do not regenerate full-corpus limitations or make
+milestone claims.
 
-Because `.base-ui` is gitignored, the parsed API surface is snapshotted into
-`baselines/api/<component>.json` and committed — so this check runs with no base-ui checkout and no
-browser.
+## Required PR CI and freshness canary
 
-## Reliability
+After Task 14b provides the production test surface, Task 18 activates:
 
-**Settle protocol** (same shape both sides): wait for the fixture root's `data-interactive` marker
-(reflecting `RendererInfo.IsInteractive`, as the existing Playwright test pages already do), then
-`document.fonts.ready`, then two consecutive animation frames with no mutations. React skips only the
-interactivity gate.
+1. a required baseline-only PR job for relevant changes, initially broad rather than prematurely
+   path-filtered;
+2. both Server and WASM legs against the same committed React baseline;
+3. Chromium, Linux Skia native assets, Linux-compatible pixel baselines, provenance/pin validation,
+   and the committed-snapshot API-surface check;
+4. a daily and manually dispatchable metadata-only freshness canary.
 
-**Parallelism is split.** `[Collection("ParityStatic")]` runs parallel under the existing
-`maxParallelThreads: 4`; `[Collection("ParityTiming")]` runs serial. CPU contention would otherwise
-skew exactly the durations the L3 check measures.
+The PR job blocks on any unwaived stable Error, execution/configuration failure, invalid/unused/
+expired/ambiguous waiver, missing baseline, provenance inconsistency introduced by the PR, API
+surface failure, or failure to execute either leg. `Info` and proven `Flaky` findings report without
+blocking. A timeout, crash, or missing leg never becomes Flaky.
 
-**Flake handling stays minimal.** A leg that throws is retried once; findings that differ between
-attempts are marked `Flaky`, reported, and never failed.
+The freshness canary compares baseline provenance and the declared upstream pin with the tracked
+upstream revision. Drift fails the scheduled job and creates or updates one deduplicated issue with
+recorded/observed revisions, baseline age, and refresh command. It is an alarm, not branch protection.
 
-**Error handling.** A missing base-ui checkout still runs the API and baseline checks, and fails
-`PARITY_LIVE=1` with instructions. A stale React bundle fails with the refresh command. A 404 or unhandled
-Blazor error becomes a `FixtureError` finding rather than aborting the run — though an unhandled
-Blazor exception is always `Error`.
+Time the first integrated 29-fixture run before setting final timeout, cache, or sharding policy.
 
-## Testing the harness
+## Implementation order
 
-The diff engine is code and can be wrong. In-project unit tests cover:
+Tasks 1–10 are complete at unit/component level. Remaining work is dependency-ordered:
 
-- **Normalizer** — id symbolization preserves `aria-controls` relationships; class-set comparison;
-  marker rename.
-- **Comparators** — synthetic bundle pairs with known diffs produce the expected findings.
-- **Waiver matcher** — wildcard resolution, unused-waiver detection, missing-reason rejection.
-
-Plus a **canary fixture**: a deliberately broken Blazor fixture with a known missing attribute, a
-wrong colour, and a suppressed animation, which the suite **must** flag. If the canary passes, the
-harness is broken. This guards the otherwise-invisible failure mode where capture silently returns
-empty and the run reports a serene zero findings.
-
-## Implementation sequencing
-
-The first milestone is 29 fixtures; this ordering exists so pipeline defects are not baked into them.
-
-1. **Skeleton** — projects, shared `parity.css`, `capture.js`, and **one** pair (Switch/Hero)
-   end-to-end through every comparator and the report.
-2. **Canary fixture + harness unit tests.**
-3. **Four hard-class pairs** — Collapsible/Hero (animation), Popover/Hero (portal, floating, custom
-   properties), Select/Grouped (composite, keyboard), Field/Hero (validation). Tolerances are
-   calibrated here.
-4. **API-surface diff across all 38 components** — no fixtures, no browser, fast, and the step most
-   likely to surface missing functionality immediately.
-5. **The remaining 24 fixtures** of the first-milestone corpus, in component batches, triaging
-   fix-or-waive as they land. (Steps 1 and 3 already cover 5 of the 29.)
-6. **Generated `parity-limitations.md` + README.**
-
-The remaining 85 fixtures are a follow-up milestone, scoped once the first quarter's findings show
-whether the signal-to-noise ratio justifies the authoring cost.
+1. Task 5b: distinct selector comparators and exhaustive registry semantics.
+2. Task 5c: per-action completion contracts, typed failures, dependent-action stop, per-step timeline.
+3. Task 10b/14a: live registry/context integration, bundle precondition, two-mode canary and smoke,
+   with no waivers or certification.
+4. Task 10c: node correspondence and run-aware timeline trust repair.
+5. Task 11: exact waiver policy and conservative retry correlation.
+6. Task 12: committed baselines and provenance.
+7. Task 13: reports with primary-evidence precedence and evidence scope.
+8. Task 14b: public theories, retry, waiver application, assertions, accumulation, report emission.
+9. Task 18: required PR job and daily freshness canary.
+10. Tasks 15–16: author and dispose findings for all 29 fixtures.
+11. Task 17: generated limitations and bounded milestone documentation.
+12. Issue #176: expand to the recounted remaining upstream corpus.
 
 ## Out of scope
 
-- The remaining 85 fixtures beyond the first-milestone 29. The pipeline is built to carry them; only
-  the authoring is deferred.
-- A CI job. CI is lint-only today, and the React bundle depends on a gitignored checkout; wiring this
-  into CI is a separate decision once baselines have proven stable.
-- LLM-based classification of findings (`--explain`).
-- Dark-mode capture for all fixtures (available per fixture via `themes`, off by default).
-- Cross-browser capture (Firefox/WebKit). The pixel-diff guarantee depends on a single browser build.
+- Implementing the #176 expansion inside Tasks 15–17.
+- Live React capture in CI.
+- Fixture-specific completion or private renderer instrumentation without a new demonstrated need and
+  explicit design review.
+- LLM classification, universal dark-mode capture, and cross-browser pixel baselines.
