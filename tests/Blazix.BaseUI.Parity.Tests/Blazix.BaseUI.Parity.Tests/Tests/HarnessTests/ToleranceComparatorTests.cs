@@ -249,7 +249,7 @@ public sealed class ToleranceComparatorTests
     public void ComputedStyleSaysWhenThePairingWasRelaxed()
     {
         // Nothing under the <div> pairs on tag, role, and name together, so the matcher
-        // falls back to the tag alone. The two <ul> nodes are still compared — suppressing
+        // falls back without proving correspondence. The two <ul> nodes are still compared — suppressing
         // them would lose a real layout difference — but a reader has to be told that the
         // operands may not be the same element.
         var context = Context(
@@ -261,7 +261,7 @@ public sealed class ToleranceComparatorTests
         finding.NodePath.ShouldBe("root > ul");
         finding.ReferenceValue.ShouldBe("1");
         finding.CandidateValue.ShouldBe("0");
-        finding.Message.ShouldContain("tag alone");
+        finding.Message.ShouldContain("could not prove");
     }
 
     [Fact]
@@ -461,7 +461,7 @@ public sealed class ToleranceComparatorTests
 
         var finding = new GeometryComparator().Compare(context).ShouldHaveSingleItem();
 
-        finding.Message.ShouldContain("tag alone");
+        finding.Message.ShouldContain("could not prove");
     }
 
     [Fact]
@@ -473,7 +473,7 @@ public sealed class ToleranceComparatorTests
 
         var finding = new CustomPropertyComparator().Compare(context).ShouldHaveSingleItem();
 
-        finding.Message.ShouldContain("tag alone");
+        finding.Message.ShouldContain("could not prove");
     }
 
     [Fact]
@@ -488,7 +488,7 @@ public sealed class ToleranceComparatorTests
             .ToList();
 
         findings.Count.ShouldBe(3);
-        findings.ShouldAllBe(f => f.Fixture == "switch/hero");
+        findings.ShouldAllBe(f => f.Fixture == "switch/hero@light");
         findings.ShouldAllBe(f => f.Leg == ParityLeg.BlazorServer);
         findings.ShouldAllBe(f => f.Step == "initial");
     }
@@ -612,7 +612,15 @@ public sealed class ToleranceComparatorTests
         => Context(Capture(Tree(), geometry: reference), Capture(Tree(), geometry: candidate));
 
     private static ComparisonContext Context(StepCapture reference, StepCapture candidate)
-        => new("switch/hero", ParityLeg.BlazorServer, "initial", reference, candidate, 0.001);
+        => new(
+            "switch/hero",
+            "light",
+            "switch/hero@light",
+            ParityLeg.BlazorServer,
+            "initial",
+            reference,
+            candidate,
+            0.001);
 
     private static StepCapture Capture(
         DomNode dom,

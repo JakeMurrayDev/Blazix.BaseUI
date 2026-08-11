@@ -59,6 +59,8 @@ public static class SettleProtocol
     private const string QuiesceScript = """
         (timeoutMs) => new Promise((resolve, reject) => {
           let quiet = 0;
+          let finished = false;
+          let frame = 0;
           const observer = new MutationObserver(() => { quiet = 0; });
           observer.observe(document.body, { attributes: true, subtree: true, childList: true });
 
@@ -66,7 +68,12 @@ public static class SettleProtocol
             .some((el) => el.style.display === 'none');
 
           let deadline = 0;
-          const stop = () => { observer.disconnect(); clearTimeout(deadline); };
+          const stop = () => {
+            finished = true;
+            observer.disconnect();
+            if (frame) cancelAnimationFrame(frame);
+            clearTimeout(deadline);
+          };
 
           deadline = setTimeout(() => {
             const pending = portalPending();
@@ -77,11 +84,12 @@ public static class SettleProtocol
           }, timeoutMs);
 
           const tick = () => {
-            if (portalPending()) { quiet = 0; requestAnimationFrame(tick); return; }
+            if (finished) return;
+            if (portalPending()) { quiet = 0; frame = requestAnimationFrame(tick); return; }
             if (++quiet >= 2) { stop(); resolve(); return; }
-            requestAnimationFrame(tick);
+            frame = requestAnimationFrame(tick);
           };
-          requestAnimationFrame(tick);
+          frame = requestAnimationFrame(tick);
         })
         """;
 }

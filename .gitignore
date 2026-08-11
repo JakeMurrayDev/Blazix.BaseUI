@@ -383,6 +383,13 @@ tests/Blazix.BaseUI.Playwright.Tests/traces/
 /.mcp.json
 
 # Parity harness build output (baselines and waivers ARE committed)
+tests/Blazix.BaseUI.Parity.Tests/baselines/.*.tmp/
+tests/Blazix.BaseUI.Parity.Tests/baselines/.*.bak/
 tests/Blazix.BaseUI.Parity.Tests/react-fixtures/dist/
 tests/Blazix.BaseUI.Parity.Tests/react-fixtures/src/base-ui-source.css
 tests/Blazix.BaseUI.Parity.Tests/parity-report/
+tests/Blazix.BaseUI.Parity.Tests/parity-report-diagnostics/
+tests/Blazix.BaseUI.Parity.Tests/.parity-report-attempts/
+
+# Ad-hoc PARITY_REPORT_DIR target used for scratch runs; derived screenshots and logs only.
+/output/

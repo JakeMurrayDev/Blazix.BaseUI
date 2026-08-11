@@ -47,7 +47,7 @@ public sealed partial class ConsoleComparator : IComparator
 
             yield return new Finding
             {
-                Fixture = context.Fixture,
+                Fixture = context.ExecutionId,
                 Leg = context.Leg,
                 Step = context.Step,
                 Kind = FindingKind.Console,

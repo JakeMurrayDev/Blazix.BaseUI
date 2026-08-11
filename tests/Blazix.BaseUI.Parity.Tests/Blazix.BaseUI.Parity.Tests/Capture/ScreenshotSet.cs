@@ -51,19 +51,6 @@ public static class ScreenshotSet
 
     private const string Extension = ".png";
 
-    private const string RootSelector = "[data-parity-root]";
-
-    /// <summary>
-    /// The portal containers, spelled to match <c>roots()</c> in
-    /// <c>shared/capture.js</c>: every direct child of <c>body</c> that is neither the
-    /// fixture root, nor framework chrome a fixture marked as ignorable, nor a script tag.
-    /// The one divergence is a page carrying two <c>[data-parity-root]</c> elements, which
-    /// <c>roots()</c> would treat the second of as a portal and this selector excludes;
-    /// both fixture hosts render exactly one.
-    /// </summary>
-    private const string PortalSelector =
-        "body > *:not([data-parity-root]):not([data-parity-ignore]):not(script)";
-
     // Long enough for a popup that has just portalled out to become photographable, short
     // enough that an element which never will does not dominate the run.
     private const float ScreenshotTimeoutMs = 5_000;
@@ -94,8 +81,13 @@ public static class ScreenshotSet
     /// <param name="step">The manifest step name.</param>
     /// <param name="shot">The shot id, for example <c>00</c> or <c>frame025.01</c>.</param>
     /// <returns>The file name.</returns>
-    public static string Name(string fixtureId, ParityLeg leg, string step, string shot)
-        => $"{Slug(fixtureId)}.{leg}.{step}.{shot}{Extension}";
+    public static string Name(
+        string fixtureId,
+        string theme,
+        ParityLeg leg,
+        string step,
+        string shot)
+        => $"{Slug(fixtureId)}.{theme}.{leg}.{step}.{shot}{Extension}";
 
     /// <summary>
     /// Recovers the shot id from a file name.
@@ -111,9 +103,14 @@ public static class ScreenshotSet
     /// <param name="leg">The leg the name should belong to.</param>
     /// <param name="step">The step the name should belong to.</param>
     /// <returns>The shot id.</returns>
-    public static string Shot(string name, string fixtureId, ParityLeg leg, string step)
+    public static string Shot(
+        string name,
+        string fixtureId,
+        string theme,
+        ParityLeg leg,
+        string step)
     {
-        var prefix = $"{Slug(fixtureId)}.{leg}.{step}.";
+        var prefix = $"{Slug(fixtureId)}.{theme}.{leg}.{step}.";
 
         return name.StartsWith(prefix, StringComparison.Ordinal)
             && name.EndsWith(Extension, StringComparison.Ordinal)
@@ -133,83 +130,81 @@ public static class ScreenshotSet
             : $"{name}.diff{Extension}";
 
     /// <summary>
-    /// Photographs one settled step, and its animation frames when it has any.
+    /// Photographs one naturally settled canonical step.
     /// </summary>
     /// <param name="page">The page the step was captured on.</param>
     /// <param name="directory">Where the files are written.</param>
     /// <param name="fixtureId">The fixture id.</param>
+    /// <param name="theme">The emulated theme.</param>
     /// <param name="leg">The leg being captured.</param>
     /// <param name="step">The manifest step name.</param>
-    /// <param name="animation">Whether the step's settle mode is <c>animation</c>.</param>
     /// <returns>The file names written, in shot order.</returns>
-    public static async Task<IReadOnlyList<string>> CaptureAsync(
+    public static async Task<IReadOnlyList<ScreenshotObservation>> CaptureCanonicalAsync(
         IPage page,
         string directory,
         string fixtureId,
+        string theme,
         ParityLeg leg,
-        string step,
-        bool animation)
+        string step)
     {
         // The directory is not created here: Playwright's screenshot path option creates
         // the parent directory it is given, so a run on a fresh checkout needs nothing to
         // exist beforehand.
-        var names = await ShootAsync(page, directory, fixtureId, leg, step, string.Empty);
+        return await ShootAsync(
+            page, directory, fixtureId, theme, leg, step, string.Empty);
+    }
 
-        if (!animation)
-        {
-            return names;
-        }
+    /// <summary>
+    /// Photographs deterministic fractions on a disposable replay page.
+    /// </summary>
+    /// <remarks>
+    /// Seeking can resolve a component's <c>animation.finished</c> callbacks and therefore
+    /// advance lifecycle state. The caller must discard <paramref name="page"/> after this
+    /// method returns; it must never be the authoritative page or be reused for another step.
+    /// </remarks>
+    /// <param name="page">The isolated replay page.</param>
+    /// <param name="directory">Where the files are written.</param>
+    /// <param name="fixtureId">The fixture id.</param>
+    /// <param name="theme">The emulated theme.</param>
+    /// <param name="leg">The leg being captured.</param>
+    /// <param name="step">The manifest step name.</param>
+    /// <returns>The frame file names written, in fraction order.</returns>
+    public static async Task<IReadOnlyList<ScreenshotObservation>> CaptureFramesAsync(
+        IPage page,
+        string directory,
+        string fixtureId,
+        string theme,
+        ParityLeg leg,
+        string step)
+    {
+        var observations = new List<ScreenshotObservation>();
 
         // Seeking is what makes the frames comparable, so a leg with nothing to seek has
-        // no frames rather than five copies of the settled shot. The asymmetry is the
+        // no frames rather than five copies of the canonical shot. The asymmetry is the
         // point: if one leg animates and the other does not, the frames exist on one side
         // only and the pixel comparator reports each of them, which is exactly the finding
         // a run of five identical images would have hidden.
         //
-        // Returning here without resuming is safe only because seekAnimations() arms
-        // nothing when it finds nothing to seek. If it armed its resume state regardless,
-        // this return would strand it — and the next animation step's seek would believe
-        // the recording had already been torn down and record its own seeking into that
-        // step's timeline.
+        // The replay page is discarded after this call. Finding nothing therefore needs no
+        // cleanup and correctly produces no frame files.
         if (await SeekAsync(page, Fractions[0]) == 0)
         {
-            return names;
+            return observations;
         }
 
-        try
+        observations.AddRange(
+            await ShootAsync(
+                page, directory, fixtureId, theme, leg, step, FramePrefix(Fractions[0])));
+
+        foreach (var fraction in Fractions.Skip(1))
         {
-            names.AddRange(
-                await ShootAsync(page, directory, fixtureId, leg, step, FramePrefix(Fractions[0])));
-
-            foreach (var fraction in Fractions.Skip(1))
-            {
-                await SeekAsync(page, fraction);
-                names.AddRange(
-                    await ShootAsync(page, directory, fixtureId, leg, step, FramePrefix(fraction)));
-            }
-        }
-        finally
-        {
-            // In a finally because the page outlives the step: every remaining step of the
-            // fixture runs on it, and one left with its animations paused would capture a
-            // frozen popup and record no transition at all.
-            try
-            {
-                await page.EvaluateAsync($"() => {Api}.resumeAnimations()");
-            }
-            // Guarded because a finally that throws replaces whatever was already in
-            // flight. The case is precisely the one that matters: a screenshot fails with
-            // something this method does not filter, and the reason it failed — a closed
-            // page, a crashed browser — is also why the resume cannot run. Unguarded, the
-            // resume's exception is what the runner would report, and the original cause
-            // would be gone. There is nothing to recover here anyway: a page that cannot
-            // be evaluated has no animations left to put back.
-            catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
-            {
-            }
+            await SeekAsync(page, fraction);
+            observations.AddRange(
+                await ShootAsync(
+                    page, directory, fixtureId, theme, leg, step, FramePrefix(fraction)));
         }
 
-        return names;
+        return observations;
     }
 
     private static Task<int> SeekAsync(IPage page, double fraction)
@@ -222,45 +217,48 @@ public static class ScreenshotSet
     private static string FramePrefix(double fraction)
         => $"frame{Math.Round(fraction * 100).ToString("000", CultureInfo.InvariantCulture)}";
 
-    private static async Task<List<string>> ShootAsync(
+    private static async Task<List<ScreenshotObservation>> ShootAsync(
         IPage page,
         string directory,
         string fixtureId,
+        string theme,
         ParityLeg leg,
         string step,
         string framePrefix)
     {
-        // .First for the same reason every action locator in ParityCapturer carries it. A
-        // page with two [data-parity-root] elements resolves this to both, and a strict-mode
-        // violation surfaces as a PlaywrightException the loop below swallows — so the root
-        // shot would not merely be joined by a second, it would be lost outright, and the
-        // step compared against nothing. First is also the element roots() resolves by
-        // querySelector, so shot 00 stays the tree capture.js labels `root`.
-        var targets = new List<ILocator> { page.Locator(RootSelector).First };
-        var portals = page.Locator(PortalSelector);
-        var portalCount = await portals.CountAsync();
+        var roots = await page.EvaluateAsync<ScreenshotRoot[]>(
+            $"() => {Api}.screenshotRoots()");
+        var observations = new List<ScreenshotObservation>(roots.Length);
 
-        for (var i = 0; i < portalCount; i++)
-        {
-            targets.Add(portals.Nth(i));
-        }
-
-        var names = new List<string>(targets.Count);
-
-        for (var index = 0; index < targets.Count; index++)
+        for (var index = 0; index < roots.Length; index++)
         {
             // Padded for the same reason the percentage is: a fixture with ten capture
             // roots would otherwise list shot 10 between shots 1 and 2.
             var root = index.ToString("00", CultureInfo.InvariantCulture);
             var shot = framePrefix.Length == 0 ? root : $"{framePrefix}.{root}";
-            var name = Name(fixtureId, leg, step, shot);
+            var name = Name(fixtureId, theme, leg, step, shot);
+
+            if (roots[index].State == nameof(ScreenshotObservationState.NotVisible) ||
+                roots[index].Clip is null)
+            {
+                observations.Add(ScreenshotObservation.NotVisible(roots[index].Label, shot));
+                continue;
+            }
 
             try
             {
-                await targets[index].ScreenshotAsync(new LocatorScreenshotOptions
+                var clip = roots[index].Clip!;
+                await page.ScreenshotAsync(new PageScreenshotOptions
                 {
                     Path = Path.Combine(directory, name),
-                    Timeout = ScreenshotTimeoutMs
+                    Timeout = ScreenshotTimeoutMs,
+                    Clip = new Clip
+                    {
+                        X = (float)clip.X,
+                        Y = (float)clip.Y,
+                        Width = (float)clip.Width,
+                        Height = (float)clip.Height
+                    }
                 });
             }
             // Both, because they are unrelated types: a zero-size or invisible container
@@ -269,17 +267,36 @@ public static class ScreenshotSet
             // non-element target surfaces as PlaywrightException, which is not a timeout.
             catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
             {
-                // A container that is empty, zero-size, or still detaching cannot be
-                // photographed. That is a parity result, not a harness failure: the shot
-                // is simply absent from this leg's list, which the pixel comparator reports
-                // as one-sided when the other leg produced it and passes over in silence
-                // when neither did. Throwing here would end the run over one popup.
+                observations.Add(ScreenshotObservation.CaptureFailed(
+                    roots[index].Label,
+                    shot,
+                    ex.Message.Length <= 500 ? ex.Message : ex.Message[..500]));
                 continue;
             }
 
-            names.Add(name);
+            observations.Add(ScreenshotObservation.Captured(roots[index].Label, shot, name));
         }
 
-        return names;
+        return observations;
+    }
+
+    private sealed record ScreenshotRoot
+    {
+        public required string Label { get; init; }
+
+        public required string State { get; init; }
+
+        public ScreenshotClip? Clip { get; init; }
+    }
+
+    private sealed record ScreenshotClip
+    {
+        public double X { get; init; }
+
+        public double Y { get; init; }
+
+        public double Width { get; init; }
+
+        public double Height { get; init; }
     }
 }

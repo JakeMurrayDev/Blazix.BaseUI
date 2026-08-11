@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import Canary from './canary';
 
 export interface Fixture {
   id: string;
@@ -29,4 +30,11 @@ export const fixtures: Fixture[] = Object.entries(modules)
   })
   .sort((a, b) => a.id.localeCompare(b.id));
 
-export const fixtureById = new Map(fixtures.map((f) => [f.id, f]));
+// The deliberately broken canary is reachable by its reserved harness URL but
+// stays out of `fixtures`, which is the ordinary fixture list and denominator.
+const canary: Fixture = { id: 'harness/canary', Component: Canary };
+
+export const fixtureById = new Map([
+  ...fixtures.map((fixture): [string, Fixture] => [fixture.id, fixture]),
+  [canary.id, canary] as [string, Fixture],
+]);

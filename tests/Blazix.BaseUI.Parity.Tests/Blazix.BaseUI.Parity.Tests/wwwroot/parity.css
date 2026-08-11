@@ -506,6 +506,9 @@
   .inline-flex {
     display: inline-flex;
   }
+  .table {
+    display: table;
+  }
   .aspect-5\/3 {
     aspect-ratio: 5/3;
   }
@@ -1656,6 +1659,9 @@
   }
   .text-white {
     color: var(--color-white);
+  }
+  .lowercase {
+    text-transform: lowercase;
   }
   .uppercase {
     text-transform: uppercase;
@@ -5387,6 +5393,18 @@
     padding: 16px;
     background: #ffffff;
   }
+}
+.parity-canary-reference-colour {
+  background-color: rgb(0, 128, 0);
+}
+.parity-canary-candidate-colour {
+  background-color: rgb(255, 0, 0);
+}
+.parity-canary-reference-duration {
+  transition-duration: 100ms;
+}
+.parity-canary-candidate-duration {
+  transition-duration: 400ms;
 }
 @property --tw-translate-x {
   syntax: "*";

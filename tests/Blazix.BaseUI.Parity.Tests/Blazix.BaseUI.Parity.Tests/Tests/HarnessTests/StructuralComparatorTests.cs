@@ -23,6 +23,23 @@ public sealed class StructuralComparatorTests
         findings[0].Kind.ShouldBe(FindingKind.Structure);
         findings[0].Severity.ShouldBe(Severity.Error);
         findings[0].NodePath.ShouldBe("ul");
+        findings[0].Property.ShouldBe("presence");
+    }
+
+    [Fact]
+    public void SamePathTagReplacementIsOneTruthfulUniqueIdentityFinding()
+    {
+        var context = Context(
+            At("div", "root", At("button", "root>control")),
+            At("div", "root", At("a", "root>control")));
+
+        var finding = new StructureComparator().Compare(context).ShouldHaveSingleItem();
+
+        finding.Kind.ShouldBe(FindingKind.Structure);
+        finding.NodePath.ShouldBe("root>control");
+        finding.Property.ShouldBe("identity");
+        finding.ReferenceValue.ShouldBe("<button>");
+        finding.CandidateValue.ShouldBe("<a>");
     }
 
     [Fact]
@@ -51,8 +68,33 @@ public sealed class StructuralComparatorTests
         findings[0].Kind.ShouldBe(FindingKind.Structure);
         findings[0].Severity.ShouldBe(Severity.Error);
         findings[0].NodePath.ShouldBe("div");
+        findings[0].Property.ShouldBe("sibling-order");
         findings[0].ReferenceValue.ShouldBe("button, ul");
         findings[0].CandidateValue.ShouldBe("ul, button");
+    }
+
+    [Fact]
+    public void RelaxedParentIdentityAndChildReorderHaveDistinctSixFieldProperties()
+    {
+        var context = Context(
+            AtRole("div", "container", "region",
+                AtText("button", "container>save", "Save"),
+                AtText("button", "container>cancel", "Cancel")),
+            AtRole("div", "container", "group",
+                AtText("button", "container>cancel", "Cancel"),
+                AtText("button", "container>save", "Save")));
+
+        var findings = new StructureComparator().Compare(context)
+            .Concat(new CorrespondenceUncertainComparator().Compare(context))
+            .ToArray();
+
+        findings.Length.ShouldBe(2);
+        findings.ShouldAllBe(finding => finding.NodePath == "container");
+        findings.Select(finding => finding.Property).ShouldBe(["sibling-order", "identity"]);
+        findings.Select(finding =>
+                (finding.Fixture, finding.Leg, finding.Step, finding.Kind,
+                    finding.NodePath, finding.Property))
+            .ShouldBeUnique();
     }
 
     [Fact]
@@ -72,7 +114,7 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
-    public void StructureReportsALevelThatOnlyPairedByTag()
+    public void CorrespondenceUncertaintyReportsALevelThatOnlyPairedByTag()
     {
         // Nothing under the <div> matches on tag, role, and name together, and the <ul> has
         // two children so there is no wrapper to step through. Dumping both subtrees would
@@ -82,12 +124,13 @@ public sealed class StructuralComparatorTests
             Node("div", Role("ul", "menu", Node("li"), Node("li"))),
             Node("div", Role("ul", "listbox", Node("li"), Node("li"))));
 
-        var findings = new StructureComparator().Compare(context).ToList();
+        var findings = new CorrespondenceUncertainComparator().Compare(context).ToList();
 
         findings.Count.ShouldBe(1);
-        findings[0].Kind.ShouldBe(FindingKind.Structure);
+        findings[0].Kind.ShouldBe(FindingKind.CorrespondenceUncertain);
         findings[0].Severity.ShouldBe(Severity.Error);
         findings[0].NodePath.ShouldBe("ul");
+        findings[0].Property.ShouldBe("identity");
         findings[0].Message.ShouldContain("menu");
         findings[0].Message.ShouldContain("listbox");
     }
@@ -107,7 +150,36 @@ public sealed class StructuralComparatorTests
     }
 
     [Fact]
-    public void StructureReportsARoleDifferenceOnContainersThatEachHoldOneChild()
+    public void DuplicateKeyLeafInsertionProducesTypedNonWaivableCorrespondence()
+    {
+        var context = Context(
+            At("div", "root",
+                AtAttributes("button", "root>edit-a",
+                    ("aria-label", "Edit"), ("data-id", "A")),
+                AtAttributes("button", "root>edit-b",
+                    ("aria-label", "Edit"), ("data-id", "B"))),
+            At("div", "root",
+                AtAttributes("button", "root>edit-x",
+                    ("aria-label", "Edit"), ("data-id", "X")),
+                AtAttributes("button", "root>edit-a",
+                    ("aria-label", "Edit"), ("data-id", "A")),
+                AtAttributes("button", "root>edit-b",
+                    ("aria-label", "Edit"), ("data-id", "B"))));
+
+        var findings = new CorrespondenceUncertainComparator().Compare(context).ToArray();
+
+        findings.Length.ShouldBe(2);
+        findings.ShouldAllBe(finding =>
+            finding.Kind == FindingKind.CorrespondenceUncertain &&
+            finding.Severity == Severity.Error &&
+            finding.Property == "identity");
+        findings.Select(finding => finding.NodePath)
+            .ShouldBe(["root>edit-a", "root>edit-b"]);
+        ComparatorRegistry.NonWaivableKinds.ShouldContain(FindingKind.CorrespondenceUncertain);
+    }
+
+    [Fact]
+    public void CorrespondenceUncertaintyReportsARoleDifferenceOnContainersThatEachHoldOneChild()
     {
         // The popup shape this harness exists to check: one child on both legs, so every
         // leftover at the level is unwrappable. Reporting the popup as React-only *and* as
@@ -116,11 +188,12 @@ public sealed class StructuralComparatorTests
             Node("div", Popup("dialog", Text("p", "hi"))),
             Node("div", Popup(role: null, Text("p", "hi"))));
 
-        var findings = new StructureComparator().Compare(context).ToList();
+        var findings = new CorrespondenceUncertainComparator().Compare(context).ToList();
 
         findings.Count.ShouldBe(1);
-        findings[0].Kind.ShouldBe(FindingKind.Structure);
+        findings[0].Kind.ShouldBe(FindingKind.CorrespondenceUncertain);
         findings[0].NodePath.ShouldBe("div");
+        findings[0].Property.ShouldBe("identity");
         findings[0].Message.ShouldContain("dialog");
     }
 
@@ -152,10 +225,14 @@ public sealed class StructuralComparatorTests
             Node("div", Role("ul", "menu", Node("li"))),
             Node("div", Role("ul", "listbox", Node("li"), Node("li"))));
 
-        var findings = new StructureComparator().Compare(context).ToList();
+        var findings = new StructureComparator().Compare(context)
+            .Concat(new CorrespondenceUncertainComparator().Compare(context))
+            .ToList();
 
-        findings.Count.ShouldBe(2);
+        findings.Count.ShouldBe(3);
         findings.ShouldContain(f => f.Message.Contains("menu") && f.Message.Contains("listbox"));
+        findings.ShouldContain(f =>
+            f.Kind == FindingKind.CorrespondenceUncertain && f.NodePath == "li");
         findings.ShouldContain(f => f.CandidateValue == "li" && f.NodePath == "li");
     }
 
@@ -194,6 +271,149 @@ public sealed class StructuralComparatorTests
         // level in. A fabricated attribute finding is worse than a missed one: it sends a
         // reader to an element that is not the one that differs.
         new AttributeComparator().Compare(WrapperContext()).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ChildlessWrapperReportsOnlyTheWrapperAndTheRealBodyAttributeDifference()
+    {
+        var context = Context(
+            At("div", "dlg",
+                AtAttributes("div", "dlg>body",
+                    ("data-node", "body"), ("aria-expanded", "true")),
+                AtAttributes("div", "dlg>foot", ("data-node", "foot"))),
+            At("div", "dlg",
+                At("div", "dlg>wrap",
+                    AtAttributes("div", "dlg>wrap>body",
+                        ("data-node", "body"), ("aria-expanded", "false"))),
+                AtAttributes("div", "dlg>foot", ("data-node", "foot"))));
+
+        var structure = new StructureComparator().Compare(context).ToList();
+        var correspondence = new CorrespondenceUncertainComparator().Compare(context).ToList();
+        var attributes = new AttributeComparator().Compare(context).ToList();
+
+        structure.ShouldHaveSingleItem().NodePath.ShouldBe("dlg>wrap");
+        correspondence.ShouldBeEmpty();
+        var attribute = attributes.ShouldHaveSingleItem();
+        attribute.NodePath.ShouldBe("dlg>body");
+        attribute.Property.ShouldBe("aria-expanded");
+        attribute.ReferenceValue.ShouldBe("true");
+        attribute.CandidateValue.ShouldBe("false");
+    }
+
+    [Fact]
+    public void CorroborationTiebreakReportsTheWrapperAndReorderWithoutCrossPairAttributes()
+    {
+        var context = Context(
+            At("div", "dlg",
+                AtAttributes("div", "dlg>body",
+                    [("data-node", "body"), ("aria-live", "polite")],
+                    At("p", "dlg>body>p"), At("q", "dlg>body>q")),
+                AtAttributes("div", "dlg>foot", [("data-node", "foot")],
+                    At("p", "dlg>foot>p"))),
+            At("div", "dlg",
+                AtAttributes("div", "dlg>foot", [("data-node", "foot")],
+                    At("p", "dlg>foot>p")),
+                At("div", "dlg>wrap",
+                    AtAttributes("div", "dlg>wrap>body",
+                        [("data-node", "body"), ("aria-live", "off")],
+                        At("p", "dlg>wrap>body>p"), At("q", "dlg>wrap>body>q")))));
+
+        var structure = new StructureComparator().Compare(context).ToList();
+        var correspondence = new CorrespondenceUncertainComparator().Compare(context).ToList();
+        var attributes = new AttributeComparator().Compare(context).ToList();
+
+        structure.Count.ShouldBe(2);
+        correspondence.ShouldBeEmpty();
+        structure.ShouldContain(finding =>
+            finding.NodePath == "dlg>wrap" && finding.CandidateValue == "div");
+        var reorder = structure.Single(finding => finding.NodePath == "dlg");
+        reorder.ReferenceValue.ShouldBe("dlg>body, dlg>foot");
+        reorder.CandidateValue.ShouldBe("dlg>foot, dlg>body");
+
+        var attribute = attributes.ShouldHaveSingleItem();
+        attribute.NodePath.ShouldBe("dlg>body");
+        attribute.Property.ShouldBe("aria-live");
+        attribute.ReferenceValue.ShouldBe("polite");
+        attribute.CandidateValue.ShouldBe("off");
+    }
+
+    [Fact]
+    public void WrapperAndIdentityChangeRemainTruthfulWhileDescendantAttributesAreCompared()
+    {
+        var context = Context(
+            AtAttributes("div", "root>popup", [("role", "dialog")],
+                AtAttributes("p", "root>popup>text", ("aria-hidden", "false"))),
+            At("span", "root>wrapper",
+                At("div", "root>wrapper>popup",
+                    AtAttributes("p", "root>wrapper>popup>text", ("aria-hidden", "true")))));
+
+        var structure = new StructureComparator().Compare(context).ToList();
+        var correspondence = new CorrespondenceUncertainComparator().Compare(context).ToList();
+        var attributes = new AttributeComparator().Compare(context).ToList();
+
+        structure.ShouldHaveSingleItem().NodePath.ShouldBe("root>wrapper");
+        var identity = correspondence.ShouldHaveSingleItem();
+        identity.Kind.ShouldBe(FindingKind.CorrespondenceUncertain);
+        identity.Property.ShouldBe("identity");
+        identity.NodePath.ShouldBe("root>popup");
+        identity.ReferenceValue.ShouldNotBeNull().ShouldContain("dialog");
+        identity.CandidateValue.ShouldBe("<div>");
+
+        attributes.Select(finding => (finding.NodePath, finding.Property)).ShouldBe(
+            [("root>popup", "role"), ("root>popup>text", "aria-hidden")]);
+    }
+
+    [Fact]
+    public void PairedSiblingDoesNotHideAWrapperIdentityChangeOrItsDescendantDifferences()
+    {
+        var context = Context(
+            At("div", "root",
+                At("hr", "root>rule"),
+                AtAttributes("div", "root>popup", [("role", "dialog")],
+                    AtAttributes("p", "root>popup>first", ("aria-hidden", "false")),
+                    AtAttributes("p", "root>popup>second", ("data-state", "open")))),
+            At("div", "root",
+                At("hr", "root>rule"),
+                At("span", "root>wrapper",
+                    At("div", "root>wrapper>popup",
+                        AtAttributes("p", "root>wrapper>popup>first", ("aria-hidden", "true")),
+                        AtAttributes("p", "root>wrapper>popup>second", ("data-state", "closed"))))));
+
+        var structure = new StructureComparator().Compare(context).ToList();
+        var correspondence = new CorrespondenceUncertainComparator().Compare(context).ToList();
+        var attributes = new AttributeComparator().Compare(context).ToList();
+
+        structure.ShouldHaveSingleItem().NodePath.ShouldBe("root>wrapper");
+        correspondence.ShouldHaveSingleItem().NodePath.ShouldBe("root>popup");
+        attributes.Select(finding => (finding.NodePath, finding.Property)).ShouldBe(
+            [
+                ("root>popup", "role"),
+                ("root>popup>first", "aria-hidden"),
+                ("root>popup>second", "data-state")
+            ]);
+    }
+
+    [Fact]
+    public void StructureReportsReorderBelowAProjectedWrapperLevel()
+    {
+        var context = Context(
+            At("div", "toolbar",
+                AtText("button", "toolbar>save", "Save"),
+                AtText("button", "toolbar>cancel", "Cancel")),
+            At("div", "toolbar",
+                At("span", "toolbar>cancel-wrap",
+                    AtText("button", "toolbar>cancel-wrap>cancel", "Cancel")),
+                At("span", "toolbar>save-wrap",
+                    AtText("button", "toolbar>save-wrap>save", "Save"))));
+
+        var findings = new StructureComparator().Compare(context).ToList();
+
+        findings.Count.ShouldBe(3);
+        findings.Count(finding => finding.NodePath.EndsWith("-wrap", StringComparison.Ordinal))
+            .ShouldBe(2);
+        var reorder = findings.Single(finding => finding.NodePath == "toolbar");
+        reorder.ReferenceValue.ShouldBe("toolbar>save, toolbar>cancel");
+        reorder.CandidateValue.ShouldBe("toolbar>cancel, toolbar>save");
     }
 
     [Fact]
@@ -238,7 +458,7 @@ public sealed class StructuralComparatorTests
 
         var finding = new StructureComparator().Compare(context).Single();
 
-        finding.Fixture.ShouldBe("switch/hero");
+        finding.Fixture.ShouldBe("switch/hero@light");
         finding.Leg.ShouldBe(ParityLeg.BlazorServer);
         finding.Step.ShouldBe("initial");
     }
@@ -554,6 +774,29 @@ public sealed class StructuralComparatorTests
         string tag, string path, string attribute, params DomNode[] children)
         => At(tag, path, new Dictionary<string, string> { [attribute] = string.Empty }, children);
 
+    private static DomNode AtAttributes(
+        string tag,
+        string path,
+        params (string Name, string Value)[] attributes)
+        => At(tag, path, attributes.ToDictionary(item => item.Name, item => item.Value), []);
+
+    private static DomNode AtAttributes(
+        string tag,
+        string path,
+        (string Name, string Value)[] attributes,
+        params DomNode[] children)
+        => At(tag, path, attributes.ToDictionary(item => item.Name, item => item.Value), children);
+
+    private static DomNode AtText(string tag, string path, string text) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = text,
+        Children = []
+    };
+
     private static DomNode At(
         string tag,
         string path,
@@ -580,6 +823,8 @@ public sealed class StructuralComparatorTests
 
     private static ComparisonContext Context(DomNode reference, DomNode candidate) => new(
         "switch/hero",
+        "light",
+        "switch/hero@light",
         ParityLeg.BlazorServer,
         "initial",
         Capture(reference),

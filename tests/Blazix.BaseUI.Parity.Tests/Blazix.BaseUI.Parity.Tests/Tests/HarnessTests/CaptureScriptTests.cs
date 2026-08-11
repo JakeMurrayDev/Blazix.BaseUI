@@ -70,6 +70,8 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
     {
         await using var context = await playwright.Browser.NewContextAsync();
         var page = await OpenProbeAsync(context);
+        await page.Locator("button").EvaluateAsync(
+            "element => element.style.setProperty('--blazor-load-percentage', '88%')");
 
         var capture = await CaptureScript.CaptureAsync(page, "initial");
         var button = capture.Dom.Descendants().Single(n => n.Tag == "button");
@@ -80,6 +82,29 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
         props["--parity-probe"].ShouldBe("7px");
 
         props.Keys.ShouldNotContain(name => name.StartsWith("--tw-", StringComparison.Ordinal));
+        props.Keys.ShouldNotContain(name =>
+            name.StartsWith("--blazor-load-", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CapturesAnimationDelayAndIterationCountForRunMeasurement()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+        await page.Locator("button").EvaluateAsync(
+            """
+            element => {
+              element.style.animationDelay = '-1.2s';
+              element.style.animationIterationCount = '3';
+            }
+            """);
+
+        var capture = await CaptureScript.CaptureAsync(page, "initial");
+        var button = capture.Dom.Descendants().Single(node => node.Tag == "button");
+        var styles = capture.Styles[button.Path];
+
+        styles["animation-delay"].ShouldBe("-1.2s");
+        styles["animation-iteration-count"].ShouldBe("3");
     }
 
     [Fact]
@@ -147,8 +172,8 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
         await using var context = await playwright.Browser.NewContextAsync();
         var page = await OpenProbeAsync(context);
 
-        // A per-step runner naturally does start -> capture -> start -> capture, because
-        // capture() returns the timeline without stopping it.
+        // The production runner stops each step explicitly. This still guards an interrupted
+        // diagnostic attempt that starts the next recording without reaching that stop.
         var recorded = await page.EvaluateAsync<int>(
             """
             async () => {
@@ -310,6 +335,246 @@ public sealed class CaptureScriptTests(PlaywrightFixture playwright)
             """);
 
         state.ShouldBe("running");
+    }
+
+    [Fact]
+    public async Task AnimationRegistrationWaitsForAStaggeredActiveSet()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var count = await page.EvaluateAsync<int>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              const pending = api.awaitAnimationRegistration([], 1000);
+
+              const first = document.createElement('div');
+              root.appendChild(first);
+              first.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 500 });
+
+              requestAnimationFrame(() => {
+                const second = document.createElement('div');
+                root.appendChild(second);
+                second.animate(
+                  [{ transform: 'scale(0)' }, { transform: 'scale(1)' }],
+                  { duration: 500 });
+              });
+
+              return pending;
+            }
+            """);
+
+        count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task AnimationRegistrationWaitsForDelayedRootMotionAfterNonTerminalCompletion()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              api.beginAnimationProbe();
+
+              const descendant = document.createElement('div');
+              descendant.style.cssText = 'width:0;height:0;overflow:hidden';
+              root.appendChild(descendant);
+              descendant.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 1000, easing: 'linear' });
+
+              setTimeout(() => {
+                root.setAttribute('data-root-motion-ready', 'true');
+                root.animate(
+                  [{ backgroundColor: 'rgb(255, 255, 255)' },
+                   { backgroundColor: 'rgb(0, 0, 0)' }],
+                  { duration: 1000, easing: 'linear' });
+              }, 100);
+
+              const registered = await api.awaitAnimationRegistration([
+                {
+                  kind: 'attribute',
+                  selector: { css: '[data-parity-root]', index: 0 },
+                  name: 'data-root-motion-ready',
+                  expected: 'true',
+                },
+              ], 1000);
+              const seeked = api.seekAnimations(0.5);
+              return { registered, seeked };
+            }
+            """);
+
+        // The zero-box descendant models the thumb transition that can register before
+        // Blazor Server publishes the checked state on the root. The declared consequence
+        // is non-terminal, so selecting the first stable animation set would freeze only
+        // the descendant and photograph the root at wall-clock rather than fraction time.
+        result.GetProperty("registered").GetInt32().ShouldBe(2);
+        result.GetProperty("seeked").GetInt32().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task FrozenEndpointDoesNotResolveOriginalFinishedLifecycleOrDetachPortal()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const portal = document.createElement('div');
+              const popup = document.createElement('div');
+              popup.textContent = 'closing popup';
+              popup.style.cssText = 'width:120px;height:40px;background:red';
+              portal.appendChild(popup);
+              document.body.appendChild(portal);
+
+              api.beginAnimationProbe();
+              const original = popup.animate(
+                [{ opacity: 1, transform: 'scale(1)' },
+                 { opacity: 0, transform: 'scale(0.98)' }],
+                { duration: 500, easing: 'linear' });
+              original.finished.then(() => portal.remove());
+              setTimeout(() => portal.remove(), 100);
+
+              const registered = await api.awaitAnimationRegistration([
+                {
+                  kind: 'detached',
+                  selector: { css: 'body > div:last-child', index: 0 },
+                },
+              ], 1000);
+              const seeked = api.seekAnimations(1);
+              await new Promise((resolve) => setTimeout(resolve, 150));
+
+              return {
+                registered,
+                seeked,
+                connected: portal.isConnected,
+                roots: api.screenshotRoots().map((root) => root.label),
+              };
+            }
+            """);
+
+        result.GetProperty("registered").GetInt32().ShouldBe(1);
+        result.GetProperty("seeked").GetInt32().ShouldBe(1);
+        result.GetProperty("connected").GetBoolean().ShouldBeTrue();
+        result.GetProperty("roots").EnumerateArray()
+            .Select(item => item.GetString())
+            .ShouldContain("portal(2)");
+    }
+
+    [Fact]
+    public async Task AnimationRegistrationRetainsAnObservedAnimationAfterItFinishes()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              api.beginAnimationProbe();
+
+              const moving = document.createElement('div');
+              moving.style.cssText =
+                'width:40px;height:40px;background:red;opacity:1';
+              root.appendChild(moving);
+              const animation = moving.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 30 });
+
+              // Let the probe observe the animation, then let its short natural run finish
+              // before registration asks for a stable set. WASM render/interop can create
+              // this exact scheduling gap for a 100 ms popup transition.
+              await new Promise((resolve) => setTimeout(resolve, 100));
+              const registered = await api.awaitAnimationRegistration([], 250);
+              const seeked = api.seekAnimations(0.5);
+              const currentTime = animation.currentTime;
+              const state = animation.playState;
+              return { registered, seeked, currentTime, state };
+            }
+            """);
+
+        result.GetProperty("registered").GetInt32().ShouldBe(1);
+        result.GetProperty("seeked").GetInt32().ShouldBe(1);
+        result.GetProperty("state").GetString().ShouldBe("paused");
+        result.GetProperty("currentTime").GetDouble().ShouldBe(15, tolerance: 2);
+    }
+
+    [Fact]
+    public async Task SeekingIgnoresAnimationsOutsideTheCaptureRoots()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var count = await page.EvaluateAsync<int>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const ignored = document.createElement('div');
+              ignored.setAttribute('data-parity-ignore', '');
+              document.body.appendChild(ignored);
+              const animation = ignored.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 20000, iterations: Infinity });
+              await new Promise((resolve) => requestAnimationFrame(resolve));
+              const count = api.seekAnimations(0.5);
+              animation.cancel();
+              ignored.remove();
+              return count;
+            }
+            """);
+
+        count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task SeekingDoesNotRewindAFinishedFillForwardAnimation()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context);
+
+        var result = await page.EvaluateAsync<JsonElement>(
+            """
+            async () => {
+              const api = window[Symbol.for('Blazix.Parity.Capture')];
+              const root = document.querySelector('[data-parity-root]');
+              const finished = root.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 40, fill: 'forwards' });
+              await finished.finished;
+              const terminalTime = finished.currentTime;
+              const active = root.animate(
+                [{ transform: 'scale(0)' }, { transform: 'scale(1)' }],
+                { duration: 20000 });
+              await new Promise((resolve) => requestAnimationFrame(resolve));
+
+              const count = api.seekAnimations(0);
+              const result = {
+                count,
+                terminalTime,
+                finishedTime: finished.currentTime,
+                activeTime: active.currentTime,
+              };
+              finished.cancel();
+              active.cancel();
+              return result;
+            }
+            """);
+
+        result.GetProperty("count").GetInt32().ShouldBe(1);
+        result.GetProperty("finishedTime").GetDouble().ShouldBe(
+            result.GetProperty("terminalTime").GetDouble(), tolerance: 1);
+        result.GetProperty("activeTime").GetDouble().ShouldBe(0);
     }
 
     private static async Task<IPage> OpenProbeAsync(IBrowserContext context)

@@ -27,7 +27,9 @@ public sealed class GeometryComparator : IComparator
     /// length above it, so its rounding error compounds where a single computed length's
     /// does not; below a pixel nothing is visible and nothing is a parity break.
     /// </summary>
-    private const double Epsilon = 1.0;
+    private static readonly double Epsilon = ComparatorContract.Value(
+        FindingKind.Geometry,
+        ComparatorContract.NumericTolerance);
 
     private static readonly IReadOnlyDictionary<string, double> NoBox =
         new Dictionary<string, double>(StringComparer.Ordinal);
@@ -68,7 +70,7 @@ public sealed class GeometryComparator : IComparator
 
                 yield return new Finding
                 {
-                    Fixture = context.Fixture,
+                    Fixture = context.ExecutionId,
                     Leg = context.Leg,
                     Step = context.Step,
                     Kind = FindingKind.Geometry,

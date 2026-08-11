@@ -563,7 +563,7 @@ public sealed class SemanticComparatorTests
             .ToList();
 
         findings.Count.ShouldBe(3);
-        findings.ShouldAllBe(f => f.Fixture == "switch/hero");
+        findings.ShouldAllBe(f => f.Fixture == "switch/hero@light");
         findings.ShouldAllBe(f => f.Leg == ParityLeg.BlazorServer);
         findings.ShouldAllBe(f => f.Step == "initial");
     }
@@ -590,7 +590,15 @@ public sealed class SemanticComparatorTests
         => Context(Capture(console: reference), Capture(console: candidate));
 
     private static ComparisonContext Context(StepCapture reference, StepCapture candidate)
-        => new("switch/hero", ParityLeg.BlazorServer, "initial", reference, candidate, 0.001);
+        => new(
+            "switch/hero",
+            "light",
+            "switch/hero@light",
+            ParityLeg.BlazorServer,
+            "initial",
+            reference,
+            candidate,
+            0.001);
 
     private static StepCapture Capture(
         string? aria = null,

@@ -23,6 +23,7 @@ public sealed class PixelComparatorTests : IDisposable
     /// a naive <c>{fixture}.png</c> and not on a shape no manifest can produce.
     /// </summary>
     private const string Fixture = "select/grouped";
+    private const string Theme = "light";
 
     private const string Step = "initial";
 
@@ -220,6 +221,47 @@ public sealed class PixelComparatorTests : IDisposable
     }
 
     [Fact]
+    public void PixelComparatorAcceptsSymmetricNotVisibleRoots()
+    {
+        var context = Context(
+            threshold: 0,
+            referenceObservations:
+            [
+                ScreenshotObservation.NotVisible("portal(1)", "01")
+            ],
+            candidateObservations:
+            [
+                ScreenshotObservation.NotVisible("portal(1)", "01")
+            ]);
+
+        new PixelComparator(directory).Compare(context).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void PixelComparatorBlocksCapturedVersusNotVisible()
+    {
+        var referenceName = Name(ParityLeg.React, "01");
+        Write(referenceName, 4, 4);
+        var context = Context(
+            threshold: 1,
+            referenceObservations:
+            [
+                ScreenshotObservation.Captured("portal(1)", "01", referenceName)
+            ],
+            candidateObservations:
+            [
+                ScreenshotObservation.NotVisible("portal(1)", "01")
+            ]);
+
+        var finding = new PixelComparator(directory).Compare(context).ShouldHaveSingleItem();
+
+        finding.Kind.ShouldBe(FindingKind.Pixel);
+        finding.Property.ShouldBe("01");
+        finding.Message.ShouldContain("visible on the React leg");
+        finding.Message.ShouldContain("not visible on the Blazor leg");
+    }
+
+    [Fact]
     public void ReportsAScreenshotThatIsNotOnDisk()
     {
         Write(Name(ParityLeg.React, "00"), 4, 4);
@@ -350,7 +392,7 @@ public sealed class PixelComparatorTests : IDisposable
 
         var finding = Compare(threshold: 0.01).ShouldHaveSingleItem();
 
-        finding.Fixture.ShouldBe(Fixture);
+        finding.Fixture.ShouldBe($"{Fixture}@{Theme}");
         finding.Leg.ShouldBe(ParityLeg.BlazorServer);
         finding.Step.ShouldBe(Step);
     }
@@ -384,13 +426,15 @@ public sealed class PixelComparatorTests : IDisposable
     [Fact]
     public void RecoversTheShotFromAFileName()
     {
-        var name = ScreenshotSet.Name(Fixture, ParityLeg.BlazorWasm, "open", "frame025.01");
+        var name = ScreenshotSet.Name(
+            Fixture, Theme, ParityLeg.BlazorWasm, "open", "frame025.01");
 
-        name.ShouldBe("select__grouped.BlazorWasm.open.frame025.01.png");
+        name.ShouldBe("select__grouped.light.BlazorWasm.open.frame025.01.png");
 
         // Recovered from the leg and step the comparison already knows, so a shot id that
         // contains a dot of its own does not have to be parsed out of the name.
-        ScreenshotSet.Shot(name, Fixture, ParityLeg.BlazorWasm, "open").ShouldBe("frame025.01");
+        ScreenshotSet.Shot(name, Fixture, Theme, ParityLeg.BlazorWasm, "open")
+            .ShouldBe("frame025.01");
     }
 
     [Fact]
@@ -420,10 +464,26 @@ public sealed class PixelComparatorTests : IDisposable
         double threshold, IReadOnlyList<string> reference, IReadOnlyList<string> candidate)
         => new(
             Fixture,
+            Theme,
+            $"{Fixture}@{Theme}",
             ParityLeg.BlazorServer,
             Step,
             Capture(reference),
             Capture(candidate),
+            threshold);
+
+    private static ComparisonContext Context(
+        double threshold,
+        IReadOnlyList<ScreenshotObservation> referenceObservations,
+        IReadOnlyList<ScreenshotObservation> candidateObservations)
+        => new(
+            Fixture,
+            Theme,
+            $"{Fixture}@{Theme}",
+            ParityLeg.BlazorServer,
+            Step,
+            Capture(referenceObservations),
+            Capture(candidateObservations),
             threshold);
 
     private static StepCapture Capture(IReadOnlyList<string> screenshots) => new()
@@ -444,8 +504,26 @@ public sealed class PixelComparatorTests : IDisposable
         Screenshots = screenshots
     };
 
+    private static StepCapture Capture(IReadOnlyList<ScreenshotObservation> observations) => new()
+    {
+        Step = Step,
+        Dom = new DomNode
+        {
+            Tag = "div",
+            Path = "root",
+            Attributes = new Dictionary<string, string>(StringComparer.Ordinal),
+            Classes = [],
+            Text = string.Empty,
+            Children = []
+        },
+        Styles = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal),
+        CustomProps = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal),
+        Geometry = new Dictionary<string, IReadOnlyDictionary<string, double>>(StringComparer.Ordinal),
+        ScreenshotObservations = observations
+    };
+
     private static string Name(ParityLeg leg, string shot)
-        => ScreenshotSet.Name(Fixture, leg, Step, shot);
+        => ScreenshotSet.Name(Fixture, Theme, leg, Step, shot);
 
     /// <summary>Writes a white PNG with the listed pixels overpainted.</summary>
     private void Write(string name, int width, int height, params (int X, int Y, SKColor Colour)[] pixels)

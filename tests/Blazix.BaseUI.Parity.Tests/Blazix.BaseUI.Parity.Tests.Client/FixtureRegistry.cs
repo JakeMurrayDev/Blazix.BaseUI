@@ -5,7 +5,8 @@ namespace Blazix.BaseUI.Parity.Tests.Client;
 /// </summary>
 public static class FixtureRegistry
 {
-    private static readonly Dictionary<string, Type> Fixtures = BuildIndex();
+    private static readonly Dictionary<string, Type> Fixtures =
+        BuildIndex(typeof(FixtureRegistry).Assembly.GetTypes());
 
     /// <summary>
     /// Gets every registered fixture id.
@@ -21,12 +22,12 @@ public static class FixtureRegistry
     public static Type? Resolve(string component, string demo)
         => Fixtures.GetValueOrDefault($"{component}/{demo}");
 
-    private static Dictionary<string, Type> BuildIndex()
+    internal static Dictionary<string, Type> BuildIndex(IEnumerable<Type> types)
     {
         var index = new Dictionary<string, Type>(StringComparer.Ordinal);
         var prefix = $"{typeof(FixtureRegistry).Namespace}.Fixtures.";
 
-        foreach (var type in typeof(FixtureRegistry).Assembly.GetTypes())
+        foreach (var type in types)
         {
             // Nested types must be excluded: the Razor compiler emits closure classes
             // such as Fixtures.Switch.Hero+<>c, whose FullName still splits into two
@@ -49,11 +50,34 @@ public static class FixtureRegistry
                 continue;
             }
 
-            index[$"{ToKebab(segments[0])}/{ToKebab(segments[1])}"] = type;
+            var id = $"{ToKebab(segments[0])}/{ToKebab(segments[1])}";
+            if (!IsSafeFixtureId(id))
+            {
+                throw new InvalidOperationException(
+                    $"The fixture registry type '{type.FullName}' produces '{id}', which is not " +
+                    "a safe lowercase fixture id.");
+            }
+
+            if (!index.TryAdd(id, type))
+            {
+                throw new InvalidOperationException(
+                    $"The fixture registry contains duplicate fixture id '{id}' for " +
+                    $"'{index[id].FullName}' and '{type.FullName}'.");
+            }
         }
 
         return index;
     }
+
+    private static bool IsSafeFixtureId(string id)
+        => id.Count(character => character == '/') == 1 &&
+            id.Split('/').All(segment =>
+                segment.Length > 0 &&
+                segment[0] is >= 'a' and <= 'z' &&
+                segment[^1] is >= 'a' and <= 'z' or >= '0' and <= '9' &&
+                !segment.Contains("--", StringComparison.Ordinal) &&
+                segment.All(character =>
+                    character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'));
 
     /// <summary>
     /// Converts a PascalCase segment to kebab-case by inserting a separator before every

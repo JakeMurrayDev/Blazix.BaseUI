@@ -35,7 +35,7 @@ public static class FindingText
         => present ? $"'{value.ToString(CultureInfo.InvariantCulture)}'" : "absent";
 
     /// <summary>
-    /// Says so when the two nodes only matched on their tag.
+    /// Says so when fallback matching could not prove node correspondence.
     /// </summary>
     /// <remarks>
     /// Such a pair is still compared — suppressing it would lose a real difference beneath
@@ -46,6 +46,6 @@ public static class FindingText
     /// <returns>The note, or an empty string when the pair matched on its full identity.</returns>
     public static string RelaxedNote(NodePair pair)
         => pair.Relaxed
-            ? " The two nodes were paired on tag alone, so they may not be the same element."
+            ? " Fallback matching could not prove that the two nodes correspond."
             : string.Empty;
 }

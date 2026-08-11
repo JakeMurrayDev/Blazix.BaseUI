@@ -21,21 +21,21 @@ public sealed class StructureComparator : IComparator
     {
         var match = NodeMatcher.Match(context.Reference.Dom, context.Candidate.Dom);
 
-        // A leftover on each side at the same path and tag is one element both legs render,
+        // A leftover on each side at the same stable path is one position both legs render,
         // left unpaired because their identities disagree or because an ancestor did not
         // pair. Reporting it as "React renders <li> here; Blazor does not" *and* as its
         // mirror is two statements that are each false and that contradict each other. What
         // each leg renders at that path is knowable from these two lists alone, so it is
         // said instead. The pairing is untouched: role is in the key on purpose, so a role
         // difference is meant to surface structurally — only the wording was ever wrong.
-        var counterparts = new Dictionary<(string Path, string Tag), List<int>>();
+        var counterparts = new Dictionary<string, List<int>>(StringComparer.Ordinal);
         for (var i = 0; i < match.CandidateOnly.Count; i++)
         {
             var node = match.CandidateOnly[i];
-            if (!counterparts.TryGetValue((node.Path, node.Tag), out var indices))
+            if (!counterparts.TryGetValue(node.Path, out var indices))
             {
                 indices = [];
-                counterparts[(node.Path, node.Tag)] = indices;
+                counterparts[node.Path] = indices;
             }
 
             indices.Add(i);
@@ -45,7 +45,7 @@ public sealed class StructureComparator : IComparator
 
         foreach (var node in match.ReferenceOnly)
         {
-            if (counterparts.TryGetValue((node.Path, node.Tag), out var indices) && indices.Count > 0)
+            if (counterparts.TryGetValue(node.Path, out var indices) && indices.Count > 0)
             {
                 var counterpart = match.CandidateOnly[indices[0]];
                 reconciled[indices[0]] = true;
@@ -56,12 +56,13 @@ public sealed class StructureComparator : IComparator
 
                 yield return new Finding
                 {
-                    Fixture = context.Fixture,
+                    Fixture = context.ExecutionId,
                     Leg = context.Leg,
                     Step = context.Step,
                     Kind = FindingKind.Structure,
                     Severity = Severity.Error,
                     NodePath = node.Path,
+                    Property = "identity",
                     ReferenceValue = referenceIdentity,
                     CandidateValue = candidateIdentity,
                     Message =
@@ -75,12 +76,13 @@ public sealed class StructureComparator : IComparator
 
             yield return new Finding
             {
-                Fixture = context.Fixture,
+                Fixture = context.ExecutionId,
                 Leg = context.Leg,
                 Step = context.Step,
                 Kind = FindingKind.Structure,
                 Severity = Severity.Error,
                 NodePath = node.Path,
+                Property = "presence",
                 ReferenceValue = node.Tag,
                 Message = $"React renders <{node.Tag}> at '{node.Path}'; Blazor does not."
             };
@@ -97,35 +99,15 @@ public sealed class StructureComparator : IComparator
 
             yield return new Finding
             {
-                Fixture = context.Fixture,
+                Fixture = context.ExecutionId,
                 Leg = context.Leg,
                 Step = context.Step,
                 Kind = FindingKind.Structure,
                 Severity = Severity.Error,
                 NodePath = node.Path,
+                Property = "presence",
                 CandidateValue = node.Tag,
                 Message = $"Blazor renders <{node.Tag}> at '{node.Path}'; React does not."
-            };
-        }
-
-        foreach (var relaxed in match.Relaxed)
-        {
-            yield return new Finding
-            {
-                Fixture = context.Fixture,
-                Leg = context.Leg,
-                Step = context.Step,
-                Kind = FindingKind.Structure,
-                Severity = Severity.Error,
-                NodePath = relaxed.Pair.Reference.Path,
-                ReferenceValue = relaxed.ReferenceIdentity,
-                CandidateValue = relaxed.CandidateIdentity,
-                Message =
-                    $"Node identity differs at '{relaxed.Pair.Reference.Path}': " +
-                    $"React renders {relaxed.ReferenceIdentity}; " +
-                    $"Blazor renders {relaxed.CandidateIdentity}. Nothing else at that " +
-                    "level matched, so the two were paired on tag alone to keep comparing " +
-                    "beneath them."
             };
         }
 
@@ -136,12 +118,13 @@ public sealed class StructureComparator : IComparator
 
             yield return new Finding
             {
-                Fixture = context.Fixture,
+                Fixture = context.ExecutionId,
                 Leg = context.Leg,
                 Step = context.Step,
                 Kind = FindingKind.Structure,
                 Severity = Severity.Error,
                 NodePath = reorder.ParentPath,
+                Property = "sibling-order",
                 ReferenceValue = referenceOrder,
                 CandidateValue = candidateOrder,
                 Message =

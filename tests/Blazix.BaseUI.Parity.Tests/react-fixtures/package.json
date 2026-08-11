@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "parity:css": "node scripts/resolve-base-ui-source.mjs && tailwindcss -i src/parity.css -o ../Blazix.BaseUI.Parity.Tests/wwwroot/parity.css",
-    "parity:build": "node scripts/resolve-base-ui-source.mjs && vite build",
+    "parity:report-css": "node scripts/build-report-css.mjs",
+    "parity:report-css:check": "node scripts/build-report-css.mjs --check",
+    "parity:build": "node scripts/resolve-base-ui-source.mjs && vite build && node scripts/write-provenance-manifest.mjs",
+    "parity:baseline": "pnpm parity:build && dotnet run --project ../Blazix.BaseUI.Parity.Tests/Blazix.BaseUI.Parity.Tests.csproj -- --write-baselines",
     "parity:dev": "vite"
   },
   "devDependencies": {

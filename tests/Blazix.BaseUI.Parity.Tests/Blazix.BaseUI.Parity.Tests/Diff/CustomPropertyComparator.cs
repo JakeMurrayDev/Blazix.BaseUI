@@ -33,7 +33,9 @@ public sealed class CustomPropertyComparator : IComparator
     /// carrying no length at all, which is compared exactly — including the <c>rem</c>
     /// values a demo's own stylesheet declares, where half a unit would be eight pixels.
     /// </summary>
-    private const double Epsilon = 0.5;
+    private static readonly double Epsilon = ComparatorContract.Value(
+        FindingKind.CustomProperty,
+        ComparatorContract.NumericTolerance);
 
     private static readonly IReadOnlyDictionary<string, string> NoProperties =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -76,7 +78,7 @@ public sealed class CustomPropertyComparator : IComparator
 
                 yield return new Finding
                 {
-                    Fixture = context.Fixture,
+                    Fixture = context.ExecutionId,
                     Leg = context.Leg,
                     Step = context.Step,
                     Kind = FindingKind.CustomProperty,

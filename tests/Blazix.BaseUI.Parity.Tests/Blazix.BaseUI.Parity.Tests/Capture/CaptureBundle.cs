@@ -17,6 +17,121 @@ public enum ParityLeg
     BlazorWasm
 }
 
+/// <summary>Describes what was observed for one capture root at one shot.</summary>
+[JsonConverter(typeof(ScreenshotObservationStateJsonConverter))]
+public enum ScreenshotObservationState
+{
+    /// <summary>The root had photographable pixels and its PNG was written.</summary>
+    Captured,
+
+    /// <summary>The root was present but had no photographable viewport pixels.</summary>
+    NotVisible,
+
+    /// <summary>The root had photographable pixels but its PNG could not be written.</summary>
+    CaptureFailed
+}
+
+/// <summary>Reads and writes only the exact screenshot-observation state vocabulary.</summary>
+public sealed class ScreenshotObservationStateJsonConverter
+    : JsonConverter<ScreenshotObservationState>
+{
+    /// <inheritdoc />
+    public override ScreenshotObservationState Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+        {
+            throw new JsonException("Screenshot observation state must be a JSON string.");
+        }
+
+        return reader.GetString() switch
+        {
+            nameof(ScreenshotObservationState.Captured) => ScreenshotObservationState.Captured,
+            nameof(ScreenshotObservationState.NotVisible) => ScreenshotObservationState.NotVisible,
+            nameof(ScreenshotObservationState.CaptureFailed) => ScreenshotObservationState.CaptureFailed,
+            var value => throw new JsonException(
+                $"Unknown screenshot observation state '{value ?? "null"}'.")
+        };
+    }
+
+    /// <inheritdoc />
+    public override void Write(
+        Utf8JsonWriter writer,
+        ScreenshotObservationState value,
+        JsonSerializerOptions options)
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new JsonException($"Unknown screenshot observation state value '{(int)value}'.");
+        }
+
+        writer.WriteStringValue(value.ToString());
+    }
+}
+
+/// <summary>Canonical screenshot evidence for one shared capture-script root.</summary>
+public sealed record ScreenshotObservation
+{
+    /// <summary>Gets the label assigned by <c>shared/capture.js</c>.</summary>
+    [JsonPropertyName("rootLabel")]
+    [JsonRequired]
+    public required string RootLabel { get; init; }
+
+    /// <summary>Gets the stable shot id, for example <c>00</c> or <c>frame025.01</c>.</summary>
+    [JsonPropertyName("shot")]
+    [JsonRequired]
+    public required string Shot { get; init; }
+
+    /// <summary>Gets the observed capture state.</summary>
+    [JsonPropertyName("state")]
+    [JsonRequired]
+    public required ScreenshotObservationState State { get; init; }
+
+    /// <summary>Gets the PNG file name when <see cref="State"/> is <see cref="ScreenshotObservationState.Captured"/>.</summary>
+    [JsonPropertyName("fileName")]
+    public string? FileName { get; init; }
+
+    /// <summary>Gets a bounded diagnostic when capture failed.</summary>
+    [JsonPropertyName("detail")]
+    public string? Detail { get; init; }
+
+    /// <summary>Creates a successfully captured observation.</summary>
+    public static ScreenshotObservation Captured(string rootLabel, string shot, string fileName)
+        => new() { RootLabel = rootLabel, Shot = shot, State = ScreenshotObservationState.Captured, FileName = fileName };
+
+    /// <summary>Creates an explicit no-photographable-viewport-pixels observation.</summary>
+    public static ScreenshotObservation NotVisible(string rootLabel, string shot)
+        => new() { RootLabel = rootLabel, Shot = shot, State = ScreenshotObservationState.NotVisible };
+
+    /// <summary>Creates an observation for a photographable root whose capture failed.</summary>
+    public static ScreenshotObservation CaptureFailed(string rootLabel, string shot, string detail)
+        => new() { RootLabel = rootLabel, Shot = shot, State = ScreenshotObservationState.CaptureFailed, Detail = detail };
+}
+
+/// <summary>A typed failure from deterministic animation-frame replay.</summary>
+public sealed record AnimationFrameCaptureFailure
+{
+    /// <summary>Gets the replay stage that failed.</summary>
+    [JsonPropertyName("stage")]
+    [JsonRequired]
+    public required string Stage { get; init; }
+
+    /// <summary>Gets the zero-based manifest action index, when the failure occurred during an action.</summary>
+    [JsonPropertyName("actionIndex")]
+    public int? ActionIndex { get; init; }
+
+    /// <summary>Gets the primary diagnostic.</summary>
+    [JsonPropertyName("detail")]
+    [JsonRequired]
+    public required string Detail { get; init; }
+
+    /// <summary>Gets a cleanup diagnostic without replacing the primary failure.</summary>
+    [JsonPropertyName("cleanupDetail")]
+    public string? CleanupDetail { get; init; }
+}
+
 /// <summary>A single node in a normalized DOM snapshot.</summary>
 public sealed record DomNode
 {
@@ -91,6 +206,8 @@ public sealed record TimelineEvent
 /// <summary>Everything captured for one manifest step on one leg.</summary>
 public sealed record StepCapture
 {
+    private IReadOnlyList<string>? screenshots;
+
     /// <summary>Gets the manifest step name.</summary>
     [JsonPropertyName("step")]
     public required string Step { get; init; }
@@ -127,43 +244,63 @@ public sealed record StepCapture
     [JsonPropertyName("console")]
     public IReadOnlyList<string> Console { get; init; } = [];
 
-    /// <summary>Gets the screenshot file names produced for this step.</summary>
-    [JsonPropertyName("screenshots")]
-    public IReadOnlyList<string> Screenshots { get; init; } = [];
+    /// <summary>Gets one explicit observation per shared capture root and shot.</summary>
+    [JsonPropertyName("screenshotObservations")]
+    [JsonRequired]
+    public IReadOnlyList<ScreenshotObservation> ScreenshotObservations { get; init; } = [];
 
-    /// <summary>
-    /// Gets the expanded step selectors that matched nothing on this leg.
-    /// </summary>
-    /// <remarks>
-    /// Steps address elements through role-based aliases because roles are the one
-    /// contract both implementations must honour, so a selector that resolves on one leg
-    /// and not the other is a parity result rather than a harness failure. The capturer
-    /// records it here and skips the action instead of throwing; comparing the two legs'
-    /// lists is what turns it into a finding.
-    /// </remarks>
-    [JsonPropertyName("unresolvedSelectors")]
-    public IReadOnlyList<string> UnresolvedSelectors { get; init; } = [];
+    /// <summary>Projects captured PNG names for in-process compatibility.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> Screenshots
+    {
+        get => screenshots ??
+            [.. ScreenshotObservations
+                .Where(observation => observation.State == ScreenshotObservationState.Captured)
+                .Select(observation => observation.FileName!)];
+        init => screenshots = value;
+    }
 
-    /// <summary>
-    /// Gets the expanded step selectors that resolved to an element the action could not
-    /// be driven against on this leg.
-    /// </summary>
-    /// <remarks>
-    /// The element is present and not driveable — zero-size, covered, or
-    /// <c>pointer-events: none</c> — which is a different parity result from a selector
-    /// that matched nothing, and is kept out of
-    /// <see cref="UnresolvedSelectors"/> for that reason. Folding the two together also
-    /// lets them cancel: two legs whose elements are non-actionable for unrelated reasons
-    /// would report identical lists and no difference at all. The capturer records the
-    /// selector here and skips the action instead of throwing.
-    /// </remarks>
-    [JsonPropertyName("nonActionableSelectors")]
-    public IReadOnlyList<string> NonActionableSelectors { get; init; } = [];
+    /// <summary>Gets exactly one canonical execution row per manifest action.</summary>
+    [JsonPropertyName("actions")]
+    [JsonRequired]
+    public IReadOnlyList<ActionExecution> Actions { get; init; } = [];
+
+    /// <summary>Projects unresolved selector occurrences from <see cref="Actions"/>.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> UnresolvedSelectors =>
+    [
+        .. Actions
+            .Where(action => action.Status == ActionExecutionStatus.Unresolved)
+            .Select(action => action.ExpandedSelector!)
+    ];
+
+    /// <summary>Projects non-actionable selector occurrences from <see cref="Actions"/>.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> NonActionableSelectors =>
+    [
+        .. Actions
+            .Where(action => action.Status == ActionExecutionStatus.NonActionable)
+            .Select(action => action.ExpandedSelector!)
+    ];
+
+    /// <summary>Gets the declared action consequences that missed their deadlines.</summary>
+    [JsonPropertyName("actionCompletionFailures")]
+    public IReadOnlyList<ActionCompletionFailure> ActionCompletionFailures { get; init; } = [];
+
+    /// <summary>Gets typed deterministic-frame replay failures without discarding canonical evidence.</summary>
+    [JsonPropertyName("animationFrameCaptureFailures")]
+    [JsonRequired]
+    public IReadOnlyList<AnimationFrameCaptureFailure> AnimationFrameCaptureFailures { get; init; } = [];
 }
 
 /// <summary>All steps captured for one fixture on one leg.</summary>
 public sealed record CaptureBundle
 {
+    /// <summary>Gets the capture document schema.</summary>
+    [JsonPropertyName("captureSchemaVersion")]
+    [JsonRequired]
+    public int CaptureSchemaVersion { get; init; }
+
     /// <summary>Gets the fixture id, for example <c>select/grouped</c>.</summary>
     [JsonPropertyName("fixture")]
     public required string Fixture { get; init; }
@@ -180,6 +317,10 @@ public sealed record CaptureBundle
     [JsonPropertyName("sourceHash")]
     public string SourceHash { get; init; } = string.Empty;
 
+    /// <summary>Gets the color-scheme theme emulated while this bundle was captured.</summary>
+    [JsonPropertyName("theme")]
+    public string Theme { get; init; } = string.Empty;
+
     /// <summary>Gets the captured steps.</summary>
     [JsonPropertyName("steps")]
     public required IReadOnlyList<StepCapture> Steps { get; init; }
@@ -188,11 +329,6 @@ public sealed record CaptureBundle
 /// <summary>Injects and invokes the shared capture script.</summary>
 public static class CaptureScript
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     /// <summary>
     /// Injects the shared capture script so it runs before any page script.
     /// </summary>
@@ -212,6 +348,32 @@ public static class CaptureScript
         var json = await page.EvaluateAsync<JsonElement>(
             "s => JSON.stringify(window[Symbol.for('Blazix.Parity.Capture')].capture(s))", step);
 
-        return JsonSerializer.Deserialize<StepCapture>(json.GetString()!, SerializerOptions)!;
+        return CaptureSchema.DeserializeStep(json.GetString()!);
     }
+
+    internal static Task<JsonElement> WaitForCompletionAsync(
+        IPage page,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> predicates,
+        float timeoutMs)
+        => page.EvaluateAsync<JsonElement>(
+            "args => window[Symbol.for('Blazix.Parity.Capture')].awaitCompletion(" +
+            "args.predicates, args.timeoutMs)",
+            new { predicates, timeoutMs = (double)timeoutMs });
+
+    internal static Task<int> WaitForAnimationRegistrationAsync(
+        IPage page,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> predicates,
+        float timeoutMs)
+        => page.EvaluateAsync<int>(
+            "args => window[Symbol.for('Blazix.Parity.Capture')].awaitAnimationRegistration(" +
+            "args.predicates, args.timeoutMs)",
+            new { predicates, timeoutMs = (double)timeoutMs });
+
+    internal static Task BeginAnimationProbeAsync(IPage page)
+        => page.EvaluateAsync(
+            "() => window[Symbol.for('Blazix.Parity.Capture')].beginAnimationProbe()");
+
+    internal static Task<int> SelectCurrentAnimationsAsync(IPage page)
+        => page.EvaluateAsync<int>(
+            "() => window[Symbol.for('Blazix.Parity.Capture')].selectCurrentAnimations()");
 }

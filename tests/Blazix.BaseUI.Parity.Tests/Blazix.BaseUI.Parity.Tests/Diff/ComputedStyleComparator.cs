@@ -35,10 +35,12 @@ public sealed class ComputedStyleComparator : IComparator
     /// <c>flex-basis</c> keeps into its computed value. Both are authored, read from the
     /// same stylesheet by both legs, so they have nothing to differ by and the slack
     /// absorbs nothing that was ever going to be reported.
-    /// Kept private rather than shared: the custom property comparator's tolerance is the
-    /// same number today for its own reasons, and a shared constant would tie the two.
+    /// The reportable comparator contract keeps this threshold distinct from the custom
+    /// property threshold even though their current numeric values are equal.
     /// </summary>
-    private const double Epsilon = 0.5;
+    private static readonly double Epsilon = ComparatorContract.Value(
+        FindingKind.ComputedStyle,
+        ComparatorContract.NumericTolerance);
 
     private static readonly IReadOnlyDictionary<string, string> NoStyles =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -79,7 +81,7 @@ public sealed class ComputedStyleComparator : IComparator
 
                 yield return new Finding
                 {
-                    Fixture = context.Fixture,
+                    Fixture = context.ExecutionId,
                     Leg = context.Leg,
                     Step = context.Step,
                     Kind = FindingKind.ComputedStyle,

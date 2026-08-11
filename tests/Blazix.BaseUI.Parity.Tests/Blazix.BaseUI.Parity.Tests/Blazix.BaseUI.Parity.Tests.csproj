@@ -34,6 +34,7 @@
     <None Include="..\manifest\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="manifest" />
     <None Include="..\waivers\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="waivers" />
     <None Include="..\react-fixtures\dist\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="react-dist" />
+    <None Include="Report\report.css" CopyToOutputDirectory="PreserveNewest" LinkBase="Report" />
   </ItemGroup>
 
 </Project>

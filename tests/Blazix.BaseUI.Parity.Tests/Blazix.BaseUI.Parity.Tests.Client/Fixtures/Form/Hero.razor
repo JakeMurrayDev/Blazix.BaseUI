@@ -1,0 +1,65 @@
+@using Blazix.BaseUI.Button
+@using Blazix.BaseUI.Field
+@using Blazix.BaseUI.Form
+
+<Form Model="@model"
+      Errors="@errors"
+      OnSubmit="HandleSubmitAsync"
+      class="flex w-full max-w-64 flex-col gap-4">
+    <FieldRoot Name="url" class="flex flex-col items-start gap-1">
+        <FieldLabel class="text-sm font-bold text-neutral-950 dark:text-white">
+            Homepage
+        </FieldLabel>
+        <FieldControl TValue="string"
+                      @bind-Value="model.Url"
+                      type="url"
+                      required="true"
+                      placeholder="https://example.com"
+                      pattern="https?://.*"
+                      class="h-8 w-full border border-neutral-950 bg-white dark:bg-neutral-950 px-2 text-sm any-pointer-coarse:text-base font-normal text-neutral-950 placeholder:text-neutral-500 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:focus:outline-white dark:border-white dark:text-white dark:placeholder:text-neutral-400" />
+        <FieldError class="text-sm text-red-700 dark:text-red-400" />
+    </FieldRoot>
+    <Button Disabled="@loading"
+            FocusableWhenDisabled="true"
+            type="submit"
+            class="flex h-8 items-center justify-center gap-2 rounded-none border border-neutral-950 bg-white px-3 text-sm leading-none whitespace-nowrap font-normal text-neutral-950 select-none hover:not-data-disabled:bg-neutral-100 active:not-data-disabled:bg-neutral-200 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-neutral-950 dark:focus-visible:outline-white data-disabled:border-neutral-500 data-disabled:text-neutral-500 disabled:border-neutral-500 disabled:text-neutral-500 dark:border-white dark:bg-neutral-950 dark:text-white dark:hover:not-data-disabled:bg-neutral-800 dark:active:not-data-disabled:bg-neutral-700 dark:data-disabled:border-neutral-400 dark:data-disabled:text-neutral-400">
+        Submit
+    </Button>
+</Form>
+
+@code {
+    private readonly UrlModel model = new() { Url = "https://example.com" };
+    private Dictionary<string, string[]> errors = [];
+    private bool loading;
+
+    private async Task HandleSubmitAsync(EditContext context)
+    {
+        loading = true;
+        errors = [];
+
+        await Task.Delay(1000);
+
+        if (Uri.TryCreate(model.Url, UriKind.Absolute, out var url) &&
+            url.Host.EndsWith("example.com", StringComparison.OrdinalIgnoreCase))
+        {
+            errors = new Dictionary<string, string[]>
+            {
+                ["url"] = ["The example domain is not allowed"]
+            };
+        }
+        else if (!Uri.TryCreate(model.Url, UriKind.Absolute, out _))
+        {
+            errors = new Dictionary<string, string[]>
+            {
+                ["url"] = ["This is not a valid URL"]
+            };
+        }
+
+        loading = false;
+    }
+
+    private sealed class UrlModel
+    {
+        public string Url { get; set; } = string.Empty;
+    }
+}

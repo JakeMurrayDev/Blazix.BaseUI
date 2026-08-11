@@ -148,6 +148,281 @@ public sealed class TimelineComparatorTests
     }
 
     [Fact]
+    public void CollapsesNestedSubtreeAdditionsWithinOneBatchButKeepsAnimatedParentMount()
+    {
+        const string wrapper = "root > div";
+        const string animated = "root > div > div[role=dialog]";
+        TimelineEvent[] timeline =
+        [
+            Added(10, wrapper),
+            Added(10, animated),
+            Added(10, animated + " > p", "p"),
+            Run(11, "transitionstart", animated)
+        ];
+
+        TimelineSequence.Normalize(timeline).ShouldBe(
+        [
+            $"added:{wrapper}::div",
+            $"added:{animated}::div",
+            $"transitionstart:{animated}:opacity:<absent>"
+        ]);
+    }
+
+    [Fact]
+    public void KeepsNestedSubtreeAdditionsFromDifferentRoundedTimesDistinct()
+    {
+        TimelineEvent[] timeline =
+        [
+            Added(10, Popup),
+            Added(11, Popup + " > p", "p")
+        ];
+
+        TimelineSequence.Normalize(timeline).Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void KeepsSiblingAdditionsWithinOneBatchDistinct()
+    {
+        TimelineEvent[] timeline =
+        [
+            Added(10, Popup + " > p", "p"),
+            Added(10, Popup + " > button", "button")
+        ];
+
+        TimelineSequence.Normalize(timeline).Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void CanonicalizesEquivalentInlineStyleSerializationAndTrailingSemicolons()
+    {
+        TimelineEvent[] reference =
+        [
+            Attribute(0, Popup, "style", null,
+                "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Attribute(0, Popup, "style", null,
+                " --collapsible-panel-width:192px;--collapsible-panel-height:92px ")
+        ];
+
+        TimelineSequence.Normalize(reference).ShouldBe(TimelineSequence.Normalize(candidate));
+    }
+
+    [Fact]
+    public void KeepsSemanticallyDifferentInlineStyleValuesDistinct()
+    {
+        TimelineEvent[] ordinary = [Attribute(0, Popup, "style", null, "position: absolute;")];
+        TimelineEvent[] important = [Attribute(0, Popup, "style", null, "position:absolute !important")];
+
+        TimelineSequence.Normalize(ordinary).ShouldNotBe(TimelineSequence.Normalize(important));
+    }
+
+    [Fact]
+    public void KeepsAbsentAndEmptyInlineStylesDistinct()
+    {
+        TimelineEvent[] absent = [Attribute(0, Popup, "style", string.Empty, null)];
+        TimelineEvent[] empty = [Attribute(0, Popup, "style", null, string.Empty)];
+
+        TimelineSequence.Normalize(absent).ShouldNotBe(TimelineSequence.Normalize(empty));
+    }
+
+    [Fact]
+    public void DropsRepeatedSameValuePlacementWritesAcrossInterleavedStyleChurn()
+    {
+        const string arrow = "portal(1) > div[role=dialog] > div[data-arrow]";
+        TimelineEvent[] reference =
+        [
+            Attribute(0, Popup, "style", "opacity:1", "opacity:.5"),
+            Attribute(4, Popup, "style", "opacity:.5", "opacity:0")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Attribute(0, Popup, "style", "opacity:1", "opacity:.5;"),
+            Attribute(1, Popup, "data-side", "bottom", "bottom"),
+            Attribute(2, Popup, "data-align", "center", "center"),
+            Attribute(3, arrow, "data-side", "bottom", "bottom"),
+            Attribute(4, Popup, "style", "opacity:.5", "opacity:0;"),
+            Attribute(5, Popup, "data-side", "bottom", "bottom")
+        ];
+
+        TimelineSequence.Normalize(reference).ShouldBe(TimelineSequence.Normalize(candidate));
+    }
+
+    [Fact]
+    public void KeepsARealDataSideVisibilityFlickerDistinct()
+    {
+        TimelineEvent[] stable = [Attribute(0, Popup, "data-side", "none", "bottom")];
+        TimelineEvent[] flicker =
+        [
+            Attribute(0, Popup, "data-side", "none", "bottom"),
+            Attribute(1, Popup, "style", "left:0", "left:1px"),
+            Attribute(2, Popup, "data-side", "bottom", "none")
+        ];
+
+        TimelineSequence.Normalize(stable).ShouldNotBe(TimelineSequence.Normalize(flicker));
+    }
+
+    [Fact]
+    public void TreatsSourceEquivalentSameBatchOpenClosedSiblingWritesAsAnUnorderedPhase()
+    {
+        const string panel = "root > div[data-panel]";
+        const string positioner = "root > div[data-positioner]";
+        TimelineEvent[] reference =
+        [
+            Attribute(10, panel, "data-open", null, string.Empty),
+            Attribute(10, panel, "data-closed", string.Empty, null),
+            Attribute(10, positioner, "data-open", null, string.Empty),
+            Attribute(10, positioner, "data-closed", string.Empty, null)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Attribute(10, positioner, "data-closed", string.Empty, null),
+            Attribute(10, positioner, "data-open", null, string.Empty),
+            Attribute(10, panel, "data-closed", string.Empty, null),
+            Attribute(10, panel, "data-open", null, string.Empty)
+        ];
+
+        TimelineSequence.Normalize(reference).ShouldBe(TimelineSequence.Normalize(candidate));
+    }
+
+    [Fact]
+    public void KeepsOpenClosedWritesFromDifferentRoundedTimesOrdered()
+    {
+        TimelineEvent[] reference =
+        [
+            Attribute(10, Popup, "data-open", null, string.Empty),
+            Attribute(11, Popup, "data-closed", string.Empty, null)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Attribute(10, Popup, "data-closed", string.Empty, null),
+            Attribute(11, Popup, "data-open", null, string.Empty)
+        ];
+
+        TimelineSequence.Normalize(reference).ShouldNotBe(TimelineSequence.Normalize(candidate));
+    }
+
+    [Fact]
+    public void KeepsNonSourceEquivalentSameBatchOpenClosedWritesDistinct()
+    {
+        TimelineEvent[] complete =
+        [
+            Attribute(10, Popup, "data-open", null, string.Empty),
+            Attribute(10, Popup, "data-closed", string.Empty, null)
+        ];
+        TimelineEvent[] missingClosed = [Attribute(10, Popup, "data-open", null, string.Empty)];
+
+        TimelineSequence.Normalize(complete).ShouldNotBe(TimelineSequence.Normalize(missingClosed));
+    }
+
+    [Fact]
+    public void KeepsSameBatchOpenClosedMultiplicityDistinct()
+    {
+        TimelineEvent[] repeatedOpen =
+        [
+            Attribute(10, Popup, "data-open", null, string.Empty),
+            Attribute(10, Popup, "data-closed", string.Empty, null),
+            Attribute(10, Popup, "data-open", null, string.Empty)
+        ];
+        TimelineEvent[] singleOpen =
+        [
+            Attribute(10, Popup, "data-open", null, string.Empty),
+            Attribute(10, Popup, "data-closed", string.Empty, null)
+        ];
+
+        TimelineSequence.Normalize(repeatedOpen).ShouldNotBe(TimelineSequence.Normalize(singleOpen));
+    }
+
+    [Fact]
+    public void KeepsStartingAndEndingHookOrderDistinct()
+    {
+        TimelineEvent[] startingThenEnding =
+        [
+            Attribute(10, Popup, "data-starting-style", null, string.Empty),
+            Attribute(10, Popup, "data-ending-style", null, string.Empty)
+        ];
+        TimelineEvent[] endingThenStarting =
+        [
+            Attribute(10, Popup, "data-ending-style", null, string.Empty),
+            Attribute(10, Popup, "data-starting-style", null, string.Empty)
+        ];
+
+        TimelineSequence.Normalize(startingThenEnding).ShouldNotBe(
+            TimelineSequence.Normalize(endingThenStarting));
+    }
+
+    [Fact]
+    public void KeepsTransitionStartAndEndOrderDistinct()
+    {
+        TimelineEvent[] startThenEnd =
+        [Run(10, "transitionstart", Popup), Run(10, "transitionend", Popup)];
+        TimelineEvent[] endThenStart =
+        [Run(10, "transitionend", Popup), Run(10, "transitionstart", Popup)];
+
+        TimelineSequence.Normalize(startThenEnd).ShouldNotBe(TimelineSequence.Normalize(endThenStart));
+    }
+
+    [Fact]
+    public void KeepsPopupRemovalDistinct()
+    {
+        TimelineEvent[] present = [Run(10, "transitionend", Popup)];
+        TimelineEvent[] removed = [Run(10, "transitionend", Popup), Removed(11)];
+
+        TimelineSequence.Normalize(present).ShouldNotBe(TimelineSequence.Normalize(removed));
+    }
+
+    [Fact]
+    public void KeepsPublicTriggerPanelRootHookOrderDistinct()
+    {
+        const string trigger = "root > button";
+        const string panel = "root > div[data-panel]";
+        const string root = "root";
+        TimelineEvent[] publicOrder =
+        [
+            Attribute(10, trigger, "data-ending-style", null, string.Empty),
+            Attribute(10, panel, "data-ending-style", null, string.Empty),
+            Attribute(10, root, "data-ending-style", null, string.Empty)
+        ];
+        TimelineEvent[] rendererOrder =
+        [
+            Attribute(10, root, "data-ending-style", null, string.Empty),
+            Attribute(10, trigger, "data-ending-style", null, string.Empty),
+            Attribute(10, panel, "data-ending-style", null, string.Empty)
+        ];
+
+        TimelineSequence.Normalize(publicOrder).ShouldNotBe(TimelineSequence.Normalize(rendererOrder));
+    }
+
+    [Fact]
+    public void NormalizesReportDerivedCollapsibleSelectAndPopoverRendererNoise()
+    {
+        const string panel = "root > div[data-panel]";
+        const string positioner = "root > div[data-positioner]";
+        TimelineEvent[] reference =
+        [
+            Added(10, panel),
+            Attribute(11, panel, "style", null, "height: 100%; --available-width: 240px;"),
+            Attribute(12, panel, "data-open", null, string.Empty),
+            Attribute(12, positioner, "data-closed", string.Empty, null),
+            Run(13, "transitionstart", panel, "height")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Added(10, panel),
+            Added(10, panel + " > div"),
+            Added(10, panel + " > div > span", "span"),
+            Attribute(11, panel, "style", null, "--available-width:240px;height:100%"),
+            Attribute(11, panel, "data-side", "bottom", "bottom"),
+            Attribute(12, positioner, "data-closed", string.Empty, null),
+            Attribute(12, panel, "data-open", null, string.Empty),
+            Run(13, "transitionstart", panel, "height")
+        ];
+
+        TimelineSequence.Normalize(reference).ShouldBe(TimelineSequence.Normalize(candidate));
+    }
+
+    [Fact]
     public void ReportsNothingWhenNeitherLegRecordedATimeline()
     {
         // Every step whose manifest entry does not settle on "animation" looks like this.
@@ -567,7 +842,7 @@ public sealed class TimelineComparatorTests
             Capture(candidate, declared: "0.3s", present: [Popup])));
         var finding = Errors(findings).ShouldHaveSingleItem();
 
-        finding.Property.ShouldBe("transition-duration");
+        finding.Property.ShouldBe("transition-duration@transition:opacity#0/blazor");
         finding.NodePath.ShouldBe(Popup);
         // The run's start is named as well as its length, because one step can hold several
         // runs on one node and two of them breaking the same declaration by the same amount
@@ -787,8 +1062,18 @@ public sealed class TimelineComparatorTests
         ];
 
         var findings = Compare(Context(
-            Capture(timeline, declared: "1s", present: [Popup]),
-            Capture(timeline, declared: "1s", present: [Popup])));
+            Capture(
+                timeline,
+                declared: "1s, 0.3s",
+                present: [Popup],
+                transitionProperty: "opacity, transform",
+                transitionDelay: "0s, 0.7s"),
+            Capture(
+                timeline,
+                declared: "1s, 0.3s",
+                present: [Popup],
+                transitionProperty: "opacity, transform",
+                transitionDelay: "0s, 0.7s")));
 
         findings.ShouldBeEmpty();
     }
@@ -1040,7 +1325,7 @@ public sealed class TimelineComparatorTests
             Capture(candidate, animation: "0.5s", present: [Popup])));
         var finding = Errors(findings).ShouldHaveSingleItem();
 
-        finding.Property.ShouldBe("animation-duration");
+        finding.Property.ShouldBe("animation-duration@animation:fade-in#0/blazor");
         finding.NodePath.ShouldBe(Popup);
         finding.Message.ShouldBe(
             $"Animation duration differs from its own declaration at '{Popup}': " +
@@ -1050,7 +1335,7 @@ public sealed class TimelineComparatorTests
         // keyframe span beside the transition duration it was not measured against.
         var record = findings.Where(f => f.Severity == Severity.Info).ShouldHaveSingleItem();
 
-        record.Property.ShouldBe("animation-duration");
+        record.Property.ShouldBe("animation-duration@animation:fade-in#0");
         record.Message.ShouldBe(
             $"Animation span at '{Popup}': React started at 0 ms and ran 500 ms (declared '0.5s'); " +
             "Blazor started at 0 ms and ran 1500 ms (declared '0.5s'); the spans differ by 1000 ms.");
@@ -1127,7 +1412,7 @@ public sealed class TimelineComparatorTests
             Capture(candidate, declared: "0.2s", present: [Popup])));
         var finding = Errors(findings).ShouldHaveSingleItem();
 
-        finding.Property.ShouldBe("transition-duration");
+        finding.Property.ShouldBe("transition-duration@transition:opacity#0/blazor");
         finding.Message.ShouldBe(
             $"Animation duration differs from its own declaration at '{Popup}': " +
             "Blazor ran for 400 ms starting at 0 ms against a declared '0.2s'.");
@@ -1192,6 +1477,374 @@ public sealed class TimelineComparatorTests
     }
 
     [Fact]
+    public void KeysOnlyTheInterruptedSecondRunPhaseFindingsByFamilyPropertyAndOrdinal()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Run(200, "transitionstart", Popup, "opacity"),
+            Run(300, "transitionend", Popup, "opacity"),
+            Removed(301)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Run(200, "transitionstart", Popup, "opacity"),
+            Removed(250)
+        ];
+
+        var findings = Compare(Context(Capture(reference), Capture(candidate)));
+        var phases = findings.Where(finding => finding.Property.Contains('@')).ToArray();
+
+        phases.Select(finding => finding.Property).ShouldBe(
+        [
+            "present-at-transitionend@transition:opacity#1",
+            "removed-after-transitionend@transition:opacity#1"
+        ]);
+        phases.ShouldAllBe(finding => finding.Severity == Severity.Error);
+        findings[0].Property.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DoesNotReportSymmetricCleanFirstInterruptedSecondRunsAsDifferences()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Run(200, "transitionstart", Popup, "opacity"),
+            Removed(250)
+        ];
+
+        Compare(Context(Capture(timeline), Capture(timeline))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DoesNotLeakAnEarlierPropertyPhaseIntoALaterRunCycle()
+    {
+        TimelineEvent[] reference =
+        [
+            Attribute(0, Popup, "data-open", null, string.Empty),
+            Attribute(1, Popup, "data-starting-style", string.Empty, null),
+            Run(2, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Run(200, "transitionstart", Popup, "transform"),
+            Run(300, "transitionend", Popup, "transform")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Attribute(0, Popup, "data-starting-style", string.Empty, null),
+            Attribute(1, Popup, "data-open", null, string.Empty),
+            Run(2, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Run(200, "transitionstart", Popup, "transform"),
+            Run(300, "transitionend", Popup, "transform")
+        ];
+
+        var ordering = Invariant(
+            Compare(Context(
+                Capture(reference, present: [Popup]),
+                Capture(candidate, present: [Popup]))),
+            "data-open-flipped-before-starting-style-cleared");
+
+        ordering.ShouldHaveSingleItem().Property.ShouldBe(
+            "data-open-flipped-before-starting-style-cleared@transition:opacity#0");
+    }
+
+    [Fact]
+    public void AttributesTwoSameTagRemovalsToTheirOwnSequentialRunWindows()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Removed(101),
+            Run(200, "transitionstart", Popup, "transform"),
+            Run(300, "transitionend", Popup, "transform"),
+            Removed(301)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(100, "transitionend", Popup, "opacity"),
+            Removed(101),
+            Run(200, "transitionstart", Popup, "transform"),
+            Removed(250)
+        ];
+
+        var phases = Compare(Context(Capture(reference), Capture(candidate)))
+            .Where(finding => finding.Property.Contains("@transition:transform#0"))
+            .ToArray();
+
+        phases.Select(finding => finding.Property).ShouldBe(
+        [
+            "present-at-transitionend@transition:transform#0",
+            "removed-after-transitionend@transition:transform#0"
+        ]);
+        phases.ShouldAllBe(finding => finding.Severity == Severity.Error);
+    }
+
+    [Fact]
+    public void KeysAnimationPhaseFindingsByAnimationName()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "animationstart", Popup, "fade-out"),
+            Run(100, "animationend", Popup, "fade-out"),
+            Removed(101)
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "animationstart", Popup, "fade-out"),
+            Removed(50)
+        ];
+
+        var properties = Compare(Context(Capture(reference), Capture(candidate)))
+            .Where(finding => finding.Property.Contains('@'))
+            .Select(finding => finding.Property)
+            .ToArray();
+
+        properties.ShouldBe(
+        [
+            "present-at-transitionend@animation:fade-out#0",
+            "removed-after-transitionend@animation:fade-out#0"
+        ]);
+    }
+
+    [Fact]
+    public void DoesNotPrintAnOppositeValueFromAnotherPropertyWhenRunCountsDiffer()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(900, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionstart", Popup, "transform"),
+            Run(1200, "transitionend", Popup, "transform")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(1000, "transitionstart", Popup, "transform"),
+            Run(1200, "transitionend", Popup, "transform")
+        ];
+
+        var overrun = Errors(Compare(Context(
+            Capture(reference, declared: "0.2s", present: [Popup]),
+            Capture(candidate, declared: "0.2s", present: [Popup]))))
+            .Single(finding =>
+                finding.Property == "transition-duration@transition:opacity#0/react");
+
+        overrun.ReferenceValue.ShouldBe("900");
+        overrun.CandidateValue.ShouldBeNull();
+        overrun.Message.ShouldContain("React ran for 900 ms");
+    }
+
+    [Fact]
+    public void OmitsSamePropertyOppositeValuesWheneverRunCountsDiffer()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(900, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionstart", Popup, "opacity"),
+            Run(1200, "transitionend", Popup, "opacity")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(1000, "transitionstart", Popup, "opacity"),
+            Run(1200, "transitionend", Popup, "opacity")
+        ];
+
+        var overrun = Errors(Compare(Context(
+                Capture(reference, declared: "0.2s", present: [Popup]),
+                Capture(candidate, declared: "0.2s", present: [Popup]))))
+            .Single(finding => finding.Property.EndsWith("/react", StringComparison.Ordinal));
+
+        overrun.ReferenceValue.ShouldBe("900");
+        overrun.CandidateValue.ShouldBeNull();
+    }
+
+    [Fact]
+    public void GivesMultipleDurationOverrunsDistinctStableRunProperties()
+    {
+        TimelineEvent[] reference =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(200, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionstart", Popup, "opacity"),
+            Run(1200, "transitionend", Popup, "opacity")
+        ];
+        TimelineEvent[] candidate =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(900, "transitionend", Popup, "opacity"),
+            Run(1000, "transitionstart", Popup, "opacity"),
+            Run(1900, "transitionend", Popup, "opacity")
+        ];
+
+        var overruns = Errors(Compare(Context(
+                Capture(reference, declared: "0.2s", present: [Popup]),
+                Capture(candidate, declared: "0.2s", present: [Popup]))))
+            .Where(finding => finding.Property.StartsWith(
+                "transition-duration@", StringComparison.Ordinal))
+            .ToArray();
+
+        overruns.Select(finding => finding.Property).ShouldBe(
+        [
+            "transition-duration@transition:opacity#0/blazor",
+            "transition-duration@transition:opacity#1/blazor"
+        ]);
+        overruns.Select(finding => finding.Property).ShouldBeUnique();
+    }
+
+    [Fact]
+    public void GivesSymmetricSameRunOverrunsDistinctActualLegProperties()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(900, "transitionend", Popup, "opacity")
+        ];
+        var capture = Capture(timeline, declared: "0.2s", present: [Popup]);
+
+        var overruns = Errors(Compare(Context(capture, capture)));
+
+        overruns.Select(finding => finding.Property).ShouldBe(
+        [
+            "transition-duration@transition:opacity#0/react",
+            "transition-duration@transition:opacity#0/blazor"
+        ]);
+        overruns.Select(finding =>
+                (finding.Fixture, finding.Leg, finding.Step, finding.Kind,
+                    finding.NodePath, finding.Property))
+            .ShouldBeUnique();
+    }
+
+    [Fact]
+    public void MultipliesFiniteAnimationDurationByIterationCountWithoutSymmetricErrors()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "animationstart", Popup, "pulse"),
+            Run(600, "animationend", Popup, "pulse")
+        ];
+
+        var capture = Capture(
+            timeline,
+            present: [Popup],
+            animation: "0.2s",
+            animationName: "pulse",
+            animationIterations: "3");
+
+        Compare(Context(capture, capture)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void MeasuresByteIdenticalRepeatedAnimationsByNameAndOrdinal()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "animationstart", Popup, "pulse"),
+            Run(600, "animationend", Popup, "pulse"),
+            Run(1000, "animationstart", Popup, "pulse"),
+            Run(1600, "animationend", Popup, "pulse")
+        ];
+        var capture = Capture(
+            timeline,
+            present: [Popup],
+            animation: "0.2s",
+            animationName: "pulse",
+            animationDelay: "0s",
+            animationIterations: "3");
+
+        Compare(Context(capture, capture)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AccountsForNegativeAnimationDelayWithoutSymmetricErrors()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "animationstart", Popup, "fade"),
+            Run(800, "animationend", Popup, "fade")
+        ];
+
+        var capture = Capture(
+            timeline,
+            present: [Popup],
+            animation: "2s",
+            animationName: "fade",
+            animationDelay: "-1.2s",
+            animationIterations: "1");
+
+        Compare(Context(capture, capture)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AccountsForNegativeTransitionDelayWithoutSymmetricErrors()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "transitionstart", Popup, "opacity"),
+            Run(800, "transitionend", Popup, "opacity")
+        ];
+
+        var capture = Capture(
+            timeline,
+            declared: "2s",
+            present: [Popup],
+            transitionProperty: "opacity",
+            transitionDelay: "-1.2s");
+
+        Compare(Context(capture, capture)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DoesNotMeasureAnInfiniteAnimationEvenWithASyntheticTerminal()
+    {
+        TimelineEvent[] timeline =
+        [
+            Run(0, "animationstart", Popup, "spin"),
+            Run(5000, "animationend", Popup, "spin")
+        ];
+
+        var capture = Capture(
+            timeline,
+            present: [Popup],
+            animation: "0.2s",
+            animationName: "spin",
+            animationIterations: "infinite");
+
+        Compare(Context(capture, capture)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void DoesNotCompareUnequalSyntheticSpansForAnInfiniteAnimation()
+    {
+        var reference = Capture(
+            [
+                Run(0, "animationstart", Popup, "spin"),
+                Run(5000, "animationend", Popup, "spin")
+            ],
+            present: [Popup],
+            animation: "0.2s",
+            animationName: "spin",
+            animationIterations: "infinite");
+        var candidate = Capture(
+            [
+                Run(0, "animationstart", Popup, "spin"),
+                Run(7000, "animationend", Popup, "spin")
+            ],
+            present: [Popup],
+            animation: "0.2s",
+            animationName: "spin",
+            animationIterations: "infinite");
+
+        Compare(Context(reference, candidate)).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void OwnsOneKind()
     {
         new TimelineComparator().Kind.ShouldBe(FindingKind.Timeline);
@@ -1220,7 +1873,7 @@ public sealed class TimelineComparatorTests
         // A sequence diff, a phase invariant, and a duration check, all from one step.
         findings.Count.ShouldBe(4);
         findings.ShouldAllBe(f => f.Kind == FindingKind.Timeline);
-        findings.ShouldAllBe(f => f.Fixture == "dialog/hero");
+        findings.ShouldAllBe(f => f.Fixture == "dialog/hero@light");
         findings.ShouldAllBe(f => f.Leg == ParityLeg.BlazorServer);
         findings.ShouldAllBe(f => f.Step == "open");
     }
@@ -1274,23 +1927,47 @@ public sealed class TimelineComparatorTests
 
     /// <summary>Picks out the findings one named phase invariant produced.</summary>
     private static IReadOnlyList<Finding> Invariant(IReadOnlyList<Finding> findings, string invariant)
-        => [.. findings.Where(f => f.Property == invariant)];
+        =>
+        [
+            .. findings.Where(f =>
+                f.Property == invariant ||
+                f.Property.StartsWith(invariant + "@", StringComparison.Ordinal))
+        ];
 
     private static IReadOnlyList<Finding> Errors(IReadOnlyList<Finding> findings)
         => [.. findings.Where(f => f.Severity == Severity.Error)];
 
     private static ComparisonContext Context(StepCapture reference, StepCapture candidate)
-        => new("dialog/hero", ParityLeg.BlazorServer, "open", reference, candidate, 0.001);
+        => new(
+            "dialog/hero",
+            "light",
+            "dialog/hero@light",
+            ParityLeg.BlazorServer,
+            "open",
+            reference,
+            candidate,
+            0.001);
 
     private static StepCapture Capture(
         IReadOnlyList<TimelineEvent> timeline,
         string? declared = null,
         IReadOnlyList<string>? present = null,
-        string? animation = null)
+        string? animation = null,
+        string? transitionProperty = null,
+        string? transitionDelay = null,
+        string? animationName = null,
+        string? animationDelay = null,
+        string? animationIterations = null)
     {
         var styles = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
 
-        if (declared is not null || animation is not null)
+        if (declared is not null ||
+            animation is not null ||
+            transitionProperty is not null ||
+            transitionDelay is not null ||
+            animationName is not null ||
+            animationDelay is not null ||
+            animationIterations is not null)
         {
             var node = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -1302,6 +1979,31 @@ public sealed class TimelineComparatorTests
             if (animation is not null)
             {
                 node["animation-duration"] = animation;
+            }
+
+            if (transitionProperty is not null)
+            {
+                node["transition-property"] = transitionProperty;
+            }
+
+            if (transitionDelay is not null)
+            {
+                node["transition-delay"] = transitionDelay;
+            }
+
+            if (animationName is not null)
+            {
+                node["animation-name"] = animationName;
+            }
+
+            if (animationDelay is not null)
+            {
+                node["animation-delay"] = animationDelay;
+            }
+
+            if (animationIterations is not null)
+            {
+                node["animation-iteration-count"] = animationIterations;
             }
 
             styles[Popup] = node;

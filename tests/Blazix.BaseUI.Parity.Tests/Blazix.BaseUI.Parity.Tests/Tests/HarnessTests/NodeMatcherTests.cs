@@ -174,15 +174,11 @@ public sealed class NodeMatcherTests
     }
 
     [Fact]
-    public void StillMispairsAWrapperAroundAnElementWithNoChildren()
+    public void PairsBeneathAWrapperAroundAChildlessSameKeySibling()
     {
-        // The shape that defeats the fix above, pinned rather than left for the next probe
-        // to find. Unpicking a colliding wrapper needs evidence, and the only evidence
-        // outside the node itself is its children: the wrapper's child has to share a child
-        // key with the reference. Wrap an element that has no children and there is nothing
-        // to share, so the wrapper is still consumed as if it were the body. Only the
-        // attributes tell these two apart, and attributes are outside the key on purpose —
-        // they are what AttributeComparator exists to diff.
+        // A childless body and footer both key as div||, as does the wrapper. Child
+        // corroboration is necessarily zero, so the matcher must use the wrapper chain and
+        // sibling assignment rather than consuming the wrapper as the body.
         var reference = At("div", "dlg", At("div", "dlg>body"), At("div", "dlg>foot"));
         var candidate = At("div", "dlg",
             At("div", "dlg>wrap", At("div", "dlg>wrap>body")),
@@ -190,8 +186,109 @@ public sealed class NodeMatcherTests
 
         var result = NodeMatcher.Match(reference, candidate);
 
-        result.Pairs.ShouldContain(p => p.Reference.Path == "dlg>body" && p.Candidate.Path == "dlg>wrap");
-        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap>body"]);
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Pairs.ShouldContain(p =>
+            p.Reference.Path == "dlg>body" && p.Candidate.Path == "dlg>wrap>body");
+        result.Pairs.ShouldContain(p =>
+            p.Reference.Path == "dlg>foot" && p.Candidate.Path == "dlg>foot");
+        result.Pairs.ShouldNotContain(p => p.Candidate.Path == "dlg>wrap");
+        result.Reorders.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void WrapperLookaheadOutranksACorroboratingSameKeySiblingWithoutCrossPairing()
+    {
+        // The footer shares the body's <p> key and therefore scores above the wrapper
+        // itself. The exact body one level inside the wrapper has stronger corroboration
+        // and must win; otherwise body and footer cross-pair and downstream attributes are
+        // compared across unrelated elements.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("q", "dlg>body>q")),
+            At("div", "dlg>foot", At("p", "dlg>foot>p")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>foot", At("p", "dlg>foot>p")),
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body",
+                    At("p", "dlg>wrap>body>p"),
+                    At("q", "dlg>wrap>body>q"))));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["dlg>wrap"]);
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "dlg>body" && pair.Candidate.Path == "dlg>wrap>body");
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "dlg>foot" && pair.Candidate.Path == "dlg>foot");
+        result.Pairs.ShouldNotContain(pair =>
+            pair.Reference.Path == "dlg>body" && pair.Candidate.Path == "dlg>foot");
+
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("dlg");
+        reorder.ReferenceOrder.ShouldBe(["dlg>body", "dlg>foot"]);
+        reorder.CandidateOrder.ShouldBe(["dlg>foot", "dlg>body"]);
+    }
+
+    [Fact]
+    public void StepsAWrapperBeforePairingAnIdentityChangeByTag()
+    {
+        var reference = AtRole("div", "root>popup", "dialog", At("p", "root>popup>text"));
+        var candidate = At("span", "root>wrapper",
+            At("div", "root>wrapper>popup", At("p", "root>wrapper>popup>text")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["root>wrapper"]);
+        var popup = result.Relaxed.ShouldHaveSingleItem().Pair;
+        popup.Reference.Path.ShouldBe("root>popup");
+        popup.Candidate.Path.ShouldBe("root>wrapper>popup");
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "root>popup>text" &&
+            pair.Candidate.Path == "root>wrapper>popup>text");
+    }
+
+    [Fact]
+    public void ReportsSiblingReorderAfterSteppingTheCandidateLevel()
+    {
+        var reference = At("div", "toolbar",
+            AtText("button", "toolbar>save", "Save"),
+            AtText("button", "toolbar>cancel", "Cancel"));
+        var candidate = At("div", "toolbar",
+            At("span", "toolbar>cancel-wrap",
+                AtText("button", "toolbar>cancel-wrap>cancel", "Cancel")),
+            At("span", "toolbar>save-wrap",
+                AtText("button", "toolbar>save-wrap>save", "Save")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(
+            ["toolbar>cancel-wrap", "toolbar>save-wrap"], ignoreOrder: true);
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("toolbar");
+        reorder.ReferenceOrder.ShouldBe(["toolbar>save", "toolbar>cancel"]);
+        reorder.CandidateOrder.ShouldBe(["toolbar>cancel", "toolbar>save"]);
+    }
+
+    [Fact]
+    public void MarksUnequalDuplicateKeyLeavesAsUncertainInsteadOfSilentFullPairs()
+    {
+        var reference = At("div", "root",
+            AtText("button", "root>edit-a", "Edit"),
+            AtText("button", "root>edit-b", "Edit"));
+        var candidate = At("div", "root",
+            AtText("button", "root>edit-x", "Edit"),
+            AtText("button", "root>edit-a", "Edit"),
+            AtText("button", "root>edit-b", "Edit"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Relaxed.Select(pair => pair.Pair.Reference.Path)
+            .ShouldBe(["root>edit-a", "root>edit-b"]);
+        result.Pairs.Where(pair => pair.Reference.Text == "Edit")
+            .ShouldAllBe(pair => pair.Relaxed);
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["root>edit-b"]);
     }
 
     [Fact]
@@ -260,9 +357,11 @@ public sealed class NodeMatcherTests
         result.Pairs.ShouldContain(p => p.Reference.Tag == "ul" && p.Candidate.Tag == "ul");
         result.Pairs.Count(p => p.Reference.Tag == "li").ShouldBe(1);
 
-        var relaxed = result.Relaxed.ShouldHaveSingleItem();
-        relaxed.ReferenceIdentity.ShouldContain("menu");
-        relaxed.CandidateIdentity.ShouldContain("listbox");
+        result.Relaxed.Count.ShouldBe(2);
+        var container = result.Relaxed.Single(pair => pair.Pair.Reference.Tag == "ul");
+        container.ReferenceIdentity.ShouldContain("menu");
+        container.CandidateIdentity.ShouldContain("listbox");
+        result.Relaxed.ShouldContain(pair => pair.Pair.Reference.Tag == "li");
     }
 
     [Fact]
@@ -466,6 +565,30 @@ public sealed class NodeMatcherTests
         Classes = [],
         Text = string.Empty,
         Children = children
+    };
+
+    private static DomNode AtRole(
+        string tag,
+        string path,
+        string role,
+        params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string> { ["role"] = role },
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    private static DomNode AtText(string tag, string path, string text) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = text,
+        Children = []
     };
 
     private static DomNode Node(string tag, params DomNode[] children) => new()

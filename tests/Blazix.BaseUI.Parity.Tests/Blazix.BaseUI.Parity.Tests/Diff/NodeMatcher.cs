@@ -8,8 +8,9 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// <param name="Reference">The node from the React snapshot.</param>
 /// <param name="Candidate">The node from the Blazor snapshot.</param>
 /// <param name="Relaxed">
-/// Whether the two only matched once the key was relaxed to the tag name alone, so the
-/// matcher does not itself hold them to be the same element. Carried here, and not only on
+/// Whether the matcher could not prove correspondence, either because it relaxed the key
+/// to the tag alone or because unequal duplicate-key leaves were positionally ambiguous.
+/// Carried here, and not only on
 /// <see cref="NodeMatchResult.Relaxed"/>, because <see cref="NodeMatchResult.Pairs"/> is
 /// what a comparator iterates: a style or geometry difference read across a relaxed pair is
 /// a difference between two elements that may not correspond, and nothing else on the list
@@ -34,7 +35,7 @@ public sealed record SiblingReorder(
     IReadOnlyList<string> CandidateOrder);
 
 /// <summary>
-/// A pair that matched only after the key was relaxed to the tag name alone.
+/// A pair whose fallback match could not prove correspondence.
 /// </summary>
 /// <remarks>
 /// The pair is in <see cref="NodeMatchResult.Pairs"/> like any other, so everything beneath
@@ -92,30 +93,29 @@ public static class NodeMatcher
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The shapes below are known to defeat this matcher. They are named here rather than
-    /// only in the task report because Tasks 8-10 read <see cref="NodeMatchResult.Pairs"/>
-    /// to diff computed styles and geometry, and a consumer of that list has to know what
-    /// it cannot assume. The list deliberately carries no count: it grew at every review,
+    /// Before the Task 10c correspondence repair, the shapes below defeated this matcher.
+    /// They remain documented as the failure modes the adversarial suite prevents because
+    /// Tasks 8-10 read <see cref="NodeMatchResult.Pairs"/> to diff computed styles and
+    /// geometry. The list deliberately carries no count: it grew at every review,
     /// and a number that stops matching invites the next person to leave the text stale.
     /// Across 27 probe trees no real difference produced zero findings — every shape here
     /// still fails the run, just not always for the right reason.
     /// </para>
     /// <para>
-    /// Read this part even if you skip the rest. <see cref="NodeMatchResult.Pairs"/> can
+    /// Before that repair, <see cref="NodeMatchResult.Pairs"/> could
     /// hold a real element paired with a layout wrapper, or with the wrong same-key sibling.
     /// In both cases the pair carries <see cref="NodePair.Relaxed"/> as
     /// <see langword="false"/> and appears nowhere in <see cref="NodeMatchResult.Relaxed"/>:
-    /// those two members flag the deliberate tag degrade and nothing else, so nothing in the
-    /// result flags a mispairing. A pair is this matcher's best guess, not an assertion that
-    /// the two nodes are the same element.
+    /// those two members flagged the deliberate tag degrade and nothing else, so nothing in
+    /// the result flagged a mispairing.
     /// </para>
     /// <list type="number">
     /// <item>
     /// <b>A childless same-key sibling swallows a wrapper.</b> Loud but mislabelled. An
     /// element carrying neither a role nor its own text keys as <c>tag||</c>, which is also
     /// every layout wrapper's key. <see cref="StepUnblocks"/> is what normally unpicks that
-    /// collision: it asks <see cref="Wraps"/> whether the reference is corroborated by
-    /// something inside the wrapper, and <see cref="Wraps"/> requires
+    /// collision: it asks <see cref="WrappedCounterpartScore"/> whether the reference is
+    /// corroborated by something inside the wrapper, and the old implementation required
     /// <see cref="Corroboration"/> above zero — which a reference with no children can never
     /// reach. So the childless sibling takes the wrapper. React
     /// <c>&lt;div&gt;(&lt;div data-popup&gt;&lt;p/&gt;, &lt;div data-arrow/&gt;)</c> against
@@ -124,7 +124,7 @@ public static class NodeMatcher
     /// about both legs — plus a fabricated <c>data-arrow</c> Attribute finding. Give the
     /// arrow a single child of its own and the same tree collapses to one correct finding,
     /// so the trigger is precisely "the colliding sibling is childless" and not the wrapper.
-    /// <c>StillMispairsAWrapperAroundAnElementWithNoChildren</c> pins it.
+    /// <c>PairsBeneathAWrapperAroundAChildlessSameKeySibling</c> prevents its return.
     /// </item>
     /// <item>
     /// <b>The corroboration tiebreak cross-pairs same-key siblings.</b> Loud but
@@ -190,6 +190,14 @@ public static class NodeMatcher
     /// differs. Shape 2 above is a worked example.
     /// </item>
     /// </list>
+    /// <para>
+    /// The repaired matcher searches wrapper chains before accepting a weaker same-key
+    /// sibling, permits step-then-tag-degrade for identity changes, and retains original
+    /// sibling-branch ordinals so a reorder remains observable after wrapper projection.
+    /// Every accepted pair therefore comes from the same original sibling branches used by
+    /// Structure evidence; deliberate tag-only uncertainty remains explicit in
+    /// <see cref="NodeMatchResult.Relaxed"/>.
+    /// </para>
     /// </remarks>
     /// <param name="reference">The React snapshot root.</param>
     /// <param name="candidate">The Blazor snapshot root.</param>
@@ -258,6 +266,58 @@ public static class NodeMatcher
         return wrappers is null ? null : new Step(stepped, wrappers);
     }
 
+    /// <summary>
+    /// Steps only single-child nodes whose wrapper chain exposes a more strongly
+    /// corroborated same-tag counterpart on the other leg.
+    /// </summary>
+    private static Step? StepThroughTagWrappers(
+        List<DomNode> nodes,
+        List<DomNode> counterparts)
+    {
+        List<DomNode>? wrappers = null;
+        var stepped = new List<DomNode>(nodes.Count);
+
+        foreach (var node in nodes)
+        {
+            if (node.Children.Count == 1 &&
+                counterparts.Exists(counterpart =>
+                    ExposesStrongerTagCounterpart(counterpart, node)))
+            {
+                (wrappers ??= []).Add(node);
+                stepped.Add(node.Children[0]);
+            }
+            else
+            {
+                stepped.Add(node);
+            }
+        }
+
+        return wrappers is null ? null : new Step(stepped, wrappers);
+    }
+
+    /// <summary>
+    /// Reports whether walking a wrapper chain reaches a same-tag node whose children
+    /// corroborate <paramref name="counterpart"/> more strongly than the outer node does.
+    /// </summary>
+    private static bool ExposesStrongerTagCounterpart(DomNode counterpart, DomNode wrapper)
+    {
+        var outerScore = string.Equals(counterpart.Tag, wrapper.Tag, StringComparison.Ordinal)
+            ? Corroboration(counterpart, wrapper)
+            : -1;
+
+        for (var inner = wrapper; inner.Children.Count == 1; inner = inner.Children[0])
+        {
+            var child = inner.Children[0];
+            if (string.Equals(counterpart.Tag, child.Tag, StringComparison.Ordinal) &&
+                Corroboration(counterpart, child) > outerScore)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Applies a step, reporting the elements it stepped through.</summary>
     private static void Commit(List<DomNode> nodes, Step step, List<DomNode> reported)
     {
@@ -277,6 +337,17 @@ public static class NodeMatcher
     }
 
     /// <summary>
+    /// Reports whether a wrapper projection exposes a node that can participate in the
+    /// explicit tag-degrade pass when no full-key pair exists at the level.
+    /// </summary>
+    private static bool SharesATag(List<DomNode> references, List<DomNode> candidates)
+    {
+        var tags = new HashSet<string>(candidates.Select(node => node.Tag), StringComparer.Ordinal);
+
+        return references.Exists(reference => tags.Contains(reference.Tag));
+    }
+
+    /// <summary>
     /// Records the sibling list when the nodes that matched do not sit in the same
     /// relative order on both legs.
     /// </summary>
@@ -289,22 +360,29 @@ public static class NodeMatcher
     /// </remarks>
     private static void RecordReorder(
         string parentPath,
-        List<MatchedPair> matched,
+        List<LevelPair> matched,
         List<SiblingReorder> reorders)
     {
-        // `matched` is built in reference document order, so "both legs agree" is exactly
-        // "the candidate indices never step backwards".
-        for (var i = 1; i < matched.Count; i++)
+        var referenceOrder = matched
+            .OrderBy(item => item.ReferenceIndex)
+            .ToArray();
+
+        // Each accepted pair retains the index of the original sibling branch it came
+        // through. Those indices remain meaningful after a wrapper is stepped through,
+        // unlike an index in the temporary projected list.
+        for (var i = 1; i < referenceOrder.Length; i++)
         {
-            if (matched[i].CandidateIndex >= matched[i - 1].CandidateIndex)
+            if (referenceOrder[i].CandidateIndex >= referenceOrder[i - 1].CandidateIndex)
             {
                 continue;
             }
 
             reorders.Add(new SiblingReorder(
                 parentPath,
-                [.. matched.Select(m => m.Pair.Reference.Path)],
-                [.. matched.OrderBy(m => m.CandidateIndex).Select(m => m.Pair.Reference.Path)]));
+                [.. referenceOrder.Select(item => item.Pair.Reference.Path)],
+                [.. referenceOrder
+                    .OrderBy(item => item.CandidateIndex)
+                    .Select(item => item.Pair.Reference.Path)]));
 
             return;
         }
@@ -339,6 +417,12 @@ public static class NodeMatcher
     {
         Func<DomNode, string> key = pass == Pass.FullKey ? Key : static node => node.Tag;
         var relaxed = pass == Pass.TagDegrade;
+        var referenceCounts = references
+            .GroupBy(key, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
+        var candidateCounts = candidates
+            .GroupBy(key, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Count(), StringComparer.Ordinal);
 
         var available = new Dictionary<string, List<int>>(StringComparer.Ordinal);
         for (var i = 0; i < candidates.Count; i++)
@@ -370,8 +454,7 @@ public static class NodeMatcher
             var chosen = indices[slot];
 
             if (pass == Pass.FullKey
-                && Corroboration(reference, candidates[chosen]) == 0
-                && StepUnblocks(reference, candidates, taken))
+                && StepUnblocks(reference, candidates, taken, chosen))
             {
                 // Nothing about this candidate says it is the reference, and something
                 // about a wrapper still on the list says the reference's counterpart is one
@@ -386,8 +469,14 @@ public static class NodeMatcher
             indices.RemoveAt(slot);
             taken[chosen] = true;
             lastMatched = chosen;
-            matched.Add(
-                new MatchedPair(new NodePair(reference, candidates[chosen], relaxed), chosen));
+            var pairKey = key(reference);
+            var duplicateUncertain = pass == Pass.FullKey &&
+                referenceCounts[pairKey] != candidateCounts[pairKey] &&
+                Corroboration(reference, candidates[chosen]) == 0 &&
+                indices.All(index => Corroboration(reference, candidates[index]) == 0);
+            matched.Add(new MatchedPair(
+                new NodePair(reference, candidates[chosen], relaxed || duplicateUncertain),
+                chosen));
         }
 
         var candidateLeftovers = new List<DomNode>();
@@ -498,15 +587,33 @@ public static class NodeMatcher
     /// construction: <see cref="PairBy"/> walks the references and looks candidates up, so a
     /// wrapper on the reference leg is invisible to the candidate-side test.
     /// </remarks>
-    private static bool StepUnblocks(DomNode reference, List<DomNode> candidates, bool[] taken)
+    private static bool StepUnblocks(
+        DomNode reference,
+        List<DomNode> candidates,
+        bool[] taken,
+        int chosen)
     {
+        var chosenScore = Corroboration(reference, candidates[chosen]);
+
         for (var i = 0; i < candidates.Count; i++)
         {
             // The candidate is the wrapper and the reference's counterpart is inside it, or
             // the mirror: the reference is the wrapper and this candidate's counterpart is
             // inside that.
-            if (!taken[i]
-                && (Wraps(reference, candidates[i]) || Wraps(candidates[i], reference)))
+            if (taken[i])
+            {
+                continue;
+            }
+
+            var forward = WrappedCounterpartScore(reference, candidates[i]);
+            var reverse = WrappedCounterpartScore(candidates[i], reference);
+
+            if ((forward is { } forwardScore
+                    && (forwardScore > chosenScore
+                        || (reference.Children.Count == 0 && i == chosen)))
+                || (reverse is { } reverseScore
+                    && (reverseScore > chosenScore
+                        || (candidates[i].Children.Count == 0 && i == chosen))))
             {
                 return true;
             }
@@ -534,21 +641,22 @@ public static class NodeMatcher
     /// differs from its counterpart's is stepped past instead of degraded onto.
     /// </para>
     /// </remarks>
-    private static bool Wraps(DomNode node, DomNode wrapper)
+    private static int? WrappedCounterpartScore(DomNode node, DomNode wrapper)
     {
         var key = Key(node);
+        int? best = null;
 
         for (var inner = wrapper; inner.Children.Count == 1; inner = inner.Children[0])
         {
             var child = inner.Children[0];
-            if (string.Equals(Key(child), key, StringComparison.Ordinal)
-                && Corroboration(node, child) > 0)
+            if (string.Equals(Key(child), key, StringComparison.Ordinal))
             {
-                return true;
+                var score = Corroboration(node, child);
+                best = best is null ? score : Math.Max(best.Value, score);
             }
         }
 
-        return false;
+        return best;
     }
 
     /// <summary>
@@ -607,8 +715,9 @@ public static class NodeMatcher
     {
         private readonly List<DomNode> references = [.. referenceChildren];
         private readonly List<DomNode> candidates = [.. candidateChildren];
-        private bool firstPass = true;
+        private readonly List<LevelPair> matchedBranches = [];
         private int pairedHere;
+        private bool tagDegradeUnblocked;
 
         /// <summary>
         /// Gets a value indicating whether nothing at this level has paired on the full key.
@@ -618,10 +727,10 @@ public static class NodeMatcher
         /// general relaxation of the key: once anything at a level has paired, the two
         /// lists are taken to be the same list, so a leftover in it reads as the presence
         /// difference it usually is. The cost is real and worth stating — an identity
-        /// difference on a node whose sibling paired is <em>not</em> degraded, so it is
-        /// reported as two one-sided subtrees with no attribute finding for the role that
-        /// differs. <see cref="Match"/> states that limit in full;
-        /// `DoesNotPairSiblingsWithDifferentRolesWhenAnotherSiblingPaired` pins it.
+        /// difference on a node whose sibling paired is <em>not</em> degraded unless a
+        /// wrapper projection exposes a better-corresponding same-tag node. This keeps two
+        /// genuinely different siblings separate while still unwrapping layout inserted
+        /// around an identity change.
         /// </remarks>
         private bool NothingPaired => pairedHere == 0;
 
@@ -670,7 +779,7 @@ public static class NodeMatcher
                     continue;
                 }
 
-                if (NothingPaired && TryPairByTag())
+                if ((NothingPaired || tagDegradeUnblocked) && TryPairByTag())
                 {
                     break;
                 }
@@ -682,6 +791,8 @@ public static class NodeMatcher
 
                 break;
             }
+
+            RecordReorder(parentPath, matchedBranches, state.Reorders);
 
             foreach (var node in references)
             {
@@ -699,13 +810,10 @@ public static class NodeMatcher
         {
             PairBy(references, candidates, Pass.FullKey, out var matched);
 
-            if (firstPass)
+            foreach (var (pair, _) in matched.Where(item => item.Pair.Relaxed))
             {
-                // Only the first pass sees the two sibling lists as the two pages ordered
-                // them. After an unwrap the candidate indices count positions in a list
-                // that exists in neither DOM, so ordering read off it means nothing.
-                RecordReorder(parentPath, matched, state.Reorders);
-                firstPass = false;
+                state.Relaxed.Add(
+                    new RelaxedPair(pair, Identity(pair.Reference), Identity(pair.Candidate)));
             }
 
             pairedHere += matched.Count;
@@ -741,12 +849,22 @@ public static class NodeMatcher
         /// <returns><see langword="true"/> if the candidates were stepped.</returns>
         private bool TryStepCandidatesOnly()
         {
-            if (StepThrough(candidates) is not { } step || !SharesAKey(references, step.Nodes))
+            if (StepThrough(candidates) is { } step &&
+                (SharesAKey(references, step.Nodes) ||
+                 NothingPaired && SharesATag(references, step.Nodes)))
+            {
+                Commit(candidates, step, state.CandidateOnly);
+                return true;
+            }
+
+            if (NothingPaired ||
+                StepThroughTagWrappers(candidates, references) is not { } tagStep)
             {
                 return false;
             }
 
-            Commit(candidates, step, state.CandidateOnly);
+            Commit(candidates, tagStep, state.CandidateOnly);
+            tagDegradeUnblocked = true;
 
             return true;
         }
@@ -755,12 +873,22 @@ public static class NodeMatcher
         /// <returns><see langword="true"/> if the references were stepped.</returns>
         private bool TryStepReferencesOnly()
         {
-            if (StepThrough(references) is not { } step || !SharesAKey(step.Nodes, candidates))
+            if (StepThrough(references) is { } step &&
+                (SharesAKey(step.Nodes, candidates) ||
+                 NothingPaired && SharesATag(step.Nodes, candidates)))
+            {
+                Commit(references, step, state.ReferenceOnly);
+                return true;
+            }
+
+            if (NothingPaired ||
+                StepThroughTagWrappers(references, candidates) is not { } tagStep)
             {
                 return false;
             }
 
-            Commit(references, step, state.ReferenceOnly);
+            Commit(references, tagStep, state.ReferenceOnly);
+            tagDegradeUnblocked = true;
 
             return true;
         }
@@ -794,10 +922,28 @@ public static class NodeMatcher
         {
             foreach (var (pair, _) in matched)
             {
+                matchedBranches.Add(new LevelPair(
+                    pair,
+                    BranchIndex(referenceChildren, pair.Reference),
+                    BranchIndex(candidateChildren, pair.Candidate)));
                 state.Pairs.Add(pair);
                 MatchChildren(
                     pair.Reference.Children, pair.Candidate.Children, pair.Reference.Path, state);
             }
+        }
+
+        private static int BranchIndex(IReadOnlyList<DomNode> branches, DomNode node)
+        {
+            for (var index = 0; index < branches.Count; index++)
+            {
+                if (branches[index].Descendants().Any(item => ReferenceEquals(item, node)))
+                {
+                    return index;
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"Matched node '{node.Path}' does not belong to this sibling level.");
         }
     }
 
@@ -805,6 +951,15 @@ public static class NodeMatcher
     /// <param name="Pair">The matched nodes.</param>
     /// <param name="CandidateIndex">The candidate's index within its sibling list.</param>
     private readonly record struct MatchedPair(NodePair Pair, int CandidateIndex);
+
+    /// <summary>
+    /// A pair together with the original sibling branches it came through, retained across
+    /// wrapper projection so reorder evidence remains tied to real document order.
+    /// </summary>
+    private readonly record struct LevelPair(
+        NodePair Pair,
+        int ReferenceIndex,
+        int CandidateIndex);
 
     /// <summary>A sibling list with its single-child nodes replaced by their children.</summary>
     /// <param name="Nodes">The replacement list.</param>

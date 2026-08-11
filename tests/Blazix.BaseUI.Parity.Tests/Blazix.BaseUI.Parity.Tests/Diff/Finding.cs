@@ -6,6 +6,9 @@ public enum FindingKind
     /// <summary>A node exists on one side only, or sibling ordering differs.</summary>
     Structure,
 
+    /// <summary>A fallback pair may not represent corresponding nodes.</summary>
+    CorrespondenceUncertain,
+
     /// <summary>An attribute value differs, or an attribute is present on one side only.</summary>
     Attribute,
 
@@ -38,6 +41,12 @@ public enum FindingKind
 
     /// <summary>A step selector resolved on one side only.</summary>
     SelectorUnresolved,
+
+    /// <summary>A step selector resolved but could not be driven on one side only.</summary>
+    SelectorNonActionable,
+
+    /// <summary>An action's declared browser-observable consequence did not arrive.</summary>
+    ActionCompletionUnmet,
 
     /// <summary>The fixture failed to load or threw.</summary>
     FixtureError

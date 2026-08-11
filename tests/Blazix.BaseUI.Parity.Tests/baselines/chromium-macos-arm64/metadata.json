@@ -1,0 +1,2240 @@
+{
+  "schemaVersion": 3,
+  "captureSchemaVersion": 3,
+  "upstreamSha": "bdcb685fadcca9d18b18f013c052795a53b6aa33",
+  "platform": {
+    "browser": "chromium",
+    "browserVersion": "143.0.7499.4",
+    "os": "macos",
+    "architecture": "arm64"
+  },
+  "generatedAtUtc": "2026-08-10T17:46:33.385+00:00",
+  "fixtureManifestHash": "43CB863DECDB35CADE9893C737226289AA2A22CBDC0A851612387A7868BC19A8",
+  "aliasManifestHash": "AE8A9607EB047F7520FF9A0DFD2725FDBB4C6A3101CD4AE3FB62298FB8B42C46",
+  "stylesheetHash": "96456BF65B5AA5A9503304D70154C14E5880939D0675556AC02AC3BB0D45728D",
+  "fixtures": [
+    {
+      "fixture": "switch/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/switch/demos/hero/tailwind/index.tsx",
+      "sourceHash": "BA3520CFFA6A02752796507F3CEC173704CB02A40CFFDA7AECD15E588AB8BC5F",
+      "contractHash": "26946530A8FE08C0092F1350A17CD0152AB565690E71BCABDE1E75A05397B6A8",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "toggle-off"
+      ],
+      "capture": "captures/switch__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/switch__hero.light.json",
+          "sha256": "5616100B594BF9EF47F333CD3A81BC6AA930EDE3FBAA7876B1ADD3B639B3783B"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.initial.00.png",
+          "sha256": "E27C5A2664793985214D2A7DC5940F4353C7B690626DFB7AE23102A8575A826A"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.00.png",
+          "sha256": "85228F0C16E335F11EF820B1F6A64715DF4E48B962EC935EE8C3F128465FFF09"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.frame000.00.png",
+          "sha256": "E27C5A2664793985214D2A7DC5940F4353C7B690626DFB7AE23102A8575A826A"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.frame025.00.png",
+          "sha256": "91F2DEA6DF2D7CDA337A5AE5ECEDFC79FB9A1CF1705E4E4CCC2E4174E2DC8E60"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.frame050.00.png",
+          "sha256": "3114AD43092CE2C2D943A35C323171E02E7DAA0ACE35A142704C97F8F9E72F01"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.frame075.00.png",
+          "sha256": "92A75A400DF7672ED0F8DB64BA38336FEFA73DFBADD4369AE1BF1D67EF121C95"
+        },
+        {
+          "path": "screenshots/switch__hero.light.React.toggle-off.frame100.00.png",
+          "sha256": "85228F0C16E335F11EF820B1F6A64715DF4E48B962EC935EE8C3F128465FFF09"
+        }
+      ]
+    },
+    {
+      "fixture": "collapsible/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/collapsible/demos/hero/tailwind/index.tsx",
+      "sourceHash": "50F4BC170BFA94037D0810C0B1EEBC2192323EA110E0B27383F00B80ED433257",
+      "contractHash": "12923445DDBA548BBFB114B7500315E6F596EE35A0916007A351FFAFFFB83B84",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "close"
+      ],
+      "capture": "captures/collapsible__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/collapsible__hero.light.json",
+          "sha256": "2096299E00825501D79D27D4CC7D59A8C0B335FBDD4EE88FCC00741B10C0CFDF"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.00.png",
+          "sha256": "09F2F3FE9C2A3F6C09DEFF6679AB51950609527B9965233AC2E324C7AA919D4A"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.frame000.00.png",
+          "sha256": "B3031BF96D6E904CA56B82F1B9D0FDEFA91F14AF5F8970601EA4526C062DE753"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.frame025.00.png",
+          "sha256": "BE5DB8BB5E302857829AA585484B2E42A22D5325AB4604BCD600B97B6201CAF9"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.frame050.00.png",
+          "sha256": "BC33E585537EEEDBC3A434734E8022084CF8B4B938821ADBD2D9BE77CBE08210"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.frame075.00.png",
+          "sha256": "C42EC62A08A366EC01F7656012FC5E54DB6C715150D7C49497F1B0FDD5F8E8F3"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.close.frame100.00.png",
+          "sha256": "75324E35A27DC1FCBFCD5D7BD4C76A480175BB40DAE076CFB02017F3E5706827"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.initial.00.png",
+          "sha256": "09F2F3FE9C2A3F6C09DEFF6679AB51950609527B9965233AC2E324C7AA919D4A"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.00.png",
+          "sha256": "8A1CA1AB0E4E3FA3BF5772A75B4AD4BB51D318E00C712CE1210A7B0ACE7526CD"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.frame000.00.png",
+          "sha256": "71D9226E83DAA4E0269E5A84CC6941C38665F32186791AF6DD8CF4774C6BAAA7"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.frame025.00.png",
+          "sha256": "E3F208060DBE17AB8B521A27ACC4B567488A16E7F6051B92B78B6CB6D86FE38E"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.frame050.00.png",
+          "sha256": "CC2ECDA86D541E27A95E06D17ED7BEAF2A2D347F08D25C6070BBDEC8F4D3572C"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.frame075.00.png",
+          "sha256": "968FF0AC6F182417B9F47E2C23499B58DF131E41C83DCD26BB81D1615FEA54BD"
+        },
+        {
+          "path": "screenshots/collapsible__hero.light.React.open.frame100.00.png",
+          "sha256": "08080461D997B99EADEF2B439F8E0A8EE2C6BF45FC75735075D941B7DE16CDC6"
+        }
+      ]
+    },
+    {
+      "fixture": "popover/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/popover/demos/hero/tailwind/index.tsx",
+      "sourceHash": "DC650C4125BD8C323D43EF096C879FD7FE7E5813C89F51AB87011CF4693EAAD2",
+      "contractHash": "C760571C3644EB257AF35F4817C6689869EFB1A9D3DB1E7DF59EE5E93F4973CE",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "close"
+      ],
+      "capture": "captures/popover__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/popover__hero.light.json",
+          "sha256": "620B61AC00CD8A5F897B2E2811EA8B2BC297795B55A776631C2E780247FD12C2"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.00.png",
+          "sha256": "55301323FA6DCC373B287DD1A47B84E3FAEAD9ECFDF17A35F2B0F158610D1E62"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame000.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame000.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame025.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame025.01.png",
+          "sha256": "B74CF5F3BE223E23FEC2E95F3F5DF291EA558601BC84EB4E6A08093DAB28FCA9"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame050.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame050.01.png",
+          "sha256": "3F2D22841475D987C4E5A8612EE929BD5FCDF9FD8E91EF6CA7094D44BC916DE5"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame075.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame075.01.png",
+          "sha256": "63E2C7A310FE2C738DF83C1C1020C9603039533A6C0035E309FDF34398B78174"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame100.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.close.frame100.01.png",
+          "sha256": "94A1402B9A6D739B5B98C4215402DAA32999346D8868CAE8E1D175232FB520E5"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.initial.00.png",
+          "sha256": "7B0BA45EA9D1C219B24E67F7CFAA8902416EBAC0D31D86E1B5353BE9AD83493E"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame000.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame000.01.png",
+          "sha256": "94A1402B9A6D739B5B98C4215402DAA32999346D8868CAE8E1D175232FB520E5"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame025.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame025.01.png",
+          "sha256": "24A8E1B67B63B0F5FDB5B715B4B9396CBB6F47BAD952943CC8C85BBD5CA61195"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame050.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame050.01.png",
+          "sha256": "13A57FA9667F35E92B60E87E0A4527EE3E6EEF53599B84899044137A473F0A1E"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame075.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame075.01.png",
+          "sha256": "B6EDD5FFEAF6526EE53BA2619000396B8B3F991803F761BFAD86365E95CB1594"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame100.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__hero.light.React.open.frame100.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        }
+      ]
+    },
+    {
+      "fixture": "select/grouped",
+      "sourcePath": "docs/src/app/(docs)/react/components/select/demos/grouped/tailwind/index.tsx",
+      "sourceHash": "70AD520F90B58355062ECC165F4E4949CD1127FBE756BA97CAC3055CC2644A01",
+      "contractHash": "076EC761CC897A477DD0FA1FFE86BE0A93EB6860FA6FB9C04DFE05692B12ECAA",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "arrow-down",
+        "arrow-up",
+        "select-banana"
+      ],
+      "capture": "captures/select__grouped.light.json",
+      "artifacts": [
+        {
+          "path": "captures/select__grouped.light.json",
+          "sha256": "D4721319DEA76996ACC875FC887E3D83186172B882ED2BC11E3BC1F3955C1202"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.arrow-down.00.png",
+          "sha256": "CE1D36C91FF96D65C8EE30628312B238F2BBD0B176F13DA53652BC0AB91A7D65"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.arrow-down.01.png",
+          "sha256": "4B161B473F02F9DB2569C3D0BB93BCF4F8C9D193B9FBCF6CE6F38BEE17AEDD06"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.arrow-up.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.arrow-up.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.initial.00.png",
+          "sha256": "9D6D2A0739419441846A3D2A6C00168EE489421B95E35E7F7C64ACAAC64A8336"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame000.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame000.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame025.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame025.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame050.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame050.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame075.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame075.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame100.00.png",
+          "sha256": "2141EC18E594028E7DBEA8BF84CF9A2F5ECF403414155631AE3E44B1E4871859"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.open.frame100.01.png",
+          "sha256": "3DD053AED2F79EBA08EF4E1547E447121C915FEFCDD39C3B6471981B86124052"
+        },
+        {
+          "path": "screenshots/select__grouped.light.React.select-banana.00.png",
+          "sha256": "44103DF6E8611CB8179D057C92DE54F012BFED4885034EABC58B84CE85A232AC"
+        }
+      ]
+    },
+    {
+      "fixture": "field/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/field/demos/hero/tailwind/index.tsx",
+      "sourceHash": "037DCAC6975C6DFABE8B95D41E0E82335D6AAC2093B7E2AD76BF820E6401CE73",
+      "contractHash": "D1325BDFF118A235D81FFDCBE837339B7468D80353E65F7C42A2C2D47742510E",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "focus",
+        "type",
+        "blur"
+      ],
+      "capture": "captures/field__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/field__hero.light.json",
+          "sha256": "302F790D1BB661B105EE3E79693FE8F20B00D595251453C74C103E983974F50A"
+        },
+        {
+          "path": "screenshots/field__hero.light.React.blur.00.png",
+          "sha256": "30DBF14570D16840F133B286F2F0387452EA5CF39CE48F5ECBA793574B02CF45"
+        },
+        {
+          "path": "screenshots/field__hero.light.React.focus.00.png",
+          "sha256": "7A98F9F1B34262A2A4997013745A6F7721CB33E56442019AEDE4087C074A7C05"
+        },
+        {
+          "path": "screenshots/field__hero.light.React.initial.00.png",
+          "sha256": "6B7FB8E05FC08F5DEA1D5023DFE6591B243E0198A540F11F9AD7E4DA1C24CEFE"
+        },
+        {
+          "path": "screenshots/field__hero.light.React.type.00.png",
+          "sha256": "909D7DE84E0D63FDFD974720AC7A1E37F59DB08C8A79C80F3B906E7A6C947D94"
+        }
+      ]
+    },
+    {
+      "fixture": "avatar/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/avatar/demos/hero/tailwind/index.tsx",
+      "sourceHash": "56A81381C79585A0726E2D13CC44A7BAE5B5ED2870F7050EC74D378E67875F23",
+      "contractHash": "B2D85B93481D7DD07314E6E96E5930904B06670B6DFDDD947FBC8702C60157AE",
+      "theme": "light",
+      "steps": [
+        "initial"
+      ],
+      "capture": "captures/avatar__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/avatar__hero.light.json",
+          "sha256": "386094522ED85D8DA55B70F65E34DDBA41D3E9937CA939B777334697C13F7F42"
+        },
+        {
+          "path": "screenshots/avatar__hero.light.React.initial.00.png",
+          "sha256": "CF3077DF4AAF95718FC610BE7F8C2F86525227D0D7DB288989509D53FC4E9B6C"
+        }
+      ]
+    },
+    {
+      "fixture": "separator/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/separator/demos/hero/tailwind/index.tsx",
+      "sourceHash": "0B2909EAE0B739D8ED8A119EF5FF1D77ED8174AF8A5C09EB34E5D805458A69B3",
+      "contractHash": "1EBC7686B159A17F53652AC7DB6C9F1F21A9EA79732E26A08BA0F593F205F6C8",
+      "theme": "light",
+      "steps": [
+        "initial"
+      ],
+      "capture": "captures/separator__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/separator__hero.light.json",
+          "sha256": "568C63794E89C5394B0DB54B10018C4C30B9506918875F733B4F71713BFE6A67"
+        },
+        {
+          "path": "screenshots/separator__hero.light.React.initial.00.png",
+          "sha256": "25F8CF433C4B0D82C42CDD4B5C13CE450FC558B03E03989D02881CBC71464354"
+        }
+      ]
+    },
+    {
+      "fixture": "progress/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/progress/demos/hero/tailwind/index.tsx",
+      "sourceHash": "F3054F38C8EE1AD80E9E95D7C835C023579CEF87546DF17992079FC6DB8694FD",
+      "contractHash": "9DF309A3030DD906C0C1C5FB7D67BCC72DEE7EC5B0212B8681DCF45BC1805C5C",
+      "theme": "light",
+      "steps": [
+        "initial"
+      ],
+      "capture": "captures/progress__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/progress__hero.light.json",
+          "sha256": "C37C28C4916ADC7A971808D8BD0DBC47D35CABF31F07AFE5237F5EBE0889299D"
+        },
+        {
+          "path": "screenshots/progress__hero.light.React.initial.00.png",
+          "sha256": "476EDCF3EAAEAAB3BDA7026D551523268E7E14E11A6B7991A0BE2854CE3D2176"
+        }
+      ]
+    },
+    {
+      "fixture": "meter/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/meter/demos/hero/tailwind/index.tsx",
+      "sourceHash": "3F6A8FAEEF7B63873B23595DAACDE7023BE3AE711D5A1A9C45D25835EE9A37DB",
+      "contractHash": "BEC7648F129A14D3528CC296CA39E83BC7342E9F2E95FCE857EFECE1FB9455E0",
+      "theme": "light",
+      "steps": [
+        "initial"
+      ],
+      "capture": "captures/meter__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/meter__hero.light.json",
+          "sha256": "9E736039721174715BA337B017B7F822E91B1F2748A26BCE1326B1898D4A44B0"
+        },
+        {
+          "path": "screenshots/meter__hero.light.React.initial.00.png",
+          "sha256": "8E92BD34827928FF7AD29029C285C802CB9C2600C6805973EE7E477C07E53955"
+        }
+      ]
+    },
+    {
+      "fixture": "accordion/multiple",
+      "sourcePath": "docs/src/app/(docs)/react/components/accordion/demos/multiple/tailwind/index.tsx",
+      "sourceHash": "0417A3E3FBAACD2FA4C0267BEB49F0D0E2C3243D5697C0E4F8AAA330594CA2DF",
+      "contractHash": "29F4C55610312422DDB4337649159CCEE522BFD7B12C6FB8AE0852B26BC9D158",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open-first",
+        "open-second",
+        "close-first"
+      ],
+      "capture": "captures/accordion__multiple.light.json",
+      "artifacts": [
+        {
+          "path": "captures/accordion__multiple.light.json",
+          "sha256": "1138EA7F3927B47B65BFA8C30B2FD733E913DDCFEED739A6ACA2BF931BF74565"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.00.png",
+          "sha256": "23A13364833F88F18B2C8371A3BFAF73072686724F3ED706F88595DECCAEF2FC"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.frame000.00.png",
+          "sha256": "4EEBAB64DD9BF49EF0411800E792D0A78186FBD2BEC54C6EF0E00CFE7A6616DD"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.frame025.00.png",
+          "sha256": "C29F79ED566935E6630B5EF379DF52BF54F51A116D6D20320D918FACE1614DD0"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.frame050.00.png",
+          "sha256": "476860D1B972B93D4DA6EC3888FD3F3C70BFC2C66B9E71A0D49DE6712DE5DDB8"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.frame075.00.png",
+          "sha256": "7BABCFF93AC6F2BEA614A7F1DD451A58699D14260E4599CBA8C955FAF4325902"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.close-first.frame100.00.png",
+          "sha256": "34CAA30C679D8CA79BB46168DBA1F7624DD140E6865202A47200807B8C61450D"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.initial.00.png",
+          "sha256": "C8C543712C18BB25678F28DA7621F139389CF05D33D1062FB73B8C2F04BED0DF"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.00.png",
+          "sha256": "C957EC56442F8B2D7284865F51303F89D6153D3A83AB82AD5740D732CD739083"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.frame000.00.png",
+          "sha256": "3AE132F140208EF233A83ECCE908FE1019F4FD24A642B1823C2FB13F82E928D4"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.frame025.00.png",
+          "sha256": "747D837EFFDA95D5041285746DF1AE8FA9B64A369F3304D38AC5348FB8406D49"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.frame050.00.png",
+          "sha256": "1E1F8585CD831E398B2139C08A672C8C7153C4F826DDA0C0398B3DFF914B3C7D"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.frame075.00.png",
+          "sha256": "BCDDB35C07A4602FEEA10FB7D8CA51E3B1EDAB169856696500E26C4184BD38B1"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-first.frame100.00.png",
+          "sha256": "EE3D6FADA8A2CF2C5B856C3E99A14585F91AFCD2F41D34A14450F584CF42F717"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.00.png",
+          "sha256": "67AEE5500789FDAFA62EB212D22D87C455F9842A33A074145378147769378D0D"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.frame000.00.png",
+          "sha256": "C77303EBE2B148D7FDDA7C2FE61A85C556C443BFA38077A10DA0378B57838279"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.frame025.00.png",
+          "sha256": "D9315AE8A980A94E12E460C1D3854A1D4559BAD1066CEFE63E9C9A0984424909"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.frame050.00.png",
+          "sha256": "468EEE824F70F9BF92A9AD859427449C57E89475A8DD9A03186DA85AC4CD79F8"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.frame075.00.png",
+          "sha256": "5A14EA9E6C515CD3140AA7A608A05B65DC5F065923C92FF1D97E7850F2CE0CA8"
+        },
+        {
+          "path": "screenshots/accordion__multiple.light.React.open-second.frame100.00.png",
+          "sha256": "3329DFCFE24ACE4F135DFC547AC74A2894D3A6EEEF1ECB032EC8CB0B54C31664"
+        }
+      ]
+    },
+    {
+      "fixture": "dialog/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/dialog/demos/hero/tailwind/index.tsx",
+      "sourceHash": "93FC360AAE269FEF5C3B85567874252B1E4C0D0C1AF8ADA5E67B06D4CC9C965B",
+      "contractHash": "C4FA7BE707E99A9A74392D8807377D93456F74A3A3079E6907D916520EB1B011",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "close"
+      ],
+      "capture": "captures/dialog__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/dialog__hero.light.json",
+          "sha256": "A5D79D62CC13E0627F2665370D3AE8AA531DC62D3C80B7ED221D487514231E0E"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.00.png",
+          "sha256": "5A92922881D8002E7E210DB9B89ABB0C18D5879B51C7F696AA699F77DE7E21F7"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame000.00.png",
+          "sha256": "5D9A262BC34771907C0DB99E4C545954985DE456704D54F0326000D8E737952A"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame000.01.png",
+          "sha256": "375D3A43E8693F12182A37E8DAC3D5BC9C13CCD6335A2A6D48E32D3CE0820116"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame025.00.png",
+          "sha256": "229D5E4185E74C641397A8A42C7FCA312D2661A69AB2D1C5AECFDBB9FC89967D"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame025.01.png",
+          "sha256": "8B60F5B84F435DF195AF7FD80D801004F9D19F0C8969D8DE81A1CC2A85E7C3EF"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame050.00.png",
+          "sha256": "16BEB827FE4D80AD1B69F368E5526B30083659E3E29D5BE6671E737C6063A00A"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame050.01.png",
+          "sha256": "937CE6C4E955C97B677B52BEAA41091B2ADB7B21047D5FC5B8FAB733EA910691"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame075.00.png",
+          "sha256": "CCF54A5E9DCCF553E4D00F2022F101F4A738BDFDEB6A37991339049294F157FA"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame075.01.png",
+          "sha256": "60C22745F00C14D98BDB263548C43E30E3533419D20BFB7906D8F69C288C2908"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame100.00.png",
+          "sha256": "5A92922881D8002E7E210DB9B89ABB0C18D5879B51C7F696AA699F77DE7E21F7"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.close.frame100.01.png",
+          "sha256": "721999F07B7BFBC70027775E0B35DDF4908AE91DEC6908C08B983B8B86C3847D"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.initial.00.png",
+          "sha256": "5A92922881D8002E7E210DB9B89ABB0C18D5879B51C7F696AA699F77DE7E21F7"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.00.png",
+          "sha256": "709EEACDE525DA0780368EF60BB78536F1AB3AFCA193296244A3328C395DA754"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.01.png",
+          "sha256": "A81C9B29C5B7720D7C85F94DD9AB8A0542FE9D16084E1D35868F45C3BB898E50"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame000.00.png",
+          "sha256": "5A92922881D8002E7E210DB9B89ABB0C18D5879B51C7F696AA699F77DE7E21F7"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame000.01.png",
+          "sha256": "721999F07B7BFBC70027775E0B35DDF4908AE91DEC6908C08B983B8B86C3847D"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame025.00.png",
+          "sha256": "DD06123D76B40704B0D095E12E7568D2D2F256A2D66D2BBCE404D0C56BD7A9DA"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame025.01.png",
+          "sha256": "16FAFD8247FE69D8A4ECE741F2F796E6C35BC544119EB78BEFDC62FA0093F206"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame050.00.png",
+          "sha256": "B184E7F8BD5075F6E5B4DCC13C8CED4D9C77AAEB129803D1A1856EAA2D61CBCC"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame050.01.png",
+          "sha256": "26E0A396DFB40E3A116BD11B18AE4740550510364A8A8238A77AEC510B2653C7"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame075.00.png",
+          "sha256": "0233EE743CE0179EA09C0C8EE3A007001FAF851961A6B5576D1F05E63EB9B766"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame075.01.png",
+          "sha256": "A311B69D43C20FFD261C39DB79185FF255A693318596158B2B3FB0EF4C9E0B41"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame100.00.png",
+          "sha256": "5D9A262BC34771907C0DB99E4C545954985DE456704D54F0326000D8E737952A"
+        },
+        {
+          "path": "screenshots/dialog__hero.light.React.open.frame100.01.png",
+          "sha256": "1A90C06B9AE4E7DE1F30A87D7DA45727941B368D37A2716FF7343A78A3A07A21"
+        }
+      ]
+    },
+    {
+      "fixture": "drawer/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/drawer/demos/hero/tailwind/index.tsx",
+      "sourceHash": "43E458FC07EE9F5692ECD08C89D15E2330B48583F85E5C54E31122A146010FD8",
+      "contractHash": "F705BF058D3CABA77A631A30C274E14F4F94CB58244DE2BDB05C6104F440AA45",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "close"
+      ],
+      "capture": "captures/drawer__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/drawer__hero.light.json",
+          "sha256": "8E12B3C3565A22333D30D8061E44E5059ACDFFAE71E53DF7C5353B80E05CF55D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.00.png",
+          "sha256": "478355DAF9795C6A3E9606302D2D11EB7739614186998344792844A8A77C8903"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame000.00.png",
+          "sha256": "DE15C849E6A96DE3C1FCA229F2729DC2CD6B7101D3CB4C7976EC1E2C50ADB34F"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame000.01.png",
+          "sha256": "6F9700D9BF349E507099CE3A11338D5EDCDDE440A1F71D231C542E082F2D2E01"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame025.00.png",
+          "sha256": "0240D3A6F43677DDB247496AC24AE5EDB6637AA493C66C6777D04C19C0B44C0F"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame025.01.png",
+          "sha256": "CF5341B337E88E4A6479EBBDD3CD38F048906525A3C4EAF5E110D64793B8A03D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame050.00.png",
+          "sha256": "00CD9FA4A18AE864CCD091691404E65153C25B87529548F14AC547BAF36CD26D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame050.01.png",
+          "sha256": "4E0E48B84A8A9ADAAA47F74844D1BF5A8D8760830F5DFD554AF0FE417348D9B3"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame075.00.png",
+          "sha256": "478355DAF9795C6A3E9606302D2D11EB7739614186998344792844A8A77C8903"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame075.01.png",
+          "sha256": "8E06E8CE56027329276FA12139ACAA7A2818C330838536D516BF747FABEB120D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame100.00.png",
+          "sha256": "478355DAF9795C6A3E9606302D2D11EB7739614186998344792844A8A77C8903"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.close.frame100.01.png",
+          "sha256": "8E06E8CE56027329276FA12139ACAA7A2818C330838536D516BF747FABEB120D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.initial.00.png",
+          "sha256": "478355DAF9795C6A3E9606302D2D11EB7739614186998344792844A8A77C8903"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.00.png",
+          "sha256": "B4193D17713C7851D2210E892F33BFC2639A4E4629CC7FF4009807C779E57094"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.01.png",
+          "sha256": "09434D04E387DD31122912379E4BED3D022C80EF901230BDF9FD7A1082CEE329"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame000.00.png",
+          "sha256": "478355DAF9795C6A3E9606302D2D11EB7739614186998344792844A8A77C8903"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame000.01.png",
+          "sha256": "8E06E8CE56027329276FA12139ACAA7A2818C330838536D516BF747FABEB120D"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame025.00.png",
+          "sha256": "7AFB6C9C70021E4AA75FA8BF9F511CE37DDF6505F745A6A9E58297E08401B18B"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame025.01.png",
+          "sha256": "84B76714249A3F12C9A257BA3A9F36F8ACD6AEF65EFBCECE3605BC1537C4E421"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame050.00.png",
+          "sha256": "200D36FD68A3D46BDA542FEE2202AE6BFCA05943CE9C1469D0B6B455DA3FF8EC"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame050.01.png",
+          "sha256": "2E2B6DA3E47C91197C140C415FCA9E48D797EC18656D3C6CF01A88953B7B0431"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame075.00.png",
+          "sha256": "240C1EAAAF91E2E20511597B38399250FF52D9FE1CDD43A7F7A3AE2BC4885BC2"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame075.01.png",
+          "sha256": "D118393A2333AFC32DE94C424DCEF736365BB0CDF705AACB9F5E67B3079866A7"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame100.00.png",
+          "sha256": "DE15C849E6A96DE3C1FCA229F2729DC2CD6B7101D3CB4C7976EC1E2C50ADB34F"
+        },
+        {
+          "path": "screenshots/drawer__hero.light.React.open.frame100.01.png",
+          "sha256": "6F9700D9BF349E507099CE3A11338D5EDCDDE440A1F71D231C542E082F2D2E01"
+        }
+      ]
+    },
+    {
+      "fixture": "toast/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/toast/demos/hero/tailwind/index.tsx",
+      "sourceHash": "32CA22CE17287AF5465F1143FB32A2C34DC9251AA31C7175BD2C81B800CA7392",
+      "contractHash": "235A2162F8E98E748D52CAA38E8BC70AD88C26F8847DB51B188494B561E2DD97",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "create-toast",
+        "dismiss-toast"
+      ],
+      "capture": "captures/toast__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/toast__hero.light.json",
+          "sha256": "4376334774589D6543468F2C1B2CC5012AC4B00E7C1FE78CCC24514E1220CDF1"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.01.png",
+          "sha256": "181FD6B0CD238BD0A0A0073C46E1AD545D51D42D0EFFB2402B395572056D2F72"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame000.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame025.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame025.01.png",
+          "sha256": "05C6A543F80768D3EE4CB68B7CF3CA1EDA5C311AA0C6446DB6B36008A0711783"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame050.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame050.01.png",
+          "sha256": "B2821A75623749F89EA41A314F8CDE3AB15B52E68B041A418673B013A3442784"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame075.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame075.01.png",
+          "sha256": "7FDBD9E59F8956C913E83B2BD0283E42B13F5E02E0BB0A6D9BC8F1DF71024A45"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame100.00.png",
+          "sha256": "5AE4BD85F466169A1FBF423840F4495AA6C0384A5E1DB3509D436E1543CC6183"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.create-toast.frame100.01.png",
+          "sha256": "181FD6B0CD238BD0A0A0073C46E1AD545D51D42D0EFFB2402B395572056D2F72"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame000.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame000.01.png",
+          "sha256": "F37FFA1F479C297A1B50C5BB544C6B8C5528938548DC6566F5507ABF98507C05"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame025.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame025.01.png",
+          "sha256": "0AC76C3E19F60AA862DE59B140D69EB6C539428EAD95F0D53183EF8E8A3B7B40"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame050.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame050.01.png",
+          "sha256": "F1613E18D86D326C8BC33BBC5FB7F82FFC5C9C4C5A0A15D684249EE12DA5FC18"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame075.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame075.01.png",
+          "sha256": "66EB01D3B4B4F7A27444759140C09FE81E6D3B24986CD7801F948BF1FDE675EC"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame100.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.dismiss-toast.frame100.01.png",
+          "sha256": "257D9C12828DFBECE024BABB9AC7B48E498A565CFC4F24ABD752D9BA5F034033"
+        },
+        {
+          "path": "screenshots/toast__hero.light.React.initial.00.png",
+          "sha256": "A4AC804C290981C6D65A3A7C47A7FCA71C3FD18A2979D197198FF44FC1DB2974"
+        }
+      ]
+    },
+    {
+      "fixture": "tooltip/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/tooltip/demos/hero/tailwind/index.tsx",
+      "sourceHash": "75D9430F61921A15D51478170A77D6974BE9B600892B50877C75EE69C817501F",
+      "contractHash": "28E9F3F44EE9364D194401BA3DBA7534F9DB2A80D0DF2211904729B284FDF69A",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "show-bold-tooltip",
+        "dismiss-tooltip"
+      ],
+      "capture": "captures/tooltip__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/tooltip__hero.light.json",
+          "sha256": "01F6B2AE73633493DCBF5509B7E22B805A27E791A3080D9866C900080DCF3F83"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.dismiss-tooltip.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.initial.00.png",
+          "sha256": "B8A73C138B94528368B4C25AF8B0838A681F5BE2BAD54DA5CFD603034D5E199E"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.01.png",
+          "sha256": "9CC5920D1764CAB6A505E48C5F087F90A9D6BEE396FC4E37855C24F0BDB29D70"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame000.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame000.01.png",
+          "sha256": "E5B5CBFD0DA39235FA4B92D93F6DDFB05EBA710E8A8CDE9E53D7BEA8593283B5"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame025.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame025.01.png",
+          "sha256": "FAE0D9721EFE62FA36C78F2FF5DC6EBF212E9B24CA032501E1AAEAE8249CCD20"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame050.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame050.01.png",
+          "sha256": "5D75691858B3F195B04271C1AD144F8C7658EA423277B06CEA65AE640DE133D3"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame075.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame075.01.png",
+          "sha256": "24D812F2BC82611D85F4277DF37177672131B94FD4E156CA4F4975D82EB7DFBF"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame100.00.png",
+          "sha256": "9944B476AD2265B4DD1C7CB9EBFA51D303AB2768C2E49D059FA9180C6E9FCB75"
+        },
+        {
+          "path": "screenshots/tooltip__hero.light.React.show-bold-tooltip.frame100.01.png",
+          "sha256": "9CC5920D1764CAB6A505E48C5F087F90A9D6BEE396FC4E37855C24F0BDB29D70"
+        }
+      ]
+    },
+    {
+      "fixture": "preview-card/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/preview-card/demos/hero/tailwind/index.tsx",
+      "sourceHash": "66DC3213384EC36135903387444117A0122ABFA948C63224F6751298A5A5BDEB",
+      "contractHash": "6E513935DF6738E9DEF1FE85C5C94F6D2947E0C78D10664164AE1EF59F80160F",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "show-preview",
+        "dismiss-preview"
+      ],
+      "capture": "captures/preview-card__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/preview-card__hero.light.json",
+          "sha256": "2A2E19248A71BC8FCBE76926B20D8B6D4534C99A5425721CF490021E3F44119D"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame000.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame000.01.png",
+          "sha256": "2C2D0128D5AD327A5958091507AE8B6EB5DA204BC2466A6C75AEF34979669B82"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame025.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame025.01.png",
+          "sha256": "FD99CD847589D2A078C065635AE290F9AEBEECFD1BA2D122153FEE03E3C2E7C7"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame050.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame050.01.png",
+          "sha256": "D60C5290912EFDEFCB5F2DA76095EE32B32FC3791647478A3BACB7F7E5BA0338"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame075.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame075.01.png",
+          "sha256": "7785507A2E7E87978291238CCFDABF34C48CA674214EB6D92130A89A66C4F136"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame100.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.dismiss-preview.frame100.01.png",
+          "sha256": "53C512BBA1F5EF6DEDAD2124E01CB39FFA968D9AC458F78E3E8965887BDC8365"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.initial.00.png",
+          "sha256": "E792A352DD7917A04C48B4DD31E854FE1857D5E9AB3021EB9F92934BD2D79C0A"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.01.png",
+          "sha256": "2C2D0128D5AD327A5958091507AE8B6EB5DA204BC2466A6C75AEF34979669B82"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame000.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame000.01.png",
+          "sha256": "53C512BBA1F5EF6DEDAD2124E01CB39FFA968D9AC458F78E3E8965887BDC8365"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame025.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame025.01.png",
+          "sha256": "48A0D85912B7E7E203A87CC42990FFA50CDDF525BB4BA65C17E1E0C6EC969278"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame050.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame050.01.png",
+          "sha256": "D41C7FB44E7543A031B62EFDB76AFF9D82A4FD86D4F5B9AB56B77F66A18EE996"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame075.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame075.01.png",
+          "sha256": "5CAA34B6F131CA13E633AC9448EC777D2A61463C71C8220E8416F553E8555EE4"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame100.00.png",
+          "sha256": "C2960A407C3010613BC9D9CE32C2A0870FCE942479AAF73ABE7FBF3FE0B6A3D8"
+        },
+        {
+          "path": "screenshots/preview-card__hero.light.React.show-preview.frame100.01.png",
+          "sha256": "2C2D0128D5AD327A5958091507AE8B6EB5DA204BC2466A6C75AEF34979669B82"
+        }
+      ]
+    },
+    {
+      "fixture": "menu/arrow",
+      "sourcePath": "docs/src/app/(docs)/react/components/menu/demos/arrow/tailwind/index.tsx",
+      "sourceHash": "DD95B34300AB2F95134B3A6036740C33F0275DEC70F3296CAAA461E2359EE87C",
+      "contractHash": "9670E1E564158746827C07EF5D0D4AC45672B061710AA31F484F3636A1BF9755",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "arrow-down",
+        "close"
+      ],
+      "capture": "captures/menu__arrow.light.json",
+      "artifacts": [
+        {
+          "path": "captures/menu__arrow.light.json",
+          "sha256": "6B28CF2DA6F4A67AEE3FD70B3A52CD1515656307BCCAF00C94D1A4D03F2E295C"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.arrow-down.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.arrow-down.01.png",
+          "sha256": "0A90FF371ABEE12D46CF96F99F0CF1649F9BD48BE95B820802D32A3FEA746263"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.00.png",
+          "sha256": "026784380360CED25815D2A67FB3C3DB66ACCD0C2ADBCA4BDFBD25FC3559FEC2"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame000.00.png",
+          "sha256": "98097D382956A521D0C533F0BB812EE3A8D4B0A4EFD703B96C22DCBB0FAAF605"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame000.01.png",
+          "sha256": "4B2E46EFD76F68290AEE316E1C719D69A487EC0F7AEF6730F2C26F36FC061581"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame025.00.png",
+          "sha256": "98097D382956A521D0C533F0BB812EE3A8D4B0A4EFD703B96C22DCBB0FAAF605"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame025.01.png",
+          "sha256": "973484DFF2A9440356E280FE9332795136028118FCAAEF1E1BC2776BA5F99230"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame050.00.png",
+          "sha256": "98097D382956A521D0C533F0BB812EE3A8D4B0A4EFD703B96C22DCBB0FAAF605"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame050.01.png",
+          "sha256": "7E757FC0EE9C40A21BF3B04794B7CC4E46AE1F3C87DD28715BD08714C3E25D77"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame075.00.png",
+          "sha256": "98097D382956A521D0C533F0BB812EE3A8D4B0A4EFD703B96C22DCBB0FAAF605"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame075.01.png",
+          "sha256": "EA5E8431FD8F354EB36D45138A3361C4C462FEC081CE196068BAB626222ECE29"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame100.00.png",
+          "sha256": "98097D382956A521D0C533F0BB812EE3A8D4B0A4EFD703B96C22DCBB0FAAF605"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.close.frame100.01.png",
+          "sha256": "C365FB4CFABECF980F146FBBAD433F7FEC96C399EE2E3EB347D274774E663D73"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.initial.00.png",
+          "sha256": "1CAF63F1497F54C6B459ADF3227778C4E02A9A259F8A2BA65D198680370C94C1"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.01.png",
+          "sha256": "4B2E46EFD76F68290AEE316E1C719D69A487EC0F7AEF6730F2C26F36FC061581"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame000.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame000.01.png",
+          "sha256": "C365FB4CFABECF980F146FBBAD433F7FEC96C399EE2E3EB347D274774E663D73"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame025.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame025.01.png",
+          "sha256": "3A0A918566D9F631EC3FF16405C00A2684566CDA69C171EAB2B1FCAA5D552144"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame050.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame050.01.png",
+          "sha256": "57D7B651843965E259C607145E64DBAEB94F552E0D8518AE687442909840D9C4"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame075.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame075.01.png",
+          "sha256": "A7BB544D90A36E38A2D79FA608C7DD4A6D6756BC1ADF833E31147DF191130717"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame100.00.png",
+          "sha256": "8AF57AD4860449DE781D6E5D2D8C02B161530DFE0081BB1A56103CF5134DAFBD"
+        },
+        {
+          "path": "screenshots/menu__arrow.light.React.open.frame100.01.png",
+          "sha256": "4B2E46EFD76F68290AEE316E1C719D69A487EC0F7AEF6730F2C26F36FC061581"
+        }
+      ]
+    },
+    {
+      "fixture": "select/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/select/demos/hero/tailwind/index.tsx",
+      "sourceHash": "B7C83261FE057D9A16BD420E71000A1E583E6F60C4525AF66A65427F8E328111",
+      "contractHash": "7E614F389719A3DA2B1595847CD26000FD8FD9396B7D53D373698CEF708B6371",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "select-fuji"
+      ],
+      "capture": "captures/select__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/select__hero.light.json",
+          "sha256": "3EEB9C263F97FA4A41426EBA85A762025920BB6BF2308E84FE49AED1E23C7D1E"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.initial.00.png",
+          "sha256": "83DFA87868FB07ACD79C8853AC875D8409528C26F34E368F70C4F4FFD9A3E17E"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame000.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame000.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame025.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame025.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame050.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame050.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame075.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame075.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame100.00.png",
+          "sha256": "6EC807C050475F530E02434AF7B34AD2130C51BFC38DA126B227045A514BBDB7"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.open.frame100.01.png",
+          "sha256": "496F005874AC21424A0BD8CAC2D93639FF7008700082BC8D8811536EEA00DA34"
+        },
+        {
+          "path": "screenshots/select__hero.light.React.select-fuji.00.png",
+          "sha256": "83BBFDF3D0C13F6AB2016CF232B97E53E50A8C810E83BC878B45CBC8B62012C7"
+        }
+      ]
+    },
+    {
+      "fixture": "menu/checkbox-items",
+      "sourcePath": "docs/src/app/(docs)/react/components/menu/demos/checkbox-items/tailwind/index.tsx",
+      "sourceHash": "A9B58ED11A825E5B981F031FC0C38FDCA25AC6C7ED64D86177DAFDE7CCEF6473",
+      "contractHash": "BE5EA1F0F78B9798D8B4DD5AA36863BFA8F13CABB12E582514BCF7ACFABBF92E",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "toggle-minimap",
+        "close"
+      ],
+      "capture": "captures/menu__checkbox-items.light.json",
+      "artifacts": [
+        {
+          "path": "captures/menu__checkbox-items.light.json",
+          "sha256": "C63033093A85D2C4F068306B06B8A4FEBC7F35520874F40203333B64400A61C9"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.00.png",
+          "sha256": "AFF3C26463639C91D30DAC6318B84E71A3E2755A0BE28C7C30B4BE16D7963C64"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame000.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame000.01.png",
+          "sha256": "55C0ACECACB5D75C4644A8B72AE8E1332D119877A0BDDDAD5959BFC51F52E646"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame025.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame025.01.png",
+          "sha256": "E094347970796C74291A654A8744BE8998E35A81B4BCA0F82F327C007B31092A"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame050.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame050.01.png",
+          "sha256": "67BE7EBE6987D3FC8795081644050994DAB9EC4FF258E3EACDE8AC8FD739986C"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame075.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame075.01.png",
+          "sha256": "2C9797B475B68B66FE68D49AF5CA568A9CD6D437A707F976D08E4B6E09E97D6C"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame100.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.close.frame100.01.png",
+          "sha256": "81D86CE75C7CABE101EF32BEF76F5DCAD0F0CF92C4A3896B951703FB589A27D9"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.initial.00.png",
+          "sha256": "300EA5F248C242E93681B0D8E8C736D0AAD23329BEC652654C143DE203E81A61"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.01.png",
+          "sha256": "A39A9D6D2034C6FA000FF309B68111929298D1AB559DD0CA44E63D94921391AC"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame000.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame000.01.png",
+          "sha256": "7D11A56B4D2082EDD2D0D9199DAA12E3081F03F4B9379C09FD8233B9B1C5E295"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame025.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame025.01.png",
+          "sha256": "877640F436B5FED2A2F0DCB6DA10C6B18683C90FC26EA7CDD45763CD26FA4739"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame050.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame050.01.png",
+          "sha256": "FFB9023CE94F24ED507DD973B1E0997B4C866A59D74267ABB23CAA9CA1058340"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame075.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame075.01.png",
+          "sha256": "B97CADB4281F03E78ED949A908DE1E785533232CCE72CAFBFDEDEC8777C2135C"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame100.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.open.frame100.01.png",
+          "sha256": "A39A9D6D2034C6FA000FF309B68111929298D1AB559DD0CA44E63D94921391AC"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.toggle-minimap.00.png",
+          "sha256": "492A5376ECA83A153665195EAB52BA6F9D332483CB5DAC8315FB4E342F3D8FDD"
+        },
+        {
+          "path": "screenshots/menu__checkbox-items.light.React.toggle-minimap.01.png",
+          "sha256": "2E1683062A2FA9BD310BA81C739CC8163A7D316D29AF8C56F4D027BD615BF4FC"
+        }
+      ]
+    },
+    {
+      "fixture": "menubar/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/menubar/demos/hero/tailwind/index.tsx",
+      "sourceHash": "45DA452D4B69059B0E797B8D559B3B448C9E5FD0E342CDDA8791F57F1CFC6A24",
+      "contractHash": "3CA5FF973CAB02460527F86750BF006E19D447C7C74E9844AF07E1D121942229",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open-file",
+        "switch-to-edit",
+        "close"
+      ],
+      "capture": "captures/menubar__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/menubar__hero.light.json",
+          "sha256": "A49BB386B39CD3719D71F0CB64A9B3468821BFE5BD0481F17956CBDA49DBC494"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.close.00.png",
+          "sha256": "1B3ADD0AB3B70F1DEB543F63B7ADF0F7A71A7B16B2E49ACB2887CE5DE1A08971"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.initial.00.png",
+          "sha256": "F0B3EA42B1AFF562B87A0289E83BA0AC35E5C373C1D34C8A5336BA8EE12C79BE"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.01.png",
+          "sha256": "83A45A009052BB8AD7C4286F195197731359E305430082F79B7B3FA985B0828B"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame000.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame000.01.png",
+          "sha256": "852310F843D07DB34E4E62ADD602E3EB79B595B05D2551DF75F4079768FB8114"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame025.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame025.01.png",
+          "sha256": "0D944D5058653C8C3263F9CAAC3161A06DC862B817A899D7606A4983E563DFB8"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame050.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame050.01.png",
+          "sha256": "5EC22EFBC3E135026A774ACF7ED2DC98528A653489FD1297630F71B736ADBBEB"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame075.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame075.01.png",
+          "sha256": "82FC98632C6B5875C2E6DC101A7A6F5B19E98325C7D8989C437A81935A3B748C"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame100.00.png",
+          "sha256": "C4E6C99913025E03F24E04FCA86899ACD0245094D67D2708FA7579565CC1CE17"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.open-file.frame100.01.png",
+          "sha256": "83A45A009052BB8AD7C4286F195197731359E305430082F79B7B3FA985B0828B"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.switch-to-edit.00.png",
+          "sha256": "35C2A792A5C905219858DE262A545E6A65859086BCF8B1D314E24DAA98A4D20D"
+        },
+        {
+          "path": "screenshots/menubar__hero.light.React.switch-to-edit.01.png",
+          "sha256": "1A2576EF5BB1FF8FBD2E57B5E56C81D1CEDB4FEBE7F99CA2F2E931791E25FB02"
+        }
+      ]
+    },
+    {
+      "fixture": "tabs/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/tabs/demos/hero/tailwind/index.tsx",
+      "sourceHash": "B825C1C1E9C196DD66333B4EDFF9034B53C6E2A632433738563D904880EACEE5",
+      "contractHash": "D2CDF406D4CEB12F12B03C694931FEBFB3E6C2E2C7E406BCC4CDE524AF906BF5",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "activate-projects",
+        "focus-account",
+        "activate-account"
+      ],
+      "capture": "captures/tabs__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/tabs__hero.light.json",
+          "sha256": "030A64EE0D254C7A6A301A7B547C646A56F5366A40088EF669B79FD3503F2D08"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.00.png",
+          "sha256": "94401B476B4BBD2ED3259347FC94BD254314FA5CB5EA7B0CD90FD9137C3C5EF0"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.frame000.00.png",
+          "sha256": "E2CBAA1A0D67A221A09C10BBC270B2F4AF9273145C4FD4CA7991D33E9DCF5988"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.frame025.00.png",
+          "sha256": "3EDB58FE960EBA7351AD2FFF55DE133B48488AF221EACDCD486B9021B6BEF0F8"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.frame050.00.png",
+          "sha256": "5053E1193AD6E41BD75BD8CE688C0067D85331506CBFEA03CCC477CF798C38FC"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.frame075.00.png",
+          "sha256": "C80BE0C52A50DEEC86CFCE4344357CE8CCBA20A3361DA594B665341CEF6CC584"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-account.frame100.00.png",
+          "sha256": "06D45F0B11F5492585A675F6C773591312A23235CC4AC023F228B6F8038E132A"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.00.png",
+          "sha256": "764E0F8774BB26BF284209E16EC7CE78C5941495B287212474CAD0019248C86B"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.frame000.00.png",
+          "sha256": "C8C7AD71CA85FD8142901A766C7C4D4EDF697405B270762F340AF5EB6BA5195F"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.frame025.00.png",
+          "sha256": "C4F6F68AA738FBA2B93CA6FA6AED73B67A499C91461FB1BD5F646CEECAE888BF"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.frame050.00.png",
+          "sha256": "4FE31A1F151C94A3C6D3E6C2739FAF43A7DF599480777949E0D90B059959B4F9"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.frame075.00.png",
+          "sha256": "7AA61AD1A9CA023219EF0251E4DBBDE44EC8191CE42484FB4ECE04C9F6912EEE"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.activate-projects.frame100.00.png",
+          "sha256": "F0A06D36F732E357E37E98949883C4767D2E71CED208A195EC7CA3C4A1C37DA6"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.focus-account.00.png",
+          "sha256": "B79F66E98735CB21AF276173063B8CB552673D0D35FDE9C4433B706B584889C0"
+        },
+        {
+          "path": "screenshots/tabs__hero.light.React.initial.00.png",
+          "sha256": "1A8594189BF97C75E938C1A46C8A915A2C1DEDF7115742D112A36B91CEC31DA5"
+        }
+      ]
+    },
+    {
+      "fixture": "toolbar/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/toolbar/demos/hero/tailwind/index.tsx",
+      "sourceHash": "0C66FD2505C48E6CFE3C33A7B1669B4D1848859838CA885DF27B5E86E14828F2",
+      "contractHash": "14DEF7648B59DEC4AA9421E149F8800ACA121B9F52A497372044F7C4833687D1",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "press-align-left",
+        "focus-align-right",
+        "press-align-right",
+        "open-font-select",
+        "select-arial"
+      ],
+      "capture": "captures/toolbar__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/toolbar__hero.light.json",
+          "sha256": "7F5B3CDCC1C9A889BFDA789F22B15B91850A2E0FDCD6FC4939A7512DBABCC381"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.focus-align-right.00.png",
+          "sha256": "DB6CDA1C46D230EF6083D3319F827DCCB99C2ED3589FE8E953EDBA90D8EBFEB9"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.initial.00.png",
+          "sha256": "F9DBEFC31B23F661D25A5AC3700E90549FBBF66F26B03E7FF967A5793415A1A0"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.01.png",
+          "sha256": "2FB1BB0414F919E63127EB08EFB421A7F92CCF70FD923DE34212461BCD39AB7F"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame000.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame000.01.png",
+          "sha256": "5DF7E0C75C253B16917F588E35534BE96FF4029CACB3C7063152392F6FA2F823"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame025.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame025.01.png",
+          "sha256": "E9953B33FC23FE229517F1F98EAD073DD135731FB5921170D1693FB0A73DFBB0"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame050.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame050.01.png",
+          "sha256": "47F5CB17295F85549E642A1E4B33220F93957BC40C700A88204143914F7A665B"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame075.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame075.01.png",
+          "sha256": "6471B1EFF2969638FB70ECEDA281A66080665DD9DE0DBABBFD17ED029E5673FA"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame100.00.png",
+          "sha256": "2E69A2F51778C174C755A3BAAA815827C398EE4D16DD6F90328E005201882D87"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.open-font-select.frame100.01.png",
+          "sha256": "2FB1BB0414F919E63127EB08EFB421A7F92CCF70FD923DE34212461BCD39AB7F"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.press-align-left.00.png",
+          "sha256": "531FF0D0FC74E3D6324A8BEC368441DFEA980482C3D3D395D602AE46E5FF0E49"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.press-align-right.00.png",
+          "sha256": "CC52A84D84A4BDB69EAAD2786C961A31498A6FA523A82E7FEF397FEB22320F4E"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.00.png",
+          "sha256": "B69404618245C5D094A1085ADE15197987FBDAC8FBA9D3EA085FEEFE53D4FDCB"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame000.00.png",
+          "sha256": "9C49BA3425A540957357495CDF614071849E5C8AF3F1E8EB124DD1D547891601"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame000.01.png",
+          "sha256": "8AB0A666A71688F2547FE811A600BF2FFA1B33BCE5E61F0EE6AB9590280F0FD6"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame025.00.png",
+          "sha256": "9C49BA3425A540957357495CDF614071849E5C8AF3F1E8EB124DD1D547891601"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame025.01.png",
+          "sha256": "4FA54184E2FAFE7FA52A96BC54E7B6DDE957DA249A8E1D9DC1BCA246737BD56B"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame050.00.png",
+          "sha256": "9C49BA3425A540957357495CDF614071849E5C8AF3F1E8EB124DD1D547891601"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame050.01.png",
+          "sha256": "B84E9973D4C5683832D35F9839DD5EE930D4CFA1ECA5DB60189B4BB5841C6021"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame075.00.png",
+          "sha256": "9C49BA3425A540957357495CDF614071849E5C8AF3F1E8EB124DD1D547891601"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame075.01.png",
+          "sha256": "6F9EE121E742C2239BA5EE7526F53801A94E872C084C2FE6DFAC89715FEB4E68"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame100.00.png",
+          "sha256": "9C49BA3425A540957357495CDF614071849E5C8AF3F1E8EB124DD1D547891601"
+        },
+        {
+          "path": "screenshots/toolbar__hero.light.React.select-arial.frame100.01.png",
+          "sha256": "146C2CA5B92F62BEE5EE528CB11FF031B70060006E1F0B2C3F7233A87847193D"
+        }
+      ]
+    },
+    {
+      "fixture": "form/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/form/demos/hero/tailwind/index.tsx",
+      "sourceHash": "33B3C9D38C1A68EBC8EF5CB0895F85D6A3BDE2A8A7977D7B05765AA31A04BCCD",
+      "contractHash": "28443A6D19747670F149F79AFA2F088124A0E4B97709345AA2955B0146106441",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "submit-example-domain"
+      ],
+      "capture": "captures/form__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/form__hero.light.json",
+          "sha256": "C83E7920AA02BB38CA858D8FB3030C6A09C126C447D31D721AF8D1723B8599E2"
+        },
+        {
+          "path": "screenshots/form__hero.light.React.initial.00.png",
+          "sha256": "DE0699588A0E5D02331AC9119B99C661E20B76BB6FE025C61D13254D44FF8B27"
+        },
+        {
+          "path": "screenshots/form__hero.light.React.submit-example-domain.00.png",
+          "sha256": "11E60EE03F6C21FE7A3B06F09203F8A995E982794752913C42B6AD1FD45A168B"
+        }
+      ]
+    },
+    {
+      "fixture": "number-field/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/number-field/demos/hero/tailwind/index.tsx",
+      "sourceHash": "FDAD966D9B656E2226FD8462B71A305B53F37F376CD1ABFD1D575C08EA14FF40",
+      "contractHash": "1A54203D80817846BB3A27ED0482C1735BE6CCA1802CB53BB204E961B37C368A",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "increment",
+        "decrement"
+      ],
+      "capture": "captures/number-field__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/number-field__hero.light.json",
+          "sha256": "011EBE4913498380F37E0A73B9A0D03F714CD39E136BF335390D3EA71996DD6D"
+        },
+        {
+          "path": "screenshots/number-field__hero.light.React.decrement.00.png",
+          "sha256": "2D005BD14FCA88FB24355576F22407C979ED0B1F3654D86575673C635A97AE6E"
+        },
+        {
+          "path": "screenshots/number-field__hero.light.React.increment.00.png",
+          "sha256": "595CA9F94A3051B785D266162208A1D6CF27C7F164337004A63C03F2A88E9891"
+        },
+        {
+          "path": "screenshots/number-field__hero.light.React.initial.00.png",
+          "sha256": "F5D861BE8D075C01D96F0D4DEFDFE0096B870BEACF442C3E675542D27EB7A659"
+        }
+      ]
+    },
+    {
+      "fixture": "checkbox/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/checkbox/demos/hero/tailwind/index.tsx",
+      "sourceHash": "826BD0C59CDEB76C2FD7062A2DC69A22F2FB1D880A0471B9C2CC005DD4CDDCE0",
+      "contractHash": "A25F9955B68E4FD2FB389DC7D4D8DD0F22E52741066DA6F37D8474BE53639686",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "toggle-off"
+      ],
+      "capture": "captures/checkbox__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/checkbox__hero.light.json",
+          "sha256": "C3B13594C38EB27E8073B11192497F8E9B73F125A8408990630A415BFD4AB624"
+        },
+        {
+          "path": "screenshots/checkbox__hero.light.React.initial.00.png",
+          "sha256": "764104B1BA8918E8351724509963B889FAF0B08E23BDE0B4C557DA09AEA6A977"
+        },
+        {
+          "path": "screenshots/checkbox__hero.light.React.toggle-off.00.png",
+          "sha256": "8018F3F2AF091978B142EB48A085B0D1876153DA62C65B3FCF33A8BE5EB59478"
+        }
+      ]
+    },
+    {
+      "fixture": "otp-field/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/otp-field/demos/hero/tailwind/index.tsx",
+      "sourceHash": "2C3BD1A58ABC3845F7F9C0E97553A5B1B5C3C95FA8107672C03D36D5FB7B3B51",
+      "contractHash": "531A09931A8AAD83A76BAE29180F2ACCB79A98ECF7B48585B935D9A3AA85B53D",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "complete-code"
+      ],
+      "capture": "captures/otp-field__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/otp-field__hero.light.json",
+          "sha256": "3CB9EE276DD33B03F3962E988C37082E5E67E445FADD72CFC42E05CA36FA5C65"
+        },
+        {
+          "path": "screenshots/otp-field__hero.light.React.complete-code.00.png",
+          "sha256": "535571B7ABD47A336743B908B333EDBEAE47D44BC6B21DBAD7BB266FD2AABA69"
+        },
+        {
+          "path": "screenshots/otp-field__hero.light.React.initial.00.png",
+          "sha256": "BDB47ACCDC4CA4D050CB9153F79893136A1770AB0EC2B054860EA8C90E8BE877"
+        }
+      ]
+    },
+    {
+      "fixture": "popover/detached-triggers-simple",
+      "sourcePath": "docs/src/app/(docs)/react/components/popover/demos/detached-triggers-simple/tailwind/index.tsx",
+      "sourceHash": "343CFE15D98CCC0411E9FA68ACA1CBCFBCEB71067AB0D3BDD73E3BDE11E6B763",
+      "contractHash": "DEF48E2654BA8ECF7C39466D5886999B1E44D7B91B2071DB12C6AD4FAE7DDF26",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "close"
+      ],
+      "capture": "captures/popover__detached-triggers-simple.light.json",
+      "artifacts": [
+        {
+          "path": "captures/popover__detached-triggers-simple.light.json",
+          "sha256": "0923B229C631E98B98C77B8C87ABBD18AAA2911631C041D6BF28611206B68261"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.00.png",
+          "sha256": "55301323FA6DCC373B287DD1A47B84E3FAEAD9ECFDF17A35F2B0F158610D1E62"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame000.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame000.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame025.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame025.01.png",
+          "sha256": "B74CF5F3BE223E23FEC2E95F3F5DF291EA558601BC84EB4E6A08093DAB28FCA9"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame050.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame050.01.png",
+          "sha256": "3F2D22841475D987C4E5A8612EE929BD5FCDF9FD8E91EF6CA7094D44BC916DE5"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame075.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame075.01.png",
+          "sha256": "63E2C7A310FE2C738DF83C1C1020C9603039533A6C0035E309FDF34398B78174"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame100.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.close.frame100.01.png",
+          "sha256": "94A1402B9A6D739B5B98C4215402DAA32999346D8868CAE8E1D175232FB520E5"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.initial.00.png",
+          "sha256": "7B0BA45EA9D1C219B24E67F7CFAA8902416EBAC0D31D86E1B5353BE9AD83493E"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame000.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame000.01.png",
+          "sha256": "94A1402B9A6D739B5B98C4215402DAA32999346D8868CAE8E1D175232FB520E5"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame025.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame025.01.png",
+          "sha256": "24A8E1B67B63B0F5FDB5B715B4B9396CBB6F47BAD952943CC8C85BBD5CA61195"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame050.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame050.01.png",
+          "sha256": "13A57FA9667F35E92B60E87E0A4527EE3E6EEF53599B84899044137A473F0A1E"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame075.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame075.01.png",
+          "sha256": "B6EDD5FFEAF6526EE53BA2619000396B8B3F991803F761BFAD86365E95CB1594"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame100.00.png",
+          "sha256": "A5B08B9CB135D35EB63062F9E5B865CCFE1E03038BF8394BE85411E1E929FBFA"
+        },
+        {
+          "path": "screenshots/popover__detached-triggers-simple.light.React.open.frame100.01.png",
+          "sha256": "39E753F562F28D49E6D906F40D1878D0F617D7C419739547A74727982824AD2F"
+        }
+      ]
+    },
+    {
+      "fixture": "navigation-menu/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/navigation-menu/demos/hero/tailwind/index.tsx",
+      "sourceHash": "15A8A7C46E18871B18EEAABC21AA41DCE4627F31D88653F35650FA2648582ECE",
+      "contractHash": "178649BD774742DBE25953FBF8D4DC4D5A231082FE6CC4E15C0DD308AFCA38A5",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open-overview",
+        "switch-handbook",
+        "close"
+      ],
+      "capture": "captures/navigation-menu__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/navigation-menu__hero.light.json",
+          "sha256": "38A97CF3321A2E4240471896210E0CE6D21EFB3C85FEACD7AAEAD137AE39C29F"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.00.png",
+          "sha256": "B065338D40731D7C5817B29136294B709E9C64F7B91F38A76AD2A96BC9C33F57"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame000.00.png",
+          "sha256": "19F07B688EEEB50C442DF674A18CA62845B60D0C75ECA0415499EFD5A88922C5"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame000.01.png",
+          "sha256": "E9B71210E5595BA5D2440AFE49BADE71E3544B30C6BBAE3BB8882BCFD75277E9"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame025.00.png",
+          "sha256": "DE2ED2286F074A6DC62B236AF75F90AC3453ABBF9CC9CFBE7F625F8020184F76"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame025.01.png",
+          "sha256": "5EF2248675D2475A7A8652FAEEA1277C986B94E860F6913C22AA29FF7D502A38"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame050.00.png",
+          "sha256": "F1CE6F6010E7F370F35522A9DB6D38A3239436ADE8D3C10C638A8FA17B104D7E"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame050.01.png",
+          "sha256": "BCA77DD5C78393F9D3EA3D08457CB0170580107DF73E3B4BA2888D5044ACB6A0"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame075.00.png",
+          "sha256": "F9E21D101404A88B1A1183443C9128DCD24C8ADDF2685B01ECC496DFA771A1EB"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame075.01.png",
+          "sha256": "E9C563E3149CACBEF7099A2C2FAE63AB4D1E7443002E3A28CA9ECC022C8254E4"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame100.00.png",
+          "sha256": "E38162D89693D82401139F78734CDE07D8DEF15046FA0FEFBC78F185795550BD"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.close.frame100.01.png",
+          "sha256": "2B3D331F5E60D88F0EEFF4E4E57A1DA832553D456CC9E302794BB958EBCA0483"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.initial.00.png",
+          "sha256": "0BE11463BB5EA4129672B4F451D205D41EB705FFAEAE92977661F501C4A8D718"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.00.png",
+          "sha256": "B37DD264A18A49CA39752A27C70849E087D31F28EC634FBDD2EB90AE4B2EB188"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.01.png",
+          "sha256": "E6BAA3927247BB9C2F827F0875B543324817AD5F2F988FBA44F5CF65F05DC45D"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame000.00.png",
+          "sha256": "A61B01490AE2E70353B24686D1F5FFAAD62346F967B3B495A6233861FF21E1DD"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame000.01.png",
+          "sha256": "6AB039FEB878FB959FA209BB67C33BE137B4E9DA25C2551D0209D8D2701F5F94"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame025.00.png",
+          "sha256": "135244DA47E59B7282C8C1353F511B5AECEA144C8AB16FEA6304CC88B5912602"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame025.01.png",
+          "sha256": "20616379A15CD93E778E55AD39C02F8461616565E1B4B00B31E8BFFA9576BD28"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame050.00.png",
+          "sha256": "D59DEAF0391EE8F25EB4639D68BCA96382DF111076C3BD3C4AF1F5DC1A26425B"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame050.01.png",
+          "sha256": "204202E5DDD8A9F378EAC6E4B31C5B1E3229908960BD73C977A2F11668FCE2B9"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame075.00.png",
+          "sha256": "026C192D410B627E9F1C78EDE365E82CDAA3BE2D4CAC44C481F9A37FBD65ED13"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame075.01.png",
+          "sha256": "A8CB890918536C5B46F50BF661BE0AACF8BCEB6B08C71EEA0094C4E5D8A7A30B"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame100.00.png",
+          "sha256": "B37DD264A18A49CA39752A27C70849E087D31F28EC634FBDD2EB90AE4B2EB188"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame100.01.png",
+          "sha256": "7A75173F105FB8AA2C605C2FFC77350420163B28B2618E2C13B69B527C746D01"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.00.png",
+          "sha256": "6A0E4BF203C8969023A8F826716B56BC28A536E1D6C650F2EC7089F0F4C2E3F3"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.01.png",
+          "sha256": "2F6B54679472CD90930FFBB1E9E1E250AADE05E47F83505A766123308673A614"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame000.00.png",
+          "sha256": "34201760A493E3BCA80A91FD464C18C9E691DAAE7D59D8E47CED81C50CC64685"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame000.01.png",
+          "sha256": "33350FA6544A0D905D807A5322FB577955854A9FF8C1C3AA7CF8FEE2065B3AA2"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame025.00.png",
+          "sha256": "F4F3C77DCB45E4CD012C6E799C776889E11F8E3413F8E8C6DBE634AB6B007F90"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame025.01.png",
+          "sha256": "60B93CE098DE63FB7060BB26FA02115B21B276C5A2C156F1403065ACD8AE5BBB"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame050.00.png",
+          "sha256": "1CD7F3763CC1CF32F3436D6991ECDAB99E5EDDABCFB39CC635ACAC0F7F21D6A6"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame050.01.png",
+          "sha256": "CB805E525B28FF72CB69B96A2AD3B743E1C259C7CE3FB7E6D37D89C68D5F0653"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame075.00.png",
+          "sha256": "3A1340985280F0614B7E61D19CB5422C28C82BB02BDC37857BFF17650CE27578"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame075.01.png",
+          "sha256": "39F11BA6A0C84ACAD85FBECB40EF44FC3514591938C1924C343127D737966B5A"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame100.00.png",
+          "sha256": "6A0E4BF203C8969023A8F826716B56BC28A536E1D6C650F2EC7089F0F4C2E3F3"
+        },
+        {
+          "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame100.01.png",
+          "sha256": "1D17F14CD5868141370C046C789BF9B4B793CA84C1133984B4EC691972D62C02"
+        }
+      ]
+    },
+    {
+      "fixture": "scroll-area/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/scroll-area/demos/hero/tailwind/index.tsx",
+      "sourceHash": "BC9FD023879E355D017AE64CF3D921FA6A862131F6F579C163648F1B5030EDA9",
+      "contractHash": "D725943F1BE6030E622BBA4E8F741448A882E059D34BA4A390534E89ACE929B1",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "focus-viewport"
+      ],
+      "capture": "captures/scroll-area__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/scroll-area__hero.light.json",
+          "sha256": "57978C6ACB3AF5F1772BBC3A2DCC9BD3DA74E9AAEAE9F675CD6310DFCA76901D"
+        },
+        {
+          "path": "screenshots/scroll-area__hero.light.React.focus-viewport.00.png",
+          "sha256": "AA361120FE1BF48BE9B609A819D61CDE9DDF875691036E798733306D3AE7044D"
+        },
+        {
+          "path": "screenshots/scroll-area__hero.light.React.initial.00.png",
+          "sha256": "35341009BA569B62129E26D8EFE77F5E2DD2325A02886795179D8ADEA019D396"
+        }
+      ]
+    },
+    {
+      "fixture": "combobox/hero",
+      "sourcePath": "docs/src/app/(docs)/react/components/combobox/demos/hero/tailwind/index.tsx",
+      "sourceHash": "0CC8496CB1EA970AECCE29BCAC8955D080A460A7ECE688F8725655F4891F7ACC",
+      "contractHash": "D36A9F57C68D75693163B47157DF3E478B07FE60B60D85E19DB5FD9EC88E8ECA",
+      "theme": "light",
+      "steps": [
+        "initial",
+        "open",
+        "filter-banana",
+        "select-banana"
+      ],
+      "capture": "captures/combobox__hero.light.json",
+      "artifacts": [
+        {
+          "path": "captures/combobox__hero.light.json",
+          "sha256": "67263C11DBEF03E24BEEEABE0F2D11921B3B67A1A1E8DD8BC0B926F50BA5546E"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.filter-banana.00.png",
+          "sha256": "57217D8A344C002F1498997A68090EE522F08A84955BAA07334791E388C30D4D"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.filter-banana.01.png",
+          "sha256": "E84EC488EF204FC3CEBDB268DDEECD2E2982AA19C45A17AE7D79F126D1352A44"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.initial.00.png",
+          "sha256": "528558761242F3832FAF78AF15A9F2C3D6DF5EB90550B53FC28AF471D110DD34"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.01.png",
+          "sha256": "9049CCC4E0F1043CB472986F4EC01BBA929AEC5A14F80BF32D200BD09063E68F"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame000.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame000.01.png",
+          "sha256": "317B477E22143C6ECDD481A8413DE8FDE892B295294D7E5446DA117EF78F08EA"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame025.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame025.01.png",
+          "sha256": "F580559B6435DB7B76471AE1EC2BE9CF6011DAB6AAA771B10F9673A517065DA1"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame050.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame050.01.png",
+          "sha256": "21956A24606A287E2C47DF155526003B727CCF7A0EAB2145C3957371AF9F9E12"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame075.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame075.01.png",
+          "sha256": "3E7954D4387BDC95CC1C31B6FA1FBA9294EECA1411EC350BD43AD0382258FB99"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame100.00.png",
+          "sha256": "0BBE299D6D07E1B7D449E9177A92E44CF40C80E512AA8D1F8E11A23B9A62E8A6"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.open.frame100.01.png",
+          "sha256": "9049CCC4E0F1043CB472986F4EC01BBA929AEC5A14F80BF32D200BD09063E68F"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame000.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame000.01.png",
+          "sha256": "9969C01AED13AD90ABE76A3A1BA285AC265E6F1C3CE839607636FAFD99958313"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame025.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame025.01.png",
+          "sha256": "C11A983DCEF45C9EA6136EDA97B155AA8F387672F1380CD9560EDAB14EC5478D"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame050.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame050.01.png",
+          "sha256": "5F406BECAF07E8E0E408D1473EC32454BD37F4C6B079021572BA24798F630880"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame075.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame075.01.png",
+          "sha256": "C3545630A6EB69064E8CD30591A84E5714F6D6681AC0930816009D8EB1ADC1D7"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame100.00.png",
+          "sha256": "597E453A668649629353F46A8C3D71B08E2F8771E80D97FBA2C73B6519D88D40"
+        },
+        {
+          "path": "screenshots/combobox__hero.light.React.select-banana.frame100.01.png",
+          "sha256": "74735C249C006AE705A4ACCD1AEF25439AC970254A896281CA4F8B39B395F829"
+        }
+      ]
+    }
+  ]
+}

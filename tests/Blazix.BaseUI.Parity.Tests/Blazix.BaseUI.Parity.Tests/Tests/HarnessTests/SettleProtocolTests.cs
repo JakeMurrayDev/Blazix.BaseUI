@@ -99,4 +99,151 @@ public sealed class SettleProtocolTests(PlaywrightFixture playwright)
         // failed one phase earlier would otherwise satisfy this test.
         failure.Message.ShouldContain("Timed out after 1000ms waiting for the page to settle");
     }
+
+    [Fact]
+    [SlopwatchSuppress("SW004", "The post-deadline observation is fault injection that proves the rejected quiescence loop stopped scheduling work.")]
+    public async Task SettleDeadlineStopsTheQuiescenceFrameLoop()
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await context.NewPageAsync();
+        await CaptureScript.InjectAsync(page);
+        await page.GotoAsync(
+            $"{ParityServerAssemblyFixture.ServerAddress}/fixture/harness/capture-probe/server");
+        await SettleProtocol.WaitAsync(page);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+              const pending = document.createElement('div');
+              pending.setAttribute('data-blazix-base-ui-portal', '');
+              pending.style.display = 'none';
+              document.body.appendChild(pending);
+              window.__parityFrameTicks = 0;
+              const native = window.requestAnimationFrame.bind(window);
+              window.requestAnimationFrame = (callback) => native((time) => {
+                window.__parityFrameTicks += 1;
+                callback(time);
+              });
+            }
+            """);
+
+        await Should.ThrowAsync<PlaywrightException>(() => SettleProtocol.WaitAsync(page, 100));
+        var atDeadline = await page.EvaluateAsync<int>("() => window.__parityFrameTicks");
+        await Task.Delay(100);
+        var afterDeadline = await page.EvaluateAsync<int>("() => window.__parityFrameTicks");
+
+        afterDeadline.ShouldBe(atDeadline);
+    }
+
+    [Theory]
+    [InlineData(ParityLeg.BlazorServer)]
+    [InlineData(ParityLeg.BlazorWasm)]
+    public async Task AnimationFenceIgnoresInfiniteMotionAndWaitsFiniteCompletion(
+        ParityLeg leg)
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context, leg);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+              const root = document.querySelector('[data-parity-root]');
+              const infinite = document.createElement('div');
+              const finite = document.createElement('div');
+              infinite.textContent = 'infinite';
+              finite.textContent = 'finite';
+              root.append(infinite, finite);
+              infinite.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 1000, iterations: Infinity });
+              finite.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 120 }).finished.then(() => {
+                  finite.remove();
+                  root.dataset.finiteComplete = 'true';
+                });
+            }
+            """);
+
+        await AnimationSettleProtocol.WaitAsync(page, 1_000);
+
+        (await page.Locator("[data-parity-root]")
+                .GetAttributeAsync("data-finite-complete"))
+            .ShouldBe("true");
+        (await page.GetByText("infinite", new PageGetByTextOptions { Exact = true })
+                .CountAsync())
+            .ShouldBe(1);
+        (await page.GetByText("finite", new PageGetByTextOptions { Exact = true })
+                .CountAsync())
+            .ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(ParityLeg.BlazorServer)]
+    [InlineData(ParityLeg.BlazorWasm)]
+    public async Task AnimationFenceFailsItsDeadlineForUnfinishedFiniteMotion(ParityLeg leg)
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context, leg);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+              const root = document.querySelector('[data-parity-root]');
+              const finite = document.createElement('div');
+              finite.textContent = 'long finite';
+              root.appendChild(finite);
+              finite.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 20000 });
+            }
+            """);
+
+        var failure = await Should.ThrowAsync<PlaywrightException>(() =>
+            AnimationSettleProtocol.WaitAsync(page, 250));
+
+        failure.Message.ShouldContain(
+            "Timed out after 250ms waiting for finite animations");
+        failure.Message.ShouldContain("pending: 1");
+    }
+
+    [Theory]
+    [InlineData(ParityLeg.BlazorServer)]
+    [InlineData(ParityLeg.BlazorWasm)]
+    public async Task AnimationFenceFailsItsDeadlineForPausedFiniteMotion(ParityLeg leg)
+    {
+        await using var context = await playwright.Browser.NewContextAsync();
+        var page = await OpenProbeAsync(context, leg);
+
+        await page.EvaluateAsync(
+            """
+            () => {
+              const root = document.querySelector('[data-parity-root]');
+              const finite = root.animate(
+                [{ opacity: 0 }, { opacity: 1 }],
+                { duration: 20000 });
+              finite.pause();
+            }
+            """);
+
+        var failure = await Should.ThrowAsync<PlaywrightException>(() =>
+            AnimationSettleProtocol.WaitAsync(page, 250));
+
+        failure.Message.ShouldContain(
+            "Timed out after 250ms waiting for finite animations");
+        failure.Message.ShouldContain("pending: 1");
+    }
+
+    private static async Task<IPage> OpenProbeAsync(
+        IBrowserContext context,
+        ParityLeg leg)
+    {
+        var page = await context.NewPageAsync();
+        await CaptureScript.InjectAsync(page);
+        var mode = leg == ParityLeg.BlazorServer ? "server" : "wasm";
+        await page.GotoAsync(
+            $"{ParityServerAssemblyFixture.ServerAddress}/fixture/harness/capture-probe/{mode}");
+        await SettleProtocol.WaitAsync(page);
+        return page;
+    }
 }

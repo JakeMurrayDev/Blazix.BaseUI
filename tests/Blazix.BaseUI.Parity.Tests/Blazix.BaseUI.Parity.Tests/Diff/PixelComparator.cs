@@ -35,7 +35,9 @@ public sealed class PixelComparator(string directory) : IComparator
     /// than to their sum, so this absorbs antialiasing without also absorbing three
     /// channels moving together — which is a colour change and not a rasterizer artifact.
     /// </remarks>
-    private const int ChannelTolerance = 8;
+    private static readonly int ChannelTolerance = checked((int)ComparatorContract.Value(
+        FindingKind.Pixel,
+        ComparatorContract.ChannelTolerance));
 
     /// <summary>Thirty percent of 255: the reference is a backdrop, not the subject.</summary>
     private const byte ReferenceAlpha = 77;
@@ -56,8 +58,18 @@ public sealed class PixelComparator(string directory) : IComparator
     /// <inheritdoc />
     public IEnumerable<Finding> Compare(ComparisonContext context)
     {
-        var reference = Index(context.Reference.Screenshots, context.Fixture, ParityLeg.React, context.Step);
-        var candidate = Index(context.Candidate.Screenshots, context.Fixture, context.Leg, context.Step);
+        var reference = Index(
+            context.Reference,
+            context.Fixture,
+            context.Theme,
+            ParityLeg.React,
+            context.Step);
+        var candidate = Index(
+            context.Candidate,
+            context.Fixture,
+            context.Theme,
+            context.Leg,
+            context.Step);
 
         // This is the order the findings are reported in, so it is the order a reader meets
         // the step's shots in. Ordinal is the right comparison only because the ids are
@@ -71,8 +83,10 @@ public sealed class PixelComparator(string directory) : IComparator
 
         foreach (var shot in shots)
         {
-            var hasReference = reference.TryGetValue(shot, out var referenceName);
-            var hasCandidate = candidate.TryGetValue(shot, out var candidateName);
+            var hasReference = reference.TryGetValue(shot, out var referenceObservation);
+            var hasCandidate = candidate.TryGetValue(shot, out var candidateObservation);
+            var referenceName = referenceObservation?.FileName;
+            var candidateName = candidateObservation?.FileName;
 
             // Cleared for every shot the candidate leg produced, not only for the ones that
             // reach the comparison below. A shot that was two-sided and failing on one run
@@ -84,19 +98,54 @@ public sealed class PixelComparator(string directory) : IComparator
             // producing: its overlay is named after a candidate screenshot this run has no
             // name for. That finding carries a null CandidateValue, so a report that links
             // diffs by candidate name will not surface the stale file either.
-            if (hasCandidate)
+            if (candidateObservation?.State == ScreenshotObservationState.Captured)
             {
                 ClearDiff(candidateName!);
             }
 
-            var finding = hasReference && hasCandidate
-                ? CompareOne(context, shot, referenceName!, candidateName!)
-                : Report(
+            Finding? finding;
+            if (!hasReference || !hasCandidate)
+            {
+                finding = Report(
                     context,
                     shot,
                     referenceName,
                     candidateName,
                     $"Screenshot '{shot}' was taken on the {(hasReference ? "React" : "Blazor")} leg only.");
+            }
+            else if (referenceObservation!.RootLabel != candidateObservation!.RootLabel)
+            {
+                finding = Report(
+                    context, shot, referenceName, candidateName,
+                    $"Screenshot '{shot}' names different roots: React '{referenceObservation.RootLabel}', " +
+                    $"Blazor '{candidateObservation.RootLabel}'.");
+            }
+            else if (referenceObservation.State == ScreenshotObservationState.CaptureFailed ||
+                     candidateObservation.State == ScreenshotObservationState.CaptureFailed)
+            {
+                // Runner validation reports capture failures as typed, nonwaivable fixture
+                // errors. Pixel comparison must not reinterpret the same execution failure.
+                finding = null;
+            }
+            else if (referenceObservation.State == ScreenshotObservationState.NotVisible &&
+                     candidateObservation.State == ScreenshotObservationState.NotVisible)
+            {
+                finding = null;
+            }
+            else if (referenceObservation.State != candidateObservation.State)
+            {
+                finding = Report(
+                    context, shot, referenceName, candidateName,
+                    $"Screenshot '{shot}' is visible on the " +
+                    $"{(referenceObservation.State == ScreenshotObservationState.Captured ? "React" : "Blazor")} " +
+                    $"leg only and not visible on the " +
+                    $"{(referenceObservation.State == ScreenshotObservationState.NotVisible ? "React" : "Blazor")} " +
+                    $"leg (React {referenceObservation.State}, Blazor {candidateObservation.State}).");
+            }
+            else
+            {
+                finding = CompareOne(context, shot, referenceName!, candidateName!);
+            }
 
             if (finding is not null)
             {
@@ -105,16 +154,26 @@ public sealed class PixelComparator(string directory) : IComparator
         }
     }
 
-    private static Dictionary<string, string> Index(
-        IReadOnlyList<string> names, string fixture, ParityLeg leg, string step)
+    private static Dictionary<string, ScreenshotObservation> Index(
+        StepCapture capture,
+        string fixture,
+        string theme,
+        ParityLeg leg,
+        string step)
     {
-        var index = new Dictionary<string, string>(names.Count, StringComparer.Ordinal);
+        var observations = capture.ScreenshotObservations.Count > 0
+            ? capture.ScreenshotObservations
+            : [.. capture.Screenshots.Select(name => ScreenshotObservation.Captured(
+                ScreenshotSet.Shot(name, fixture, theme, leg, step),
+                ScreenshotSet.Shot(name, fixture, theme, leg, step),
+                name))];
+        var index = new Dictionary<string, ScreenshotObservation>(observations.Count, StringComparer.Ordinal);
 
-        foreach (var name in names)
+        foreach (var observation in observations)
         {
             // Assigned rather than added: a duplicate shot id is a capturer bug, and
             // throwing here would end the run over it instead of comparing what exists.
-            index[ScreenshotSet.Shot(name, fixture, leg, step)] = name;
+            index[observation.Shot] = observation;
         }
 
         return index;
@@ -159,7 +218,7 @@ public sealed class PixelComparator(string directory) : IComparator
         string? candidateName,
         string message) => new()
         {
-            Fixture = context.Fixture,
+            Fixture = context.ExecutionId,
             Leg = context.Leg,
             Step = context.Step,
             Kind = FindingKind.Pixel,
