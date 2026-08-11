@@ -1,0 +1,21 @@
+@using Blazix.BaseUI.OtpField
+
+<div class="flex w-full max-w-80 flex-col items-start gap-1">
+    <label for="otp-field-hero" class="text-sm font-bold text-neutral-950 dark:text-white">
+        Verification code
+    </label>
+    <OtpFieldRoot Id="otp-field-hero"
+                  Length="6"
+                  aria-describedby="otp-field-hero-description"
+                  class="flex w-full gap-2">
+        @for (var index = 0; index < 6; index++)
+        {
+            <OtpFieldInput @key="index"
+                           class="m-0 h-10 w-10 rounded-none border border-neutral-950 bg-white dark:bg-neutral-950 text-center font-inherit text-base font-normal text-neutral-950 focus:outline-2 focus:-outline-offset-1 focus:outline-neutral-950 dark:focus:outline-white dark:border-white dark:text-white"
+                           aria-label="@(index == 0 ? null : $"Character {index + 1} of 6")" />
+        }
+    </OtpFieldRoot>
+    <p id="otp-field-hero-description" class="m-0 text-sm text-neutral-600 dark:text-neutral-400">
+        Enter the 6-character code we sent to your device.
+    </p>
+</div>

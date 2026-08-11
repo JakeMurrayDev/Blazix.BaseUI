@@ -1,0 +1,124 @@
+@using Blazix.BaseUI.Portal
+@using Blazix.BaseUI.Utilities
+
+<section data-completion-probe
+         data-sync-value="@syncValue"
+         data-async-value="@asyncValue"
+         data-missing-value="@missingValue"
+         data-dependent-value="@dependentValue"
+         data-phase="@phase"
+         data-atomic-a="@atomicA"
+         data-atomic-b="@atomicB">
+    <button data-action="sync" @onclick="CompleteSynchronously">Sync</button>
+    <button data-action="async" @onclick="CompleteAfterQuietGapAsync">Async</button>
+    <button data-action="noop" @onclick="DoNothing">No-op</button>
+    <button data-action="portal" aria-expanded="@portalOpen" @onclick="TogglePortal">Portal</button>
+    <button data-action="missing" @onclick="ChangeTheWrongConsequence">Missing</button>
+    <button data-action="prepare" @onclick="PrepareDependentActionAsync">Prepare</button>
+    <button data-action="property" @onclick="ToggleProperty">Property</button>
+    <button data-action="hide" @onclick="HideTarget">Hide</button>
+    <button data-action="transient" @onclick="ChangeThroughTransientStatesAsync">Transient</button>
+    <button data-action="alternate" @onclick="RapidlyAlternateStatesAsync">Alternate</button>
+    <input data-action="input" value="" />
+    <input data-property-target type="checkbox" checked="@checkedValue" />
+    <div data-hide-target hidden="@hidden">Hide target</div>
+    <span role="option" data-option="0">First</span>
+    <span role="option" data-option="1">Second</span>
+    <span role="option" data-option="2">Third</span>
+
+    @if (dependentReady)
+    {
+        <button data-action="dependent" @onclick="CompleteDependentAction">Dependent</button>
+    }
+
+    @if (portalOpen)
+    {
+        <Portal>
+            <div data-probe-portal data-portal-state="open">Portal content</div>
+        </Portal>
+    }
+</section>
+
+@code {
+    private int syncValue;
+    private int asyncValue;
+    private int missingValue;
+    private int dependentValue;
+    private bool dependentReady;
+    private bool portalOpen;
+    private bool checkedValue;
+    private bool hidden;
+    private string atomicA = "false";
+    private string atomicB = "true";
+    private string phase = "initial";
+
+    private void CompleteSynchronously()
+    {
+        syncValue++;
+    }
+
+    [SlopwatchSuppress("SW004", "The 250 ms quiet gap is deliberate fault injection for the completion contract, not a settle heuristic.")]
+    private async Task CompleteAfterQuietGapAsync()
+    {
+        await Task.Delay(250);
+        asyncValue++;
+    }
+
+    private static void DoNothing()
+    {
+    }
+
+    private void TogglePortal()
+    {
+        portalOpen = !portalOpen;
+    }
+
+    private void ChangeTheWrongConsequence()
+    {
+        missingValue++;
+    }
+
+    [SlopwatchSuppress("SW004", "The 250 ms quiet gap is deliberate fault injection for the dependent-action completion contract.")]
+    private async Task PrepareDependentActionAsync()
+    {
+        dependentReady = false;
+        await Task.Delay(250);
+        dependentReady = true;
+    }
+
+    private void CompleteDependentAction()
+    {
+        dependentValue++;
+        dependentReady = false;
+    }
+
+    private void ToggleProperty()
+    {
+        checkedValue = !checkedValue;
+    }
+
+    private void HideTarget()
+    {
+        hidden = true;
+    }
+
+    [SlopwatchSuppress("SW004", "The transient split is deliberate fault injection proving all completion predicates must coexist.")]
+    private async Task ChangeThroughTransientStatesAsync()
+    {
+        phase = "first";
+        await Task.Delay(100);
+        phase = "second";
+    }
+
+    [SlopwatchSuppress("SW004", "Rapid alternation is deliberate fault injection for atomic predicate snapshots.")]
+    private async Task RapidlyAlternateStatesAsync()
+    {
+        for (var index = 0; index < 20; index++)
+        {
+            atomicA = index % 2 == 0 ? "true" : "false";
+            atomicB = index % 2 == 0 ? "false" : "true";
+            StateHasChanged();
+            await Task.Delay(10);
+        }
+    }
+}

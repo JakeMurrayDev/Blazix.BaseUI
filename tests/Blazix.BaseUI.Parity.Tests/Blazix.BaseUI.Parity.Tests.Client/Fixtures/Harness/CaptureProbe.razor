@@ -1,0 +1,41 @@
+@using Blazix.BaseUI.Portal
+@using Blazix.BaseUI.Separator
+
+@* A purpose-built probe with known markup, used to pin the shared capture script's
+   normalization rules. The @onclick lambda is deliberately non-capturing: it makes the
+   Razor compiler emit a nested closure class, which is what FixtureRegistry's
+   nested-type guard exists to exclude. A lambda capturing `this` would compile to an
+   instance method and emit no nested type at all. *@
+
+@* --parity-probe stands in for the properties base-ui exposes (--anchor-width and
+   friends): a custom property that must survive the --tw-* exclusion. *@
+<button class="px-3 py-1" style="color: rgb(1, 2, 3); --parity-probe: 7px;"
+        aria-controls="@panelId" aria-expanded="true"
+        @onclick="() => Console.WriteLine()">Toggle</button>
+
+@* Separator is the cheapest component that renders through RenderElement — no context,
+   no interop, no state. RenderElement calls AddElementReferenceCapture on every element
+   it renders, so this is the only node here that carries Blazor's `_bl_<id>` attribute.
+   Raw markup carries none, which is how the missing filter went unnoticed. *@
+<Separator />
+
+@* Both spellings occur in the component library, so the rename must be idempotent:
+   the already-unprefixed marker has to survive untouched alongside the renamed one. *@
+<aside data-blazix-base-ui-portal="true" data-base-ui-focusable="">Portal marker</aside>
+
+@* Deliberately shares a shape with the portal's own <p>: as direct children of their
+   respective roots both resolve to the same un-namespaced path, so a scheme that does
+   not namespace by root silently collapses them onto one styles/geometry key. *@
+<p data-probe="in-root">In the fixture root</p>
+
+@* A real portal: its container is appended to <body>, becoming a second capture root,
+   and the id the trigger above points at lives inside it. Symbolizing that reference
+   is only possible from an id table that spans every root. *@
+<Portal>
+    <section id="@panelId">Panel</section>
+    <p data-probe="in-portal">In the portal</p>
+</Portal>
+
+@code {
+    private readonly string panelId = $"probe-{Guid.NewGuid():N}";
+}

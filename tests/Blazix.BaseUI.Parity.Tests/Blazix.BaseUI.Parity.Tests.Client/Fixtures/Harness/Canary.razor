@@ -1,0 +1,8 @@
+@* The canary is deliberately broken in exactly three independent, hidden nodes.
+   Keeping the nodes hidden isolates the intended DOM and computed-style findings
+   from ARIA-snapshot and pixel findings. *@
+
+<p>Parity canary</p>
+<div hidden>Attribute canary</div>
+<div hidden class="parity-canary-candidate-colour">Colour canary</div>
+<div hidden class="parity-canary-candidate-duration">Transition duration canary</div>

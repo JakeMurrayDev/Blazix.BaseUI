@@ -1,0 +1,109 @@
+namespace Blazix.BaseUI.Parity.Tests.Client;
+
+/// <summary>
+/// Resolves a fixture id such as <c>select/grouped</c> to its fixture component type.
+/// </summary>
+public static class FixtureRegistry
+{
+    private static readonly Dictionary<string, Type> Fixtures =
+        BuildIndex(typeof(FixtureRegistry).Assembly.GetTypes());
+
+    /// <summary>
+    /// Gets every registered fixture id.
+    /// </summary>
+    public static IReadOnlyCollection<string> Ids => Fixtures.Keys;
+
+    /// <summary>
+    /// Resolves the fixture component for the supplied id segments.
+    /// </summary>
+    /// <param name="component">The component segment, for example <c>select</c>.</param>
+    /// <param name="demo">The demo segment, for example <c>grouped</c>.</param>
+    /// <returns>The fixture component type, or <see langword="null"/> when unknown.</returns>
+    public static Type? Resolve(string component, string demo)
+        => Fixtures.GetValueOrDefault($"{component}/{demo}");
+
+    internal static Dictionary<string, Type> BuildIndex(IEnumerable<Type> types)
+    {
+        var index = new Dictionary<string, Type>(StringComparer.Ordinal);
+        var prefix = $"{typeof(FixtureRegistry).Namespace}.Fixtures.";
+
+        foreach (var type in types)
+        {
+            // Nested types must be excluded: the Razor compiler emits closure classes
+            // such as Fixtures.Switch.Hero+<>c, whose FullName still splits into two
+            // segments and would otherwise register as `switch/hero+<>c`.
+            if (type.IsNested ||
+                !typeof(Microsoft.AspNetCore.Components.IComponent).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
+            if (type.FullName is null || !type.FullName.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            // Fixtures.Select.Grouped -> select/grouped
+            var segments = type.FullName[prefix.Length..].Split('.');
+            if (segments.Length != 2)
+            {
+                continue;
+            }
+
+            var id = $"{ToKebab(segments[0])}/{ToKebab(segments[1])}";
+            if (!IsSafeFixtureId(id))
+            {
+                throw new InvalidOperationException(
+                    $"The fixture registry type '{type.FullName}' produces '{id}', which is not " +
+                    "a safe lowercase fixture id.");
+            }
+
+            if (!index.TryAdd(id, type))
+            {
+                throw new InvalidOperationException(
+                    $"The fixture registry contains duplicate fixture id '{id}' for " +
+                    $"'{index[id].FullName}' and '{type.FullName}'.");
+            }
+        }
+
+        return index;
+    }
+
+    private static bool IsSafeFixtureId(string id)
+        => id.Count(character => character == '/') == 1 &&
+            id.Split('/').All(segment =>
+                segment.Length > 0 &&
+                segment[0] is >= 'a' and <= 'z' &&
+                segment[^1] is >= 'a' and <= 'z' or >= '0' and <= '9' &&
+                !segment.Contains("--", StringComparison.Ordinal) &&
+                segment.All(character =>
+                    character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'));
+
+    /// <summary>
+    /// Converts a PascalCase segment to kebab-case by inserting a separator before every
+    /// upper-case character.
+    /// </summary>
+    /// <remarks>
+    /// This conversion is not injective, so fixture directory and class names must be simple
+    /// PascalCase words with no acronym runs: <c>WithRtl</c> yields <c>with-rtl</c> but
+    /// <c>WithRTL</c> yields <c>with-r-t-l</c>, and digits get no separator, so <c>Level2</c>
+    /// yields <c>level2</c>. Ids derived here must match <c>manifest/fixtures.json</c> exactly,
+    /// and there is no way to recover the original name from the id.
+    /// </remarks>
+    private static string ToKebab(string pascal)
+    {
+        var builder = new System.Text.StringBuilder(pascal.Length + 4);
+
+        for (var i = 0; i < pascal.Length; i++)
+        {
+            if (i > 0 && char.IsUpper(pascal[i]))
+            {
+                builder.Append('-');
+            }
+
+            builder.Append(char.ToLowerInvariant(pascal[i]));
+        }
+
+        return builder.ToString();
+    }
+}

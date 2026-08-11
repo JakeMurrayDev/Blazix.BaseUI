@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parity fixtures</title>
+    <!-- The one stylesheet, served from the Blazor host's wwwroot at the shared
+         origin. Rooted, not relative: the bundle is mounted under /react/, and the
+         host serves the Tailwind CLI's single output at /parity.css.
+
+         Deliberately a link rather than `import './parity.css'` in main.tsx. An
+         import would make Vite emit its own copy of the stylesheet, and without a
+         Tailwind plugin that copy is the uncompiled source — every utility class
+         missing. Adding the plugin instead would compile a *second* stylesheet from
+         a separate scan, and a Tailwind configuration difference between the two
+         builds would then surface as a fake component discrepancy. Linking the
+         host's file is what makes a computed-style difference attributable to the
+         components. src/parity.css stays as the Tailwind CLI's input. -->
+    <link rel="stylesheet" href="/parity.css" />
+  </head>
+  <body>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

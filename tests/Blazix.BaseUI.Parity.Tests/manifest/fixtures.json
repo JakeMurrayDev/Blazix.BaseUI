@@ -1,0 +1,1669 @@
+[
+  {
+    "id": "switch/hero",
+    "component": "switch",
+    "react": "switch/demos/hero/tailwind/index.tsx",
+    "blazor": "Switch/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "toggle-off",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='switch']",
+            "complete": [
+              {
+                "selector": "[role='switch']",
+                "attribute": "aria-checked",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "collapsible/hero",
+    "component": "collapsible",
+    "react": "collapsible/demos/hero/tailwind/index.tsx",
+    "blazor": "Collapsible/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "button[aria-expanded]",
+            "complete": [
+              {
+                "selector": "button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "button[aria-expanded='true'] + div",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "button[aria-expanded]",
+            "complete": [
+              {
+                "selector": "button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "button[aria-expanded='false'] + div",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "popover/hero",
+    "component": "popover",
+    "react": "popover/demos/hero/tailwind/index.tsx",
+    "blazor": "Popover/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "button[aria-haspopup='dialog']",
+            "complete": [
+              {
+                "selector": "[role='dialog']",
+                "state": "visible"
+              },
+              {
+                "selector": "button[aria-haspopup='dialog']",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "[role='dialog']",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "select/grouped",
+    "component": "select",
+    "react": "select/demos/grouped/tailwind/index.tsx",
+    "blazor": "Select/Grouped",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "@item(0)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(0)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "arrow-down",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(1)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(1)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "arrow-up",
+        "do": [
+          {
+            "key": "ArrowUp",
+            "complete": [
+              {
+                "selector": "@item(0)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(0)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "select-banana",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(1)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(1)",
+                "focus": "equals"
+              }
+            ]
+          },
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "hidden"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "@trigger",
+                "property": "innerText",
+                "equals": "Banana"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "field/hero",
+    "component": "field",
+    "react": "field/demos/hero/tailwind/index.tsx",
+    "blazor": "Field/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "focus",
+        "do": [
+          {
+            "focus": "@input",
+            "complete": [
+              {
+                "selector": "@input",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "type",
+        "do": [
+          {
+            "type": "Ada",
+            "into": "@input",
+            "complete": [
+              {
+                "selector": "@input",
+                "inputValue": "Ada"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "blur",
+        "do": [
+          {
+            "blur": "@input",
+            "complete": [
+              {
+                "selector": "@input",
+                "inputValue": "Ada"
+              },
+              {
+                "selector": "@input",
+                "focus": "not-equals"
+              },
+              {
+                "selector": ".text-red-700",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "avatar/hero",
+    "component": "avatar",
+    "react": "avatar/demos/hero/tailwind/index.tsx",
+    "blazor": "Avatar/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      }
+    ]
+  },
+  {
+    "id": "separator/hero",
+    "component": "separator",
+    "react": "separator/demos/hero/tailwind/index.tsx",
+    "blazor": "Separator/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      }
+    ]
+  },
+  {
+    "id": "progress/hero",
+    "component": "progress",
+    "react": "progress/demos/hero/tailwind/index.tsx",
+    "blazor": "Progress/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      }
+    ]
+  },
+  {
+    "id": "meter/hero",
+    "component": "meter",
+    "react": "meter/demos/hero/tailwind/index.tsx",
+    "blazor": "Meter/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      }
+    ]
+  },
+  {
+    "id": "accordion/multiple",
+    "component": "accordion",
+    "react": "accordion/demos/multiple/tailwind/index.tsx",
+    "blazor": "Accordion/Multiple",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open-first",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[data-parity-root] > div > div:nth-child(1) > h3 > button",
+            "complete": [
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(1) > h3 > button",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(1) > [role='region']",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "open-second",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[data-parity-root] > div > div:nth-child(2) > h3 > button",
+            "complete": [
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(2) > h3 > button",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(2) > [role='region']",
+                "state": "visible"
+              },
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(1) > h3 > button",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close-first",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[data-parity-root] > div > div:nth-child(1) > h3 > button",
+            "complete": [
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(1) > h3 > button",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(1) > [role='region']",
+                "state": "detached"
+              },
+              {
+                "selector": "[data-parity-root] > div > div:nth-child(2) > h3 > button",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dialog/hero",
+    "component": "dialog",
+    "react": "dialog/demos/hero/tailwind/index.tsx",
+    "blazor": "Dialog/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='dialog'] button",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "detached"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "drawer/hero",
+    "component": "drawer",
+    "react": "drawer/demos/hero/tailwind/index.tsx",
+    "blazor": "Drawer/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='dialog'] button",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "detached"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "toast/hero",
+    "component": "toast",
+    "react": "toast/demos/hero/tailwind/index.tsx",
+    "blazor": "Toast/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "create-toast",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "button[type='button']",
+            "complete": [
+              {
+                "selector": "[role='dialog']",
+                "state": "visible"
+              },
+              {
+                "selector": "[role='dialog'] h2",
+                "property": "innerText",
+                "equals": "Toast 1 created"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "dismiss-toast",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='dialog'] button",
+            "complete": [
+              {
+                "selector": "[role='dialog']",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tooltip/hero",
+    "component": "tooltip",
+    "react": "tooltip/demos/hero/tailwind/index.tsx",
+    "blazor": "Tooltip/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "show-bold-tooltip",
+        "settle": "animation",
+        "do": [
+          {
+            "hover": "button[aria-label='Bold']",
+            "complete": [
+              {
+                "selector": "[role='presentation'] > [data-open]",
+                "state": "visible"
+              },
+              {
+                "selector": "[role='presentation'] > [data-open]",
+                "property": "innerText",
+                "equals": "Bold"
+              },
+              {
+                "selector": "button[aria-label='Bold']",
+                "attribute": "data-popup-open",
+                "equals": ""
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "dismiss-tooltip",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "[role='presentation'] > [data-open]",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "preview-card/hero",
+    "component": "preview-card",
+    "react": "preview-card/demos/hero/tailwind/index.tsx",
+    "blazor": "PreviewCard/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "show-preview",
+        "settle": "animation",
+        "do": [
+          {
+            "hover": "a[href='https://en.wikipedia.org/wiki/Typography']",
+            "complete": [
+              {
+                "selector": "img[alt='Station Hofplein signage in Rotterdam, Netherlands']",
+                "state": "visible"
+              },
+              {
+                "selector": "a[href='https://en.wikipedia.org/wiki/Typography']",
+                "attribute": "data-popup-open",
+                "equals": ""
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "dismiss-preview",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "img[alt='Station Hofplein signage in Rotterdam, Netherlands']",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "menu/arrow",
+    "component": "menu",
+    "react": "menu/demos/arrow/tailwind/index.tsx",
+    "blazor": "Menu/Arrow",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "arrow-down",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(0)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "detached"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "select/hero",
+    "component": "select",
+    "react": "select/demos/hero/tailwind/index.tsx",
+    "blazor": "Select/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "@item(0)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(0)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "select-fuji",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(1)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(1)",
+                "focus": "equals"
+              }
+            ]
+          },
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "hidden"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "@trigger",
+                "property": "innerText",
+                "equals": "Fuji"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "menu/checkbox-items",
+    "component": "menu",
+    "react": "menu/demos/checkbox-items/tailwind/index.tsx",
+    "blazor": "Menu/CheckboxItems",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "toggle-minimap",
+        "do": [
+          {
+            "click": "[role='menuitemcheckbox']:first-of-type",
+            "complete": [
+              {
+                "selector": "[role='menuitemcheckbox']:first-of-type",
+                "attribute": "aria-checked",
+                "equals": "false"
+              },
+              {
+                "selector": "@popup",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "detached"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "menubar/hero",
+    "component": "menubar",
+    "react": "menubar/demos/hero/tailwind/index.tsx",
+    "blazor": "Menubar/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open-file",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[data-parity-root] > div > button:nth-of-type(1)",
+            "complete": [
+              {
+                "selector": "[data-parity-root] > div > button:nth-of-type(1)",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "[role='menu'][data-open]",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "switch-to-edit",
+        "settle": "animation",
+        "do": [
+          {
+            "hover": "[data-parity-root] > div > button:nth-of-type(2)",
+            "complete": [
+              {
+                "selector": "[data-parity-root] > div > button:nth-of-type(1)",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "[data-parity-root] > div > button:nth-of-type(2)",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "[role='menu'][data-open]",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "[role='menu'][data-open]",
+                "state": "detached"
+              },
+              {
+                "selector": "[data-parity-root] > div > button:nth-of-type(2)",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tabs/hero",
+    "component": "tabs",
+    "react": "tabs/demos/hero/tailwind/index.tsx",
+    "blazor": "Tabs/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "activate-projects",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='tab']:nth-of-type(2)",
+            "complete": [
+              {
+                "selector": "[role='tab']:nth-of-type(2)",
+                "attribute": "aria-selected",
+                "equals": "true"
+              },
+              {
+                "selector": "[role='tabpanel']",
+                "property": "innerText",
+                "equals": "Milestones and deadlines."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "focus-account",
+        "do": [
+          {
+            "key": "ArrowRight",
+            "complete": [
+              {
+                "selector": "[role='tab']:nth-of-type(3)",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "activate-account",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "[role='tab']:nth-of-type(3)",
+                "attribute": "aria-selected",
+                "equals": "true"
+              },
+              {
+                "selector": "[role='tabpanel']",
+                "property": "innerText",
+                "equals": "Profile and preferences."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "toolbar/hero",
+    "component": "toolbar",
+    "react": "toolbar/demos/hero/tailwind/index.tsx",
+    "blazor": "Toolbar/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "press-align-left",
+        "do": [
+          {
+            "click": "[aria-label='Align left']",
+            "complete": [
+              {
+                "selector": "[aria-label='Align left']",
+                "attribute": "aria-pressed",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "focus-align-right",
+        "do": [
+          {
+            "key": "ArrowRight",
+            "complete": [
+              {
+                "selector": "[aria-label='Align right']",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "press-align-right",
+        "do": [
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "[aria-label='Align right']",
+                "attribute": "aria-pressed",
+                "equals": "true"
+              },
+              {
+                "selector": "[aria-label='Align left']",
+                "attribute": "aria-pressed",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "open-font-select",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "@item(0)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "select-arial",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(1)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "@item(1)",
+                "focus": "equals"
+              }
+            ]
+          },
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "hidden"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "@trigger",
+                "property": "innerText",
+                "equals": "Arial"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "form/hero",
+    "component": "form",
+    "react": "form/demos/hero/tailwind/index.tsx",
+    "blazor": "Form/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "submit-example-domain",
+        "do": [
+          {
+            "click": "button[type='submit']",
+            "complete": [
+              {
+                "selector": ".text-red-700",
+                "state": "visible"
+              },
+              {
+                "selector": ".text-red-700",
+                "property": "innerText",
+                "equals": "The example domain is not allowed"
+              },
+              {
+                "selector": "button[type='submit']",
+                "property": "disabled",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "number-field/hero",
+    "component": "number-field",
+    "react": "number-field/demos/hero/tailwind/index.tsx",
+    "blazor": "NumberField/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "increment",
+        "do": [
+          {
+            "click": "button[aria-label='Increase']",
+            "complete": [
+              {
+                "selector": "input[type='text']",
+                "inputValue": "101"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "decrement",
+        "do": [
+          {
+            "click": "button[aria-label='Decrease']",
+            "complete": [
+              {
+                "selector": "input[type='text']",
+                "inputValue": "100"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkbox/hero",
+    "component": "checkbox",
+    "react": "checkbox/demos/hero/tailwind/index.tsx",
+    "blazor": "Checkbox/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "toggle-off",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "[role='checkbox']",
+            "complete": [
+              {
+                "selector": "[role='checkbox']",
+                "attribute": "aria-checked",
+                "equals": "false"
+              },
+              {
+                "selector": "[role='checkbox'] > span",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "otp-field/hero",
+    "component": "otp-field",
+    "react": "otp-field/demos/hero/tailwind/index.tsx",
+    "blazor": "OtpField/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "complete-code",
+        "do": [
+          {
+            "type": "123456",
+            "into": "[role='group'] input:first-of-type",
+            "complete": [
+              {
+                "selector": "[role='group']",
+                "attribute": "data-complete",
+                "equals": ""
+              },
+              {
+                "selector": "input[aria-hidden='true']",
+                "inputValue": "123456"
+              },
+              {
+                "selector": "input[aria-label='Character 6 of 6']",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "popover/detached-triggers-simple",
+    "component": "popover",
+    "react": "popover/demos/detached-triggers-simple/tailwind/index.tsx",
+    "blazor": "Popover/DetachedTriggersSimple",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "@trigger",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "detached"
+              },
+              {
+                "selector": "@trigger",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "navigation-menu/hero",
+    "component": "navigation-menu",
+    "react": "navigation-menu/demos/hero/tailwind/index.tsx",
+    "blazor": "NavigationMenu/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open-overview",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "ul > li:nth-child(1) > button[aria-expanded]",
+            "complete": [
+              {
+                "selector": "ul > li:nth-child(1) > button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "[role='presentation'][data-side]",
+                "state": "visible"
+              },
+              {
+                "selector": "a[href='/react/overview/quick-start']",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "switch-handbook",
+        "settle": "animation",
+        "do": [
+          {
+            "hover": "ul > li:nth-child(2) > button[aria-expanded]",
+            "complete": [
+              {
+                "selector": "ul > li:nth-child(1) > button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "ul > li:nth-child(2) > button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "a[href='/react/overview/quick-start']",
+                "state": "hidden"
+              },
+              {
+                "selector": "a[href='/react/handbook/styling']",
+                "state": "visible"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "close",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "Escape",
+            "complete": [
+              {
+                "selector": "ul > li:nth-child(2) > button[aria-expanded]",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "[role='presentation'][data-side]",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "scroll-area/hero",
+    "component": "scroll-area",
+    "react": "scroll-area/demos/hero/tailwind/index.tsx",
+    "blazor": "ScrollArea/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "focus-viewport",
+        "do": [
+          {
+            "focus": "[role='presentation'][tabindex='0']",
+            "complete": [
+              {
+                "selector": "[role='presentation'][tabindex='0']",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "combobox/hero",
+    "component": "combobox",
+    "react": "combobox/demos/hero/tailwind/index.tsx",
+    "blazor": "Combobox/Hero",
+    "themes": [
+      "light"
+    ],
+    "pixelThreshold": 0.001,
+    "steps": [
+      {
+        "name": "initial"
+      },
+      {
+        "name": "open",
+        "settle": "animation",
+        "do": [
+          {
+            "click": "input[role='combobox']",
+            "complete": [
+              {
+                "selector": "@popup",
+                "state": "visible"
+              },
+              {
+                "selector": "input[role='combobox']",
+                "attribute": "aria-expanded",
+                "equals": "true"
+              },
+              {
+                "selector": "input[role='combobox']",
+                "focus": "equals"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "filter-banana",
+        "do": [
+          {
+            "type": "Ban",
+            "into": "input[role='combobox']",
+            "complete": [
+              {
+                "selector": "input[role='combobox']",
+                "inputValue": "Ban"
+              },
+              {
+                "selector": "@item(0)",
+                "state": "visible"
+              },
+              {
+                "selector": "@item(0)",
+                "property": "innerText",
+                "equals": "Banana"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "select-banana",
+        "settle": "animation",
+        "do": [
+          {
+            "key": "ArrowDown",
+            "complete": [
+              {
+                "selector": "@item(0)",
+                "attribute": "data-highlighted",
+                "equals": ""
+              },
+              {
+                "selector": "input[role='combobox']",
+                "focus": "equals"
+              }
+            ]
+          },
+          {
+            "key": "Enter",
+            "complete": [
+              {
+                "selector": "input[role='combobox']",
+                "inputValue": "Banana"
+              },
+              {
+                "selector": "input[role='combobox']",
+                "attribute": "aria-expanded",
+                "equals": "false"
+              },
+              {
+                "selector": "@popup",
+                "state": "detached"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "*": {
+    "trigger": "[aria-haspopup],[aria-expanded]",
+    "popup": "[role=dialog],[role=menu],[role=listbox],[role=tooltip]",
+    "input": "input,textarea,[contenteditable=true]",
+    "item": ":nth-match([role=option], {n})"
+  },
+  "popover": { "trigger": "[aria-haspopup],[aria-expanded]" },
+  "menu": { "item": ":nth-match([role=menuitem], {n})" },
+  "select": { "item": ":nth-match([role=option], {n})" },
+  "tabs": { "item": ":nth-match([role=tab], {n})" },
+  "accordion": { "trigger": "[aria-expanded]" },
+  "collapsible": { "trigger": "[aria-expanded]" }
+}

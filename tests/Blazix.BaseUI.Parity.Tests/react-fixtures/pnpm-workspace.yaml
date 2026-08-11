@@ -1,0 +1,6 @@
+# pnpm 11 requires every dependency install script to be approved or refused here.
+allowBuilds:
+  # Only backs `tailwindcss --watch`, which this project never runs.
+  '@parcel/watcher': false
+  # Needed by vite, so `parity:build` can bundle the React fixtures.
+  esbuild: true
