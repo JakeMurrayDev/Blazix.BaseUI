@@ -41,7 +41,7 @@
 
 @if (!CurrentChecked && GroupContext is null && ResolvedName is not null && !Parent && UncheckedValue is not null)
 {
-    <input type="hidden" form="@Form" name="@ResolvedName" value="@UncheckedValue" />
+    <input type="hidden" form="@Form" name="@ResolvedName" value="@UncheckedValue" disabled="@ResolvedDisabled" />
 }
 
 <input type="checkbox"
@@ -56,6 +56,7 @@
        name="@((!Parent && ResolvedName is not null) ? ResolvedName : null)"
        value="@ComputedInputValue"
        @onclick="HandleInputClick"
+       @onclick:stopPropagation="true"
        @onchange="HandleInputChangeAsync"
        @onfocus="HandleInputFocusAsync"
        @ref="inputElement" />
@@ -164,6 +165,11 @@
     private string HiddenInputStyle => ResolvedName is not null
         ? "position:absolute;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);"
         : "position:fixed;top:0;left:0;overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;clip-path:inset(50%);";
+
+    private bool EnableNativeLabelFallback =>
+        !NativeButton &&
+        !AttributeUtilities.HasAttributeIgnoreCase(AdditionalAttributes, "aria-labelledby") &&
+        string.IsNullOrEmpty(LabelableContext?.LabelId);
 
     [CascadingParameter]
     private FieldRootContext? FieldContext { get; set; }
@@ -624,7 +630,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ReadOnly, CurrentIndeterminate, CurrentChecked, NativeButton, AllowsOptimisticState);
+            await module.InvokeVoidAsync("initialize", Element.Value, inputElement, ResolvedDisabled, ReadOnly, CurrentIndeterminate, CurrentChecked, NativeButton, AllowsOptimisticState, EnableNativeLabelFallback);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -642,7 +648,7 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("updateState", Element.Value, inputElement, ResolvedDisabled, ReadOnly, CurrentIndeterminate, CurrentChecked, NativeButton, AllowsOptimisticState);
+            await module.InvokeVoidAsync("updateState", Element.Value, inputElement, ResolvedDisabled, ReadOnly, CurrentIndeterminate, CurrentChecked, NativeButton, AllowsOptimisticState, EnableNativeLabelFallback);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -691,6 +697,7 @@
     {
         if (ReadOnly || ResolvedDisabled)
         {
+            await ResetInputCheckedAsync();
             return;
         }
 

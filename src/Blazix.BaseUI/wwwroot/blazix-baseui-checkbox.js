@@ -70,6 +70,64 @@ function dispatchToggle(state) {
     }
 }
 
+function findAssociatedLabel(labelSource) {
+    if (!labelSource) {
+        return null;
+    }
+
+    const parent = labelSource.parentElement;
+    if (parent?.tagName === 'LABEL') {
+        return parent;
+    }
+
+    const controlId = labelSource.id;
+    if (controlId) {
+        const nextSibling = labelSource.nextElementSibling;
+        if (nextSibling?.tagName === 'LABEL' && nextSibling.htmlFor === controlId) {
+            return nextSibling;
+        }
+    }
+
+    return labelSource.labels?.[0] ?? null;
+}
+
+function ensureLabelId(label, state, element) {
+    if (label.id) {
+        return label.id;
+    }
+
+    const baseId = state.inputElement?.id || element.id || `base-ui-checkbox-${Math.random().toString(36).slice(2)}`;
+    label.id = `${baseId}-label`;
+    return label.id;
+}
+
+function syncFallbackAriaLabelledBy(element, state) {
+    if (!state.enableLabelFallback) {
+        if (state.fallbackAriaLabelledBy &&
+            element.getAttribute('aria-labelledby') === state.fallbackAriaLabelledBy) {
+            element.removeAttribute('aria-labelledby');
+        }
+
+        state.fallbackAriaLabelledBy = null;
+        return;
+    }
+
+    const label = findAssociatedLabel(state.inputElement);
+    if (!label) {
+        if (state.fallbackAriaLabelledBy &&
+            element.getAttribute('aria-labelledby') === state.fallbackAriaLabelledBy) {
+            element.removeAttribute('aria-labelledby');
+        }
+
+        state.fallbackAriaLabelledBy = null;
+        return;
+    }
+
+    const labelId = ensureLabelId(label, state, element);
+    state.fallbackAriaLabelledBy = labelId;
+    element.setAttribute('aria-labelledby', labelId);
+}
+
 function handleEnterKey(event, state) {
     if (event.defaultPrevented) {
         return;
@@ -96,7 +154,7 @@ function handleEnterKey(event, state) {
     });
 }
 
-export function initialize(element, inputElement, disabled, readOnly, indeterminate, checked, nativeButton, allowsOptimisticState) {
+export function initialize(element, inputElement, disabled, readOnly, indeterminate, checked, nativeButton, allowsOptimisticState, enableLabelFallback) {
     if (!element) {
         return;
     }
@@ -108,6 +166,8 @@ export function initialize(element, inputElement, disabled, readOnly, indetermin
         indeterminate,
         nativeButton,
         allowsOptimisticState: allowsOptimisticState !== false,
+        enableLabelFallback,
+        fallbackAriaLabelledBy: null,
         optimisticChecked: checked,
         lastInteractionModifiers: null,
         debounceTimer: null,
@@ -127,8 +187,9 @@ export function initialize(element, inputElement, disabled, readOnly, indetermin
     }
 
     state.keydownHandler = (event) => {
+        // Upstream `useButton` bails out before any `preventDefault()` when disabled,
+        // so keys the browser owns (Tab, shortcuts, scrolling) keep working.
         if (state.disabled) {
-            event.preventDefault();
             return;
         }
 
@@ -161,8 +222,14 @@ export function initialize(element, inputElement, disabled, readOnly, indetermin
     };
 
     state.clickHandler = (event) => {
-        if (state.disabled || state.readOnly) {
+        // Only `useButton` cancels the default for a disabled control; the root's own
+        // read-only guard returns without preventing it upstream.
+        if (state.disabled) {
             event.preventDefault();
+            return;
+        }
+
+        if (state.readOnly) {
             return;
         }
 
@@ -175,6 +242,7 @@ export function initialize(element, inputElement, disabled, readOnly, indetermin
     element.addEventListener('click', state.clickHandler);
 
     element[STATE_KEY] = state;
+    syncFallbackAriaLabelledBy(element, state);
 }
 
 /**
@@ -211,7 +279,7 @@ function toggleCheckbox(element, state, event) {
     }, 60);
 }
 
-export function updateState(element, inputElement, disabled, readOnly, indeterminate, checked, nativeButton, allowsOptimisticState) {
+export function updateState(element, inputElement, disabled, readOnly, indeterminate, checked, nativeButton, allowsOptimisticState, enableLabelFallback) {
     if (!element) {
         return;
     }
@@ -241,10 +309,13 @@ export function updateState(element, inputElement, disabled, readOnly, indetermi
         state.indeterminate = indeterminate;
         state.nativeButton = nativeButton;
         state.allowsOptimisticState = nextAllowsOptimisticState;
+        state.enableLabelFallback = enableLabelFallback;
 
         if (state.inputElement) {
             state.inputElement.indeterminate = indeterminate;
         }
+
+        syncFallbackAriaLabelledBy(element, state);
 
         // Reconcile optimistic state with server truth when no debounce is pending.
         // This ensures controlled checkboxes and group parents stay in sync.

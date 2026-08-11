@@ -40,7 +40,7 @@
 
 @if (!CurrentChecked && ResolvedName is not null && UncheckedValue is not null)
 {
-    <input type="hidden" form="@Form" name="@ResolvedName" value="@UncheckedValue" />
+    <input type="hidden" form="@Form" name="@ResolvedName" value="@UncheckedValue" disabled="@ResolvedDisabled" />
 }
 
 <input type="checkbox"
@@ -51,11 +51,13 @@
        form="@Form"
        aria-hidden="true"
        aria-describedby="@InputAriaDescribedBy"
+       aria-invalid="@InputAriaInvalid"
        tabindex="-1"
        style="@HiddenInputStyle"
        name="@(ResolvedName is not null ? ResolvedName : null)"
        value="@Value"
        @onclick="HandleInputClick"
+       @onclick:stopPropagation="true"
        @onchange="HandleInputChangeAsync"
        @onfocus="HandleInputFocusAsync"
        @ref="inputElement" />
@@ -118,6 +120,8 @@
     private string? FieldAriaDescribedBy => LabelableContext?.GetAriaDescribedBy();
 
     private string? InputAriaDescribedBy => FieldAriaDescribedBy;
+
+    private string? InputAriaInvalid => state.Valid == false && !ResolvedDisabled ? "true" : null;
 
     private bool EnableNativeLabelFallback => string.IsNullOrEmpty(ExplicitAriaLabelledBy) &&
                                               string.IsNullOrEmpty(LabelableContext?.LabelId) &&
@@ -477,7 +481,7 @@
         if (!string.IsNullOrEmpty(describedBy))
             attrs["aria-describedby"] = describedBy;
 
-        if (state.Valid == false)
+        if (state.Valid == false && !ResolvedDisabled)
             AddAttributeUnlessOverridden(attrs, "aria-invalid", "true");
 
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
@@ -575,11 +579,6 @@
         }
 
         var nextChecked = e.Value is bool b ? b : bool.TryParse(e.Value?.ToString(), out var parsed) && parsed;
-
-        if (nextChecked == CurrentChecked)
-        {
-            return;
-        }
 
         await SetChecked(nextChecked, inputClickArgs);
     }
