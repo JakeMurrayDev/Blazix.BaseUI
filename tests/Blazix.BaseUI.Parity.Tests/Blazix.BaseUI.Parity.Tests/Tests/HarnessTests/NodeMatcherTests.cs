@@ -1,0 +1,646 @@
+using Blazix.BaseUI.Parity.Tests.Capture;
+using Blazix.BaseUI.Parity.Tests.Diff;
+using Shouldly;
+
+namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
+
+/// <summary>
+/// Pins the tree-matching primitive every comparator pairs nodes with.
+/// </summary>
+public sealed class NodeMatcherTests
+{
+    [Fact]
+    public void PairsIdenticalTrees()
+    {
+        var tree = Node("div", Node("button"));
+
+        var result = NodeMatcher.Match(tree, tree);
+
+        result.Pairs.Count.ShouldBe(2);
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReportsAnExtraWrapperAsCandidateOnly()
+    {
+        var reference = Node("div", Node("button"));
+        var candidate = Node("div", Node("span", Node("button")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.ShouldContain(n => n.Tag == "span");
+    }
+
+    [Fact]
+    public void KeepsMatchingBeneathAnExtraWrapper()
+    {
+        // The wrapper is reported once and the button underneath still pairs, so a
+        // single extra element does not blank out every comparison below it.
+        var reference = Node("div", Node("button"));
+        var candidate = Node("div", Node("span", Node("button")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.Count.ShouldBe(1);
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "button" && p.Candidate.Tag == "button");
+    }
+
+    [Fact]
+    public void PairsBeneathAnExtraWrapperWhenTheReferenceLeftoverAlsoHasOneChild()
+    {
+        // The canonical positioner/popup shape: React <div positioner><div popup><p/></div></div>
+        // against Blazor's extra <span wrapper> around the popup. Both leftovers have exactly
+        // one child, so stepping the two sides in lockstep reports the popup React *does*
+        // render as absent from Blazor and leaves the two popups unpaired for good — and the
+        // attribute comparator only walks pairs, so role, data-open, data-side, and every
+        // aria-* on the one element this harness exists to check would go uncompared.
+        var reference = Node("div", Node("div", Node("p")));
+        var candidate = Node("div", Node("span", Node("div", Node("p"))));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["span"]);
+        result.ReferenceOnly.ShouldBeEmpty();
+
+        // The positioner and the popup, not just the positioner.
+        result.Pairs.Count(p => p.Reference.Tag == "div").ShouldBe(2);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "p" && p.Candidate.Tag == "p");
+    }
+
+    [Fact]
+    public void PairsBeneathAnExtraWrapperWhoseKeyCollidesWithASibling()
+    {
+        // The commonest extra-wrapper shape, and the one every earlier wrapper test missed
+        // by having a single child at the level. A wrapper carries no role and no text of
+        // its own, so its key is `div||` — identical to the plain <div> sibling beside it.
+        // Taking the earliest same-key candidate consumes the wrapper as if it were the
+        // body, pairs a real element against a wrapper, marks the level as having paired,
+        // and so stops the one-sided step from ever running. Nothing in this tree has an
+        // identity difference: the only variable is the wrapper.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body", At("p", "dlg>wrap>body>p"), At("p", "dlg>wrap>body>q"))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>body~dlg>wrap>body",
+                "dlg>body>p~dlg>wrap>body>p",
+                "dlg>body>q~dlg>wrap>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+
+        // Tasks 8-10 diff computed styles and geometry across Pairs. A real element paired
+        // with a wrapper carries Relaxed == false, so nothing on the list would say so.
+        result.Pairs.ShouldAllBe(p => !p.Relaxed);
+    }
+
+    [Fact]
+    public void PairsBeneathAnExtraWrapperWhoseKeyCollidesWithASiblingOnTheReferenceLeg()
+    {
+        // The mirror. Nothing in the matcher is symmetric by construction — references and
+        // candidates run through different methods — so the leg that carries the wrapper has
+        // to be exercised on both sides.
+        var reference = At("div", "dlg",
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body", At("p", "dlg>wrap>body>p"), At("p", "dlg>wrap>body>q"))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.ShouldBeEmpty();
+        result.ReferenceOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>wrap>body~dlg>body",
+                "dlg>wrap>body>p~dlg>body>p",
+                "dlg>wrap>body>q~dlg>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void PairsBeneathTwoNestedWrappersWhoseKeysCollideWithASibling()
+    {
+        // Two nested layout wrappers are as ordinary as one, and a lookahead that steps once
+        // sees only the outer wrapper's child — another wrapper, which corroborates nothing,
+        // so the body is consumed as the outer wrapper again and the whole subtree is
+        // reported twice over. Walking the single-child chain is what reaches the body.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("p", "dlg>body>q")),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>w1",
+                At("div", "dlg>w1>w2",
+                    At("div", "dlg>w1>w2>body",
+                        At("p", "dlg>w1>w2>body>p"),
+                        At("p", "dlg>w1>w2>body>q")))),
+            At("div", "dlg>foot", At("button", "dlg>foot>ok")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>w1", "dlg>w1>w2"], ignoreOrder: true);
+        result.Pairs.Select(p => $"{p.Reference.Path}~{p.Candidate.Path}").ShouldBe(
+            [
+                "dlg~dlg",
+                "dlg>body~dlg>w1>w2>body",
+                "dlg>body>p~dlg>w1>w2>body>p",
+                "dlg>body>q~dlg>w1>w2>body>q",
+                "dlg>foot~dlg>foot",
+                "dlg>foot>ok~dlg>foot>ok"
+            ],
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void PairsBeneathAWrapperAroundAChildlessSameKeySibling()
+    {
+        // A childless body and footer both key as div||, as does the wrapper. Child
+        // corroboration is necessarily zero, so the matcher must use the wrapper chain and
+        // sibling assignment rather than consuming the wrapper as the body.
+        var reference = At("div", "dlg", At("div", "dlg>body"), At("div", "dlg>foot"));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>wrap", At("div", "dlg>wrap>body")),
+            At("div", "dlg>foot"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Path).ShouldBe(["dlg>wrap"]);
+        result.Pairs.ShouldContain(p =>
+            p.Reference.Path == "dlg>body" && p.Candidate.Path == "dlg>wrap>body");
+        result.Pairs.ShouldContain(p =>
+            p.Reference.Path == "dlg>foot" && p.Candidate.Path == "dlg>foot");
+        result.Pairs.ShouldNotContain(p => p.Candidate.Path == "dlg>wrap");
+        result.Reorders.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void WrapperLookaheadOutranksACorroboratingSameKeySiblingWithoutCrossPairing()
+    {
+        // The footer shares the body's <p> key and therefore scores above the wrapper
+        // itself. The exact body one level inside the wrapper has stronger corroboration
+        // and must win; otherwise body and footer cross-pair and downstream attributes are
+        // compared across unrelated elements.
+        var reference = At("div", "dlg",
+            At("div", "dlg>body", At("p", "dlg>body>p"), At("q", "dlg>body>q")),
+            At("div", "dlg>foot", At("p", "dlg>foot>p")));
+        var candidate = At("div", "dlg",
+            At("div", "dlg>foot", At("p", "dlg>foot>p")),
+            At("div", "dlg>wrap",
+                At("div", "dlg>wrap>body",
+                    At("p", "dlg>wrap>body>p"),
+                    At("q", "dlg>wrap>body>q"))));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["dlg>wrap"]);
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "dlg>body" && pair.Candidate.Path == "dlg>wrap>body");
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "dlg>foot" && pair.Candidate.Path == "dlg>foot");
+        result.Pairs.ShouldNotContain(pair =>
+            pair.Reference.Path == "dlg>body" && pair.Candidate.Path == "dlg>foot");
+
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("dlg");
+        reorder.ReferenceOrder.ShouldBe(["dlg>body", "dlg>foot"]);
+        reorder.CandidateOrder.ShouldBe(["dlg>foot", "dlg>body"]);
+    }
+
+    [Fact]
+    public void StepsAWrapperBeforePairingAnIdentityChangeByTag()
+    {
+        var reference = AtRole("div", "root>popup", "dialog", At("p", "root>popup>text"));
+        var candidate = At("span", "root>wrapper",
+            At("div", "root>wrapper>popup", At("p", "root>wrapper>popup>text")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["root>wrapper"]);
+        var popup = result.Relaxed.ShouldHaveSingleItem().Pair;
+        popup.Reference.Path.ShouldBe("root>popup");
+        popup.Candidate.Path.ShouldBe("root>wrapper>popup");
+        result.Pairs.ShouldContain(pair =>
+            pair.Reference.Path == "root>popup>text" &&
+            pair.Candidate.Path == "root>wrapper>popup>text");
+    }
+
+    [Fact]
+    public void ReportsSiblingReorderAfterSteppingTheCandidateLevel()
+    {
+        var reference = At("div", "toolbar",
+            AtText("button", "toolbar>save", "Save"),
+            AtText("button", "toolbar>cancel", "Cancel"));
+        var candidate = At("div", "toolbar",
+            At("span", "toolbar>cancel-wrap",
+                AtText("button", "toolbar>cancel-wrap>cancel", "Cancel")),
+            At("span", "toolbar>save-wrap",
+                AtText("button", "toolbar>save-wrap>save", "Save")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(
+            ["toolbar>cancel-wrap", "toolbar>save-wrap"], ignoreOrder: true);
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("toolbar");
+        reorder.ReferenceOrder.ShouldBe(["toolbar>save", "toolbar>cancel"]);
+        reorder.CandidateOrder.ShouldBe(["toolbar>cancel", "toolbar>save"]);
+    }
+
+    [Fact]
+    public void MarksUnequalDuplicateKeyLeavesAsUncertainInsteadOfSilentFullPairs()
+    {
+        var reference = At("div", "root",
+            AtText("button", "root>edit-a", "Edit"),
+            AtText("button", "root>edit-b", "Edit"));
+        var candidate = At("div", "root",
+            AtText("button", "root>edit-x", "Edit"),
+            AtText("button", "root>edit-a", "Edit"),
+            AtText("button", "root>edit-b", "Edit"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Relaxed.Select(pair => pair.Pair.Reference.Path)
+            .ShouldBe(["root>edit-a", "root>edit-b"]);
+        result.Pairs.Where(pair => pair.Reference.Text == "Edit")
+            .ShouldAllBe(pair => pair.Relaxed);
+        result.CandidateOnly.Select(node => node.Path).ShouldBe(["root>edit-b"]);
+    }
+
+    [Fact]
+    public void PairsAContainerWhoseRoleDiffersAndKeepsComparingBeneathIt()
+    {
+        // A role-only difference on a container. Dumping both subtrees would cost every
+        // attribute, style, and geometry comparison beneath them to report what is one
+        // attribute on one element.
+        var reference = Node("div", Role("ul", "menu", Node("li"), Node("li")));
+        var candidate = Node("div", Role("ul", "listbox", Node("li"), Node("li")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "ul" && p.Candidate.Tag == "ul");
+        result.Pairs.Count(p => p.Reference.Tag == "li").ShouldBe(2);
+
+        // Force-pairing must not make the difference vanish.
+        var relaxed = result.Relaxed.ShouldHaveSingleItem();
+        relaxed.Pair.Reference.Tag.ShouldBe("ul");
+        relaxed.ReferenceIdentity.ShouldContain("menu");
+        relaxed.CandidateIdentity.ShouldContain("listbox");
+    }
+
+    [Fact]
+    public void PairsAContainerWhoseRoleDiffersWhenEachSideHasExactlyOneChild()
+    {
+        // The dominant real-world shape and the one the degrade above could not reach: a
+        // popup carrying a single child on both legs. Every leftover at the level has
+        // exactly one child, so a matcher that unwraps before it degrades steps straight
+        // past the two popups and reports each of them as one-sided — two Structure
+        // findings that contradict each other, and *no* attribute finding for the missing
+        // role, because only pairs are ever diffed attribute by attribute.
+        var reference = Node("div", Popup("dialog", Text("p", "hi")));
+        var candidate = Node("div", Popup(role: null, Text("p", "hi")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+
+        // The outer div and the popup, and the paragraph beneath the popup.
+        result.Pairs.Count(p => p.Reference.Tag == "div").ShouldBe(2);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "p" && p.Candidate.Tag == "p");
+
+        var relaxed = result.Relaxed.ShouldHaveSingleItem();
+        relaxed.ReferenceIdentity.ShouldContain("dialog");
+        relaxed.CandidateIdentity.ShouldBe("<div>");
+    }
+
+    [Fact]
+    public void PairsAContainerWhoseRoleDiffersWhenTheTwoSidesHoldDifferentChildCounts()
+    {
+        // Asymmetric child counts, which is what makes only one side steppable. A matcher
+        // that unwraps before it degrades commits that one-sided step even though it
+        // unblocks nothing, and then compares the <li> against the <ul> — five one-sided
+        // nodes and no attribute finding, for one role difference plus one extra <li>.
+        var reference = Node("div", Role("ul", "menu", Node("li")));
+        var candidate = Node("div", Role("ul", "listbox", Node("li"), Node("li")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["li"]);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "ul" && p.Candidate.Tag == "ul");
+        result.Pairs.Count(p => p.Reference.Tag == "li").ShouldBe(1);
+
+        result.Relaxed.Count.ShouldBe(2);
+        var container = result.Relaxed.Single(pair => pair.Pair.Reference.Tag == "ul");
+        container.ReferenceIdentity.ShouldContain("menu");
+        container.CandidateIdentity.ShouldContain("listbox");
+        result.Relaxed.ShouldContain(pair => pair.Pair.Reference.Tag == "li");
+    }
+
+    [Fact]
+    public void FlagsARelaxedPairOnThePairListItself()
+    {
+        // Later comparators iterate Pairs and diff styles and geometry across it. A pair
+        // the matcher does not itself hold to be the same element has to say so there, not
+        // only on a side list a consumer has to remember to cross-reference.
+        var reference = Node("div", Role("li", "menuitem"));
+        var candidate = Node("div", Role("li", "option"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "li" && p.Relaxed);
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && !p.Relaxed);
+        result.Relaxed.ShouldHaveSingleItem().Pair.Relaxed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DoesNotForcePairAGenuinelyAbsentSubtree()
+    {
+        // Same trigger as above — nothing pairs and nothing can be stepped — but the tags
+        // differ too, so the last resort must decline and report both sides as one-sided.
+        var reference = Node("div", Node("ul", Node("li"), Node("li")));
+        var candidate = Node("div", Node("section", Node("p"), Node("p")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Relaxed.ShouldBeEmpty();
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "ul");
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["ul", "li", "li"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["section", "p", "p"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void ReportsAMissingNodeAndItsSubtreeAsReferenceOnly()
+    {
+        var reference = Node("div", Node("button"), Node("ul", Node("li")));
+        var candidate = Node("div", Node("button"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["ul", "li"], ignoreOrder: true);
+        result.CandidateOnly.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void PairsRepeatedSameKeySiblingsByOrdinal()
+    {
+        var reference = Node("div", Node("span"), Node("span"), Node("span"));
+        var candidate = Node("div", Node("span"), Node("span"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        // Root plus the two spans the candidate has; the third has nothing to pair with.
+        result.Pairs.Count.ShouldBe(3);
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["span"]);
+    }
+
+    [Fact]
+    public void ReportsSiblingsThatPairedOutOfOrder()
+    {
+        var reference = Node("div", Node("button"), Node("ul"));
+        var candidate = Node("div", Node("ul"), Node("button"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        // Both siblings pair — the difference is only where they sit.
+        result.ReferenceOnly.ShouldBeEmpty();
+        result.CandidateOnly.ShouldBeEmpty();
+
+        var reorder = result.Reorders.ShouldHaveSingleItem();
+        reorder.ParentPath.ShouldBe("div");
+        reorder.ReferenceOrder.ShouldBe(["button", "ul"]);
+        reorder.CandidateOrder.ShouldBe(["ul", "button"]);
+    }
+
+    [Fact]
+    public void ReportsNoReorderWhenPairedSiblingsKeepTheirOrder()
+    {
+        var reference = Node("div", Node("button"), Node("span"), Node("ul"));
+        var candidate = Node("div", Node("button"), Node("ul"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Reorders.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReportsNoReorderWhenAnExtraSameKeySiblingIsInsertedAhead()
+    {
+        // Blazor renders one extra leading item. Taking the earliest candidate of a key
+        // regardless of position pairs the <b> React renders second with the inserted one
+        // rendered first, so the indices step backwards and a move is reported. Nothing
+        // moved — a node was inserted, and the extra node is already reported on its own.
+        var reference = Node("div", Node("a"), Node("b"));
+        var candidate = Node("div", Node("b"), Node("a"), Node("b"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Reorders.ShouldBeEmpty();
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["b"]);
+    }
+
+    [Fact]
+    public void ReportsAnExtraCaptureRootAsReferenceOnly()
+    {
+        // capture.js emits the root element itself when a fixture has one root and a
+        // synthetic '#roots' wrapper when content is portalled, so the two legs do not
+        // even agree on what the top of the tree is. React opening a portal while Blazor
+        // renders inline is a first-order parity defect; pairing '#roots' with the real
+        // root would compare the wrapper's empty attribute set against a live element and
+        // push every real root's children one level out of step.
+        var reference = Node("#roots", Node("div", Node("button")), Node("div", Node("dialog")));
+        var candidate = Node("div", Node("button"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "#roots" || p.Candidate.Tag == "#roots");
+        result.ReferenceOnly.Select(n => n.Tag).ShouldBe(["div", "dialog"], ignoreOrder: true);
+        result.CandidateOnly.ShouldBeEmpty();
+
+        // The root both legs do share still pairs, and still matches beneath itself.
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && p.Candidate.Tag == "div");
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "button" && p.Candidate.Tag == "button");
+    }
+
+    [Fact]
+    public void ReportsAnExtraCaptureRootAsCandidateOnly()
+    {
+        // The mirror of the case above, and the likelier Blazix defect: Blazor portals
+        // where React renders inline. Root normalization is symmetric, so swapping the two
+        // legs must produce the same result with the sides exchanged.
+        var reference = Node("div", Node("button"));
+        var candidate = Node("#roots", Node("div", Node("button")), Node("div", Node("dialog")));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldNotContain(p => p.Reference.Tag == "#roots" || p.Candidate.Tag == "#roots");
+        result.CandidateOnly.Select(n => n.Tag).ShouldBe(["div", "dialog"], ignoreOrder: true);
+        result.ReferenceOnly.ShouldBeEmpty();
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "div" && p.Candidate.Tag == "div");
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "button" && p.Candidate.Tag == "button");
+    }
+
+    [Fact]
+    public void DoesNotPairSiblingsWithDifferentAccessibleNames()
+    {
+        // The <hr> pairs, which keeps the level off the last-resort tag pairing. This test
+        // is about the key itself, so it has to exercise the ordinary path.
+        var reference = Node("div", Node("hr"), Text("button", "Save"));
+        var candidate = Node("div", Node("hr"), Text("button", "Cancel"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.Select(n => n.Text).ShouldBe(["Save"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Text).ShouldBe(["Cancel"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void DoesNotPairSiblingsWithDifferentRolesWhenAnotherSiblingPaired()
+    {
+        // Named for what it pins, which is narrower than "does not pair across roles": the
+        // matcher *does* pair across roles whenever nothing else at the level pairs, which
+        // is what PairsAMismatchedLeafByTagOnceNothingElseAtTheLevelMatches covers. The <hr>
+        // here is what keeps the level off that degrade.
+        var reference = Node("div", Node("hr"), Role("li", "menuitem"));
+        var candidate = Node("div", Node("hr"), Role("li", "option"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.ReferenceOnly.Select(n => n.Attributes["role"]).ShouldBe(["menuitem"], ignoreOrder: true);
+        result.CandidateOnly.Select(n => n.Attributes["role"]).ShouldBe(["option"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void PairsAMismatchedLeafByTagOnceNothingElseAtTheLevelMatches()
+    {
+        // Without the sibling above, the same two nodes are all the level has. Reporting
+        // them as two unrelated elements loses the one fact worth reporting: they are the
+        // same element with a different role.
+        var reference = Node("div", Role("li", "menuitem"));
+        var candidate = Node("div", Role("li", "option"));
+
+        var result = NodeMatcher.Match(reference, candidate);
+
+        result.Pairs.ShouldContain(p => p.Reference.Tag == "li" && p.Candidate.Tag == "li");
+        result.Relaxed.ShouldHaveSingleItem().ReferenceIdentity.ShouldContain("menuitem");
+    }
+
+    /// <summary>
+    /// Builds a node with a path of its own, for the trees whose projections are asserted by
+    /// path rather than by tag.
+    /// </summary>
+    private static DomNode At(string tag, string path, params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    private static DomNode AtRole(
+        string tag,
+        string path,
+        string role,
+        params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string> { ["role"] = role },
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    private static DomNode AtText(string tag, string path, string text) => new()
+    {
+        Tag = tag,
+        Path = path,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = text,
+        Children = []
+    };
+
+    private static DomNode Node(string tag, params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = tag,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    private static DomNode Text(string tag, string text) => new()
+    {
+        Tag = tag,
+        Path = tag,
+        Attributes = new Dictionary<string, string>(),
+        Classes = [],
+        Text = text,
+        Children = []
+    };
+
+    private static DomNode Role(string tag, string role, params DomNode[] children) => new()
+    {
+        Tag = tag,
+        Path = tag,
+        Attributes = new Dictionary<string, string> { ["role"] = role },
+        Classes = [],
+        Text = string.Empty,
+        Children = children
+    };
+
+    /// <summary>
+    /// Builds the popup shape: a div carrying <c>data-open</c>, which both legs agree on,
+    /// and optionally the role, which is the only thing they differ by.
+    /// </summary>
+    private static DomNode Popup(string? role, params DomNode[] children)
+    {
+        var attributes = new Dictionary<string, string> { ["data-open"] = string.Empty };
+        if (role is not null)
+        {
+            attributes["role"] = role;
+        }
+
+        return new DomNode
+        {
+            Tag = "div",
+            Path = "div",
+            Attributes = attributes,
+            Classes = [],
+            Text = string.Empty,
+            Children = children
+        };
+    }
+}
