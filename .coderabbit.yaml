@@ -1,0 +1,20 @@
+# CodeRabbit configuration
+# Scope automated review to the parity-harness *logic* (comparators, capture,
+# infrastructure, report, baselines, test definitions). The generated artifacts
+# (screenshot/JSON baselines, React + Razor fixtures, manifests, lockfiles, host
+# boilerplate) are excluded so the changed-file count stays under CodeRabbit's
+# 100-file review limit and the review focuses on hand-written code.
+reviews:
+  path_filters:
+    - "!**/*.png"
+    - "!tests/Blazix.BaseUI.Parity.Tests/baselines/**"
+    - "!tests/Blazix.BaseUI.Parity.Tests/react-fixtures/**"
+    - "!tests/Blazix.BaseUI.Parity.Tests/manifest/**"
+    - "!tests/Blazix.BaseUI.Parity.Tests/waivers/**"
+    - "!tests/Blazix.BaseUI.Parity.Tests/shared/**"
+    - "!**/Fixtures/**"
+    - "!**/wwwroot/**"
+    - "!**/Blazix.BaseUI.Parity.Tests.Client/**"
+    - "!**/Components/**"
+    - "!**/pnpm-lock.yaml"
+    - "!docs/superpowers/**"
