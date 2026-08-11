@@ -86,6 +86,7 @@
     private bool previousIndeterminate;
     private bool previousNativeButton;
     private bool previousAllowsOptimisticState;
+    private bool previousEnableNativeLabelFallback;
     private bool? previousValid;
     private bool previousTouched;
     private bool previousDirty;
@@ -465,7 +466,8 @@
                 ReadOnly != previousReadOnly ||
                 currentIndeterminate != previousIndeterminate ||
                 NativeButton != previousNativeButton ||
-                currentAllowsOptimisticState != previousAllowsOptimisticState)
+                currentAllowsOptimisticState != previousAllowsOptimisticState ||
+                EnableNativeLabelFallback != previousEnableNativeLabelFallback)
             {
                 _ = InvokeAsync(async () =>
                 {
@@ -488,6 +490,7 @@
         previousIndeterminate = currentIndeterminate;
         previousNativeButton = NativeButton;
         previousAllowsOptimisticState = currentAllowsOptimisticState;
+        previousEnableNativeLabelFallback = EnableNativeLabelFallback;
         previousValid = fieldState.Valid;
         previousTouched = fieldState.Touched;
         previousDirty = fieldState.Dirty;
@@ -697,6 +700,7 @@
     {
         if (ReadOnly || ResolvedDisabled)
         {
+            lastInputClickArgs = null;
             await ResetInputCheckedAsync();
             return;
         }
@@ -879,6 +883,7 @@
         previousRequired = Required;
         previousNativeButton = NativeButton;
         previousAllowsOptimisticState = currentAllowsOptimisticState;
+        previousEnableNativeLabelFallback = EnableNativeLabelFallback;
         previousValid = fieldState.Valid;
         previousTouched = fieldState.Touched;
         previousDirty = fieldState.Dirty;
