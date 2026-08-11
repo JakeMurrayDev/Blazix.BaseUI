@@ -11,7 +11,7 @@ namespace Blazix.BaseUI.Parity.Tests.Capture;
 /// <param name="completionTimeoutMs">The deadline for each action's all-of consequence.</param>
 public sealed class ParityCapturer(string screenshotDirectory, float completionTimeoutMs = 5_000)
 {
-    // ParityOptions arrives in Task 12; until then the per-action budget is fixed here.
+    // The per-action budget is fixed here.
     // It bounds how long an unresolved selector costs, so it is generous enough for a
     // popup that has to portal out and short enough that a genuinely absent element does
     // not dominate the run.
@@ -33,6 +33,7 @@ public sealed class ParityCapturer(string screenshotDirectory, float completionT
     /// <param name="page">A page belonging to the shared browser context.</param>
     /// <param name="fixture">The manifest entry to capture.</param>
     /// <param name="leg">Which side is being captured.</param>
+    /// <param name="theme">The color-scheme theme to emulate while capturing.</param>
     /// <returns>The assembled capture bundle.</returns>
     public async Task<CaptureBundle> CaptureAsync(
         IPage page,
@@ -223,6 +224,52 @@ public sealed class ParityCapturer(string screenshotDirectory, float completionT
             page.Console -= OnConsole;
         }
     }
+
+    internal static async Task<T> PreservePrimaryDuringCleanupAsync<T>(
+        Func<Task<T>> operation,
+        Func<Task> cleanup)
+    {
+        Exception? primary = null;
+        try
+        {
+            return await operation();
+        }
+        catch (Exception exception)
+        {
+            primary = exception;
+            throw;
+        }
+        finally
+        {
+            try
+            {
+                await cleanup();
+            }
+            catch (Exception cleanupException) when (primary is not null)
+            {
+                primary.Data["ParityAnimationTargetProbeCloseFailure"] = cleanupException;
+            }
+        }
+    }
+
+    internal static string ExpectedValue(CompletionPredicate predicate) => predicate switch
+    {
+        { State: { } value } => value,
+        { Expected: { } value } => value,
+        { InputValue: { } value } => value,
+        { Focus: { } value } => value,
+        _ => string.Empty
+    };
+
+    internal static string PredicateName(CompletionPredicate predicate) => predicate switch
+    {
+        { State: not null } => "state",
+        { Attribute: { } value } => $"attribute:{value}",
+        { Property: { } value } => $"property:{value}",
+        { InputValue: not null } => "input-value",
+        { Focus: not null } => "focus",
+        _ => "unknown"
+    };
 
     private async Task AttachAnimationFramesAsync(
         IBrowserContext context,
@@ -553,33 +600,6 @@ public sealed class ParityCapturer(string screenshotDirectory, float completionT
             () => replay.CloseAsync());
     }
 
-    internal static async Task<T> PreservePrimaryDuringCleanupAsync<T>(
-        Func<Task<T>> operation,
-        Func<Task> cleanup)
-    {
-        Exception? primary = null;
-        try
-        {
-            return await operation();
-        }
-        catch (Exception exception)
-        {
-            primary = exception;
-            throw;
-        }
-        finally
-        {
-            try
-            {
-                await cleanup();
-            }
-            catch (Exception cleanupException) when (primary is not null)
-            {
-                primary.Data["ParityAnimationTargetProbeCloseFailure"] = cleanupException;
-            }
-        }
-    }
-
     private async Task<int> AwaitAnimationRegistrationAsync(
         IPage page,
         FixtureEntry fixture,
@@ -841,25 +861,6 @@ public sealed class ParityCapturer(string screenshotDirectory, float completionT
                 ? predicate.Expected ?? predicate.InputValue
                 : PropertyExpected(predicate.Expected!)
         };
-
-    internal static string ExpectedValue(CompletionPredicate predicate) => predicate switch
-    {
-        { State: { } value } => value,
-        { Expected: { } value } => value,
-        { InputValue: { } value } => value,
-        { Focus: { } value } => value,
-        _ => string.Empty
-    };
-
-    internal static string PredicateName(CompletionPredicate predicate) => predicate switch
-    {
-        { State: not null } => "state",
-        { Attribute: { } value } => $"attribute:{value}",
-        { Property: { } value } => $"property:{value}",
-        { InputValue: not null } => "input-value",
-        { Focus: not null } => "focus",
-        _ => "unknown"
-    };
 
     private static object PropertyExpected(string expected)
         => expected switch

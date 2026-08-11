@@ -125,14 +125,21 @@ public sealed class ReportPackageWriter
         var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
-        if (string.Equals(canonical, target, comparison))
+        if (string.Equals(canonical, target, comparison) ||
+            IsWithin(target, canonical, comparison) ||
+            IsWithin(canonical, target, comparison))
         {
             throw new InvalidOperationException(
-                "A filtered report target cannot alias the canonical report package.");
+                "A filtered report target cannot alias or contain the canonical report package.");
         }
 
         return target;
     }
+
+    private static bool IsWithin(string candidate, string ancestor, StringComparison comparison)
+        => candidate.StartsWith(
+            ancestor + Path.DirectorySeparatorChar,
+            comparison);
 
     private static IReadOnlyList<ReportArtifactSource> ValidateArtifacts(
         IReadOnlyList<ReportArtifactSource> sources)
@@ -155,23 +162,28 @@ public sealed class ReportPackageWriter
                     $"Report artifact path '{source.Artifact.RelativePath}' is duplicated.");
             }
 
+            if (!string.Equals(source.Artifact.MediaType, "image/png", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Report artifact '{source.Artifact.RelativePath}' has an unsupported media type.");
+            }
+
             if (!File.Exists(source.SourcePath))
             {
                 throw new InvalidOperationException(
                     $"Report artifact '{source.Artifact.RelativePath}' is missing.");
             }
 
-            var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(source.SourcePath)));
+            string hash;
+            using (var stream = File.OpenRead(source.SourcePath))
+            {
+                hash = Convert.ToHexString(SHA256.HashData(stream));
+            }
+
             if (!string.Equals(hash, source.Artifact.Sha256, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"Report artifact '{source.Artifact.RelativePath}' failed integrity validation.");
-            }
-
-            if (!string.Equals(source.Artifact.MediaType, "image/png", StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"Report artifact '{source.Artifact.RelativePath}' has an unsupported media type.");
             }
         }
 

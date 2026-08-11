@@ -67,87 +67,6 @@ public sealed class BaselineStore
         this.deleteDirectory = deleteDirectory ?? DeleteDirectory;
     }
 
-    /// <summary>Creates an empty sibling store with upgraded authority for an all-fixture migration.</summary>
-    internal (BaselineStore Store, string Root) CreateSchemaMigrationStaging(
-        Action<string, BaselineAuthority>? writeAuthority = null)
-    {
-        var authority = Read<BaselineAuthority>(Path.Combine(root, MetadataFileName));
-        if (authority.SchemaVersion != BaselineAuthority.CurrentSchemaVersion ||
-            authority.CaptureSchemaVersion is not (CaptureSchema.CurrentVersion or 2) ||
-            !IsHex(authority.DeclaredRepositoryPin, 40))
-        {
-            throw Stale("baseline authority cannot be migrated to the current capture schema");
-        }
-
-        var stagingRoot = Path.Combine(
-            Path.GetDirectoryName(root)!, $".{Path.GetFileName(root)}.schema3.{Guid.NewGuid():N}.tmp");
-        try
-        {
-            Directory.CreateDirectory(stagingRoot);
-            var upgraded = authority with { CaptureSchemaVersion = CaptureSchema.CurrentVersion };
-            if (writeAuthority is null)
-            {
-                WriteJson(Path.Combine(stagingRoot, MetadataFileName), upgraded);
-            }
-            else
-            {
-                writeAuthority(Path.Combine(stagingRoot, MetadataFileName), upgraded);
-            }
-            return (new BaselineStore(
-                stagingRoot,
-                screenshotDirectory,
-                manifestPath,
-                stylesheetPath,
-                deleteDirectory,
-                aliasManifestPath), stagingRoot);
-        }
-        catch
-        {
-            deleteDirectory(stagingRoot);
-            throw;
-        }
-    }
-
-    internal bool RequiresCaptureSchemaMigration()
-    {
-        var authority = Read<BaselineAuthority>(Path.Combine(root, MetadataFileName));
-        return authority.CaptureSchemaVersion != CaptureSchema.CurrentVersion;
-    }
-
-    /// <summary>Atomically installs a completely validated sibling store.</summary>
-    internal void ReplaceWithValidatedStaging(string stagingRoot, BaselinePlatform platform)
-    {
-        var staged = new BaselineStore(
-            stagingRoot,
-            screenshotDirectory,
-            manifestPath,
-            stylesheetPath,
-            deleteDirectory,
-            aliasManifestPath);
-        _ = staged.Describe(platform);
-
-        var backup = Path.Combine(
-            Path.GetDirectoryName(root)!, $".{Path.GetFileName(root)}.{Guid.NewGuid():N}.bak");
-        Directory.Move(root, backup);
-        try
-        {
-            Directory.Move(stagingRoot, root);
-            deleteDirectory(backup);
-        }
-        catch
-        {
-            if (Directory.Exists(backup))
-            {
-                if (Directory.Exists(root))
-                {
-                    Directory.Move(root, stagingRoot);
-                }
-                Directory.Move(backup, root);
-            }
-            throw;
-        }
-    }
-
     /// <summary>Loads a single-theme fixture through the explicit theme-aware path.</summary>
     /// <param name="fixture">The current manifest fixture.</param>
     /// <param name="platform">The exact runtime platform.</param>
@@ -321,6 +240,12 @@ public sealed class BaselineStore
         ArgumentNullException.ThrowIfNull(provenance);
         ValidatePlatform(platform);
 
+        if (captures.Any(capture => capture is null))
+        {
+            throw new InvalidOperationException(
+                $"Live captures for '{fixture.Id}' must not contain a null capture.");
+        }
+
         captures = captures.Select(NormalizeScreenshotObservations).ToArray();
 
         var authority = ValidateLiveProvenance(fixture, provenance);
@@ -335,7 +260,6 @@ public sealed class BaselineStore
         }
 
         if (captures.Any(capture =>
-                capture is null ||
                 capture.CaptureSchemaVersion != CaptureSchema.CurrentVersion ||
                 capture.Leg != ParityLeg.React ||
                 !string.Equals(capture.Fixture, fixture.Id, StringComparison.Ordinal) ||
@@ -468,6 +392,87 @@ public sealed class BaselineStore
         finally
         {
             deleteDirectory(staging);
+        }
+    }
+
+    /// <summary>Creates an empty sibling store with upgraded authority for an all-fixture migration.</summary>
+    internal (BaselineStore Store, string Root) CreateSchemaMigrationStaging(
+        Action<string, BaselineAuthority>? writeAuthority = null)
+    {
+        var authority = Read<BaselineAuthority>(Path.Combine(root, MetadataFileName));
+        if (authority.SchemaVersion != BaselineAuthority.CurrentSchemaVersion ||
+            authority.CaptureSchemaVersion is not (CaptureSchema.CurrentVersion or 2) ||
+            !IsHex(authority.DeclaredRepositoryPin, 40))
+        {
+            throw Stale("baseline authority cannot be migrated to the current capture schema");
+        }
+
+        var stagingRoot = Path.Combine(
+            Path.GetDirectoryName(root)!, $".{Path.GetFileName(root)}.schema3.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            Directory.CreateDirectory(stagingRoot);
+            var upgraded = authority with { CaptureSchemaVersion = CaptureSchema.CurrentVersion };
+            if (writeAuthority is null)
+            {
+                WriteJson(Path.Combine(stagingRoot, MetadataFileName), upgraded);
+            }
+            else
+            {
+                writeAuthority(Path.Combine(stagingRoot, MetadataFileName), upgraded);
+            }
+            return (new BaselineStore(
+                stagingRoot,
+                screenshotDirectory,
+                manifestPath,
+                stylesheetPath,
+                deleteDirectory,
+                aliasManifestPath), stagingRoot);
+        }
+        catch
+        {
+            deleteDirectory(stagingRoot);
+            throw;
+        }
+    }
+
+    internal bool RequiresCaptureSchemaMigration()
+    {
+        var authority = Read<BaselineAuthority>(Path.Combine(root, MetadataFileName));
+        return authority.CaptureSchemaVersion != CaptureSchema.CurrentVersion;
+    }
+
+    /// <summary>Atomically installs a completely validated sibling store.</summary>
+    internal void ReplaceWithValidatedStaging(string stagingRoot, BaselinePlatform platform)
+    {
+        var staged = new BaselineStore(
+            stagingRoot,
+            screenshotDirectory,
+            manifestPath,
+            stylesheetPath,
+            deleteDirectory,
+            aliasManifestPath);
+        _ = staged.Describe(platform);
+
+        var backup = Path.Combine(
+            Path.GetDirectoryName(root)!, $".{Path.GetFileName(root)}.{Guid.NewGuid():N}.bak");
+        Directory.Move(root, backup);
+        try
+        {
+            Directory.Move(stagingRoot, root);
+            deleteDirectory(backup);
+        }
+        catch
+        {
+            if (Directory.Exists(backup))
+            {
+                if (Directory.Exists(root))
+                {
+                    Directory.Move(root, stagingRoot);
+                }
+                Directory.Move(backup, root);
+            }
+            throw;
         }
     }
 
@@ -1026,8 +1031,10 @@ internal static class LiveBaselineSource
 
         using var process = Process.Start(start)
             ?? throw new InvalidOperationException("Could not start git for Base UI provenance.");
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        var output = outputTask.GetAwaiter().GetResult();
+        var error = errorTask.GetAwaiter().GetResult();
         process.WaitForExit();
         if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
         {

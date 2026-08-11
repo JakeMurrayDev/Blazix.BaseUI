@@ -11,6 +11,7 @@ namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
 
 /// <summary>Exercises bundle validation, context construction, and the real live smoke path.</summary>
 /// <param name="playwright">The production browser fixture.</param>
+[Collection(ParityTimingCollection.Name)]
 public sealed class LiveIntegrationTests(PlaywrightFixture playwright)
     : IClassFixture<PlaywrightFixture>, IDisposable
 {
@@ -302,8 +303,9 @@ public sealed class LiveIntegrationTests(PlaywrightFixture playwright)
             .GetDateTimeOffset();
 
         var first = LiveBaselineSource.Read(fixture);
+        var readAt = DateTimeOffset.UtcNow;
         SpinWait.SpinUntil(
-            () => DateTimeOffset.UtcNow > first.GeneratedAtUtc.AddMilliseconds(20),
+            () => DateTimeOffset.UtcNow > readAt.AddMilliseconds(20),
             TimeSpan.FromSeconds(1)).ShouldBeTrue();
         var retry = LiveBaselineSource.Read(fixture);
 

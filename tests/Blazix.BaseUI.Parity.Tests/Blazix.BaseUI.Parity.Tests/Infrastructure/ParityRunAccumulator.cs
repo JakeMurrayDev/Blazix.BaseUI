@@ -804,9 +804,9 @@ public sealed class ParityRunAccumulator : IAsyncLifetime
             }
         }
 
-        var artifacts = BuildArtifactMapping(finalization.FirstBatches);
+        var artifacts = BuildArtifactMapping(firstBatches);
         diagnostics.AddRange(artifacts.Diagnostics);
-        var receiptsMatch = RetryReceiptsMatch(finalization);
+        var receiptsMatch = RetryReceiptsMatch(finalization, firstBatches, retryBatches);
         if (!receiptsMatch)
         {
             diagnostics.Add(ProvenanceDiagnostic(
@@ -899,10 +899,13 @@ public sealed class ParityRunAccumulator : IAsyncLifetime
         Blocking = true
     };
 
-    private static bool RetryReceiptsMatch(ParityRunFinalization finalization)
+    private static bool RetryReceiptsMatch(
+        ParityRunFinalization finalization,
+        IReadOnlyList<ParityRunBatch> firstBatches,
+        IReadOnlyList<ParityRunBatch> retryBatches)
     {
-        var firstRows = finalization.FirstBatches.SelectMany(item => item.Results).ToArray();
-        var retryRows = finalization.RetryBatches.SelectMany(item => item.Results).ToArray();
+        var firstRows = firstBatches.SelectMany(item => item.Results).ToArray();
+        var retryRows = retryBatches.SelectMany(item => item.Results).ToArray();
         if (firstRows.GroupBy(item => (item.ExecutionId, item.Leg)).Any(group => group.Count() != 1) ||
             retryRows.GroupBy(item => (item.ExecutionId, item.Leg)).Any(group => group.Count() != 1))
         {
@@ -1321,9 +1324,14 @@ public sealed class ParityRunAccumulator : IAsyncLifetime
 
     private static string AttemptWorkRoot()
     {
-        var parent = Path.GetDirectoryName(ParityPaths.ReportDir)
-            ?? throw new InvalidOperationException("Parity report root has no parent directory.");
-        return Path.Combine(parent, $".{Path.GetFileName(ParityPaths.ReportDir)}-attempts");
+        var report = Path.GetFullPath(ParityPaths.ReportDir);
+        var parent = Path.GetDirectoryName(report);
+        if (string.IsNullOrEmpty(parent))
+        {
+            throw new InvalidOperationException("Parity report root has no parent directory.");
+        }
+
+        return Path.Combine(parent, $".{Path.GetFileName(report)}-attempts");
     }
 
     private sealed record FixtureEvaluation(

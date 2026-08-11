@@ -450,6 +450,12 @@ public sealed record ReportModel
     [JsonIgnore]
     public IReadOnlyList<ReportArtifactSource> ArtifactSources { get; init; } = [];
 
+    /// <summary>
+    /// Comparator-kind sort ordinals, precomputed once from the shared registry order.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<FindingKind, int> ComparatorKindOrdinals =
+        BuildComparatorKindOrdinals();
+
     /// <summary>Builds the one shared deterministic report model.</summary>
     public static ReportModel Create(ReportModelInput input)
     {
@@ -503,8 +509,16 @@ public sealed record ReportModel
                 $"'{duplicateExecution.Key.Leg}' candidate legs.");
         }
 
-        var appliedByIdentity = input.WaiverVerdict.Applied
-            .ToDictionary(item => FindingIdentity.From(item.Finding));
+        var appliedByIdentity = new Dictionary<FindingIdentity, AppliedWaiver>();
+        foreach (var item in input.WaiverVerdict.Applied)
+        {
+            if (!appliedByIdentity.TryAdd(FindingIdentity.From(item.Finding), item))
+            {
+                throw new InvalidOperationException(
+                    "Report applied waivers require identity-unique findings.");
+            }
+        }
+
         var retryIdentities = input.RetryVerdict.Evidence.Select(item => item.Identity).ToArray();
         var retryFindingIdentities = input.RetryVerdict.Findings
             .Select(FindingIdentity.From).ToArray();
@@ -595,10 +609,11 @@ public sealed record ReportModel
         var baselineWrites = ValidateBaselineWrites(input, declarations);
         var attempts = ValidateAttempts(input);
         var blocking = findings.Count(item => item.Blocking);
+        var milestoneDenominator = MilestoneFixtureCatalog.Ids.Count;
         var reasons = new List<string>();
-        if (executedFixtures != 29)
+        if (executedFixtures != milestoneDenominator)
         {
-            reasons.Add($"Only {executedFixtures}/29 milestone fixtures are complete.");
+            reasons.Add($"Only {executedFixtures}/{milestoneDenominator} milestone fixtures are complete.");
         }
 
         if (blocking > 0)
@@ -613,7 +628,7 @@ public sealed record ReportModel
 
         var verdictKind = filtered
             ? ReportVerdictKind.Diagnostic
-            : executedFixtures != 29 || completedLegs != requiredLegs
+            : executedFixtures != milestoneDenominator || completedLegs != requiredLegs
                 ? ReportVerdictKind.Incomplete
                 : blocking > 0 || diagnostics.Any(item => item.Blocking)
                     ? ReportVerdictKind.Failed
@@ -626,6 +641,7 @@ public sealed record ReportModel
             {
                 Filtered = filtered,
                 FixtureFilter = input.Options.FixtureFilter,
+                MilestoneFixtureDenominator = milestoneDenominator,
                 CatalogFixtures = MilestoneFixtureCatalog.Ids,
                 RequiredModes = [nameof(ParityLeg.BlazorServer), nameof(ParityLeg.BlazorWasm)],
                 Comparators = ComparatorContract.Descriptors
@@ -1143,16 +1159,21 @@ public sealed record ReportModel
             return 2;
         }
 
+        return ComparatorKindOrdinals.TryGetValue(kind, out var ordinal)
+            ? ordinal
+            : int.MaxValue;
+    }
+
+    private static IReadOnlyDictionary<FindingKind, int> BuildComparatorKindOrdinals()
+    {
         var kinds = new ComparatorRegistry().OrderedKinds;
+        var ordinals = new Dictionary<FindingKind, int>();
         for (var index = 0; index < kinds.Count; index++)
         {
-            if (kinds[index] == kind)
-            {
-                return index + 3;
-            }
+            ordinals[kinds[index]] = index + 3;
         }
 
-        return int.MaxValue;
+        return ordinals;
     }
 
     private static int TimelineOrdinal(Finding finding)

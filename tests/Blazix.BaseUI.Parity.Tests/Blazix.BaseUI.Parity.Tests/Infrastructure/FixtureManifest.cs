@@ -281,6 +281,12 @@ public static class FixtureManifest
                     $"Manifest entry {entryIndex} ('{entry.Id}'): themes must contain at least one theme.");
             }
 
+            if (double.IsNaN(entry.PixelThreshold) || entry.PixelThreshold is < 0 or > 1)
+            {
+                throw new FormatException(
+                    $"Manifest entry {entryIndex} ('{entry.Id}'): pixelThreshold must be between 0 and 1.");
+            }
+
             var themes = new HashSet<string>(StringComparer.Ordinal);
             for (var themeIndex = 0; themeIndex < entry.Themes.Count; themeIndex++)
             {
@@ -338,6 +344,13 @@ public static class FixtureManifest
                     throw new FormatException(
                         $"Manifest entry {entryIndex} ('{entry.Id}'), step {stepIndex} " +
                         $"('{step.Name}'): do must be an array.");
+                }
+
+                if (step.Settle is not ("render" or "animation"))
+                {
+                    throw new FormatException(
+                        $"Manifest entry {entryIndex} ('{entry.Id}'), step {stepIndex} " +
+                        $"('{step.Name}'): settle must be exactly render or animation.");
                 }
 
                 for (var actionIndex = 0; actionIndex < step.Do.Count; actionIndex++)

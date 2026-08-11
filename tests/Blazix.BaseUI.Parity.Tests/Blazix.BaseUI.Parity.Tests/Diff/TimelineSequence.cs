@@ -22,18 +22,6 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// </remarks>
 public static class TimelineSequence
 {
-    /// <summary>
-    /// The attribute mutations that carry a phase. Every other attribute a component writes
-    /// during an animation — an <c>aria-*</c> flip, an id, a class rewrite — is noise that
-    /// would swamp the phases and differ between the two legs for reasons that are not
-    /// animation.
-    /// </summary>
-    private static readonly string[] TrackedAttributes =
-    [
-        "data-open", "data-closed", "data-starting-style", "data-ending-style",
-        "data-side", "data-align", "hidden", "inert", "style"
-    ];
-
     /// <summary>The kind whose <c>attr</c> is an attribute name.</summary>
     private const string AttributeKind = "attribute";
 
@@ -53,6 +41,18 @@ public static class TimelineSequence
     /// them the same way.
     /// </summary>
     private const string Absent = "<absent>";
+
+    /// <summary>
+    /// The attribute mutations that carry a phase. Every other attribute a component writes
+    /// during an animation — an <c>aria-*</c> flip, an id, a class rewrite — is noise that
+    /// would swamp the phases and differ between the two legs for reasons that are not
+    /// animation.
+    /// </summary>
+    private static readonly string[] TrackedAttributes =
+    [
+        "data-open", "data-closed", "data-starting-style", "data-ending-style",
+        "data-side", "data-align", "hidden", "inert", "style"
+    ];
 
     /// <summary>
     /// Reduces a timeline to its comparable signature.

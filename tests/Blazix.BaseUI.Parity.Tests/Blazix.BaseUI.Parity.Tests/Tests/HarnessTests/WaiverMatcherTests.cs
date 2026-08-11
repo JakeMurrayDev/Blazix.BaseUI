@@ -592,6 +592,42 @@ public sealed class WaiverMatcherTests
             .Message.ShouldContain("invalid JSON");
     }
 
+    [Theory]
+    [InlineData("switch/hero")]
+    [InlineData("switch/hero@blue")]
+    [InlineData("switch/hero@light@dark")]
+    [InlineData("switch/hero@Light")]
+    [InlineData("Switch/hero@light")]
+    [InlineData("switch/hero-@light")]
+    public void StrictLoaderRejectsMissingUnknownDuplicateOrCaseVariantThemeSuffix(string fixture)
+    {
+        var json = ValidJson().Replace(
+            "\"fixture\":\"switch/hero@light\"",
+            $"\"fixture\":{Json(fixture)}",
+            StringComparison.Ordinal);
+
+        var exception = Should.Throw<FormatException>(() => Load(json));
+
+        exception.Message.ShouldContain("fixture");
+        exception.Message.ShouldContain("@light");
+    }
+
+    [Fact]
+    public void ExactWaiverDoesNotCrossThemeExecutionIdentity()
+    {
+        var waiver = Load(ValidJson()).ShouldHaveSingleItem();
+        var darkFinding = Finding() with { Fixture = "switch/hero@dark" };
+
+        var verdict = WaiverMatcher.Match(
+            [darkFinding],
+            [waiver],
+            ReviewDate);
+
+        verdict.Applied.ShouldBeEmpty();
+        verdict.BlockingFindings.ShouldBe([darkFinding]);
+        verdict.Diagnostics.ShouldHaveSingleItem().Kind.ShouldBe(WaiverDiagnosticKind.Unused);
+    }
+
     private static FindingIdentity Identity()
         => FindingIdentity.From(Finding());
 
@@ -638,42 +674,6 @@ public sealed class WaiverMatcherTests
                 disposition: "deferred-defect",
                 docLink: "https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/999999"),
             ValidIssueValidator()).ShouldHaveSingleItem();
-
-    [Theory]
-    [InlineData("switch/hero")]
-    [InlineData("switch/hero@blue")]
-    [InlineData("switch/hero@light@dark")]
-    [InlineData("switch/hero@Light")]
-    [InlineData("Switch/hero@light")]
-    [InlineData("switch/hero-@light")]
-    public void StrictLoaderRejectsMissingUnknownDuplicateOrCaseVariantThemeSuffix(string fixture)
-    {
-        var json = ValidJson().Replace(
-            "\"fixture\":\"switch/hero@light\"",
-            $"\"fixture\":{Json(fixture)}",
-            StringComparison.Ordinal);
-
-        var exception = Should.Throw<FormatException>(() => Load(json));
-
-        exception.Message.ShouldContain("fixture");
-        exception.Message.ShouldContain("@light");
-    }
-
-    [Fact]
-    public void ExactWaiverDoesNotCrossThemeExecutionIdentity()
-    {
-        var waiver = Load(ValidJson()).ShouldHaveSingleItem();
-        var darkFinding = Finding() with { Fixture = "switch/hero@dark" };
-
-        var verdict = WaiverMatcher.Match(
-            [darkFinding],
-            [waiver],
-            ReviewDate);
-
-        verdict.Applied.ShouldBeEmpty();
-        verdict.BlockingFindings.ShouldBe([darkFinding]);
-        verdict.Diagnostics.ShouldHaveSingleItem().Kind.ShouldBe(WaiverDiagnosticKind.Unused);
-    }
 
     private static StubIssueValidator ValidIssueValidator()
         => new(new WaiverIssuePolicyValidation(

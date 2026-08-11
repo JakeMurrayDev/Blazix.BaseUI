@@ -60,9 +60,11 @@ public static partial class WaiverFile
 
         JsonDocument document;
 
+        var json = File.ReadAllText(path);
+
         try
         {
-            document = JsonDocument.Parse(File.ReadAllText(path));
+            document = JsonDocument.Parse(json);
         }
         catch (JsonException exception)
         {
@@ -501,7 +503,7 @@ public static partial class WaiverFile
         RegexOptions.CultureInvariant)]
     private static partial Regex IssueLinkRegex();
 
-    [GeneratedRegex(@"^(error|warning):\s+\S.*\S$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(error|warning):\s+\S(.*\S)?$", RegexOptions.CultureInvariant)]
     private static partial Regex ConsolePrefixRegex();
 
     private sealed record MatchIdentity(

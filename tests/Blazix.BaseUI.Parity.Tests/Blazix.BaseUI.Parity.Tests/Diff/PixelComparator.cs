@@ -26,6 +26,9 @@ namespace Blazix.BaseUI.Parity.Tests.Diff;
 /// <param name="directory">Where the screenshots live and the diff overlays are written.</param>
 public sealed class PixelComparator(string directory) : IComparator
 {
+    /// <summary>Thirty percent of 255: the reference is a backdrop, not the subject.</summary>
+    private const byte ReferenceAlpha = 77;
+
     /// <summary>
     /// How far one channel may move before the pixel counts as different.
     /// </summary>
@@ -38,9 +41,6 @@ public sealed class PixelComparator(string directory) : IComparator
     private static readonly int ChannelTolerance = checked((int)ComparatorContract.Value(
         FindingKind.Pixel,
         ComparatorContract.ChannelTolerance));
-
-    /// <summary>Thirty percent of 255: the reference is a backdrop, not the subject.</summary>
-    private const byte ReferenceAlpha = 77;
 
     private static readonly SKColor MismatchColour = new(255, 0, 0, 255);
 

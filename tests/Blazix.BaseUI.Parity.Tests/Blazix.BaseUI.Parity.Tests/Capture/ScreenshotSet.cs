@@ -31,13 +31,6 @@ namespace Blazix.BaseUI.Parity.Tests.Capture;
 public static class ScreenshotSet
 {
     /// <summary>
-    /// The fractions of its duration an animation step is seeked to. The endpoints are
-    /// included because a difference in the start or rest pose is as real as one in the
-    /// middle, and cheaper to read.
-    /// </summary>
-    public static readonly IReadOnlyList<double> Fractions = [0, 0.25, 0.5, 0.75, 1];
-
-    /// <summary>
     /// What a fixture id's slash becomes in a file name.
     /// </summary>
     /// <remarks>
@@ -56,6 +49,13 @@ public static class ScreenshotSet
     private const float ScreenshotTimeoutMs = 5_000;
 
     private const string Api = "window[Symbol.for('Blazix.Parity.Capture')]";
+
+    /// <summary>
+    /// The fractions of its duration an animation step is seeked to. The endpoints are
+    /// included because a difference in the start or rest pose is as real as one in the
+    /// middle, and cheaper to read.
+    /// </summary>
+    public static readonly IReadOnlyList<double> Fractions = [0, 0.25, 0.5, 0.75, 1];
 
     /// <summary>
     /// Renders a fixture id as one file-name segment.
@@ -77,6 +77,7 @@ public static class ScreenshotSet
     /// Names one screenshot.
     /// </summary>
     /// <param name="fixtureId">The fixture id.</param>
+    /// <param name="theme">The emulated theme.</param>
     /// <param name="leg">The leg the screenshot was taken on.</param>
     /// <param name="step">The manifest step name.</param>
     /// <param name="shot">The shot id, for example <c>00</c> or <c>frame025.01</c>.</param>
@@ -100,6 +101,7 @@ public static class ScreenshotSet
     /// </remarks>
     /// <param name="name">The file name.</param>
     /// <param name="fixtureId">The fixture id the name should belong to.</param>
+    /// <param name="theme">The emulated theme the name should belong to.</param>
     /// <param name="leg">The leg the name should belong to.</param>
     /// <param name="step">The step the name should belong to.</param>
     /// <returns>The shot id.</returns>

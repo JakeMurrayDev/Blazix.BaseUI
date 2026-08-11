@@ -59,7 +59,7 @@ public sealed partial class Task16NavigationMenuHeroFixtureContractTests
 
         JsonSerializer.Serialize(fixture).ShouldBe(JsonSerializer.Serialize(published));
         FixtureRegistry.Ids.ShouldContain(fixture.Id);
-        FixtureRegistry.Resolve(fixture.Component, fixture.Demo)?.FullName.ShouldBe(
+        FixtureRegistry.Resolve(fixture.Component, fixture.Demo).ShouldNotBeNull().FullName.ShouldBe(
             "Blazix.BaseUI.Parity.Tests.Client.Fixtures.NavigationMenu.Hero");
 
         fixture.Id.ShouldBe("navigation-menu/hero");

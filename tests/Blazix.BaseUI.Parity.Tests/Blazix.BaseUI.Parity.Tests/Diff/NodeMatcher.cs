@@ -224,6 +224,30 @@ public static class NodeMatcher
     }
 
     /// <summary>
+    /// Spells the parts of the pairing key out for a reader, so a report can say which part
+    /// of the identity the two legs disagreed on.
+    /// </summary>
+    /// <param name="node">The node to describe.</param>
+    /// <returns>The tag, and the role and accessible name when the node carries them.</returns>
+    public static string Identity(DomNode node)
+    {
+        var parts = new List<string> { $"<{node.Tag}>" };
+
+        if (node.Attributes.TryGetValue("role", out var role) && role.Length > 0)
+        {
+            parts.Add($"role '{role}'");
+        }
+
+        var name = node.Attributes.TryGetValue("aria-label", out var label) ? label : node.Text;
+        if (name.Length > 0)
+        {
+            parts.Add($"named '{name}'");
+        }
+
+        return string.Join(' ', parts);
+    }
+
+    /// <summary>
     /// Unwraps a snapshot into the roots it holds. The wrapper is synthetic and has no
     /// element behind it, so it is never itself paired or reported.
     /// </summary>
@@ -673,30 +697,6 @@ public static class NodeMatcher
         var name = node.Attributes.TryGetValue("aria-label", out var label) ? label : node.Text;
 
         return string.Join(KeySeparator, node.Tag, role, name);
-    }
-
-    /// <summary>
-    /// Spells the parts of the pairing key out for a reader, so a report can say which part
-    /// of the identity the two legs disagreed on.
-    /// </summary>
-    /// <param name="node">The node to describe.</param>
-    /// <returns>The tag, and the role and accessible name when the node carries them.</returns>
-    public static string Identity(DomNode node)
-    {
-        var parts = new List<string> { $"<{node.Tag}>" };
-
-        if (node.Attributes.TryGetValue("role", out var role) && role.Length > 0)
-        {
-            parts.Add($"role '{role}'");
-        }
-
-        var name = node.Attributes.TryGetValue("aria-label", out var label) ? label : node.Text;
-        if (name.Length > 0)
-        {
-            parts.Add($"named '{name}'");
-        }
-
-        return string.Join(' ', parts);
     }
 
     /// <summary>

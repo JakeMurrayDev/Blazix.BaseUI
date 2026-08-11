@@ -10,6 +10,7 @@ using Shouldly;
 namespace Blazix.BaseUI.Parity.Tests.Tests.HarnessTests;
 
 /// <summary>Pins baseline authority, provenance, platform, and atomic storage policy.</summary>
+[Collection(ParityTimingCollection.Name)]
 public sealed class BaselineStoreTests : IDisposable
 {
     private const string Pin = "bdcb685fadcca9d18b18f013c052795a53b6aa33";

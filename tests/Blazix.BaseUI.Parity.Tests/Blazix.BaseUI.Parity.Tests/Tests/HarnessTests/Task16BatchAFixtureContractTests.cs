@@ -29,7 +29,8 @@ public sealed partial class Task16BatchAFixtureContractTests
         foreach (var fixture in Fixtures)
         {
             FixtureRegistry.Ids.ShouldContain(fixture.Id);
-            FixtureRegistry.Resolve(fixture.Id.Split('/')[0], fixture.Id.Split('/')[1])?.FullName
+            FixtureRegistry.Resolve(fixture.Id.Split('/')[0], fixture.Id.Split('/')[1])
+                .ShouldNotBeNull($"No registered Blazor port for {fixture.Id}").FullName
                 .ShouldBe(
                     $"Blazix.BaseUI.Parity.Tests.Client.Fixtures.{fixture.Blazor.Replace('/', '.')}");
         }

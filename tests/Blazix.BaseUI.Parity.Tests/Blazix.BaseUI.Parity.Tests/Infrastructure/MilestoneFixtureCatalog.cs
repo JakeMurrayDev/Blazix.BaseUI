@@ -110,12 +110,6 @@ public static class MilestoneFixtureCatalog
             Ids.Where(id => !registrySet.Contains(id)).ToArray());
     }
 
-    private static string ComponentOf(string fixtureId)
-        => fixtureId[..fixtureId.IndexOf('/')];
-
-    private static string Describe(IReadOnlyCollection<string> ids)
-        => ids.Count == 0 ? "none" : string.Join(", ", ids.Select(id => $"'{id}'"));
-
     internal static bool IsFixtureId(string? id)
     {
         if (string.IsNullOrWhiteSpace(id) || id.Count(character => character == '/') != 1)
@@ -131,6 +125,12 @@ public static class MilestoneFixtureCatalog
             segment.All(character =>
                 character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'));
     }
+
+    private static string ComponentOf(string fixtureId)
+        => fixtureId[..fixtureId.IndexOf('/')];
+
+    private static string Describe(IReadOnlyCollection<string> ids)
+        => ids.Count == 0 ? "none" : string.Join(", ", ids.Select(id => $"'{id}'"));
 
     private static MilestoneCatalogDocument LoadCurrent()
     {

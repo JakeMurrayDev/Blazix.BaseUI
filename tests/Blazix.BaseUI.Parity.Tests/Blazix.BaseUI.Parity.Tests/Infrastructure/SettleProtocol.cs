@@ -8,26 +8,18 @@ namespace Blazix.BaseUI.Parity.Tests.Infrastructure;
 public static class SettleProtocol
 {
     /// <summary>
-    /// Waits for interactivity, font loading, and two consecutive mutation-free frames
-    /// during which no Blazix portal is still being mounted.
+    /// Races <c>document.fonts.ready</c> against a self-armed timer so a promise that
+    /// never settles rejects with a diagnostic rather than hanging until an outer timeout.
     /// </summary>
-    /// <param name="page">The page to wait on.</param>
-    /// <param name="timeoutMs">The overall timeout in milliseconds.</param>
-    /// <returns>A task that completes once the page is settled.</returns>
-    public static async Task WaitAsync(IPage page, int timeoutMs = 30_000)
-    {
-        // data-interactive is only ever "true": both fixture routes use prerender: false,
-        // so the component's first render is already the interactive one. Wait for the
-        // root's presence, never for a false -> true transition, which cannot occur.
-        await page.WaitForFunctionAsync(
-            "() => window[Symbol.for('Blazix.Parity.Capture')]?.settled() === true",
-            null,
-            new PageWaitForFunctionOptions { Timeout = timeoutMs });
-
-        await page.EvaluateAsync("() => document.fonts.ready");
-
-        await page.EvaluateAsync(QuiesceScript, timeoutMs);
-    }
+    private const string FontsScript = """
+        (timeoutMs) => new Promise((resolve, reject) => {
+          const deadline = setTimeout(() => reject(new Error(
+            `Timed out after ${timeoutMs}ms waiting for document.fonts.ready.`)), timeoutMs);
+          document.fonts.ready.then(
+            () => { clearTimeout(deadline); resolve(); },
+            (error) => { clearTimeout(deadline); reject(error); });
+        })
+        """;
 
     /// <summary>
     /// Waits for two consecutive mutation-free frames during which no Blazix portal is
@@ -92,4 +84,29 @@ public static class SettleProtocol
           frame = requestAnimationFrame(tick);
         })
         """;
+
+    /// <summary>
+    /// Waits for interactivity, font loading, and two consecutive mutation-free frames
+    /// during which no Blazix portal is still being mounted.
+    /// </summary>
+    /// <param name="page">The page to wait on.</param>
+    /// <param name="timeoutMs">The overall timeout in milliseconds.</param>
+    /// <returns>A task that completes once the page is settled.</returns>
+    public static async Task WaitAsync(IPage page, int timeoutMs = 30_000)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        static int Remaining(long deadline) => (int)Math.Max(1, deadline - Environment.TickCount64);
+
+        // data-interactive is only ever "true": both fixture routes use prerender: false,
+        // so the component's first render is already the interactive one. Wait for the
+        // root's presence, never for a false -> true transition, which cannot occur.
+        await page.WaitForFunctionAsync(
+            "() => window[Symbol.for('Blazix.Parity.Capture')]?.settled() === true",
+            null,
+            new PageWaitForFunctionOptions { Timeout = Remaining(deadline) });
+
+        await page.EvaluateAsync(FontsScript, Remaining(deadline));
+
+        await page.EvaluateAsync(QuiesceScript, Remaining(deadline));
+    }
 }

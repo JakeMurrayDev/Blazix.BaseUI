@@ -445,25 +445,7 @@ public static class HtmlReportWriter
         => value.ValueKind is not JsonValueKind.Object and not JsonValueKind.Array;
 
     private static bool IsSafeRelativeAssetPath(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)
-            || value.StartsWith("/", StringComparison.Ordinal)
-            || value.StartsWith("//", StringComparison.Ordinal)
-            || value.Contains("\\", StringComparison.Ordinal)
-            || value.Contains(":", StringComparison.Ordinal)
-            || value.Any(char.IsControl))
-        {
-            return false;
-        }
-
-        var segments = value.Split('/');
-        return segments.All(segment =>
-            segment.Length > 0
-            && segment is not "." and not ".."
-            && segment.All(character =>
-                char.IsAsciiLetterOrDigit(character)
-                || character is '.' or '_' or '-'));
-    }
+        => ReportOutputSafety.IsSafeRelativeArtifactPath(value);
 
     private static bool IsMachinePathField(string name)
         => name.Equals("sourcePath", StringComparison.OrdinalIgnoreCase)

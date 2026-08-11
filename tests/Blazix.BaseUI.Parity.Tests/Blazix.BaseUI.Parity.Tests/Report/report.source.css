@@ -295,7 +295,7 @@ pre {
   overflow: auto;
   padding: 0.75rem;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .three-up {
@@ -354,6 +354,21 @@ footer {
 @media print {
   :root {
     color-scheme: light;
+    --background: #f6f7f9;
+    --surface: #ffffff;
+    --surface-muted: #eef1f5;
+    --border: #c9d0da;
+    --text: #17202a;
+    --text-muted: #52606d;
+    --accent: #155eef;
+    --pass: #067647;
+    --pass-background: #ecfdf3;
+    --warn: #93370d;
+    --warn-background: #fffaeb;
+    --fail: #b42318;
+    --fail-background: #fef3f2;
+    --code-background: #182230;
+    --code-text: #f2f4f7;
   }
 
   body {

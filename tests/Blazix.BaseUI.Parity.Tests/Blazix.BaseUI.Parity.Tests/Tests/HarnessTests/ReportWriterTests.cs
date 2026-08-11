@@ -1201,7 +1201,7 @@ public sealed class ReportWriterTests
     }
 
     [Fact]
-    public void ReportStylesheetUsesThePinnedTailwindOfflineGenerationContract()
+    public async Task ReportStylesheetUsesThePinnedTailwindOfflineGenerationContract()
     {
         var harness = ParityPaths.HarnessRoot;
         var packageJson = File.ReadAllText(Path.Combine(harness, "react-fixtures", "package.json"));
@@ -1233,9 +1233,11 @@ public sealed class ReportWriterTests
         };
         start.ArgumentList.Add("parity:report-css:check");
         using var process = Process.Start(start).ShouldNotBeNull();
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = await outputTask;
+        var error = await errorTask;
         process.ExitCode.ShouldBe(0, output + error);
     }
 

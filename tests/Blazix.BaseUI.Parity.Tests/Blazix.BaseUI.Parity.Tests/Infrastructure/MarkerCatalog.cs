@@ -21,7 +21,9 @@ public static class MarkerCatalog
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        PropertyNameCaseInsensitive = true
+        AllowDuplicateProperties = false,
+        PropertyNameCaseInsensitive = false,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
     /// <summary>
@@ -35,7 +37,9 @@ public static class MarkerCatalog
     {
         var path = Path.Combine(ParityPaths.Manifest, "markers.json");
         var json = File.ReadAllText(path);
-        return JsonSerializer.Deserialize<MarkerManifest>(json, SerializerOptions)!.BlazorOnly;
+        var manifest = JsonSerializer.Deserialize<MarkerManifest>(json, SerializerOptions)
+            ?? throw new FormatException($"'{path}' must contain a marker manifest object.");
+        return manifest.BlazorOnly;
     }
 
     private sealed record MarkerManifest

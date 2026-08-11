@@ -1250,6 +1250,17 @@ public sealed class ParityRunner
             if (matches.Length == 1)
             {
                 var detail = matches[0];
+                if (action.ActionIndex < 0 || action.ActionIndex >= expectedStep.Do.Count)
+                {
+                    AddActionError(
+                        errors,
+                        fixture,
+                        leg,
+                        expectedStep.Name,
+                        $"completion detail references unknown row {action.ActionIndex}");
+                    continue;
+                }
+
                 var manifestAction = expectedStep.Do[action.ActionIndex];
                 var matchesManifestPredicate = manifestAction.Complete is { Count: > 0 } predicates &&
                     predicates.Any(predicate =>

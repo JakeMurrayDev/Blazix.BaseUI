@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -51,6 +52,9 @@ internal static class ReactBundleProvenance
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow
     };
 
+    private static readonly ConcurrentDictionary<string, string> FingerprintCache =
+        new(StringComparer.Ordinal);
+
     internal static void Validate(
         string directory,
         FixtureEntry fixture,
@@ -82,6 +86,9 @@ internal static class ReactBundleProvenance
     }
 
     internal static string Fingerprint(string directory)
+        => FingerprintCache.GetOrAdd(Path.GetFullPath(directory), ComputeFingerprint);
+
+    private static string ComputeFingerprint(string directory)
     {
         var entries = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
             .Select(path => new
