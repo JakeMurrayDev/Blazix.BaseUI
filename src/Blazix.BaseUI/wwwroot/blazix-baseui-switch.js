@@ -4,6 +4,7 @@ function getEventModifiers(event) {
     return {
         bubbles: true,
         cancelable: true,
+        composed: true,
         shiftKey: event?.shiftKey ?? false,
         ctrlKey: event?.ctrlKey ?? false,
         altKey: event?.altKey ?? false,
@@ -147,7 +148,6 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
         state.clickHandler = (event) => {
             if (state.disabled) {
                 event.preventDefault();
-                event.stopPropagation();
                 return;
             }
 
@@ -169,6 +169,12 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
     state.keydownHandler = (event) => {
         if (state.disabled) {
             event.preventDefault();
+            return;
+        }
+
+        // Upstream `useButton` only activates when the key originated on the element
+        // itself, and treats an already-prevented default as a cancelled activation.
+        if (event.target !== element || event.defaultPrevented) {
             return;
         }
 
@@ -200,6 +206,12 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
             return;
         }
 
+        // Upstream `useButton` only activates when the key originated on the element
+        // itself, and treats an already-prevented default as a cancelled activation.
+        if (event.target !== element || event.defaultPrevented) {
+            return;
+        }
+
         if (state.readOnly) {
             if (event.key === ' ') {
                 event.preventDefault();
@@ -222,7 +234,6 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
 
         if (state.disabled) {
             event.preventDefault();
-            event.stopPropagation();
             return;
         }
 
