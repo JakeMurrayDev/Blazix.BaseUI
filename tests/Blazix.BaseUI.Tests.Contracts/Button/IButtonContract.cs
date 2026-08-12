@@ -18,9 +18,11 @@ public interface IButtonContract
     Task NativeButton_DoesNotHaveRoleButton();
     Task NativeButton_DoesNotHaveDisabledWhenNotDisabled();
     Task NativeButton_DisabledDoesNotHaveTabIndex();
+    Task NativeButton_ConsumerTypeAttributeWins();
 
     // Non-native button attributes
     Task NonNativeButton_HasRoleButton();
+    Task NonNativeButton_ConsumerRoleAttributeWins();
     Task NonNativeButton_DoesNotHaveTypeButton();
     Task NonNativeButton_HasAriaDisabledTrueWhenDisabled();
     Task NonNativeButton_HasTabIndexMinusOneWhenDisabled();
@@ -36,6 +38,7 @@ public interface IButtonContract
     Task NativeFocusableWhenDisabled_HasAriaDisabledTrue();
     Task NativeFocusableWhenDisabled_HasTabIndex();
     Task NativeFocusableWhenDisabled_HasDataDisabled();
+    Task NativeFocusableWhenDisabled_HasAriaDisabledFalseWhenNotDisabled();
 
     // FocusableWhenDisabled - non-native
     Task NonNativeFocusableWhenDisabled_HasAriaDisabledTrue();

@@ -150,6 +150,16 @@ public class ButtonTests : BunitContext, IButtonContract
     }
 
     [Fact]
+    public Task NativeButton_ConsumerTypeAttributeWins()
+    {
+        var cut = Render(CreateButton(
+            additionalAttributes: new Dictionary<string, object> { ["type"] = "submit" }));
+        var button = cut.Find("button");
+        button.GetAttribute("type").ShouldBe("submit");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task NativeButton_HasDisabledAttributeWhenDisabled()
     {
         var cut = Render(CreateButton(disabled: true));
@@ -202,6 +212,17 @@ public class ButtonTests : BunitContext, IButtonContract
         var cut = Render(CreateButton(nativeButton: false));
         var element = cut.Find("[role='button']");
         element.ShouldNotBeNull();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NonNativeButton_ConsumerRoleAttributeWins()
+    {
+        var cut = Render(CreateButton(
+            nativeButton: false,
+            additionalAttributes: new Dictionary<string, object> { ["role"] = "link" }));
+        var element = cut.Find("button");
+        element.GetAttribute("role").ShouldBe("link");
         return Task.CompletedTask;
     }
 
@@ -305,6 +326,15 @@ public class ButtonTests : BunitContext, IButtonContract
         var cut = Render(CreateButton(disabled: true, focusableWhenDisabled: true));
         var button = cut.Find("button");
         button.HasAttribute("data-disabled").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task NativeFocusableWhenDisabled_HasAriaDisabledFalseWhenNotDisabled()
+    {
+        var cut = Render(CreateButton(focusableWhenDisabled: true));
+        var button = cut.Find("button");
+        button.GetAttribute("aria-disabled").ShouldBe("false");
         return Task.CompletedTask;
     }
 

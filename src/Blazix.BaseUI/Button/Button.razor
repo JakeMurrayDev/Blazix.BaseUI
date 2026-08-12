@@ -205,15 +205,54 @@
         if (NativeButton)
         {
             AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled, FocusableWhenDisabled, TabIndex);
+
+            // useFocusableWhenDisabled.ts:38-43 emits aria-disabled for every native button that is
+            // focusable when disabled, so the not-disabled case renders aria-disabled="false".
+            // The shared helper only covers the disabled branch.
+            if (FocusableWhenDisabled)
+            {
+                attrs["aria-disabled"] = Disabled ? "true" : "false";
+            }
         }
         else
         {
             AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled, FocusableWhenDisabled, TabIndex);
         }
 
+        // useButton.ts:226-229 merges `{ type: 'button' }` / `{ role: 'button' }` *before*
+        // `otherExternalProps`, so a consumer-supplied value wins. RenderElement merges
+        // ComponentAttributes last, so drop the default here to let the consumer's through.
+        if (HasConsumerAttribute("type"))
+        {
+            attrs.Remove("type");
+        }
+
+        if (HasConsumerAttribute("role"))
+        {
+            attrs.Remove("role");
+        }
+
         attrs["data-disabled"] = Disabled;
 
         componentAttributes = attrs;
+    }
+
+    private bool HasConsumerAttribute(string name)
+    {
+        if (AdditionalAttributes is null)
+        {
+            return false;
+        }
+
+        foreach (var key in AdditionalAttributes.Keys)
+        {
+            if (string.Equals(key, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task SyncJsAsync(bool dispose)

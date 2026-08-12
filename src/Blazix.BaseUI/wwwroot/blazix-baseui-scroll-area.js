@@ -138,7 +138,11 @@ export function registerViewport(rootId, viewportElement, direction) {
     const handleScroll = () => {
         computeThumbPosition(root);
 
-        if (!root.programmaticScroll) {
+        // WebKit consumes a touch that catches an in-flight momentum scroll or rubber-band
+        // bounce without dispatching any DOM events for the whole gesture (not even
+        // `touchstart`), so scrolls cannot be attributed to the user through events. Treat
+        // every scroll in touch modality as user-driven instead.
+        if (root.touchModality || !root.programmaticScroll) {
             handleScrollPosition(root, {
                 x: viewportElement.scrollLeft,
                 y: viewportElement.scrollTop
@@ -153,7 +157,6 @@ export function registerViewport(rootId, viewportElement, direction) {
 
     viewportElement.addEventListener('scroll', handleScroll, { passive: true });
     viewportElement.addEventListener('wheel', handleUserInteraction, { passive: true });
-    viewportElement.addEventListener('touchmove', handleUserInteraction, { passive: true });
     viewportElement.addEventListener('pointermove', handleUserInteraction, { passive: true });
     viewportElement.addEventListener('pointerenter', handleUserInteraction, { passive: true });
     viewportElement.addEventListener('keydown', handleUserInteraction);
@@ -198,7 +201,6 @@ export function registerViewport(rootId, viewportElement, direction) {
     root.viewportCleanup = () => {
         viewportElement.removeEventListener('scroll', handleScroll);
         viewportElement.removeEventListener('wheel', handleUserInteraction);
-        viewportElement.removeEventListener('touchmove', handleUserInteraction);
         viewportElement.removeEventListener('pointermove', handleUserInteraction);
         viewportElement.removeEventListener('pointerenter', handleUserInteraction);
         viewportElement.removeEventListener('keydown', handleUserInteraction);
@@ -694,9 +696,16 @@ function computeThumbPosition(root) {
     if (scrollbarYEl && thumbYEl) {
         const maxThumbOffsetY =
             scrollbarYEl.offsetHeight - clampedNextHeight - scrollbarYOffset - thumbYOffset;
-        const scrollRangeY = scrollableContentHeight - viewportHeight;
-        const scrollRatioY = scrollRangeY === 0 ? 0 : scrollTop / scrollRangeY;
-        const thumbOffsetY = Math.min(maxThumbOffsetY, Math.max(0, scrollRatioY * maxThumbOffsetY));
+
+        const thumbOffsetY = applyOverscrollThumb(
+            thumbYEl,
+            '--scroll-area-thumb-height',
+            scrollTop,
+            maxScrollTop,
+            scrollableContentHeight,
+            clampedNextHeight,
+            maxThumbOffsetY
+        );
 
         thumbYEl.style.transform = `translate3d(0,${thumbOffsetY}px,0)`;
     }
@@ -704,13 +713,21 @@ function computeThumbPosition(root) {
     if (scrollbarXEl && thumbXEl) {
         const maxThumbOffsetX =
             scrollbarXEl.offsetWidth - clampedNextWidth - scrollbarXOffset - thumbXOffset;
-        const scrollRangeX = scrollableContentWidth - viewportWidth;
-        const scrollRatioX = scrollRangeX === 0 ? 0 : scrollLeft / scrollRangeX;
-        const thumbOffsetX = root.direction === 'rtl'
-            ? clamp(scrollRatioX * maxThumbOffsetX, -maxThumbOffsetX, 0)
-            : clamp(scrollRatioX * maxThumbOffsetX, 0, maxThumbOffsetX);
+        // RTL scrolls from 0 down to `-maxScrollLeft`; measure from the inline start edge so the
+        // overscroll math is direction-agnostic, then flip the resulting offset back below.
+        const scrollFromStart = root.direction === 'rtl' ? -scrollLeft : scrollLeft;
 
-        thumbXEl.style.transform = `translate3d(${thumbOffsetX}px,0,0)`;
+        const offsetX = applyOverscrollThumb(
+            thumbXEl,
+            '--scroll-area-thumb-width',
+            scrollFromStart,
+            maxScrollLeft,
+            scrollableContentWidth,
+            clampedNextWidth,
+            maxThumbOffsetX
+        );
+
+        thumbXEl.style.transform = `translate3d(${root.direction === 'rtl' ? -offsetX : offsetX}px,0,0)`;
     }
 
     const overflowMetricsPx = [
@@ -885,12 +902,15 @@ function handleScrollbarPointerDown(root, orientation, event) {
             event.clientY - trackRectY.top - thumbHeight / 2 - scrollbarYOffset + thumbYOffset / 2;
         const maxThumbOffsetY =
             root.scrollbarYElement.offsetHeight - thumbHeight - scrollbarYOffset - thumbYOffset;
+        // A short or heavily padded track can drive `maxThumbOffset` to zero or negative once the
+        // thumb hits its `MIN_THUMB_SIZE` floor. Dividing by it would yield a non-finite
+        // (`Infinity`/`NaN`) or inverted scroll position, so abort the gesture entirely.
         const scrollRatioY = getThumbScrollRatio(clickY, maxThumbOffsetY);
-
-        if (scrollRatioY != null) {
-            viewportEl.scrollTop = scrollRatioY * (viewportEl.scrollHeight - viewportEl.clientHeight);
-            handleScrollPosition(root, { x: viewportEl.scrollLeft, y: viewportEl.scrollTop });
+        if (scrollRatioY == null) {
+            return;
         }
+
+        viewportEl.scrollTop = scrollRatioY * (viewportEl.scrollHeight - viewportEl.clientHeight);
     }
 
     if (root.thumbXElement && root.scrollbarXElement && orientation === 'horizontal') {
@@ -903,25 +923,26 @@ function handleScrollbarPointerDown(root, orientation, event) {
         const maxThumbOffsetX =
             root.scrollbarXElement.offsetWidth - thumbWidth - scrollbarXOffset - thumbXOffset;
         const scrollRatioX = getThumbScrollRatio(clickX, maxThumbOffsetX);
-
-        if (scrollRatioX != null) {
-            const scrollRange = viewportEl.scrollWidth - viewportEl.clientWidth;
-
-            let newScrollLeft;
-            if (root.direction === 'rtl') {
-                newScrollLeft = (1 - scrollRatioX) * scrollRange;
-                if (viewportEl.scrollLeft <= 0) {
-                    newScrollLeft = -newScrollLeft;
-                }
-            } else {
-                newScrollLeft = scrollRatioX * scrollRange;
-            }
-
-            viewportEl.scrollLeft = newScrollLeft;
-            handleScrollPosition(root, { x: viewportEl.scrollLeft, y: viewportEl.scrollTop });
+        if (scrollRatioX == null) {
+            return;
         }
+
+        const scrollRange = viewportEl.scrollWidth - viewportEl.clientWidth;
+
+        let newScrollLeft;
+        if (root.direction === 'rtl') {
+            newScrollLeft = (1 - scrollRatioX) * scrollRange;
+            if (viewportEl.scrollLeft <= 0) {
+                newScrollLeft = -newScrollLeft;
+            }
+        } else {
+            newScrollLeft = scrollRatioX * scrollRange;
+        }
+
+        viewportEl.scrollLeft = newScrollLeft;
     }
 
+    handleScrollPosition(root, { x: viewportEl.scrollLeft, y: viewportEl.scrollTop });
     handlePointerDown(root, orientation, event);
 }
 
@@ -931,21 +952,28 @@ function handleScrollbarWheel(root, orientation, event) {
         return;
     }
 
-    event.preventDefault();
-
     const horizontal = orientation === 'horizontal';
     const scrollProperty = horizontal ? 'scrollLeft' : 'scrollTop';
     const delta = horizontal ? event.deltaX : event.deltaY;
+    if (delta === 0) {
+        return;
+    }
+
     const maxScroll = horizontal
         ? viewportEl.scrollWidth - viewportEl.clientWidth
         : viewportEl.scrollHeight - viewportEl.clientHeight;
+    // RTL horizontal scrolling uses a negative `scrollLeft` range, from 0 to `-maxScroll`.
     const minScroll = horizontal && root.direction === 'rtl' ? -maxScroll : 0;
     const maxScrollValue = horizontal && root.direction === 'rtl' ? 0 : maxScroll;
     const scrollValue = viewportEl[scrollProperty];
 
+    // At an edge (or with no overflow), let the wheel event chain to the
+    // parent/page instead of swallowing it via `preventDefault`.
     if ((scrollValue <= minScroll && delta < 0) || (scrollValue >= maxScrollValue && delta > 0)) {
         return;
     }
+
+    event.preventDefault();
 
     viewportEl[scrollProperty] = Math.min(
         maxScrollValue,
@@ -982,8 +1010,8 @@ function syncDomState(root) {
     applyRootStateAttributes(root.contentElement, root, root.scrollingX || root.scrollingY);
     applyScrollbarStateAttributes(root, 'vertical');
     applyScrollbarStateAttributes(root, 'horizontal');
-    applyThumbAttributes(root.thumbYElement, 'vertical');
-    applyThumbAttributes(root.thumbXElement, 'horizontal');
+    applyThumbAttributes(root.thumbYElement, 'vertical', root.scrollingY);
+    applyThumbAttributes(root.thumbXElement, 'horizontal', root.scrollingX);
     applyCssVars(root);
 }
 
@@ -1016,12 +1044,13 @@ function applyScrollbarStateAttributes(root, orientation) {
     );
 }
 
-function applyThumbAttributes(element, orientation) {
+function applyThumbAttributes(element, orientation, scrolling) {
     if (!element) {
         return;
     }
 
     element.setAttribute('data-orientation', orientation);
+    toggleAttribute(element, 'data-scrolling', scrolling);
     element.style.visibility = stateVisibility(element.style.visibility, true);
 }
 
@@ -1105,6 +1134,25 @@ function notifyDotNet(root) {
 function queueCompute(root) {
     queueMicrotask(() => computeThumbPosition(root));
     requestAnimationFrame(() => computeThumbPosition(root));
+}
+
+/**
+ * Sizes the thumb and returns its axis offset. On overscroll (Safari rubber-band only) it shrinks
+ * against the pinned edge, damped by `content / (content + overscroll)` to match native feedback;
+ * the size flows through the thumb-size variable so the resting `var(...)` still applies.
+ */
+function applyOverscrollThumb(thumbEl, sizeVar, scrollFromStart, maxScroll, content, size, maxThumbOffset) {
+    const clamped = clamp(scrollFromStart, 0, maxScroll);
+    const overscroll = scrollFromStart - clamped;
+    const nextSize = Math.max(MIN_THUMB_SIZE, (size * content) / (content + Math.abs(overscroll)));
+
+    // Passing an empty string removes the override, restoring the resting `var(...)` size.
+    thumbEl.style.setProperty(sizeVar, overscroll ? `${nextSize}px` : '');
+
+    // Slide proportionally; at the end edge push down by the shrink so the thumb stays pinned to
+    // it, while a start overscroll pins to offset 0.
+    const offset = maxScroll ? (clamped / maxScroll) * maxThumbOffset : 0;
+    return offset + (overscroll > 0 ? size - nextSize : 0);
 }
 
 function getHiddenState(viewport) {
