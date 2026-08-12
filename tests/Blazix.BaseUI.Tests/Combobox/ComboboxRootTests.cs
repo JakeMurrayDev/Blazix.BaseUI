@@ -26,7 +26,10 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         bool required = false,
         string? name = null,
         EventCallback<ComboboxValueChangeEventArgs<string>>? onValueChange = null,
-        EventCallback<ComboboxInputValueChangeEventArgs>? onInputValueChange = null)
+        EventCallback<ComboboxInputValueChangeEventArgs>? onInputValueChange = null,
+        bool? open = null,
+        EventCallback<ComboboxOpenChangeEventArgs>? onOpenChange = null,
+        EventCallback<bool>? openChanged = null)
     {
         return builder =>
         {
@@ -44,6 +47,9 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
             if (name is not null) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Name), name);
             if (onValueChange.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OnValueChange), onValueChange.Value);
             if (onInputValueChange.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OnInputValueChange), onInputValueChange.Value);
+            if (open.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Open), open.Value);
+            if (onOpenChange.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OnOpenChange), onOpenChange.Value);
+            if (openChanged.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OpenChanged), openChanged.Value);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.ChildContent), CreateDefaultChildren(multiple));
             builder.CloseComponent();
         };
@@ -84,7 +90,8 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
             builder.CloseComponent();
 
             builder.OpenComponent<ComboboxTrigger>(30);
-            builder.AddAttribute(31, nameof(ComboboxTrigger.ChildContent), (RenderFragment)(b => b.AddContent(0, "Toggle")));
+            builder.AddAttribute(31, "data-testid", "combobox-trigger");
+            builder.AddAttribute(32, nameof(ComboboxTrigger.ChildContent), (RenderFragment)(b => b.AddContent(0, "Toggle")));
             builder.CloseComponent();
 
             builder.OpenComponent<ComboboxPositioner>(40);
@@ -565,5 +572,45 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
 
         cut.Find("input[aria-hidden='true']").GetAttribute("value").ShouldBe("Apple");
         cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe("Apple");
+    }
+
+    [Fact]
+    public async Task CancelOpen_ShouldDiscardPendingOpenAwaitingOnOpenChange()
+    {
+        var gate = new TaskCompletionSource();
+        var openStates = new List<bool>();
+        var onOpenChange = EventCallback.Factory.Create<ComboboxOpenChangeEventArgs>(this, _ => gate.Task);
+        var openChanged = EventCallback.Factory.Create<bool>(this, value => openStates.Add(value));
+        var cut = Render(CreateCombobox(onOpenChange: onOpenChange, openChanged: openChanged));
+        var root = cut.FindComponent<ComboboxRoot<string>>().Instance;
+
+        var pendingOpen = cut.Find("[data-testid='combobox-trigger']").TriggerEventAsync("onmousedown", new MouseEventArgs { Button = 0 });
+        await cut.InvokeAsync(() => root.OnCancelOpen());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        openStates.ShouldBeEmpty();
+        cut.Find("input[role='combobox']").GetAttribute("aria-expanded").ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task CancelOpen_ShouldDiscardPendingOpenAwaitingOnOpenChangeWhenControlled()
+    {
+        var gate = new TaskCompletionSource();
+        var openStates = new List<bool>();
+        var onOpenChange = EventCallback.Factory.Create<ComboboxOpenChangeEventArgs>(this, _ => gate.Task);
+        var openChanged = EventCallback.Factory.Create<bool>(this, value => openStates.Add(value));
+        var cut = Render(CreateCombobox(open: false, onOpenChange: onOpenChange, openChanged: openChanged));
+        var root = cut.FindComponent<ComboboxRoot<string>>().Instance;
+
+        var pendingOpen = cut.Find("[data-testid='combobox-trigger']").TriggerEventAsync("onmousedown", new MouseEventArgs { Button = 0 });
+        await cut.InvokeAsync(() => root.OnCancelOpen());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        openStates.ShouldBeEmpty();
+        cut.Find("input[role='combobox']").GetAttribute("aria-expanded").ShouldBe("false");
     }
 }
