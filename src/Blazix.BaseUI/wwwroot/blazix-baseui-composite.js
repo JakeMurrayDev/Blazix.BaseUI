@@ -21,9 +21,17 @@ const DEFAULTS = {
     highlightOnHover: false
 };
 
+// A natively disabled element can never receive focus, so it must always be skipped,
+// even when it is not marked with the configured disabled selector. Only `aria-disabled`
+// items can be focusable-while-disabled.
+// Mirrors React isListIndexDisabled (floating-ui-react/utils/composite.ts).
+function isItemDisabled(item, options) {
+    return item.matches(options.disabledSelector) || item.matches(':disabled');
+}
+
 function getItems(element, options) {
     const allItems = Array.from(element.querySelectorAll(options.itemSelector));
-    return allItems.filter(item => !item.matches(options.disabledSelector));
+    return allItems.filter(item => !isItemDisabled(item, options));
 }
 
 function getAllItems(element, options) {
@@ -129,7 +137,7 @@ function handleKeyDown(event, element, options) {
 
 function handlePointerMove(event, element, options) {
     const item = event.target.closest(options.itemSelector);
-    if (!item || item.matches(options.disabledSelector)) return;
+    if (!item || isItemDisabled(item, options)) return;
     if (document.activeElement === item) return;
     focusItem(element, item, options);
 }

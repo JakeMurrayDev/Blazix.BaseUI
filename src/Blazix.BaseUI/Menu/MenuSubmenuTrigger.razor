@@ -379,7 +379,9 @@
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, element.Value, Delay, CloseDelay);
+            // guardStaleOpen: Chrome can drop the trigger's `mouseleave` during a fast pointer
+            // sweep, leaving a stale submenu open (base-ui #5152) - cancel from `mouseout` too.
+            await module.InvokeVoidAsync("initializeHoverInteraction", RootContext.RootId, element.Value, Delay, CloseDelay, null, true);
             hoverInitialized = true;
             hoverRootId = RootContext.RootId;
         }

@@ -6,6 +6,7 @@
 
 import { acquireScrollLock } from './blazix-baseui-scroll-lock.min.js';
 import {
+    contains,
     createHoverInteraction,
     checkForTransitionOrAnimation,
     getMaxTransitionDuration,
@@ -17,6 +18,9 @@ import {
 
 const PATIENT_CLICK_THRESHOLD = 500;
 const TYPEAHEAD_TIMEOUT = 500;
+// Tolerance around the trigger bounds so a fast click whose pointer drifts slightly during
+// press-release isn't mistaken for a drag-off-and-release cancellation (base-ui #5159).
+const BOUNDARY_OFFSET = 5;
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Menu.State');
 const MENUBAR_STATE_KEY = Symbol.for('Blazix.BaseUI.MenuBar.State');
 
@@ -165,24 +169,30 @@ function handleGlobalKeyDown(e) {
             case 'ArrowRight':
                 if ((isHorizontal && e.key === 'ArrowRight') || (!isHorizontal && e.key === 'ArrowDown')) {
                     e.preventDefault();
-                    newIndex = currentIndex < items.length - 1 ? currentIndex + 1 : (topmostRoot.loopFocus ? 0 : currentIndex);
+                    const nextEnabled = findEnabledIndex(items, currentIndex + 1, 1, topmostRoot.loopFocus);
+                    newIndex = nextEnabled >= 0 ? nextEnabled : currentIndex;
                 }
                 break;
             case 'ArrowUp':
             case 'ArrowLeft':
                 if ((isHorizontal && e.key === 'ArrowLeft') || (!isHorizontal && e.key === 'ArrowUp')) {
                     e.preventDefault();
-                    newIndex = currentIndex > 0 ? currentIndex - 1 : (topmostRoot.loopFocus ? items.length - 1 : currentIndex);
+                    const prevEnabled = findEnabledIndex(items, currentIndex - 1, -1, topmostRoot.loopFocus);
+                    newIndex = prevEnabled >= 0 ? prevEnabled : currentIndex;
                 }
                 break;
-            case 'Home':
+            case 'Home': {
                 e.preventDefault();
-                newIndex = 0;
+                const firstEnabled = findEnabledIndex(items, 0, 1, false);
+                newIndex = firstEnabled >= 0 ? firstEnabled : currentIndex;
                 break;
-            case 'End':
+            }
+            case 'End': {
                 e.preventDefault();
-                newIndex = items.length - 1;
+                const lastEnabled = findEnabledIndex(items, items.length - 1, -1, false);
+                newIndex = lastEnabled >= 0 ? lastEnabled : currentIndex;
                 break;
+            }
             case 'Enter':
             case ' ':
                 // Space during active typeahead: append to buffer, continue search
@@ -205,7 +215,7 @@ function handleGlobalKeyDown(e) {
 
                     for (let i = 0; i < items.length; i++) {
                         const idx = (spaceStartIndex + i) % items.length;
-                        if (!isMenuItemVisible(items[idx])) continue;
+                        if (!isMenuItemAvailable(items[idx])) continue;
                         const label = items[idx].getAttribute('data-label');
                         const text = (label ?? items[idx].textContent)?.trim().toLowerCase() || '';
                         if (text.startsWith(spaceSearchString)) {
@@ -247,7 +257,7 @@ function handleGlobalKeyDown(e) {
                     // Repeated-character cycling: if all items have different first two chars,
                     // typing the same letter repeatedly cycles through items starting with that letter
                     const allowCycling = items.every(item => {
-                        if (!isMenuItemVisible(item)) return true;
+                        if (!isMenuItemAvailable(item)) return true;
                         const text = (item.getAttribute('data-label') ?? item.textContent)?.trim().toLowerCase() || '';
                         return text.length < 2 || text[0] !== text[1];
                     });
@@ -263,7 +273,7 @@ function handleGlobalKeyDown(e) {
 
                     for (let i = 0; i < items.length; i++) {
                         const idx = (startIndex + i) % items.length;
-                        if (!isMenuItemVisible(items[idx])) continue;
+                        if (!isMenuItemAvailable(items[idx])) continue;
                         const label = items[idx].getAttribute('data-label');
                         const text = (label ?? items[idx].textContent)?.trim().toLowerCase() || '';
                         if (text.startsWith(searchString)) {
@@ -275,7 +285,7 @@ function handleGlobalKeyDown(e) {
                     // No match: clear buffer and end session
                     if (newIndex === currentIndex) {
                         const hasMatch = items.some(item => {
-                            if (!isMenuItemVisible(item)) return false;
+                            if (!isMenuItemAvailable(item)) return false;
                             const text = (item.getAttribute('data-label') ?? item.textContent)?.trim().toLowerCase() || '';
                             return text.startsWith(searchString);
                         });
@@ -421,6 +431,34 @@ function isMenuItemVisible(element) {
         return element.checkVisibility();
     }
     return styles.display !== 'none' && styles.display !== 'contents';
+}
+
+// A natively disabled element can never receive focus, so list navigation and typeahead
+// must always skip it, even though `aria-disabled` items stay focusable-while-disabled.
+// Mirrors React isListIndexDisabled / useTypeahead (#5185).
+function isNativelyDisabled(element) {
+    return element?.matches(':disabled') === true;
+}
+
+// Returns the first index at or after `startIndex` (walking by `step`) whose item is not
+// natively disabled, or -1 when every candidate is skipped.
+function findEnabledIndex(items, startIndex, step, loop) {
+    let index = startIndex;
+    for (let i = 0; i < items.length; i++) {
+        if (index < 0 || index >= items.length) {
+            if (!loop) return -1;
+            index = index < 0 ? items.length - 1 : 0;
+        }
+        if (!isNativelyDisabled(items[index])) return index;
+        index += step;
+    }
+    return -1;
+}
+
+// Typeahead availability: hidden items and natively disabled items are never matched.
+// Mirrors React useTypeahead isItemAvailable (#4195, #5185).
+function isMenuItemAvailable(element) {
+    return isMenuItemVisible(element) && !isNativelyDisabled(element);
 }
 
 function updateItemHighlight(items, index) {
@@ -599,7 +637,8 @@ export function initializeRoot(rootId, dotNetRef, closeParentOnEsc, loopFocus, m
         typingBuffer: '',
         typingTimer: null,
         allowMouseUpTrigger: false,
-        popupMouseUpHandler: null
+        popupMouseUpHandler: null,
+        slipOutCancelCleanup: null
     });
 }
 
@@ -691,6 +730,7 @@ export function disposeRoot(rootId) {
         if (rootState.hoverInteraction) {
             rootState.hoverInteraction.cleanup();
         }
+        rootState.slipOutCancelCleanup?.();
         // Clean up composite key suppression
         rootState.compositeKeyCleanup?.();
         // Clean up mouseup arm timeout
@@ -708,7 +748,88 @@ export function disposeRoot(rootId) {
 // Hover Interaction Support
 // ============================================================================
 
-export async function initializeHoverInteraction(rootId, triggerElement, openDelay, closeDelay, callbackDotNetRef) {
+// Mirrors React getPseudoElementBounds (utils/getPseudoElementBounds.ts).
+function getPseudoElementBounds(element) {
+    const rect = element.getBoundingClientRect();
+    const win = element.ownerDocument?.defaultView;
+    if (!win) {
+        return rect;
+    }
+
+    const before = win.getComputedStyle(element, '::before');
+    const after = win.getComputedStyle(element, '::after');
+    if (before.content === 'none' && after.content === 'none') {
+        return rect;
+    }
+
+    const width = Math.max(rect.width, parseFloat(before.width) || 0, parseFloat(after.width) || 0);
+    const height = Math.max(rect.height, parseFloat(before.height) || 0, parseFloat(after.height) || 0);
+    const deltaWidth = (width - rect.width) / 2;
+    const deltaHeight = (height - rect.height) / 2;
+
+    return {
+        left: rect.left - deltaWidth,
+        right: rect.right + deltaWidth,
+        top: rect.top - deltaHeight,
+        bottom: rect.bottom + deltaHeight
+    };
+}
+
+// Mirrors React isMouseWithinBounds (utils/getPseudoElementBounds.ts, #5159).
+function isMouseWithinBounds(event, element) {
+    const bounds = getPseudoElementBounds(element);
+    return (
+        event.clientX >= bounds.left - BOUNDARY_OFFSET &&
+        event.clientX <= bounds.right + BOUNDARY_OFFSET &&
+        event.clientY >= bounds.top - BOUNDARY_OFFSET &&
+        event.clientY <= bounds.bottom + BOUNDARY_OFFSET
+    );
+}
+
+// After a hover-open, a mouse press that is released outside the trigger (and outside the
+// menu) cancels the open, matching MenuTrigger's document `mouseup` handler in React.
+// Registered one-shot per hover-open, exactly like the React effect keyed on
+// `isOpenedByThisTrigger && lastOpenChangeReason === 'trigger-hover'`.
+function armHoverOpenSlipOutCancel(rootState, dotNetRef) {
+    // React registers this only on `Menu.Trigger`; `Menu.SubmenuTrigger` has no such handler.
+    if (rootState.isNested || rootState.parentType === 'menu') return;
+
+    const trigger = rootState.triggerElement;
+    if (!trigger) return;
+
+    rootState.slipOutCancelCleanup?.();
+
+    const doc = trigger.ownerDocument;
+    const handler = (mouseEvent) => {
+        rootState.slipOutCancelCleanup = null;
+
+        const currentTrigger = rootState.triggerElement;
+        if (!currentTrigger || !currentTrigger.isConnected) {
+            return;
+        }
+
+        const target = mouseEvent.target;
+        if (target === currentTrigger ||
+            contains(currentTrigger, target) ||
+            contains(rootState.positionerElement, target)) {
+            return;
+        }
+
+        if (isMouseWithinBounds(mouseEvent, currentTrigger)) {
+            return;
+        }
+
+        dotNetRef?.invokeMethodAsync('OnCancelOpen').catch(() => { });
+    };
+
+    doc.addEventListener('mouseup', handler, { once: true });
+    rootState.slipOutCancelCleanup = () => {
+        doc.removeEventListener('mouseup', handler);
+        rootState.slipOutCancelCleanup = null;
+    };
+}
+
+export async function initializeHoverInteraction(rootId, triggerElement, openDelay, closeDelay, callbackDotNetRef, guardStaleOpen) {
     let rootState = state.roots.get(rootId);
 
     // For handle-based triggers, create a lightweight state entry if root doesn't exist
@@ -762,6 +883,9 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
         mouseOnly: true,
         useSafePolygon: true,
         safePolygonOptions: { blockPointerEvents: true },
+        // Chrome can drop the submenu trigger's `mouseleave` during a fast pointer sweep,
+        // leaving a stale submenu open (base-ui #5152) — cancel from `mouseout` too.
+        guardStaleOpen: guardStaleOpen === true,
         onOpen: (reason) => {
             // Skip if we're within the ignore period (e.g., after keyboard close)
             if (rootState.ignoreHoverUntil && Date.now() < rootState.ignoreHoverUntil) {
@@ -772,6 +896,7 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
                 return;
             }
             if (dotNetRef && !rootState.isOpen) {
+                armHoverOpenSlipOutCancel(rootState, dotNetRef);
                 const openTask = dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
                 if (rootState.parentType === 'menubar') {
                     openTask.then(() => closeSiblingMenubarRoots(rootState));
@@ -854,6 +979,7 @@ export function disposeHoverInteraction(rootId) {
     if (rootState) {
         rootState.allowMouseEnterCleanup?.();
         rootState.allowMouseEnterCleanup = null;
+        rootState.slipOutCancelCleanup?.();
         if (rootState.hoverInteraction) {
             rootState.hoverInteraction.cleanup();
             rootState.hoverInteraction = null;
