@@ -22,8 +22,50 @@ if (!window[stateKey]) {
 
 const state = window[stateKey];
 
+const BOUNDARY_OFFSET = 5;
+
 function getRoot(rootId) {
   return state.roots.get(rootId);
+}
+
+function getPseudoElementBounds(element) {
+  const rect = element.getBoundingClientRect();
+  const win = element.ownerDocument.defaultView;
+  if (!win) {
+    return rect;
+  }
+
+  const before = win.getComputedStyle(element, '::before');
+  const after = win.getComputedStyle(element, '::after');
+  if (before.content === 'none' && after.content === 'none') {
+    return rect;
+  }
+
+  const width = Math.max(rect.width, parseFloat(before.width) || 0, parseFloat(after.width) || 0);
+  const height = Math.max(
+    rect.height,
+    parseFloat(before.height) || 0,
+    parseFloat(after.height) || 0,
+  );
+  const deltaWidth = (width - rect.width) / 2;
+  const deltaHeight = (height - rect.height) / 2;
+
+  return {
+    left: rect.left - deltaWidth,
+    right: rect.right + deltaWidth,
+    top: rect.top - deltaHeight,
+    bottom: rect.bottom + deltaHeight,
+  };
+}
+
+function isMouseWithinBounds(event, element) {
+  const bounds = getPseudoElementBounds(element);
+  return (
+    event.clientX >= bounds.left - BOUNDARY_OFFSET &&
+    event.clientX <= bounds.right + BOUNDARY_OFFSET &&
+    event.clientY >= bounds.top - BOUNDARY_OFFSET &&
+    event.clientY <= bounds.bottom + BOUNDARY_OFFSET
+  );
 }
 
 function createRootState(rootId, dotNetRef = null) {
@@ -46,7 +88,7 @@ function createRootState(rootId, dotNetRef = null) {
     listElement: null,
     popupElement: null,
     positionerElement: null,
-    inputInsidePopup: false,
+    inputInsidePopup: true,
     inputCleanup: null,
     triggerCleanup: null,
     clearCleanup: null,
@@ -368,6 +410,40 @@ function attachTriggerHandlers(root, element) {
     }
   };
 
+  // Pressing the trigger and releasing the pointer outside of it cancels the open.
+  const onMouseDown = (event) => {
+    if (event.button !== 0 || root.isOpen || !root.inputInsidePopup) {
+      return;
+    }
+
+    const doc = element.ownerDocument;
+    const handleMouseUp = (mouseEvent) => {
+      const trigger = root.triggerElement;
+      if (!trigger) {
+        return;
+      }
+
+      const target = getTarget(mouseEvent);
+      if (
+        contains(trigger, target) ||
+        contains(root.positionerElement, target) ||
+        contains(root.listElement, target)
+      ) {
+        return;
+      }
+
+      if (isMouseWithinBounds(mouseEvent, trigger)) {
+        return;
+      }
+
+      if (canInvokeRoot(root)) {
+        root.dotNetRef.invokeMethodAsync('OnCancelOpen').catch(() => {});
+      }
+    };
+
+    doc.addEventListener('mouseup', handleMouseUp, { once: true });
+  };
+
   const onKeyDown = (event) => {
     if (event.key === 'Tab' && root.isOpen) {
       requestFocusOutClose(root);
@@ -379,10 +455,12 @@ function attachTriggerHandlers(root, element) {
   };
 
   element.addEventListener('pointerdown', onPointerDown);
+  element.addEventListener('mousedown', onMouseDown);
   element.addEventListener('keydown', onKeyDown, true);
   element.addEventListener('focusout', onFocusOut);
   root.triggerCleanup = () => {
     element.removeEventListener('pointerdown', onPointerDown);
+    element.removeEventListener('mousedown', onMouseDown);
     element.removeEventListener('keydown', onKeyDown, true);
     element.removeEventListener('focusout', onFocusOut);
   };

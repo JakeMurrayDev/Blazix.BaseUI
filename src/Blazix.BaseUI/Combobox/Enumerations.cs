@@ -49,6 +49,7 @@ public enum ComboboxChangeReason
     InputChange,
     InputClear,
     ClearPress,
+    CancelOpen,
     None
 }
 

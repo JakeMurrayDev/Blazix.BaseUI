@@ -77,6 +77,7 @@
     private ComboboxRootActions? previousActionsRef;
     private ComboboxChangeReason openChangeReason = ComboboxChangeReason.None;
     private string? autoHighlightSignature;
+    private int openChangeVersion;
 
     private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
@@ -566,6 +567,19 @@
     }
 
     [JSInvokable]
+    public Task OnCancelOpen()
+    {
+        if (!CurrentOpen)
+        {
+            // Invalidate any open request still suspended in its OnOpenChange callback.
+            openChangeVersion++;
+            return Task.CompletedTask;
+        }
+
+        return SetOpenInternalAsync(false, ComboboxChangeReason.CancelOpen);
+    }
+
+    [JSInvokable]
     public void OnStartingStyleApplied()
     {
         if (!transition.HandleStartingStyleApplied())
@@ -741,9 +755,10 @@
             return;
         }
 
+        var version = ++openChangeVersion;
         var args = new ComboboxOpenChangeEventArgs(open, reason);
         await OnOpenChange.InvokeAsync(args);
-        if (args.IsCanceled)
+        if (args.IsCanceled || version != openChangeVersion)
         {
             return;
         }

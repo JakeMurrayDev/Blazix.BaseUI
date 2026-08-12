@@ -22,6 +22,7 @@ import {
 const BOUNDARY_OFFSET = 5;
 const ALIGN_ITEM_PLACEMENT_MAX_ATTEMPTS = 3600;
 const POINTER_COMPATIBILITY_WINDOW_MS = 750;
+const TYPEAHEAD_RESET_MS = 750;
 const orphanPositionerReadyElements = new WeakSet();
 
 // ─── Popup Placement Constants & Helpers ──────────────────────────────
@@ -439,6 +440,10 @@ function handleGlobalKeyDown(e) {
     } else if (e.key === 'Tab') {
         topmostRoot.dotNetRef.invokeMethodAsync('OnTabKey').catch(() => { });
     } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // React parity (`useTypeahead`): while open, printable keys are consumed by
+        // typeahead so they don't reach page-level shortcuts or find-as-you-type.
+        e.preventDefault();
+        e.stopPropagation();
         handleTypeahead(topmostRoot, items, e.key);
     }
 }
@@ -638,19 +643,43 @@ function findNextEnabledIndex(items, currentIndex, direction, loop) {
     return -1;
 }
 
+function getItemLabel(item) {
+    // Prefer an explicit author-provided label via data-blazix-base-ui-label;
+    // fall back to SelectItemText's rendered textContent. Mirrors React
+    // `useCompositeListItem({ label, textRef })` where `label` wins and textRef
+    // is used when no explicit label is supplied.
+    // React parity: no trim — explicit `data-blazix-base-ui-label` is consumed verbatim,
+    // and `textContent` is used as-is to mirror React's `useCompositeListItem({ textRef })`.
+    return item.getAttribute('data-blazix-base-ui-label') || item.textContent || '';
+}
+
 function handleTypeahead(rootState, items, char) {
     clearTimeout(rootState.typeaheadTimer);
+
+    // React parity (`useTypeahead`): only collapse a repeated first letter into a
+    // single-character query when no available label starts with a doubled letter
+    // (e.g. "Aaron", "Llama"), otherwise such labels could never be matched.
+    const allowRapidSuccessionOfFirstLetter = items.every((item, index) => {
+        if (isItemDisabled(items[index])) {
+            return true;
+        }
+        const text = getItemLabel(item);
+        return text ? text[0]?.toLowerCase() !== text[1]?.toLowerCase() : true;
+    });
+
+    if (allowRapidSuccessionOfFirstLetter &&
+        rootState.typeaheadBuffer === char.toLowerCase()) {
+        rootState.typeaheadBuffer = '';
+    }
+
     rootState.typeaheadBuffer += char.toLowerCase();
 
     rootState.typeaheadTimer = setTimeout(() => {
         rootState.typeaheadBuffer = '';
-    }, 500);
+    }, TYPEAHEAD_RESET_MS);
 
     const startIndex = rootState.activeIndex >= 0 ? rootState.activeIndex : -1;
-    const query = rootState.typeaheadBuffer.length > 1 &&
-        Array.from(rootState.typeaheadBuffer).every(value => value === rootState.typeaheadBuffer[0])
-        ? rootState.typeaheadBuffer[0]
-        : rootState.typeaheadBuffer;
+    const query = rootState.typeaheadBuffer;
 
     for (let offset = 1; offset <= items.length; offset++) {
         const index = (startIndex + offset) % items.length;
@@ -659,17 +688,17 @@ function handleTypeahead(rootState, items, char) {
             continue;
         }
 
-        // Prefer an explicit author-provided label via data-blazix-base-ui-label;
-        // fall back to SelectItemText's rendered textContent. Mirrors React
-        // `useCompositeListItem({ label, textRef })` where `label` wins and textRef
-        // is used when no explicit label is supplied.
-        // React parity: no trim — explicit `data-blazix-base-ui-label` is consumed verbatim,
-        // and `textContent` is used as-is to mirror React's `useCompositeListItem({ textRef })`.
-        const label = item.getAttribute('data-blazix-base-ui-label') || item.textContent || '';
+        const label = getItemLabel(item);
         if (label.toLowerCase().startsWith(query)) {
             setActiveItem(rootState, items, index);
             return;
         }
+    }
+
+    // React parity (`useTypeahead`): a failed match resets the query so the next
+    // keystroke starts a fresh search instead of inheriting the bad prefix.
+    if (char !== ' ') {
+        rootState.typeaheadBuffer = '';
     }
 }
 

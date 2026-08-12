@@ -11,6 +11,9 @@ namespace Blazix.BaseUI.Select;
 /// <typeparam name="TValue">The type of value used to identify items.</typeparam>
 internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposable
 {
+    /// <summary>Milliseconds before the typeahead query resets (React `useTypeahead` `resetMs`).</summary>
+    private const int TypeaheadResetMs = 750;
+
     #pragma warning disable CS8714 // TValue may be nullable but Dictionary requires notnull key
     private readonly Dictionary<TValue, string> itemLabels = new();
     #pragma warning restore CS8714
@@ -1076,7 +1079,7 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     {
         try
         {
-            await Task.Delay(500, token);
+            await Task.Delay(TypeaheadResetMs, token);
             if (ReferenceEquals(typeaheadCts, cts))
             {
                 typeaheadBuffer = string.Empty;

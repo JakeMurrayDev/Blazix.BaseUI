@@ -196,16 +196,19 @@
             ["aria-haspopup"] = RootContext?.InputInsidePopup == true ? "dialog" : "listbox"
         };
 
+        var inputInsidePopup = RootContext?.InputInsidePopup == true;
+        var tabIndex = inputInsidePopup ? 0 : -1;
+
         if (NativeButton)
         {
-            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, disabled, focusableWhenDisabled: false, tabIndex);
         }
         else
         {
-            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: false);
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: false, tabIndex);
         }
 
-        if (RootContext?.InputInsidePopup == true)
+        if (inputInsidePopup)
         {
             attrs["role"] = "combobox";
         }
@@ -214,16 +217,26 @@
             attrs["role"] = "button";
         }
         attrs["aria-expanded"] = open ? "true" : "false";
-        attrs["aria-haspopup"] = RootContext?.InputInsidePopup == true ? "dialog" : "listbox";
+        attrs["aria-haspopup"] = inputInsidePopup ? "dialog" : "listbox";
 
-        if (open && RootContext?.ListId is not null)
+        if (open && inputInsidePopup && RootContext is not null)
+        {
+            // Fall back to the default popup id while the popup registers its own so that
+            // `aria-controls` is present on the same render `open` becomes `true`.
+            attrs["aria-controls"] = RootContext.PopupId ?? $"{RootContext.RootId}-popup";
+        }
+        else if (open && RootContext?.ListId is not null)
         {
             attrs["aria-controls"] = RootContext.ListId;
         }
 
         if (RootContext?.Required == true)
         {
-            attrs["aria-required"] = "true";
+            if (inputInsidePopup)
+            {
+                attrs["aria-required"] = "true";
+            }
+
             attrs["data-required"] = true;
         }
 
