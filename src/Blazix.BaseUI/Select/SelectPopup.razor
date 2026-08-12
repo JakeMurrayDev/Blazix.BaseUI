@@ -378,6 +378,10 @@
         var attrs = new Dictionary<string, object>();
         var hasListChild = RootContext?.HasList ?? false;
 
+        // React parity: `FOCUSABLE_POPUP_PROPS` is merged into every popup regardless of
+        // whether the listbox semantics live on the popup or on `Select.List`.
+        attrs["tabindex"] = "-1";
+
         if (hasListChild)
         {
             // SelectList carries the listbox semantics; the popup becomes presentational.
@@ -390,7 +394,6 @@
                 attrs["id"] = popupId;
             }
             attrs["role"] = "listbox";
-            attrs["tabindex"] = "-1";
             if (RootContext?.Multiple == true)
             {
                 attrs["aria-multiselectable"] = "true";

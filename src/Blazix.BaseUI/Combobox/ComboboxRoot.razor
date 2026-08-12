@@ -566,6 +566,12 @@
     }
 
     [JSInvokable]
+    public Task OnCancelOpen()
+    {
+        return SetOpenInternalAsync(false, ComboboxChangeReason.CancelOpen);
+    }
+
+    [JSInvokable]
     public void OnStartingStyleApplied()
     {
         if (!transition.HandleStartingStyleApplied())
