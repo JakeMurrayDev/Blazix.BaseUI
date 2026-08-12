@@ -174,6 +174,7 @@ public class MenuRootTests : BunitContext, IMenuRootContract
         {
             receivedOpen.ShouldBeFalse();
             receivedReason.ShouldBe(MenuOpenChangeReason.CancelOpen);
+            cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
         });
     }
 
