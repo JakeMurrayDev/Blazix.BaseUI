@@ -151,6 +151,34 @@ public class MenuRootTests : BunitContext, IMenuRootContract
     }
 
     [Fact]
+    public async Task OnCancelOpenClosesTheMenuWithCancelOpenReason()
+    {
+        // base-ui #5159: releasing a press outside the trigger bounds (plus tolerance)
+        // after a hover-open cancels the open.
+        var receivedOpen = true;
+        var receivedReason = MenuOpenChangeReason.None;
+
+        var cut = Render(CreateMenuRoot(
+            defaultOpen: true,
+            onOpenChange: EventCallback.Factory.Create<MenuOpenChangeEventArgs>(this, args =>
+            {
+                receivedOpen = args.Open;
+                receivedReason = args.Reason;
+            })
+        ));
+
+        var root = cut.FindComponent<MenuRoot>();
+        await cut.InvokeAsync(() => root.Instance.OnCancelOpen());
+
+        cut.WaitForAssertion(() =>
+        {
+            receivedOpen.ShouldBeFalse();
+            receivedReason.ShouldBe(MenuOpenChangeReason.CancelOpen);
+            cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+        });
+    }
+
+    [Fact]
     public Task InvokesOnOpenChangeComplete()
     {
         // OnOpenChangeComplete is invoked after transitions complete.

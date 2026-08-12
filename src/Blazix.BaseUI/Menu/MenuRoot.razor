@@ -503,6 +503,29 @@
     }
 
     /// <summary>
+    /// Invoked from JavaScript when a press that opened the menu by hover is released outside
+    /// the trigger and the menu, cancelling the open.
+    /// </summary>
+    [JSInvokable]
+    public Task OnCancelOpen()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await Task.Yield();
+                await SetOpenAsync(false, MenuOpenChangeReason.CancelOpen);
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        });
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Invoked from JavaScript when hover ends to close the menu.
     /// </summary>
     [JSInvokable]

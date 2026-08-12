@@ -1806,6 +1806,11 @@ export function safePolygon(options = {}) {
  * @param {Function|null} options.shouldOpenImmediately - Whether to bypass the configured open delay
  * @param {string|null} options.treeId - Optional floating tree ID for child close coordination
  * @param {string|null} options.nodeId - Optional floating node ID for child close coordination
+ * @param {boolean} options.guardStaleOpen - Also cancel a pending hover-open from the trigger's
+ *   `mouseout`, backing up a `mouseleave` that Chrome can drop during a fast pointer sweep and
+ *   leave a submenu stuck open (base-ui #5152/#5153). Only enable on single-trigger, hover-driven
+ *   roots (e.g. Menu.SubmenuTrigger): it skips the checks `mouseleave` applies, so on a
+ *   multi-trigger or click-driven root it would cancel legitimate opens.
  * @returns {Object} Interaction controller with cleanup method
  */
 
@@ -1829,7 +1834,8 @@ export function createHoverInteraction(options) {
         isRelatedTargetInside = null,
         shouldOpenImmediately = null,
         treeId = null,
-        nodeId = null
+        nodeId = null,
+        guardStaleOpen = false
     } = options;
 
     let floatingElement = options.floatingElement;
@@ -1937,6 +1943,14 @@ export function createHoverInteraction(options) {
         }
     }
 
+    // Backup cancellation for Chrome's dropped `mouseleave` — see `guardStaleOpen`.
+    function handleMouseOut(event) {
+        if (contains(triggerElement, event.relatedTarget)) {
+            return; // moved within the trigger's own subtree
+        }
+        openTimeout.clear();
+    }
+
     function handleFloatingMouseEnter() {
         closeTimeout.clear();
         cleanupMouseMove();
@@ -2034,6 +2048,9 @@ export function createHoverInteraction(options) {
     triggerElement.addEventListener('mouseover', handleMouseOver);
     triggerElement.addEventListener('mouseleave', handleMouseLeave);
     triggerElement.addEventListener('pointerdown', handlePointerDown);
+    if (guardStaleOpen) {
+        triggerElement.addEventListener('mouseout', handleMouseOut);
+    }
 
     const interaction = {
         id: interactionId,
@@ -2091,6 +2108,9 @@ export function createHoverInteraction(options) {
             triggerElement.removeEventListener('mouseover', handleMouseOver);
             triggerElement.removeEventListener('mouseleave', handleMouseLeave);
             triggerElement.removeEventListener('pointerdown', handlePointerDown);
+            if (guardStaleOpen) {
+                triggerElement.removeEventListener('mouseout', handleMouseOut);
+            }
 
             if (floatingElement) {
                 floatingElement.removeEventListener('mouseenter', handleFloatingMouseEnter);

@@ -358,6 +358,21 @@
     }
 
     /// <summary>
+    /// Handles a cancelled hover-open from JavaScript interop for handle-based triggers, raised
+    /// when the press is released outside the trigger and the menu.
+    /// </summary>
+    [JSInvokable]
+    public Task OnCancelOpen()
+    {
+        if (HasHandle)
+        {
+            Handle!.RequestClose(MenuOpenChangeReason.CancelOpen);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Handles a hover close event from JavaScript interop for handle-based triggers.
     /// </summary>
     [JSInvokable]
