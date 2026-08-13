@@ -70,6 +70,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
+    private int openChangeVersion;
     private bool previousReadOnly;
     private bool previousDisabled;
     private Direction previousDirection;
@@ -714,12 +715,12 @@
     /// Invoked from JavaScript when trigger mouseup outside bounds cancels an opening select.
     /// </summary>
     [JSInvokable]
-    public async Task NotifyCancelOpen()
+    public Task NotifyCancelOpen()
     {
-        if (CurrentOpen)
-        {
-            await SetOpenAsync(false, SelectOpenChangeReason.CancelOpen);
-        }
+        // No CurrentOpen guard: an open still suspended in its OnOpenChange callback leaves
+        // CurrentOpen false, and short-circuiting here would skip the openChangeVersion bump in
+        // SetOpenAsync that invalidates it. SetOpenAsync early-returns on its own when redundant.
+        return SetOpenAsync(false, SelectOpenChangeReason.CancelOpen);
     }
 
     /// <summary>
@@ -820,6 +821,12 @@
     /// </summary>
     private async Task SetOpenAsync(bool nextOpen, SelectOpenChangeReason reason)
     {
+        // Capture a version before awaiting OnOpenChange. Any subsequent SetOpenAsync call
+        // (including a redundant one that early-returns below) bumps the counter, which
+        // invalidates a request still suspended in its OnOpenChange callback. This prevents a
+        // close arriving during an in-flight open from being dropped and the stale open committing.
+        var version = ++openChangeVersion;
+
         if (CurrentOpen == nextOpen)
         {
             return;
@@ -828,7 +835,7 @@
         var args = new SelectOpenChangeEventArgs(nextOpen, reason);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.IsCanceled)
+        if (args.IsCanceled || version != openChangeVersion)
         {
             return;
         }

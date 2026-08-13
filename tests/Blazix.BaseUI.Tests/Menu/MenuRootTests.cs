@@ -854,4 +854,58 @@ public class MenuRootTests : BunitContext, IMenuRootContract
         updateRootInvocation.Arguments[6].ShouldNotBe(initialMenubarElement);
         updateRootInvocation.Arguments[7].ShouldBe("menubar");
     }
+
+    [Fact]
+    public async Task HandleRequestCloseDuringPendingOpenKeepsMenuClosed()
+    {
+        var handle = new MenuHandle<string>();
+        var gate = new TaskCompletionSource();
+        var onOpenChange = EventCallback.Factory.Create<MenuOpenChangeEventArgs>(this, _ => gate.Task);
+
+        RenderFragment<MenuRootPayloadContext> childContent = _ => innerBuilder =>
+        {
+            innerBuilder.OpenComponent<MenuTypedTrigger<string>>(0);
+            innerBuilder.AddAttribute(1, "Handle", handle);
+            innerBuilder.AddAttribute(2, "id", "trigger-1");
+            innerBuilder.AddAttribute(3, "Payload", "one");
+            innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+            innerBuilder.CloseComponent();
+        };
+
+        var cut = Render<MenuRoot>(parameters => parameters
+            .Add(p => p.Handle, handle)
+            .Add(p => p.OnOpenChange, onOpenChange)
+            .Add(p => p.ChildContent, childContent));
+
+        // Begin an open that suspends inside its OnOpenChange callback, then close via the handle.
+        // Verified to reopen the menu (aria-expanded=true) without the openChangeVersion guard.
+        handle.RequestOpen("trigger-1", MenuOpenChangeReason.TriggerHover);
+        handle.RequestClose(MenuOpenChangeReason.CancelOpen);
+
+        gate.SetResult();
+        await Task.Delay(50);
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false"));
+    }
+
+    [Fact]
+    public async Task CloseDuringPendingOpenKeepsMenuClosed()
+    {
+        var gate = new TaskCompletionSource();
+        var onOpenChange = EventCallback.Factory.Create<MenuOpenChangeEventArgs>(this, _ => gate.Task);
+        var cut = Render(CreateMenuRoot(onOpenChange: onOpenChange));
+        var root = cut.FindComponent<MenuRoot>().Instance;
+
+        // Begin an open that suspends inside its OnOpenChange callback.
+        var pendingOpen = cut.InvokeAsync(() => root.SetOpenAsync(true, MenuOpenChangeReason.TriggerHover));
+
+        // A close arriving in that window must invalidate the pending open.
+        await cut.InvokeAsync(() => root.OnEscapeKey());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+    }
 }

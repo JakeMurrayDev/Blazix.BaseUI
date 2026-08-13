@@ -613,4 +613,24 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         openStates.ShouldBeEmpty();
         cut.Find("input[role='combobox']").GetAttribute("aria-expanded").ShouldBe("false");
     }
+
+    [Fact]
+    public async Task EscapeKey_ShouldDiscardPendingOpenAwaitingOnOpenChange()
+    {
+        var gate = new TaskCompletionSource();
+        var openStates = new List<bool>();
+        var onOpenChange = EventCallback.Factory.Create<ComboboxOpenChangeEventArgs>(this, _ => gate.Task);
+        var openChanged = EventCallback.Factory.Create<bool>(this, value => openStates.Add(value));
+        var cut = Render(CreateCombobox(onOpenChange: onOpenChange, openChanged: openChanged));
+        var root = cut.FindComponent<ComboboxRoot<string>>().Instance;
+
+        var pendingOpen = cut.Find("[data-testid='combobox-trigger']").TriggerEventAsync("onmousedown", new MouseEventArgs { Button = 0 });
+        await cut.InvokeAsync(() => root.OnEscapeKey());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        openStates.ShouldBeEmpty();
+        cut.Find("input[role='combobox']").GetAttribute("aria-expanded").ShouldBe("false");
+    }
 }

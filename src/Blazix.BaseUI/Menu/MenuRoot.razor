@@ -28,6 +28,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isOpen;
+    private int openChangeVersion;
     private readonly TransitionLifecycleManager transition = new();
     private int? activeIndex;
     private ElementReference? triggerElement;
@@ -558,6 +559,12 @@
         string? interactionType = null,
         bool highlightLast = false)
     {
+        // Capture a version before awaiting OnOpenChange. Any subsequent SetOpenAsync call
+        // (including a redundant one that early-returns below) bumps the counter, which
+        // invalidates a request still suspended in its OnOpenChange callback. This prevents a
+        // close arriving during an in-flight open from being dropped and the stale open committing.
+        var version = ++openChangeVersion;
+
         if (CurrentOpen == nextOpen)
         {
             if (nextOpen && triggerId is not null && triggerId != activeTriggerId)
@@ -565,7 +572,7 @@
                 var triggerSwapArgs = new MenuOpenChangeEventArgs(nextOpen, reason, payload);
                 await OnOpenChange.InvokeAsync(triggerSwapArgs);
 
-                if (triggerSwapArgs.IsCanceled)
+                if (triggerSwapArgs.IsCanceled || version != openChangeVersion)
                 {
                     return;
                 }
@@ -579,7 +586,7 @@
         var args = new MenuOpenChangeEventArgs(nextOpen, reason, payload);
         await OnOpenChange.InvokeAsync(args);
 
-        if (args.IsCanceled)
+        if (args.IsCanceled || version != openChangeVersion)
         {
             return;
         }
