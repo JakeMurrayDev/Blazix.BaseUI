@@ -15,4 +15,5 @@ public interface ISliderControlContract
     // Drag commit semantics
     Task DoesNotCommitOnDragEndWhenNoValueApplied();
     Task CommitsOnDragEndWithOriginatingReason();
+    Task DoesNotCommitOnDragEndWhenValueChangeIsCanceled();
 }

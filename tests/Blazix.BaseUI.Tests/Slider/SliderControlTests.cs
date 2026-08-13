@@ -267,4 +267,39 @@ public class SliderControlTests : BunitContext, ISliderControlContract
 
         reason.ShouldBe(SliderChangeReason.TrackPress);
     }
+
+    [Fact]
+    public async Task DoesNotCommitOnDragEndWhenValueChangeIsCanceled()
+    {
+        // Upstream assigns `currentInteractionValueRef` only under `if (applied)` and `setValue`
+        // returns false for a canceled change, so a drag whose change is canceled never commits.
+        var committed = false;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "OnValueChange",
+                EventCallback.Factory.Create<SliderValueChangeEventArgs<double>>(this, args => args.Cancel()));
+            builder.AddAttribute(3, "OnValueCommitted",
+                EventCallback.Factory.Create<SliderValueCommittedEventArgs<double>>(this, _ => committed = true));
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var control = cut.FindComponent<SliderControl>().Instance;
+
+        await cut.InvokeAsync(() => control.OnDragEnd([70.0], 0, true, "drag"));
+
+        committed.ShouldBeFalse();
+    }
 }
