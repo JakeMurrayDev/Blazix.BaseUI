@@ -9,6 +9,13 @@ namespace Blazix.BaseUI.Slider;
 /// </summary>
 internal static class SliderUtilities
 {
+    /// <summary>
+    /// Upper bound accepted by <see cref="Math.Round(double, int, MidpointRounding)"/>.
+    /// Upstream rounds with <c>Number(value.toFixed(precision))</c>, which accepts 0-100 digits
+    /// and never throws, so the computed precision is clamped instead of overflowing.
+    /// </summary>
+    private const int MaxRoundingDigits = 15;
+
     private static readonly ConcurrentDictionary<string, string> CurrencySymbolCache = new(StringComparer.OrdinalIgnoreCase);
 
     public static double Clamp(double value, double min, double max) =>
@@ -23,16 +30,20 @@ internal static class SliderUtilities
             return value;
 
         var nearest = JsRound((value - min) / step) * step + min;
-        var precision = Math.Max(GetDecimalPrecision(step), GetDecimalPrecision(min));
+        var precision = Math.Min(
+            MaxRoundingDigits,
+            Math.Max(GetDecimalPrecision(step), GetDecimalPrecision(min)));
         return Math.Round(nearest, precision, MidpointRounding.AwayFromZero);
     }
 
     public static double GetNewValue(double thumbValue, double increment, int direction, double min, double max)
     {
         var value = direction == 1 ? thumbValue + increment : thumbValue - increment;
-        var precision = Math.Max(
-            GetDecimalPrecision(thumbValue),
-            Math.Max(GetDecimalPrecision(increment), GetDecimalPrecision(min)));
+        var precision = Math.Min(
+            MaxRoundingDigits,
+            Math.Max(
+                GetDecimalPrecision(thumbValue),
+                Math.Max(GetDecimalPrecision(increment), GetDecimalPrecision(min))));
         var roundedValue = Math.Round(value, precision, MidpointRounding.AwayFromZero);
         return Clamp(roundedValue, min, max);
     }

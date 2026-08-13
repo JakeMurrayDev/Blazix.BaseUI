@@ -22,6 +22,8 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool isProcessingPointerDown;
+    private bool interactionValueApplied;
+    private SliderChangeReason interactionChangeReason = SliderChangeReason.Drag;
     private double[]? previousInsetValues;
     private DotNetObjectReference<SliderControl>? dotNetRef;
     private ElementReference element;
@@ -157,25 +159,53 @@
     /// Called from JavaScript during a drag operation to update the slider values.
     /// </summary>
     [JSInvokable]
-    public void OnDragMove(double[] values, int thumbIndex)
+    public async Task OnDragMove(double[] values, int thumbIndex)
     {
         if (Context is null)
             return;
 
-        Context.SetValue(values, SliderChangeReason.Drag, thumbIndex);
+        // Upstream records the interaction value only when `setValue` reports the change as
+        // applied, so a canceled move never becomes committable.
+        if (await Context.SetValueAsync(values, SliderChangeReason.Drag, thumbIndex))
+        {
+            interactionValueApplied = true;
+            interactionChangeReason = SliderChangeReason.Drag;
+        }
     }
 
     /// <summary>
     /// Called from JavaScript when a drag operation ends to commit the final values.
     /// </summary>
+    /// <param name="values">The values produced by the interaction.</param>
+    /// <param name="thumbIndex">The index of the thumb that was pressed.</param>
+    /// <param name="valueApplied">Whether the interaction moved the value at all, as observed in JS.</param>
+    /// <param name="changeReason">The reason of the last change observed in JS: <c>trackPress</c> or <c>drag</c>.</param>
     [JSInvokable]
-    public void OnDragEnd(double[] values, int thumbIndex)
+    public async Task OnDragEnd(double[] values, int thumbIndex, bool valueApplied, string changeReason)
     {
         if (Context is null)
             return;
 
-        Context.SetValue(values, SliderChangeReason.Drag, thumbIndex);
-        Context.CommitValue(values, SliderChangeReason.Drag);
+        // When no realtime subscriber is attached JS never calls OnDragMove, so the release is the
+        // first and only point at which .NET sees the value; its accepted-result therefore decides
+        // whether this interaction is committable.
+        if (valueApplied && await Context.SetValueAsync(values, SliderChangeReason.Drag, thumbIndex))
+        {
+            interactionValueApplied = true;
+            interactionChangeReason = changeReason == "trackPress"
+                ? SliderChangeReason.TrackPress
+                : SliderChangeReason.Drag;
+        }
+
+        // Upstream commits only when the interaction produced an *applied* value
+        // (`currentInteractionValueRef.current != null`, assigned only under `if (applied)`), so a
+        // change canceled by OnValueChange/OnValuesChange must not fire OnValueCommitted.
+        if (interactionValueApplied)
+        {
+            Context.CommitValue(values, interactionChangeReason);
+        }
+
+        interactionValueApplied = false;
         Context.SetDragging(false);
         Context.SetActiveThumbIndex(-1);
     }
@@ -257,9 +287,18 @@
 
                 if (result is not null)
                 {
+                    // A fresh interaction starts with nothing applied; upstream resets
+                    // `currentInteractionValueRef` on pointer down for the same reason.
+                    interactionValueApplied = false;
+                    interactionChangeReason = SliderChangeReason.Drag;
+
                     if (result.WasTrackPress)
                     {
-                        Context.SetValue(result.Values, SliderChangeReason.TrackPress, result.ThumbIndex);
+                        if (await Context.SetValueAsync(result.Values, SliderChangeReason.TrackPress, result.ThumbIndex))
+                        {
+                            interactionValueApplied = true;
+                            interactionChangeReason = SliderChangeReason.TrackPress;
+                        }
                     }
                     else
                     {

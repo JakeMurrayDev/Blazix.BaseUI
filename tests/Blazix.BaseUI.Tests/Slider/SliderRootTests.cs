@@ -705,4 +705,137 @@ public class SliderRootTests : BunitContext, ISliderRootContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public Task DoesNotCommitCanceledValueChange()
+    {
+        // Upstream's `handleInputChange` only commits `if (applied)`, and `setValue` returns
+        // false when the change details were canceled.
+        var committed = 0;
+
+        var cut = Render(CreateSliderRoot(
+            defaultValue: 50,
+            onValueChange: EventCallback.Factory.Create<SliderValueChangeEventArgs<double>>(this, args => args.Cancel()),
+            onValueCommitted: EventCallback.Factory.Create<SliderValueCommittedEventArgs<double>>(this, _ => committed++)
+        ));
+
+        cut.Find("input[type='range']").Change("60");
+
+        committed.ShouldBe(0);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotCommitUnchangedValue()
+    {
+        // `setValue` returns false when `areValuesEqual(newValue, valueUnwrapped)`.
+        var committed = 0;
+
+        var cut = Render(CreateSliderRoot(
+            defaultValue: 50,
+            onValueCommitted: EventCallback.Factory.Create<SliderValueCommittedEventArgs<double>>(this, _ => committed++)
+        ));
+
+        cut.Find("input[type='range']").Change("50");
+
+        committed.ShouldBe(0);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SetsAriaInvalidOnRootAndThumbInputWhenFieldInvalid()
+    {
+        // Both the root and the thumb input spread `validation.getValidationProps(...)`.
+        var errors = new Dictionary<string, string[]>
+        {
+            ["volume"] = ["Required"]
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Model", new { });
+            builder.AddAttribute(2, "Errors", errors);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(formBuilder =>
+                {
+                    formBuilder.OpenComponent<FieldRoot>(0);
+                    formBuilder.AddAttribute(1, "Name", "volume");
+                    formBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<SliderRoot>(0);
+                        fieldBuilder.AddAttribute(1, "DefaultValue", 50.0);
+                        fieldBuilder.AddAttribute(2, "ChildContent", CreateChildContent());
+                        fieldBuilder.CloseComponent();
+                    }));
+                    formBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='group']").GetAttribute("aria-invalid").ShouldBe("true");
+            cut.Find("input[type='range']").GetAttribute("aria-invalid").ShouldBe("true");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotSetAriaInvalidWhenDisabled()
+    {
+        // `state.valid === false && !state.disabled && !disabled` gates the attribute.
+        var errors = new Dictionary<string, string[]>
+        {
+            ["volume"] = ["Required"]
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Model", new { });
+            builder.AddAttribute(2, "Errors", errors);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(formBuilder =>
+                {
+                    formBuilder.OpenComponent<FieldRoot>(0);
+                    formBuilder.AddAttribute(1, "Name", "volume");
+                    formBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<SliderRoot>(0);
+                        fieldBuilder.AddAttribute(1, "DefaultValue", 50.0);
+                        fieldBuilder.AddAttribute(2, "Disabled", true);
+                        fieldBuilder.AddAttribute(3, "ChildContent", CreateChildContent());
+                        fieldBuilder.CloseComponent();
+                    }));
+                    formBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='group']").HasAttribute("data-invalid").ShouldBeTrue();
+            cut.Find("[role='group']").HasAttribute("aria-invalid").ShouldBeFalse();
+            cut.Find("input[type='range']").HasAttribute("aria-invalid").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ClampsRoundingPrecisionForBinaryFloatNoise()
+    {
+        // Upstream rounds with `Number(value.toFixed(precision))`, which accepts 0-100 digits;
+        // `Math.Round` rejects more than 15.
+        var noisyValue = 0.1 + 0.2;
+
+        Should.NotThrow(() => SliderUtilities.GetNewValue(noisyValue, 1, 1, noisyValue, 100));
+        Should.NotThrow(() => SliderUtilities.RoundValueToStep(noisyValue, 1, noisyValue));
+
+        return Task.CompletedTask;
+    }
 }

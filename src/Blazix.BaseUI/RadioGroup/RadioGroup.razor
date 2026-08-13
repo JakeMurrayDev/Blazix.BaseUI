@@ -4,6 +4,7 @@
 @using Blazix.BaseUI.Form
 @using Blazix.BaseUI.Utilities.LabelableProvider
 @using Blazix.BaseUI.Fieldset
+@using Blazix.BaseUI.DirectionProvider
 @using Microsoft.Extensions.Logging
 
 @typeparam TValue
@@ -29,11 +30,14 @@
     private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-radio.min.js";
 
     private readonly Dictionary<string, TValue?> radioValues = new();
+    private readonly List<string> radioOrder = [];
+    private readonly HashSet<string> disabledRadios = [];
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private DotNetObjectReference<RadioGroup<TValue>>? dotNetRef;
     private bool hasRendered;
     private bool hasValueParameter;
+    private string? registeredDirection;
     private string? defaultId;
     private TValue? internalValue;
     private TValue? previousValue;
@@ -64,6 +68,9 @@
 
     [CascadingParameter]
     private FieldsetRootContext? FieldsetContext { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
 
     /// <summary>
     /// Gets or sets the controlled value of the radio group.
@@ -166,11 +173,13 @@
 
     private bool ResolvedDisabled => Disabled || (FieldContext?.Disabled ?? false);
 
-    private string? ResolvedName => Name ?? FieldContext?.Name;
+    private string? ResolvedName => FieldContext?.Name ?? Name;
 
     private FieldRootState FieldState => FieldContext?.State ?? FieldRootState.Default;
 
     private string ResolvedId => AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
+
+    private string ResolvedDirection => DirectionContext?.Direction == Direction.Rtl ? "rtl" : "ltr";
 
     public RadioGroup()
     {
@@ -294,6 +303,11 @@
         }
 
         BuildComponentAttributes();
+
+        if (hasRendered && registeredDirection is not null && registeredDirection != ResolvedDirection)
+        {
+            _ = UpdateJsDirectionAsync();
+        }
     }
 
     /// <inheritdoc />
@@ -349,7 +363,8 @@
         SetCheckedValueFunc = SetValueInternalAsync,
         GetGroupElementFunc = () => Element,
         RegisterRadioValueFunc = RegisterRadioValue,
-        UnregisterRadioValueFunc = UnregisterRadioValue
+        UnregisterRadioValueFunc = UnregisterRadioValue,
+        IsFirstEnabledRadioFunc = IsFirstEnabledRadio
     };
 
     private void BuildComponentAttributes()
@@ -405,10 +420,28 @@
             if (Element.HasValue)
             {
                 dotNetRef = DotNetObjectReference.Create(this);
-                await module.InvokeVoidAsync("initializeGroup", Element.Value, dotNetRef);
+                registeredDirection = ResolvedDirection;
+                await module.InvokeVoidAsync("initializeGroup", Element.Value, dotNetRef, registeredDirection);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task UpdateJsDirectionAsync()
+    {
+        if (!hasRendered || !Element.HasValue)
+            return;
+
+        try
+        {
+            var module = await moduleTask.Value;
+            registeredDirection = ResolvedDirection;
+            await module.InvokeVoidAsync("updateGroupDirection", Element.Value, registeredDirection);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -570,7 +603,42 @@
         }
     }
 
-    private void RegisterRadioValue(string key, TValue? value) => radioValues[key] = value;
+    private void RegisterRadioValue(string key, TValue? value, bool disabled)
+    {
+        radioValues[key] = value;
 
-    private void UnregisterRadioValue(string key) => radioValues.Remove(key);
+        if (!radioOrder.Contains(key))
+        {
+            radioOrder.Add(key);
+        }
+
+        if (disabled)
+        {
+            disabledRadios.Add(key);
+        }
+        else
+        {
+            disabledRadios.Remove(key);
+        }
+    }
+
+    private void UnregisterRadioValue(string key)
+    {
+        radioValues.Remove(key);
+        radioOrder.Remove(key);
+        disabledRadios.Remove(key);
+    }
+
+    private bool IsFirstEnabledRadio(string key)
+    {
+        foreach (var candidate in radioOrder)
+        {
+            if (!disabledRadios.Contains(candidate))
+            {
+                return candidate == key;
+            }
+        }
+
+        return false;
+    }
 }

@@ -50,6 +50,7 @@
     private string? inputAriaDescribedBy;
     private string? inputName;
     private string? inputForm;
+    private string? inputAriaInvalid;
     private string inputAriaOrientation = "horizontal";
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new(() =>
@@ -364,6 +365,10 @@
             ? Context.Name
             : null;
         inputForm = Context.Form;
+
+        // `validation.getValidationProps(disabled, ...)` adds `aria-invalid` when the field is
+        // invalid and neither the field nor the control is disabled.
+        inputAriaInvalid = state.Valid == false && !ResolvedDisabled ? "true" : null;
     }
 
     private void BuildInputContent(RenderTreeBuilder builder)
@@ -388,17 +393,18 @@
             builder.AddAttribute(13, "aria-valuetext", inputAriaValueText);
             builder.AddAttribute(14, "aria-labelledby", inputAriaLabelledBy);
             builder.AddAttribute(15, "aria-describedby", inputAriaDescribedBy);
-            builder.AddAttribute(16, "name", inputName);
-            builder.AddAttribute(17, "form", inputForm);
-            builder.AddAttribute(18, "style", inputStyle);
-            builder.AddAttribute(19, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange));
-            builder.AddAttribute(20, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus));
-            builder.AddAttribute(21, "onblur", EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur));
-            builder.AddElementReferenceCapture(22, element => inputElement = element);
+            builder.AddAttribute(16, "aria-invalid", inputAriaInvalid);
+            builder.AddAttribute(17, "name", inputName);
+            builder.AddAttribute(18, "form", inputForm);
+            builder.AddAttribute(19, "style", inputStyle);
+            builder.AddAttribute(20, "onchange", EventCallback.Factory.Create<ChangeEventArgs>(this, HandleChange));
+            builder.AddAttribute(21, "onfocus", EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus));
+            builder.AddAttribute(22, "onblur", EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur));
+            builder.AddElementReferenceCapture(23, element => inputElement = element);
             builder.CloseElement();
         }
 
-        builder.AddContent(23, ChildContent);
+        builder.AddContent(24, ChildContent);
     }
 
     private string? GetDefaultAriaValueText(string formattedValue)

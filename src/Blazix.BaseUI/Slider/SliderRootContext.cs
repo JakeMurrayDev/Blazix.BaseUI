@@ -38,6 +38,13 @@ internal sealed class SliderRootContext
     public Action<int> SetActiveThumbIndex { get; set; } = null!;
     public Action<bool> SetDragging { get; set; } = null!;
     public Action<double[], SliderChangeReason, int> SetValue { get; set; } = null!;
+
+    /// <summary>
+    /// Applies a value change and reports whether it was accepted, returning <see langword="false"/>
+    /// when the value is unchanged or a change callback canceled it. Drag interactions use this so a
+    /// canceled change does not commit on release, mirroring upstream's <c>setValue</c> return value.
+    /// </summary>
+    public Func<double[], SliderChangeReason, int, Task<bool>> SetValueAsync { get; set; } = null!;
     public Action<double[]> SetValueSilent { get; set; } = null!;
     public Action<double[], SliderChangeReason> CommitValue { get; set; } = null!;
     public Func<double, int, SliderChangeReason, Task> HandleInputChange { get; set; } = null!;

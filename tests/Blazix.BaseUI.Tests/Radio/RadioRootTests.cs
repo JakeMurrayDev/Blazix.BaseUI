@@ -311,12 +311,15 @@ public class RadioRootTests : BunitContext, IRadioRootContract
     }
 
     [Fact]
-    public Task HasAriaRequiredWhenRequired()
+    public Task DoesNotSetAriaRequiredOnRoot()
     {
+        // Upstream's RadioRoot never emits `aria-required`; the radiogroup carries it and the
+        // hidden input carries the native `required` attribute.
         var cut = Render(CreateRadioRoot(required: true));
 
         var radio = cut.Find("[role='radio']");
-        radio.GetAttribute("aria-required").ShouldBe("true");
+        radio.HasAttribute("aria-required").ShouldBeFalse();
+        cut.Find("input[type='radio']").HasAttribute("required").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -410,12 +413,15 @@ public class RadioRootTests : BunitContext, IRadioRootContract
 
     // ReadOnly tests
     [Fact]
-    public Task HasAriaReadonlyWhenReadOnly()
+    public Task DoesNotSetAriaReadonlyOnRoot()
     {
+        // Upstream's RadioRoot never emits `aria-readonly`; the radiogroup carries it and the
+        // hidden input carries the native `readonly` attribute.
         var cut = Render(CreateRadioRoot(readOnly: true));
 
         var radio = cut.Find("[role='radio']");
-        radio.GetAttribute("aria-readonly").ShouldBe("true");
+        radio.HasAttribute("aria-readonly").ShouldBeFalse();
+        cut.Find("input[type='radio']").HasAttribute("readonly").ShouldBeTrue();
 
         return Task.CompletedTask;
     }
@@ -1027,6 +1033,199 @@ public class RadioRootTests : BunitContext, IRadioRootContract
         radioA.GetAttribute("tabindex").ShouldBe("-1");
         radioB.GetAttribute("tabindex").ShouldBe("0");
         radioC.GetAttribute("tabindex").ShouldBe("-1");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task SetsTabindexZeroOnFirstEnabledRadioWhenGroupHasNoValue()
+    {
+        // Upstream's CompositeRoot grants tabIndex 0 to exactly one item, so an empty group
+        // must be a single tab stop even before the JS roving-tabindex pass runs.
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<RadioGroup<string>>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                groupBuilder.OpenComponent<RadioRoot<string>>(0);
+                groupBuilder.AddAttribute(1, "Value", "a");
+                groupBuilder.AddAttribute(2, "Disabled", true);
+                groupBuilder.AddAttribute(3, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio-a" } });
+                groupBuilder.CloseComponent();
+
+                groupBuilder.OpenComponent<RadioRoot<string>>(10);
+                groupBuilder.AddAttribute(11, "Value", "b");
+                groupBuilder.AddAttribute(12, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio-b" } });
+                groupBuilder.CloseComponent();
+
+                groupBuilder.OpenComponent<RadioRoot<string>>(20);
+                groupBuilder.AddAttribute(21, "Value", "c");
+                groupBuilder.AddAttribute(22, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio-c" } });
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[data-testid='radio-a']").GetAttribute("tabindex").ShouldBe("-1");
+        cut.Find("[data-testid='radio-b']").GetAttribute("tabindex").ShouldBe("0");
+        cut.Find("[data-testid='radio-c']").GetAttribute("tabindex").ShouldBe("-1");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InvokesUserOnClickWhenReadOnly()
+    {
+        // Upstream merges `elementProps` separately from the root's read-only guard, so the
+        // consumer's handler still runs while the internal selection is skipped.
+        var invoked = false;
+
+        var cut = Render(CreateRadioRoot(
+            readOnly: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => invoked = true) }
+            }));
+
+        var radio = cut.Find("[role='radio']");
+        radio.Click();
+
+        invoked.ShouldBeTrue();
+        radio.GetAttribute("aria-checked").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task InvokesUserOnKeyDownWhenReadOnly()
+    {
+        // `useButton`'s keydown pipeline only short-circuits on `disabled`.
+        var invoked = false;
+
+        var cut = Render(CreateRadioRoot(
+            readOnly: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onkeydown", EventCallback.Factory.Create<KeyboardEventArgs>(this, _ => invoked = true) }
+            }));
+
+        var radio = cut.Find("[role='radio']");
+        radio.KeyDown(new KeyboardEventArgs { Key = " " });
+
+        invoked.ShouldBeTrue();
+        radio.GetAttribute("aria-checked").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FieldNameTakesPrecedenceOverLocalName()
+    {
+        // Upstream's RadioGroup resolves `const name = fieldName ?? nameProp;`.
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "Name", "field-name");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<RadioGroup<string>>(0);
+                fieldBuilder.AddAttribute(1, "Name", "group-name");
+                fieldBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+                {
+                    groupBuilder.OpenComponent<RadioRoot<string>>(0);
+                    groupBuilder.AddAttribute(1, "Value", "a");
+                    groupBuilder.AddAttribute(2, "Name", "radio-name");
+                    groupBuilder.CloseComponent();
+                }));
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("input[type='radio']").GetAttribute("name").ShouldBe("field-name");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesVisuallyHiddenInputStyleWhenNamed()
+    {
+        // Upstream: `style: name ? visuallyHiddenInput : visuallyHidden`.
+        var cut = Render(CreateRadioRoot(name: "radio-name"));
+
+        var style = cut.Find("input[type='radio']").GetAttribute("style");
+        style.ShouldNotBeNull();
+        style.ShouldContain("position:absolute");
+        style.ShouldContain("clip-path:inset(50%)");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task UsesVisuallyHiddenStyleWhenNameless()
+    {
+        var cut = Render(CreateRadioRoot());
+
+        var style = cut.Find("input[type='radio']").GetAttribute("style");
+        style.ShouldNotBeNull();
+        style.ShouldContain("position:fixed");
+        style.ShouldContain("clip-path:inset(50%)");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotSetAriaInvalidWhenDisabled()
+    {
+        // Upstream gates the attribute on `state.valid === false && !state.disabled && !disabled`.
+        var errors = new Dictionary<string, string[]>
+        {
+            ["choice"] = ["Required"]
+        };
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Model", new { });
+            builder.AddAttribute(2, "Errors", errors);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                (RenderFragment)(formBuilder =>
+                {
+                    formBuilder.OpenComponent<FieldRoot>(0);
+                    formBuilder.AddAttribute(1, "Name", "choice");
+                    formBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                    {
+                        fieldBuilder.OpenComponent<RadioGroup<string>>(0);
+                        fieldBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+                        {
+                            groupBuilder.OpenComponent<RadioRoot<string>>(0);
+                            groupBuilder.AddAttribute(1, "Value", "a");
+                            groupBuilder.AddAttribute(2, "AdditionalAttributes",
+                                (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio-a" } });
+                            groupBuilder.CloseComponent();
+
+                            groupBuilder.OpenComponent<RadioRoot<string>>(10);
+                            groupBuilder.AddAttribute(11, "Value", "b");
+                            groupBuilder.AddAttribute(12, "Disabled", true);
+                            groupBuilder.AddAttribute(13, "AdditionalAttributes",
+                                (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { { "data-testid", "radio-b" } });
+                            groupBuilder.CloseComponent();
+                        }));
+                        fieldBuilder.CloseComponent();
+                    }));
+                    formBuilder.CloseComponent();
+                })));
+            builder.CloseComponent();
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='radio-a']").GetAttribute("aria-invalid").ShouldBe("true");
+            cut.Find("[data-testid='radio-b']").HasAttribute("aria-invalid").ShouldBeFalse();
+        });
 
         return Task.CompletedTask;
     }

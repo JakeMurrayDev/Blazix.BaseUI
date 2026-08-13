@@ -6,7 +6,65 @@ if (!window[GROUP_STATE_KEY]) {
 }
 const groupState = window[GROUP_STATE_KEY];
 
-export function initialize(element, inputElement, disabled, readOnly, nativeButton) {
+function findAssociatedLabel(labelSource) {
+    if (!labelSource) {
+        return null;
+    }
+
+    const parent = labelSource.parentElement;
+    if (parent?.tagName === 'LABEL') {
+        return parent;
+    }
+
+    const controlId = labelSource.id;
+    if (controlId) {
+        const nextSibling = labelSource.nextElementSibling;
+        if (nextSibling?.tagName === 'LABEL' && nextSibling.htmlFor === controlId) {
+            return nextSibling;
+        }
+    }
+
+    return labelSource.labels?.[0] ?? null;
+}
+
+function ensureLabelId(label, state, element) {
+    if (label.id) {
+        return label.id;
+    }
+
+    const baseId = state.inputElement?.id || element.id || `base-ui-radio-${Math.random().toString(36).slice(2)}`;
+    label.id = `${baseId}-label`;
+    return label.id;
+}
+
+function syncFallbackAriaLabelledBy(element, state) {
+    if (!state.enableLabelFallback) {
+        if (state.fallbackAriaLabelledBy &&
+            element.getAttribute('aria-labelledby') === state.fallbackAriaLabelledBy) {
+            element.removeAttribute('aria-labelledby');
+        }
+
+        state.fallbackAriaLabelledBy = null;
+        return;
+    }
+
+    const label = findAssociatedLabel(state.inputElement);
+    if (!label) {
+        if (state.fallbackAriaLabelledBy &&
+            element.getAttribute('aria-labelledby') === state.fallbackAriaLabelledBy) {
+            element.removeAttribute('aria-labelledby');
+        }
+
+        state.fallbackAriaLabelledBy = null;
+        return;
+    }
+
+    const labelId = ensureLabelId(label, state, element);
+    state.fallbackAriaLabelledBy = labelId;
+    element.setAttribute('aria-labelledby', labelId);
+}
+
+export function initialize(element, inputElement, disabled, readOnly, nativeButton, enableLabelFallback) {
     if (!element) {
         return;
     }
@@ -16,22 +74,38 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
         disabled,
         readOnly,
         nativeButton,
+        enableLabelFallback,
+        fallbackAriaLabelledBy: null,
         keydownHandler: null
     };
 
     // Set up keyboard handler that prevents default for arrow keys
     state.keydownHandler = (e) => {
-        if (state.disabled || state.readOnly) {
+        // Upstream `useButton` bails out before any `preventDefault()` when disabled,
+        // so keys the browser owns (Tab, shortcuts, scrolling) keep working.
+        // Read-only is not a `useButton` concern: the root's `onKeyDown` still prevents
+        // Enter and `useButton` still prevents Space on a read-only radio.
+        if (state.disabled) {
+            return;
+        }
+
+        // `useButton` only activates when the key originated on the element itself and
+        // treats an already-prevented default as a cancelled activation.
+        if (e.target !== element || e.defaultPrevented) {
             return;
         }
 
         // Arrow keys should prevent default to stop browser scrolling
         const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-        
+
         if (arrowKeys.includes(e.key)) {
-            e.preventDefault();
+            // The group only navigates with Shift allowed (`MODIFIER_KEYS = [SHIFT]`),
+            // so other modifier combinations must reach the browser/OS shortcut.
+            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault();
+            }
         }
-        
+
         // Space key should also prevent default (page scroll)
         if (e.key === ' ' || e.key === 'Enter') {
             e.preventDefault();
@@ -40,9 +114,10 @@ export function initialize(element, inputElement, disabled, readOnly, nativeButt
 
     element.addEventListener('keydown', state.keydownHandler);
     element[STATE_KEY] = state;
+    syncFallbackAriaLabelledBy(element, state);
 }
 
-export function updateState(element, inputElement, disabled, readOnly, nativeButton) {
+export function updateState(element, inputElement, disabled, readOnly, nativeButton, enableLabelFallback) {
     if (!element) {
         return;
     }
@@ -53,7 +128,17 @@ export function updateState(element, inputElement, disabled, readOnly, nativeBut
         state.readOnly = readOnly;
         state.nativeButton = nativeButton;
         state.inputElement = inputElement;
+        state.enableLabelFallback = enableLabelFallback;
+        syncFallbackAriaLabelledBy(element, state);
     }
+}
+
+export function setInputChecked(inputElement, checked) {
+    if (!inputElement) {
+        return;
+    }
+
+    inputElement.checked = checked;
 }
 
 export function focus(element) {
@@ -78,7 +163,7 @@ export function dispose(element) {
     }
 }
 
-export function initializeGroup(element, dotNetRef) {
+export function initializeGroup(element, dotNetRef, direction) {
     if (!element) {
         return;
     }
@@ -86,6 +171,7 @@ export function initializeGroup(element, dotNetRef) {
     const state = {
         element,
         dotNetRef,
+        direction,
         items: new Set(),
         keydownCaptureHandler: null
     };
@@ -93,30 +179,50 @@ export function initializeGroup(element, dotNetRef) {
     state.keydownCaptureHandler = async (e) => {
         const arrowKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
-        if (arrowKeys.includes(e.key)) {
-            e.preventDefault();
-
-            const currentElement = getRadioFromEventTarget(element, e.target);
-            if (!currentElement || isRadioDisabled(currentElement)) {
-                return;
-            }
-
-            await dotNetRef.invokeMethodAsync('OnArrowKeyPressed');
-
-            if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-                await navigateToPrevious(element, currentElement);
-            } else {
-                await navigateToNext(element, currentElement);
-            }
+        if (!arrowKeys.includes(e.key)) {
+            return;
         }
 
-        if (e.key === ' ') {
-            e.preventDefault();
+        // The composite root only navigates when no modifier outside `MODIFIER_KEYS = [SHIFT]`
+        // is held, so Ctrl/Alt/Meta + Arrow keeps reaching the browser or OS shortcut.
+        if (e.ctrlKey || e.altKey || e.metaKey) {
+            return;
+        }
+
+        // Resolve the originating radio before preventing anything: focusable content
+        // rendered inside the group (text inputs, buttons) keeps native arrow behavior,
+        // matching the composite root which bails out for native inputs with a caret.
+        const currentElement = getRadioFromEventTarget(element, e.target);
+        if (!currentElement || isRadioDisabled(currentElement)) {
+            return;
+        }
+
+        e.preventDefault();
+
+        await dotNetRef.invokeMethodAsync('OnArrowKeyPressed');
+
+        const backwardKey = state.direction === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+
+        if (e.key === 'ArrowUp' || e.key === backwardKey) {
+            await navigateToPrevious(element, currentElement);
+        } else {
+            await navigateToNext(element, currentElement);
         }
     };
 
     element.addEventListener('keydown', state.keydownCaptureHandler, { capture: true });
     groupState.set(element, state);
+}
+
+export function updateGroupDirection(element, direction) {
+    if (!element) {
+        return;
+    }
+
+    const state = groupState.get(element);
+    if (state) {
+        state.direction = direction;
+    }
 }
 
 export function disposeGroup(element) {

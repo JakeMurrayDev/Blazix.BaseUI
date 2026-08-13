@@ -60,13 +60,21 @@ internal interface IRadioGroupContext<TValue>
     /// </summary>
     /// <param name="key">The stable key used by JavaScript keyboard navigation.</param>
     /// <param name="value">The typed radio value.</param>
-    void RegisterRadioValue(string key, TValue? value);
+    /// <param name="disabled">Whether the child radio is disabled.</param>
+    void RegisterRadioValue(string key, TValue? value, bool disabled);
 
     /// <summary>
     /// Unregisters a child radio value.
     /// </summary>
     /// <param name="key">The stable key used by JavaScript keyboard navigation.</param>
     void UnregisterRadioValue(string key);
+
+    /// <summary>
+    /// Gets whether the radio identified by <paramref name="key"/> is the first enabled radio
+    /// in registration order, which owns the group's roving tab stop when nothing is selected.
+    /// </summary>
+    /// <param name="key">The stable key used by JavaScript keyboard navigation.</param>
+    bool IsFirstEnabledRadio(string key);
 }
 
 /// <summary>
@@ -123,12 +131,17 @@ internal sealed class RadioGroupContext<TValue> : IRadioGroupContext<TValue>
     /// <summary>
     /// Gets or sets the callback that registers a typed radio value.
     /// </summary>
-    public Action<string, TValue?> RegisterRadioValueFunc { get; set; } = null!;
+    public Action<string, TValue?, bool> RegisterRadioValueFunc { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the callback that unregisters a typed radio value.
     /// </summary>
     public Action<string> UnregisterRadioValueFunc { get; set; } = null!;
+
+    /// <summary>
+    /// Gets or sets the callback that resolves the first enabled radio in registration order.
+    /// </summary>
+    public Func<string, bool> IsFirstEnabledRadioFunc { get; set; } = null!;
 
     /// <inheritdoc />
     public TValue? CheckedValue => GetCheckedValueFunc();
@@ -140,8 +153,11 @@ internal sealed class RadioGroupContext<TValue> : IRadioGroupContext<TValue>
     public Task SetCheckedValueAsync(TValue? value) => SetCheckedValueFunc(value);
 
     /// <inheritdoc />
-    public void RegisterRadioValue(string key, TValue? value) => RegisterRadioValueFunc(key, value);
+    public void RegisterRadioValue(string key, TValue? value, bool disabled) => RegisterRadioValueFunc(key, value, disabled);
 
     /// <inheritdoc />
     public void UnregisterRadioValue(string key) => UnregisterRadioValueFunc(key);
+
+    /// <inheritdoc />
+    public bool IsFirstEnabledRadio(string key) => IsFirstEnabledRadioFunc(key);
 }
