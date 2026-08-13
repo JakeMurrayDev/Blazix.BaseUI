@@ -854,4 +854,24 @@ public class MenuRootTests : BunitContext, IMenuRootContract
         updateRootInvocation.Arguments[6].ShouldNotBe(initialMenubarElement);
         updateRootInvocation.Arguments[7].ShouldBe("menubar");
     }
+
+    [Fact]
+    public async Task CloseDuringPendingOpenKeepsMenuClosed()
+    {
+        var gate = new TaskCompletionSource();
+        var onOpenChange = EventCallback.Factory.Create<MenuOpenChangeEventArgs>(this, _ => gate.Task);
+        var cut = Render(CreateMenuRoot(onOpenChange: onOpenChange));
+        var root = cut.FindComponent<MenuRoot>().Instance;
+
+        // Begin an open that suspends inside its OnOpenChange callback.
+        var pendingOpen = cut.InvokeAsync(() => root.SetOpenAsync(true, MenuOpenChangeReason.TriggerHover));
+
+        // A close arriving in that window must invalidate the pending open.
+        await cut.InvokeAsync(() => root.OnEscapeKey());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+    }
 }
