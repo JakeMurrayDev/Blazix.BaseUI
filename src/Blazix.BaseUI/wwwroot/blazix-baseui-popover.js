@@ -44,10 +44,28 @@ const state = window[STATE_KEY];
 let pointerDownTarget = null;
 let pointerDownTime = 0;
 
+// Source: useDismiss.ts `isComposingRef` — pressing Escape while an IME composition is active
+// should close the compose menu, not the floating element. Safari fires `compositionend` before
+// `keydown`, so the flag is cleared on a short timeout rather than synchronously.
+let isComposing = false;
+
+function handleCompositionStart() {
+    isComposing = true;
+}
+
+function handleCompositionEnd() {
+    // Safari fires compositionend before keydown
+    setTimeout(() => {
+        isComposing = false;
+    }, 5);
+}
+
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
     document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('compositionstart', handleCompositionStart);
+    document.addEventListener('compositionend', handleCompositionEnd);
     document.addEventListener('pointerdown', handleGlobalPointerDown);
     document.addEventListener('click', handleGlobalClick);
     state.globalListenersInitialized = true;
@@ -312,6 +330,9 @@ export function focusPopoverContent(rootId) {
 function handleGlobalKeyDown(e) {
     if (e.key !== 'Escape') return;
 
+    // Wait until IME is settled (source: useDismiss.ts closeOnEscapeKeyDown)
+    if (isComposing) return;
+
     // Close the topmost (most recently opened) popover
     let topmost = null;
     let highestOrder = -1;
@@ -470,9 +491,12 @@ function handleGlobalPointerDown(e) {
     pointerDownTarget = e.target;
     pointerDownTime = performance.now();
 
-    const isTouchOrPen = e.pointerType === 'touch' || e.pointerType === 'pen';
+    // Source: useDismiss.ts getOutsidePressEvent — `pen` (and an unknown pointer type) resolve to
+    // the `mouse` rule, so only genuine touch input uses the `touch: 'sloppy'` mapping configured by
+    // PopoverRoot.tsx:233-237. A pen press outside therefore dismisses on the completed click.
+    const isTouch = e.pointerType === 'touch';
     processOutsidePressForRoots(e,
-        (rs) => rs.modal === 'trap-focus' || isTouchOrPen,
+        (rs) => rs.modal === 'trap-focus' || isTouch,
         false
     );
 }
@@ -559,6 +583,7 @@ export function disposeRoot(rootId) {
         cleanupFocusTrap(rootState);
         cleanupFocusOutListener(rootState);
         cleanupPopupFocusOutListener(rootState);
+        cleanupPopupEscapeListener(rootState);
 
         // Clean up composite key suppression
         rootState.compositeKeyCleanup?.();
@@ -1235,6 +1260,7 @@ export function setPopupElement(rootId, element) {
     if (rootState) {
         rootState.popupElement = element;
         cleanupPopupFocusOutListener(rootState);
+        setupPopupEscapeListener(rootState, element);
         if (element) {
             const handleFocusOut = (event) => {
                 rootState.lastFocusOutTarget = event.relatedTarget;
@@ -1441,6 +1467,40 @@ function setupCompositeKeySuppression(rootState, insideToolbar) {
 }
 
 // ============================================================================
+// Escape Dismissal (popup-scoped)
+// ============================================================================
+
+// Source: useDismiss.ts — `closeOnEscapeKeyDown` is returned as `floating.onKeyDown` and spread
+// onto the popup by PopoverPopup, so an Escape pressed inside the popup is handled by the popup
+// itself and its propagation is stopped (`bubbles.escapeKey` defaults to `false`) before it can
+// reach outer dismissal listeners such as an enclosing Dialog's.
+function setupPopupEscapeListener(rootState, popup) {
+    cleanupPopupEscapeListener(rootState);
+
+    if (!popup) return;
+
+    const handler = (e) => {
+        if (e.key !== 'Escape') return;
+        if (isComposing) return;
+        if (!rootState.isOpen || !rootState.dotNetRef) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        rootState.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => { });
+    };
+
+    popup.addEventListener('keydown', handler);
+    rootState.popupEscapeCleanup = () => popup.removeEventListener('keydown', handler);
+}
+
+function cleanupPopupEscapeListener(rootState) {
+    if (rootState.popupEscapeCleanup) {
+        rootState.popupEscapeCleanup();
+        rootState.popupEscapeCleanup = null;
+    }
+}
+
+// ============================================================================
 // Popup Management
 // ============================================================================
 
@@ -1467,6 +1527,7 @@ export function initializePopup(rootId, popupElement, dotNetRef, modal, initialM
 
         // Set up composite key suppression only when inside a Toolbar
         setupCompositeKeySuppression(rootState, !!insideToolbar);
+        setupPopupEscapeListener(rootState, popupElement);
     }
 
     const popupState = {
@@ -1508,6 +1569,7 @@ export function disposePopup(rootId, popupElement) {
     const rootState = rootId ? state.roots.get(rootId) : null;
     if (rootState) {
         cleanupPopupFocusOutListener(rootState);
+        cleanupPopupEscapeListener(rootState);
     }
     if (rootState?.compositeKeyCleanup) {
         rootState.compositeKeyCleanup();

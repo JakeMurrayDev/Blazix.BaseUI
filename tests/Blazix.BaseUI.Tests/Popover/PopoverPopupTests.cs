@@ -292,4 +292,78 @@ public class PopoverPopupTests : BunitContext, IPopoverPopupContract
         return Task.CompletedTask;
     }
 
+    // Source: popups/store.ts `popupIdSelector = state.popupElement?.id ?? state.floatingId` — a
+    // consumer-supplied id stays on the element and is what the trigger's aria-controls points at.
+    [Fact]
+    public Task UsesConsumerSuppliedIdForPopupAndAriaControls()
+    {
+        var attrs = new Dictionary<string, object> { ["id"] = "custom-popup-id" };
+
+        var cut = Render(CreatePopupInPopover(additionalAttributes: attrs));
+
+        var popup = cut.Find("[role='dialog']");
+        popup.GetAttribute("id").ShouldBe("custom-popup-id");
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-controls").ShouldBe("custom-popup-id"));
+
+        return Task.CompletedTask;
+    }
+
+    // Source: PopoverPopup.tsx `returnFocus={finalFocus}` — FloatingFocusManager evaluates a function
+    // finalFocus with the CLOSE interaction type, so it must not be resolved eagerly at open time.
+    [Fact]
+    public Task FinalFocusCallbackIsResolvedAtCloseNotOpen()
+    {
+        var receivedInteractionTypes = new List<string?>();
+
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<PopoverRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "Modal", PopoverModalMode.False);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PopoverTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PopoverPortal>(10);
+                innerBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PopoverPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PopoverPopup>(0);
+                        posBuilder.AddAttribute(1, "FinalFocus", (FocusTarget)new FocusTarget.Callback(type =>
+                        {
+                            receivedInteractionTypes.Add(type);
+                            return null;
+                        }));
+                        posBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(popupBuilder =>
+                        {
+                            popupBuilder.OpenComponent<PopoverClose>(0);
+                            popupBuilder.AddAttribute(1, "data-testid", "close");
+                            popupBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Close")));
+                            popupBuilder.CloseComponent();
+                        }));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(content);
+
+        receivedInteractionTypes.ShouldBeEmpty();
+
+        cut.Find("[data-testid='close']").Click();
+
+        cut.WaitForAssertion(() => receivedInteractionTypes.ShouldContain("mouse"));
+
+        return Task.CompletedTask;
+    }
 }

@@ -74,4 +74,62 @@ public class DialogPortalTests : BunitContext, IDialogPortalContract
 
         return Task.CompletedTask;
     }
+
+    // Source: DialogStore.ts keeps `backdropRef` and `internalBackdropRef` as separate slots. Sharing
+    // one slot made the last writer win, so whichever backdrop lost the race was left out of the focus
+    // manager's inside-elements list and got marked inert/aria-hidden while the dialog was open.
+    [Fact]
+    public Task PublishesInternalBackdropSeparatelyFromUserBackdrop()
+    {
+        var module = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-dialog.min.js");
+
+        var cut = Render(CreateModalDialogWithBothBackdrops());
+
+        cut.WaitForAssertion(() =>
+        {
+            var userBackdropCalls = module.Invocations
+                .Where(invocation => invocation.Identifier == "setBackdropElement")
+                .ToList();
+            var internalBackdropCalls = module.Invocations
+                .Where(invocation => invocation.Identifier == "setInternalBackdropElement")
+                .ToList();
+
+            userBackdropCalls.ShouldNotBeEmpty();
+            internalBackdropCalls.ShouldNotBeEmpty();
+
+            var userElement = (ElementReference)userBackdropCalls[^1].Arguments[1]!;
+            var internalElement = (ElementReference)internalBackdropCalls[^1].Arguments[1]!;
+
+            userElement.Id.ShouldNotBe(internalElement.Id);
+        });
+
+        return Task.CompletedTask;
+    }
+
+    private RenderFragment CreateModalDialogWithBothBackdrops()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<DialogRoot>(0);
+            builder.AddAttribute(1, "Open", true);
+            builder.AddAttribute(2, "Modal", Blazix.BaseUI.Dialog.DialogModalMode.True);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<DialogPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<DialogBackdrop>(0);
+                    portalBuilder.AddAttribute(1, "data-testid", "user-backdrop");
+                    portalBuilder.CloseComponent();
+
+                    portalBuilder.OpenComponent<DialogPopup>(10);
+                    portalBuilder.AddAttribute(11, "data-testid", "popup");
+                    portalBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
 }

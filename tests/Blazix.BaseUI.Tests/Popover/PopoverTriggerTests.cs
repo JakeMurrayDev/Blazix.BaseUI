@@ -452,6 +452,73 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
 
         return Task.CompletedTask;
     }
+
+    // Source: PopoverTrigger.tsx `useButton({ disabled, native: nativeButton })` — a non-native trigger
+    // needs the ported keyboard-activation handlers (Enter on keydown, Space on keyup) from the button
+    // module, otherwise Enter/Space never open the popover.
+    [Fact]
+    public Task SyncsButtonInteropWhenNotNativeButton()
+    {
+        var buttonModule = JSInterop.SetupModule("./_content/Blazix.BaseUI/blazix-baseui-button.min.js");
+        buttonModule.SetupVoid("sync", _ => true).SetVoidResult();
+
+        RenderFragment<RenderProps<PopoverTriggerState>> render = props => builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddMultipleAttributes(1, props.Attributes);
+            if (props.ElementReferenceCallback is not null)
+                builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
+            builder.AddContent(3, props.ChildContent);
+            builder.CloseElement();
+        };
+
+        var cut = Render(CreateTriggerInRoot(nativeButton: false, render: render));
+
+        cut.WaitForAssertion(() =>
+            buttonModule.Invocations.ShouldContain(invocation => invocation.Identifier == "sync"));
+
+        return Task.CompletedTask;
+    }
+
+    // Source: popups/store.ts `triggerOwnsOpenPopup` requires `activeTriggerId === triggerId`. When the
+    // active trigger unregisters while the popover stays open and more than one trigger remains, no
+    // trigger owns the popup, so none may report itself as expanded. The only-trigger fallback lives
+    // solely in `triggerOwnsOpenPopupOrIsOnlyTrigger`, which feeds aria-controls and additionally
+    // requires `triggerCount === 1`.
+    [Fact]
+    public Task DoesNotReportOpenWhenNoTriggerIsActive()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<PopoverActiveTriggerRemovalHost>(0);
+            builder.CloseComponent();
+        });
+
+        cut.Find("#trigger-a").Click();
+        cut.WaitForAssertion(() => cut.Find("#trigger-a").GetAttribute("aria-expanded").ShouldBe("true"));
+
+        // Removing the active trigger while two others remain leaves the popover open with no active
+        // trigger.
+        cut.Find("[data-testid='remove-active']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("#trigger-a").Count.ShouldBe(0);
+            cut.Find("[role='dialog']").HasAttribute("data-open").ShouldBeTrue();
+
+            var triggerB = cut.Find("#trigger-b");
+            var triggerC = cut.Find("#trigger-c");
+
+            triggerB.GetAttribute("aria-expanded").ShouldBe("false");
+            triggerC.GetAttribute("aria-expanded").ShouldBe("false");
+            triggerB.HasAttribute("data-popup-open").ShouldBeFalse();
+            triggerC.HasAttribute("data-popup-open").ShouldBeFalse();
+            triggerB.HasAttribute("aria-controls").ShouldBeFalse();
+            triggerC.HasAttribute("aria-controls").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class PopoverTriggerIdChangeRegistrationHost : ComponentBase
@@ -516,6 +583,58 @@ internal sealed class PopoverTriggerHandleSwitchRegistrationHost : ComponentBase
 
             innerBuilder.OpenComponent<PopoverPortal>(20);
             innerBuilder.AddAttribute(21, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PopoverPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PopoverPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class PopoverActiveTriggerRemovalHost : ComponentBase
+{
+    private bool showFirstTrigger = true;
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PopoverRoot>(0);
+        builder.AddAttribute(1, "Modal", PopoverModalMode.False);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+        {
+            if (showFirstTrigger)
+            {
+                innerBuilder.OpenComponent<PopoverTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-a");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "A")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<PopoverTrigger>(10);
+            innerBuilder.AddAttribute(11, "Id", "trigger-b");
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(b => b.AddContent(0, "B")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenComponent<PopoverTrigger>(20);
+            innerBuilder.AddAttribute(21, "Id", "trigger-c");
+            innerBuilder.AddAttribute(22, "ChildContent", (RenderFragment)(b => b.AddContent(0, "C")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenElement(30, "button");
+            innerBuilder.AddAttribute(31, "data-testid", "remove-active");
+            innerBuilder.AddAttribute(32, "onclick", EventCallback.Factory.Create(this, () => showFirstTrigger = false));
+            innerBuilder.AddContent(33, "Remove A");
+            innerBuilder.CloseElement();
+
+            innerBuilder.OpenComponent<PopoverPortal>(40);
+            innerBuilder.AddAttribute(41, "ChildContent", (RenderFragment)(portalBuilder =>
             {
                 portalBuilder.OpenComponent<PopoverPositioner>(0);
                 portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>

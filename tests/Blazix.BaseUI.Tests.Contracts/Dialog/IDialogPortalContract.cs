@@ -5,4 +5,5 @@ public interface IDialogPortalContract
     Task RendersChildrenWhenOpen();
     Task DoesNotRenderWhenClosed();
     Task KeepMountedTrue_StaysMounted();
+    Task PublishesInternalBackdropSeparatelyFromUserBackdrop();
 }

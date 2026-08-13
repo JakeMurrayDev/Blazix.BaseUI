@@ -50,6 +50,15 @@
         JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/Blazix.BaseUI/blazix-baseui-popover.min.js").AsTask());
 
+    // A consumer-supplied `id` stays on the element and is what the trigger's `aria-controls` must
+    // point at, matching the upstream popup id selector `popupElement?.id ?? floatingId`.
+    private string ResolvedPopupId =>
+        AdditionalAttributes is not null
+        && AdditionalAttributes.TryGetValue("id", out var suppliedId)
+        && suppliedId is string { Length: > 0 } id
+            ? id
+            : popupId;
+
     [CascadingParameter]
     private PopoverRootContext? RootContext { get; set; }
 
@@ -127,9 +136,15 @@
 
         if (RootContext is not null)
         {
-            RootContext.PopupId = popupId;
+            RootContext.PopupId = ResolvedPopupId;
             RootContext.FocusManagerModal = isModal;
             RootContext.SyncHandleRootState();
+
+            // Only a callback FinalFocus can depend on the close interaction type, so only then does
+            // the root need to re-resolve the target at close. Static targets are resolved eagerly.
+            RootContext.ResolveFinalFocusForClose = FinalFocus is FocusTarget.Callback
+                ? ResolveFinalFocusForClose
+                : null;
         }
 
         if (!open)
@@ -152,7 +167,7 @@
             if (!Equals(FinalFocus, previousFinalFocus))
             {
                 previousFinalFocus = FinalFocus;
-                var (mode, element) = ResolveFocusTarget(FinalFocus);
+                var (mode, element) = ResolveFinalFocusTargetForOpen();
                 _ = SetFinalFocusElementAsync(mode, element);
             }
         }
@@ -193,7 +208,7 @@
     {
         var attrs = new Dictionary<string, object>();
 
-        attrs["id"] = popupId;
+        attrs["id"] = ResolvedPopupId;
         attrs["role"] = "dialog";
         attrs["tabindex"] = -1;
         // lint-ignore:RULE-05 lint-ignore:RULE-06 React Base UI parity marker.
@@ -257,7 +272,7 @@
                 _ => "false"
             };
             var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
-            var (finalMode, finalElement) = ResolveFocusTarget(FinalFocus);
+            var (finalMode, finalElement) = ResolveFinalFocusTargetForOpen();
             await module.InvokeVoidAsync("initializePopup",
                 RootContext.RootId, Element.Value, dotNetRef, modalString,
                 initialMode, initialElement, finalMode, finalElement,
@@ -287,6 +302,34 @@
         var interactionType = RootContext?.InteractionType ?? "";
         var result = cb.Fn(interactionType);
         return result.HasValue ? ("element", result.Value) : ("none", null);
+    }
+
+    // Invoked by the root at close time with the resolved close interaction type, so a callback
+    // FinalFocus observes how the popover was closed. Mirrors React, where FloatingFocusManager
+    // evaluates the `returnFocus` function at close rather than at open.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusForClose(string? closeInteractionType)
+    {
+        if (FinalFocus is FocusTarget.Callback cb)
+        {
+            var result = cb.Fn(closeInteractionType ?? string.Empty);
+            return result.HasValue ? ("element", result.Value) : ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
+    }
+
+    // At open, a callback FinalFocus is deferred (the manager defaults to returning focus to the
+    // trigger) because its result can depend on the close interaction type, which is unknown until
+    // close. The root re-resolves it at close via ResolveFinalFocusForClose. Static targets resolve
+    // eagerly here, matching their unconditional behavior.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusTargetForOpen()
+    {
+        if (FinalFocus is FocusTarget.Callback)
+        {
+            return ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
     }
 
     private async Task SetInitialFocusElementAsync(string? mode, ElementReference? element)
@@ -380,6 +423,11 @@
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
+        }
+
+        if (RootContext is not null)
+        {
+            RootContext.ResolveFinalFocusForClose = null;
         }
 
         dotNetRef?.Dispose();

@@ -73,6 +73,12 @@ internal sealed class PopoverRootContext
     public string? ActiveTriggerId { get; set; }
 
     /// <summary>
+    /// Gets or sets the number of currently registered triggers. Mirrors the upstream store's
+    /// <c>triggerCount</c>, which gates the only-trigger fallback used for <c>aria-controls</c>.
+    /// </summary>
+    public int TriggerCount { get; set; }
+
+    /// <summary>
     /// Gets or sets the payload associated with the current popover interaction.
     /// </summary>
     public object? Payload { get; set; }
@@ -177,6 +183,16 @@ internal sealed class PopoverRootContext
     /// Gets or sets a delegate that sets the backdrop element reference.
     /// </summary>
     public Action<ElementReference?> SetBackdropElement { get; set; } = null!;
+
+    /// <summary>
+    /// Re-resolves the popup's <c>FinalFocus</c> target at close time using the close interaction type.
+    /// Registered by <see cref="PopoverPopup"/> only when <c>FinalFocus</c> is a callback, since the
+    /// callback result can depend on how the popover was closed (mouse/touch/pen/keyboard). Mirrors
+    /// React, where <c>FloatingFocusManager</c> evaluates the <c>returnFocus</c> function at close with
+    /// the close interaction type rather than eagerly at open. <see langword="null"/> when no close-time
+    /// re-resolution is needed.
+    /// </summary>
+    public Func<string?, (string? Mode, ElementReference? Element)>? ResolveFinalFocusForClose { get; set; }
 
     /// <summary>
     /// Gets or sets a delegate that asynchronously sets the open state with a reason, optional payload, and optional trigger ID.

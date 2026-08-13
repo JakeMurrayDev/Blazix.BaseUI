@@ -69,7 +69,7 @@
         if (!Nullable.Equals(previousBackdropElement, currentElement))
         {
             previousBackdropElement = currentElement;
-            Context?.SetBackdropElement(currentElement);
+            Context?.SetInternalBackdropElement(currentElement);
         }
     }
 }

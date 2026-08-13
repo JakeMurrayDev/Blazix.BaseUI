@@ -404,6 +404,7 @@ public static class JsInteropSetup
             module.SetupVoid("setInitialFocusElement", _ => true).SetVoidResult();
             module.SetupVoid("setFinalFocusElement", _ => true).SetVoidResult();
             module.SetupVoid("setBackdropElement", _ => true).SetVoidResult();
+            module.SetupVoid("setInternalBackdropElement", _ => true).SetVoidResult();
             module.SetupVoid("disposePopup", _ => true).SetVoidResult();
         }
     }

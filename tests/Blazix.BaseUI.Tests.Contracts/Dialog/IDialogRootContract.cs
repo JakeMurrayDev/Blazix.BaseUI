@@ -21,4 +21,8 @@ public interface IDialogRootContract : IControlledTriggerLifecycleContract
     Task OnFocusOutClosesNonModalDialog();
     Task OnOpenChangeIncludesTriggerAssociation();
     Task FinalFocusCallbackReceivesCloseInteractionType();
+    Task FinalFocusCallbackIsReResolvedOnControlledClose();
+    Task NestedDialogCountPropagatesThroughThreeLevels();
+    Task NestedDialogCountResetsWhenNestedRootUnmounts();
+    Task AppliesAriaLabelledByWhenTitleMountsAfterPopup();
 }

@@ -24,4 +24,6 @@ public interface IPopoverTriggerContract
     Task RendersFocusGuardsWhenOpenAndNonModal();
     Task DoesNotRenderFocusGuardsWhenClosed();
     Task DoesNotRenderFocusGuardsWhenModal();
+    Task SyncsButtonInteropWhenNotNativeButton();
+    Task DoesNotReportOpenWhenNoTriggerIsActive();
 }
