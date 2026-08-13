@@ -28,7 +28,11 @@
 
     private Orientation ResolvedOrientation => ScrollbarContext?.Orientation ?? Orientation.Vertical;
 
-    private ScrollAreaThumbState State => new(ResolvedOrientation);
+    private bool ResolvedScrolling => ResolvedOrientation == Orientation.Vertical
+        ? Context?.ScrollingY ?? false
+        : Context?.ScrollingX ?? false;
+
+    private ScrollAreaThumbState State => new(ResolvedScrolling, ResolvedOrientation);
 
     [CascadingParameter]
     private ScrollAreaRootContext? Context { get; set; }
@@ -149,6 +153,11 @@
             ["data-orientation"] = ResolvedOrientation.ToDataAttributeString() ?? "vertical",
             ["style"] = BuildStyle()
         };
+
+        if (ResolvedScrolling)
+        {
+            attrs["data-scrolling"] = true;
+        }
 
         componentAttributes = attrs;
     }

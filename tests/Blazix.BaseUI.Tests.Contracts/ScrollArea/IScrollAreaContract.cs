@@ -18,6 +18,7 @@ public interface IScrollAreaContract
     Task ScrollbarRendersWhenOverflowAppears();
     Task ScrollbarAppliesAxisScrollingAttribute();
     Task ThumbReceivesOrientationAndMeasuredStyles();
+    Task ThumbAppliesAxisScrollingAttribute();
     Task CornerRendersOnlyWhenBothScrollbarsAreVisible();
     Task DescendantsRequireScrollAreaContext();
 }

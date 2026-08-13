@@ -322,6 +322,22 @@ public class ScrollAreaTests : BunitContext, IScrollAreaContract
     }
 
     [Fact]
+    public async Task ThumbAppliesAxisScrollingAttribute()
+    {
+        var cut = RenderScrollArea();
+
+        await ApplyMeasuredStateAsync(cut, scrollingY: true);
+
+        cut.Find("[data-testid='vertical-thumb']").HasAttribute("data-scrolling").ShouldBeTrue();
+        cut.Find("[data-testid='horizontal-thumb']").HasAttribute("data-scrolling").ShouldBeFalse();
+
+        await ApplyMeasuredStateAsync(cut, scrollingX: true);
+
+        cut.Find("[data-testid='vertical-thumb']").HasAttribute("data-scrolling").ShouldBeFalse();
+        cut.Find("[data-testid='horizontal-thumb']").HasAttribute("data-scrolling").ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task CornerRendersOnlyWhenBothScrollbarsAreVisible()
     {
         var cut = RenderScrollArea();
