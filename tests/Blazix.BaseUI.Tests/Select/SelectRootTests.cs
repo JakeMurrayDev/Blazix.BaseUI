@@ -1862,4 +1862,24 @@ public class SelectRootTests : BunitContext, ISelectRootContract
 
         cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
     }
+
+    [Fact]
+    public async Task CancelOpenDuringPendingOpenKeepsSelectClosed()
+    {
+        var gate = new TaskCompletionSource();
+        var onOpenChange = EventCallback.Factory.Create<SelectOpenChangeEventArgs>(this, _ => gate.Task);
+        var cut = Render(CreateSelect(onOpenChange: onOpenChange));
+        var root = cut.FindComponent<SelectRoot<string>>().Instance;
+
+        // Begin an open that suspends inside its OnOpenChange callback.
+        var pendingOpen = cut.Find("button").TriggerEventAsync("onmousedown", new MouseEventArgs());
+
+        // NotifyCancelOpen must not short-circuit on CurrentOpen while the open is still pending.
+        await cut.InvokeAsync(() => root.NotifyCancelOpen());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+    }
 }
