@@ -11,4 +11,8 @@ public interface ISliderControlContract
     Task HasTabindexMinusOne();
     Task HasDataOrientation();
     Task HasDataDisabledWhenDisabled();
+
+    // Drag commit semantics
+    Task DoesNotCommitOnDragEndWhenNoValueApplied();
+    Task CommitsOnDragEndWithOriginatingReason();
 }

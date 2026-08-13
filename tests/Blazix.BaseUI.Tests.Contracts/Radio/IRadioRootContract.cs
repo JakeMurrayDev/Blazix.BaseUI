@@ -15,8 +15,9 @@ public interface IRadioRootContract
     Task HasRoleRadio();
     Task HasAriaCheckedFalseByDefault();
     Task HasAriaCheckedTrueWhenChecked();
-    Task HasAriaRequiredWhenRequired();
+    Task DoesNotSetAriaRequiredOnRoot();
     Task DoesNotHaveAriaRequiredByDefault();
+    Task DoesNotSetAriaInvalidWhenDisabled();
     Task HasTabindexZeroByDefault();
     Task HasTabindexMinusOneWhenDisabled();
 
@@ -27,9 +28,11 @@ public interface IRadioRootContract
     Task DoesNotChangeStateWhenClickedDisabled();
 
     // ReadOnly
-    Task HasAriaReadonlyWhenReadOnly();
+    Task DoesNotSetAriaReadonlyOnRoot();
     Task DoesNotHaveAriaReadonlyByDefault();
     Task DoesNotChangeStateWhenClickedReadOnly();
+    Task InvokesUserOnClickWhenReadOnly();
+    Task InvokesUserOnKeyDownWhenReadOnly();
 
     // Value prop
     Task DoesNotForwardValuePropToRoot();
@@ -46,6 +49,9 @@ public interface IRadioRootContract
     Task StandaloneBlurValidationDoesNotBlockBlurEvent();
     Task NativeButtonUsesExplicitIdOnRootAndOmitsHiddenInputId();
     Task SetsNameOnInputOnly();
+    Task FieldNameTakesPrecedenceOverLocalName();
+    Task UsesVisuallyHiddenInputStyleWhenNamed();
+    Task UsesVisuallyHiddenStyleWhenNameless();
     Task SetsValueOnHiddenInput();
     Task NullValueSerializesToEmptyInputValue();
     Task NonJsonValueUsesStringFallbackForHiddenInputValue();
@@ -73,4 +79,5 @@ public interface IRadioRootContract
     // Group integration
     Task InheritsDisabledFromGroup();
     Task SetsTabindexBasedOnGroupSelection();
+    Task SetsTabindexZeroOnFirstEnabledRadioWhenGroupHasNoValue();
 }

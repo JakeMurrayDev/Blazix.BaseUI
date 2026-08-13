@@ -168,14 +168,29 @@
     /// <summary>
     /// Called from JavaScript when a drag operation ends to commit the final values.
     /// </summary>
+    /// <param name="values">The values produced by the interaction.</param>
+    /// <param name="thumbIndex">The index of the thumb that was pressed.</param>
+    /// <param name="valueApplied">Whether the interaction produced a value at all.</param>
+    /// <param name="changeReason">The reason of the last applied change: <c>trackPress</c> or <c>drag</c>.</param>
     [JSInvokable]
-    public void OnDragEnd(double[] values, int thumbIndex)
+    public void OnDragEnd(double[] values, int thumbIndex, bool valueApplied, string changeReason)
     {
         if (Context is null)
             return;
 
         Context.SetValue(values, SliderChangeReason.Drag, thumbIndex);
-        Context.CommitValue(values, SliderChangeReason.Drag);
+
+        // Upstream commits only when the interaction produced a value
+        // (`currentInteractionValueRef.current != null`) and uses `lastChangeReasonRef`.
+        if (valueApplied)
+        {
+            var reason = changeReason == "trackPress"
+                ? SliderChangeReason.TrackPress
+                : SliderChangeReason.Drag;
+
+            Context.CommitValue(values, reason);
+        }
+
         Context.SetDragging(false);
         Context.SetActiveThumbIndex(-1);
     }

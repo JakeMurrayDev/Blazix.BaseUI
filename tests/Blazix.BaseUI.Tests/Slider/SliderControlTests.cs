@@ -202,4 +202,69 @@ public class SliderControlTests : BunitContext, ISliderControlContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public async Task DoesNotCommitOnDragEndWhenNoValueApplied()
+    {
+        // Upstream's `handleTouchEnd` commits only when `currentInteractionValueRef.current != null`,
+        // so a press-and-release on an already-positioned thumb commits nothing.
+        var committed = 0;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "OnValueCommitted",
+                EventCallback.Factory.Create<SliderValueCommittedEventArgs<double>>(this, _ => committed++));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var control = cut.FindComponent<SliderControl>().Instance;
+
+        await cut.InvokeAsync(() => control.OnDragEnd([50.0], 0, false, "drag"));
+
+        committed.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CommitsOnDragEndWithOriginatingReason()
+    {
+        // The commit reason comes from `lastChangeReasonRef`, so a track press that was never
+        // dragged commits with the track-press reason.
+        SliderChangeReason? reason = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "OnValueCommitted",
+                EventCallback.Factory.Create<SliderValueCommittedEventArgs<double>>(this, args => reason = args.Reason));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<SliderControl>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(controlBuilder =>
+                {
+                    controlBuilder.OpenComponent<SliderThumb>(0);
+                    controlBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        var control = cut.FindComponent<SliderControl>().Instance;
+
+        await cut.InvokeAsync(() => control.OnDragEnd([70.0], 0, true, "trackPress"));
+
+        reason.ShouldBe(SliderChangeReason.TrackPress);
+    }
 }

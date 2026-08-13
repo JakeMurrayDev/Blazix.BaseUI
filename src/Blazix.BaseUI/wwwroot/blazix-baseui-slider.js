@@ -25,10 +25,20 @@ export function initialize(controlElement, dotNetRef, disabled, readOnly, orient
         thumbElements: [],
         indicatorElement: null,
         boundHandlers: null,
-        insetResizeObserver: null
+        insetResizeObserver: null,
+        interactionValueApplied: false,
+        lastChangeReason: 'drag'
     };
 
     state.set(controlElement, elementState);
+}
+
+function getThumbInput(thumbElement) {
+    return thumbElement?.querySelector('input[type="range"]') ?? null;
+}
+
+function isThumbDisabled(thumbElement) {
+    return getThumbInput(thumbElement)?.disabled === true;
 }
 
 export function dispose(controlElement) {
@@ -59,6 +69,14 @@ export function registerPointerGuard(controlElement) {
 
     function guardHandler(e) {
         controlElement.__skipPointerDown = false;
+
+        // Upstream's `onPointerDown` returns before any `preventDefault()` or
+        // `setPointerCapture()` when the slider is disabled, so text selection and the
+        // native cursor keep working over a disabled control.
+        if (controlElement.getAttribute('data-disabled') !== null) {
+            controlElement.__skipPointerDown = true;
+            return;
+        }
 
         if (e.defaultPrevented) {
             controlElement.__skipPointerDown = true;
@@ -134,7 +152,9 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
             thumbElements: [],
             indicatorElement: null,
             boundHandlers: null,
-            insetResizeObserver: null
+            insetResizeObserver: null,
+            interactionValueApplied: false,
+            lastChangeReason: 'drag'
         };
         state.set(controlElement, elementState);
     }
@@ -157,13 +177,45 @@ export function startDrag(controlElement, dotNetRef, config, thumbElements, indi
     elementState.latestValues = [...config.values];
     elementState.dragging = true;
 
+    elementState.interactionValueApplied = false;
+    elementState.lastChangeReason = 'drag';
+
     // Check if click was directly on a thumb element
     const clickedThumbIndex = findClickedThumbIndex(thumbArray, clientX, clientY);
     const wasClickOnThumb = clickedThumbIndex >= 0;
-    
+
+    // Upstream abandons the whole interaction when the press lands on a disabled thumb
+    // (`isTargetDisabledThumb` -> `resetPressedThumb()` and an early return).
+    if (wasClickOnThumb && isThumbDisabled(thumbArray[clickedThumbIndex])) {
+        elementState.dragging = false;
+        elementState.pressedThumbIndex = -1;
+        elementState.thumbCenterOffset = 0;
+        elementState.pressedValues = null;
+        elementState.latestValues = null;
+        return null;
+    }
+
     // Find closest thumb based on pointer position (for track clicks)
     let closestIndex = wasClickOnThumb ? clickedThumbIndex : findClosestThumbByPosition(thumbArray, clientX, clientY, config.orientation);
+
+    // Every thumb is disabled — there is nothing to move.
+    if (closestIndex < 0) {
+        elementState.dragging = false;
+        elementState.pressedThumbIndex = -1;
+        elementState.thumbCenterOffset = 0;
+        elementState.pressedValues = null;
+        elementState.latestValues = null;
+        return null;
+    }
+
     elementState.pressedThumbIndex = closestIndex;
+
+    if (!wasClickOnThumb) {
+        // The track press applies a value straight away, mirroring upstream's
+        // `setValueFromPointer(finger, REASONS.trackPress, ...)` on pointerdown.
+        elementState.interactionValueApplied = true;
+        elementState.lastChangeReason = 'trackPress';
+    }
 
     // When selected thumb is at max, walk backward to find leftmost thumb at max
     if (closestIndex >= 0 && closestIndex < config.values.length && config.values[closestIndex] === config.max) {
@@ -256,16 +308,21 @@ function findClickedThumbIndex(thumbElements, clientX, clientY) {
 }
 
 function findClosestThumbByPosition(thumbElements, clientX, clientY, orientation) {
-    if (!thumbElements || thumbElements.length === 0) return 0;
-    if (thumbElements.length === 1) return 0;
+    if (!thumbElements || thumbElements.length === 0) return -1;
 
     const vertical = orientation === 'vertical';
-    let closestIndex = 0;
+    let closestIndex = -1;
+    let fallbackIndex = -1;
     let minDistance = Infinity;
 
     for (let i = 0; i < thumbElements.length; i++) {
         const thumb = thumbElements[i];
-        if (!thumb) continue;
+        // Upstream's closest-thumb scan skips thumbs whose `input[type=range]` is disabled.
+        if (!thumb || isThumbDisabled(thumb)) continue;
+
+        if (fallbackIndex < 0) {
+            fallbackIndex = i;
+        }
 
         const rect = thumb.getBoundingClientRect();
         if (rect.width === 0 && rect.height === 0) continue;
@@ -283,7 +340,7 @@ function findClosestThumbByPosition(thumbElements, clientX, clientY, orientation
         }
     }
 
-    return closestIndex;
+    return closestIndex >= 0 ? closestIndex : fallbackIndex;
 }
 
 function arraysEqual(a, b) {
@@ -315,6 +372,13 @@ function handlePointerMove(controlElement, e) {
     if (!validateMinimumDistance(result.values, config.step, config.minStepsBetweenValues)) return;
 
     const valuesChanged = !arraysEqual(result.values, elementState.latestValues);
+
+    if (valuesChanged) {
+        // Mirrors upstream's `currentInteractionValueRef` / `lastChangeReasonRef`, which are
+        // what `handleTouchEnd` consults before committing.
+        elementState.interactionValueApplied = true;
+        elementState.lastChangeReason = 'drag';
+    }
 
     if (config.collisionBehavior === 'swap' && result.didSwap) {
         elementState.pressedThumbIndex = result.thumbIndex;
@@ -349,19 +413,28 @@ function handlePointerUp(controlElement, e) {
     const wasDragging = elementState.dragging;
     const finalValues = elementState.latestValues ? [...elementState.latestValues] : null;
     const finalThumbIndex = elementState.pressedThumbIndex;
+    const valueApplied = elementState.interactionValueApplied === true;
+    const commitReason = elementState.lastChangeReason ?? 'drag';
 
     elementState.dragging = false;
     elementState.pressedThumbIndex = -1;
     elementState.thumbCenterOffset = 0;
     elementState.pressedValues = null;
     elementState.latestValues = null;
+    elementState.interactionValueApplied = false;
+    elementState.lastChangeReason = 'drag';
 
     if (wasDragging && finalValues && elementState.dotNetRef) {
         const safeValues = finalValues.map(v => {
             const num = Number(v);
             return Number.isFinite(num) ? num : 0;
         });
-        elementState.dotNetRef.invokeMethodAsync('OnDragEnd', safeValues, finalThumbIndex >= 0 ? finalThumbIndex : 0);
+        elementState.dotNetRef.invokeMethodAsync(
+            'OnDragEnd',
+            safeValues,
+            finalThumbIndex >= 0 ? finalThumbIndex : 0,
+            valueApplied,
+            commitReason);
     }
 }
 
@@ -887,8 +960,9 @@ const SLIDER_KEYS = new Set([
     'Home', 'End', 'PageUp', 'PageDown'
 ]);
 
-const ARROW_KEYS = new Set([
-    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'
+// Matches upstream's `COMPOSITE_KEYS`: the keys a surrounding composite would consume.
+const COMPOSITE_KEYS = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'
 ]);
 
 export function registerThumbInput(inputElement, dotNetRef) {
@@ -906,11 +980,16 @@ export function registerThumbInput(inputElement, dotNetRef) {
     };
 
     function handleKeyDown(e) {
+        // Upstream's thumb `onKeyDown` bails out when the default was already prevented.
+        if (e.defaultPrevented) return;
+
         if (!SLIDER_KEYS.has(e.key)) return;
 
+        // Every `SLIDER_KEYS` member always resolves to a new value upstream, where
+        // `event.preventDefault()` runs for exactly that case.
         e.preventDefault();
 
-        if (ARROW_KEYS.has(e.key)) {
+        if (COMPOSITE_KEYS.has(e.key)) {
             e.stopPropagation();
         }
 

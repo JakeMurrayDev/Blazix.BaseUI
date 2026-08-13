@@ -47,4 +47,15 @@ public interface ISliderRootContract
 
     // LargeStep configuration
     Task UsesLargeStepValue();
+
+    // Commit semantics
+    Task DoesNotCommitCanceledValueChange();
+    Task DoesNotCommitUnchangedValue();
+
+    // Validation
+    Task SetsAriaInvalidOnRootAndThumbInputWhenFieldInvalid();
+    Task DoesNotSetAriaInvalidWhenDisabled();
+
+    // Numeric precision
+    Task ClampsRoundingPrecisionForBinaryFloatNoise();
 }
