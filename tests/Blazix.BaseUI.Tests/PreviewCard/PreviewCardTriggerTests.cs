@@ -172,6 +172,27 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
     }
 
     [Fact]
+    public async Task DoesNotOpenOnFocusAfterEscapeDismissalWithHandleBackedTrigger()
+    {
+        var handle = new PreviewCardHandle<string>();
+        var cut = Render(CreateHandleBackedTriggerInRoot(handle));
+
+        cut.Find("a").Focus();
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue());
+
+        var root = cut.FindComponent<PreviewCardRoot>();
+        await cut.InvokeAsync(root.Instance.OnEscapeKey);
+
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue());
+
+        // A handle-backed trigger still reads its close reason from the root it sits in, so the
+        // escape dismissal must block the very next focus open just like a plain trigger does.
+        cut.Find("a").Focus();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task DoesNotOpenOnMouseEnterAfterTouchPointerDown()
     {
         var cut = Render(CreateTriggerInRoot(useJsHover: false));
@@ -242,5 +263,40 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
         cut.Markup.ShouldBeEmpty();
 
         return Task.CompletedTask;
+    }
+
+    private static RenderFragment CreateHandleBackedTriggerInRoot(PreviewCardHandle<string> handle)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<PreviewCardRoot>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<PreviewCardTypedTrigger<string>>(0);
+                innerBuilder.AddAttribute(1, "Handle", handle);
+                innerBuilder.AddAttribute(2, "Id", "trigger-one");
+                innerBuilder.AddAttribute(3, "Delay", 0);
+                innerBuilder.AddAttribute(4, "CloseDelay", 0);
+                innerBuilder.AddAttribute(5, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<PreviewCardPortal>(10);
+                innerBuilder.AddAttribute(11, "KeepMounted", true);
+                innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<PreviewCardPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<PreviewCardPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
     }
 }

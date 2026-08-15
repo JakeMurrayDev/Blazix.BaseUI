@@ -615,19 +615,17 @@
     /// </summary>
     internal ElementReference? GetTriggerElement()
     {
-        if (activeTriggerId is not null && triggerElements.TryGetValue(activeTriggerId, out var element))
+        // An active trigger owns the popup. If its element is gone — for example the trigger
+        // unmounted while a canceled close kept the popup open — report no anchor instead of
+        // falling back to an unrelated trigger, which would re-anchor the open popup to it.
+        if (activeTriggerId is not null)
         {
-            return element;
-        }
-
-        // Try to get from handle if available
-        if (Handle is not null && activeTriggerId is not null)
-        {
-            var handleElement = GetTriggerElementFromHandle(activeTriggerId);
-            if (handleElement.HasValue)
+            if (triggerElements.TryGetValue(activeTriggerId, out var element))
             {
-                return handleElement;
+                return element;
             }
+
+            return Handle is not null ? GetTriggerElementFromHandle(activeTriggerId) : null;
         }
 
         return triggerElements.Values.FirstOrDefault();

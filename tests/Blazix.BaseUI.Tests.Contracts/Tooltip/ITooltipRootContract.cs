@@ -18,6 +18,7 @@ public interface ITooltipRootContract : IControlledTriggerLifecycleContract
     Task MapsTriggerPressCloseToInstantDismiss();
     Task DoesNotMapOutsidePressCloseToInstantDismiss();
     Task ClosesWhenActiveTriggerUnmounts();
+    Task DoesNotReanchorToAnotherTriggerWhenActiveTriggerUnmountsAndCloseIsCanceled();
     Task DisabledTriggerDoesNotCloseActiveTooltip();
     Task ActionsRefCloseMethodClosesTooltip();
     Task ActionsRefUnmountMethodUnmountsTooltip();
