@@ -26,4 +26,5 @@ public interface IPopoverTriggerContract
     Task DoesNotRenderFocusGuardsWhenModal();
     Task SyncsButtonInteropWhenNotNativeButton();
     Task DoesNotReportOpenWhenNoTriggerIsActive();
+    Task DoesNotShareAriaControlsAcrossHandleTriggersWhenNoTriggerIsActive();
 }

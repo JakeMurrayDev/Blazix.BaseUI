@@ -523,7 +523,12 @@
 
         if (HasHandle)
         {
-            return Handle!.IsOpen && Handle.ActiveTriggerId is null;
+            // The only-trigger fallback requires `state.triggerCount === 1` upstream, so a
+            // handle-backed popup opened without an active trigger must not hand the same
+            // `aria-controls` to every registered trigger.
+            return Handle!.IsOpen
+                && Handle.ActiveTriggerId is null
+                && Handle.RegisteredTriggerCount == 1;
         }
 
         return RootContext is not null

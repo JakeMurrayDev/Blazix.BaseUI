@@ -519,6 +519,36 @@ public class PopoverTriggerTests : BunitContext, IPopoverTriggerContract
 
         return Task.CompletedTask;
     }
+
+    // The only-trigger fallback in `triggerOwnsOpenPopupOrIsOnlyTrigger` also requires
+    // `state.triggerCount === 1` for handle-backed triggers, so an open handle with no active
+    // trigger and several registered triggers must not hand the same aria-controls to each of them.
+    [Fact]
+    public Task DoesNotShareAriaControlsAcrossHandleTriggersWhenNoTriggerIsActive()
+    {
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<PopoverHandleActiveTriggerRemovalHost>(0);
+            builder.CloseComponent();
+        });
+
+        cut.Find("#handle-trigger-a").Click();
+        cut.WaitForAssertion(() => cut.Find("#handle-trigger-a").GetAttribute("aria-expanded").ShouldBe("true"));
+
+        // Removing the active trigger leaves the handle open with no active trigger and two
+        // registered triggers remaining.
+        cut.Find("[data-testid='remove-active']").Click();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.FindAll("#handle-trigger-a").Count.ShouldBe(0);
+
+            cut.Find("#handle-trigger-b").HasAttribute("aria-controls").ShouldBeFalse();
+            cut.Find("#handle-trigger-c").HasAttribute("aria-controls").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class PopoverTriggerIdChangeRegistrationHost : ComponentBase
@@ -583,6 +613,63 @@ internal sealed class PopoverTriggerHandleSwitchRegistrationHost : ComponentBase
 
             innerBuilder.OpenComponent<PopoverPortal>(20);
             innerBuilder.AddAttribute(21, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PopoverPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PopoverPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class PopoverHandleActiveTriggerRemovalHost : ComponentBase
+{
+    private readonly PopoverHandle handle = new();
+    private bool showFirstTrigger = true;
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        if (showFirstTrigger)
+        {
+            builder.OpenComponent<PopoverTrigger>(0);
+            builder.AddAttribute(1, "Id", "handle-trigger-a");
+            builder.AddAttribute(2, "Handle", handle);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "A")));
+            builder.CloseComponent();
+        }
+
+        builder.OpenComponent<PopoverTrigger>(10);
+        builder.AddAttribute(11, "Id", "handle-trigger-b");
+        builder.AddAttribute(12, "Handle", handle);
+        builder.AddAttribute(13, "ChildContent", (RenderFragment)(b => b.AddContent(0, "B")));
+        builder.CloseComponent();
+
+        builder.OpenComponent<PopoverTrigger>(20);
+        builder.AddAttribute(21, "Id", "handle-trigger-c");
+        builder.AddAttribute(22, "Handle", handle);
+        builder.AddAttribute(23, "ChildContent", (RenderFragment)(b => b.AddContent(0, "C")));
+        builder.CloseComponent();
+
+        builder.OpenElement(30, "button");
+        builder.AddAttribute(31, "data-testid", "remove-active");
+        builder.AddAttribute(32, "onclick", EventCallback.Factory.Create(this, () => showFirstTrigger = false));
+        builder.AddContent(33, "Remove A");
+        builder.CloseElement();
+
+        builder.OpenComponent<PopoverRoot>(40);
+        builder.AddAttribute(41, "Handle", handle);
+        builder.AddAttribute(42, "Modal", PopoverModalMode.False);
+        builder.AddAttribute(43, "ChildContent", (RenderFragment<PopoverRootPayloadContext>)(_ => innerBuilder =>
+        {
+            innerBuilder.OpenComponent<PopoverPortal>(0);
+            innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
             {
                 portalBuilder.OpenComponent<PopoverPositioner>(0);
                 portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
