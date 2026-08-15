@@ -15,6 +15,11 @@ public interface ITooltipRootContract : IControlledTriggerLifecycleContract
     Task ShouldNotOpenWhenDisabled();
     Task DisabledPreventsSubsequentOpens();
     Task DisabledDoesNotPreventInitialDefaultOpen();
+    Task MapsTriggerPressCloseToInstantDismiss();
+    Task DoesNotMapOutsidePressCloseToInstantDismiss();
+    Task ClosesWhenActiveTriggerUnmounts();
+    Task DoesNotReanchorToAnotherTriggerWhenActiveTriggerUnmountsAndCloseIsCanceled();
+    Task DisabledTriggerDoesNotCloseActiveTooltip();
     Task ActionsRefCloseMethodClosesTooltip();
     Task ActionsRefUnmountMethodUnmountsTooltip();
     Task CascadesContextToChildren();

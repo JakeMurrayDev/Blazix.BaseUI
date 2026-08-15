@@ -481,7 +481,74 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
     }
 
     [Fact]
-    public Task DisabledTriggerClosesActiveTooltip()
+    public async Task MapsTriggerPressCloseToInstantDismiss()
+    {
+        var cut = Render(CreateTooltip(defaultOpen: true));
+        var root = cut.FindComponent<TooltipRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, TooltipOpenChangeReason.TriggerPress, null));
+
+        cut.Find("[role='tooltip']").GetAttribute("data-instant").ShouldBe("dismiss");
+    }
+
+    [Fact]
+    public async Task DoesNotMapOutsidePressCloseToInstantDismiss()
+    {
+        var cut = Render(CreateTooltip(defaultOpen: true));
+        var root = cut.FindComponent<TooltipRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, TooltipOpenChangeReason.OutsidePress, null));
+
+        cut.Find("[role='tooltip']").HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ClosesWhenActiveTriggerUnmounts()
+    {
+        var cut = Render<TooltipTriggerRemovalHost>();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        await cut.InvokeAsync(cut.Instance.RemoveTrigger);
+
+        cut.WaitForAssertion(() => cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue());
+    }
+
+    [Fact]
+    public async Task DoesNotReanchorToAnotherTriggerWhenActiveTriggerUnmountsAndCloseIsCanceled()
+    {
+        var cut = Render<TooltipCanceledCloseTriggerRemovalHost>();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        var triggerB = cut.FindComponents<TooltipTrigger>().Single(component => component.Instance.Id == "trigger-b");
+        var triggerBElement = triggerB.Instance.Element;
+        triggerBElement.ShouldNotBeNull();
+
+        var anchorInvocationsBeforeRemoval = CountAnchorInvocationsFor(triggerBElement.Value);
+
+        await cut.InvokeAsync(cut.Instance.RemoveActiveTrigger);
+
+        // The queued close is deferred, so wait until the canceled close has been processed and
+        // the popup is still open with `trigger-a` still owning it.
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+            cut.Instance.CanceledCloseCount.ShouldBeGreaterThan(0);
+        });
+
+        // The positioner resolves its anchor through this delegate on every render, so the
+        // unmounted trigger must resolve to no anchor rather than to the surviving trigger.
+        var resolvedAnchorId = cut.Instance.RootContext!.GetTriggerElement()?.Id;
+        resolvedAnchorId.ShouldNotBe(triggerBElement.Value.Id);
+        resolvedAnchorId.ShouldBeNull();
+
+        // ...and the positioner must not have pushed the surviving trigger to JS as the anchor.
+        CountAnchorInvocationsFor(triggerBElement.Value).ShouldBe(anchorInvocationsBeforeRemoval);
+    }
+
+    [Fact]
+    public Task DisabledTriggerDoesNotCloseActiveTooltip()
     {
         RenderFragment content = builder =>
         {
@@ -519,7 +586,10 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
 
         cut.Find("#trigger-2").Focus();
 
-        cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue();
+        // Upstream builds the hover/focus interactions with `enabled: !disabled`, so a disabled
+        // trigger installs no handlers and leaves the sibling trigger's tooltip untouched.
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+        cut.Find("#trigger-1").HasAttribute("data-popup-open").ShouldBeTrue();
         cut.Find("#trigger-2").HasAttribute("data-popup-open").ShouldBeFalse();
 
         return Task.CompletedTask;
@@ -609,5 +679,126 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
                 handle.Payload.ShouldBe(expectedPayload);
             });
         }
+    }
+
+    private int CountAnchorInvocationsFor(ElementReference anchor) =>
+        JSInterop.Invocations.Count(invocation =>
+            invocation.Identifier is "initializePositioner" or "updatePosition"
+            && invocation.Arguments.Count > 1
+            && invocation.Arguments[1] is ElementReference argument
+            && argument.Id == anchor.Id);
+}
+
+internal sealed class TooltipCanceledCloseTriggerRemovalHost : ComponentBase
+{
+    private bool showActiveTrigger = true;
+
+    public TooltipRootContext? RootContext { get; private set; }
+
+    public int CanceledCloseCount { get; private set; }
+
+    public void RemoveActiveTrigger()
+    {
+        showActiveTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<TooltipRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-a");
+        builder.AddAttribute(3, "OnOpenChange", EventCallback.Factory.Create<TooltipOpenChangeEventArgs>(this, args =>
+        {
+            if (args.Open)
+            {
+                return;
+            }
+
+            // Cancelling the close is what keeps the popup open with `trigger-a` still recorded
+            // as the active trigger after that trigger unmounts.
+            CanceledCloseCount++;
+            args.Cancel();
+        }));
+        builder.AddAttribute(4, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            innerBuilder.OpenComponent<CascadingValueCapture<TooltipRootContext>>(0);
+            innerBuilder.AddAttribute(1, "OnCaptured", EventCallback.Factory.Create<TooltipRootContext?>(
+                this, context => RootContext = context));
+            innerBuilder.CloseComponent();
+
+            if (showActiveTrigger)
+            {
+                innerBuilder.OpenComponent<TooltipTrigger>(10);
+                innerBuilder.AddAttribute(11, "Id", "trigger-a");
+                innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger A")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<TooltipTrigger>(20);
+            innerBuilder.AddAttribute(21, "Id", "trigger-b");
+            innerBuilder.AddAttribute(22, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger B")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenComponent<TooltipPortal>(30);
+            innerBuilder.AddAttribute(31, "KeepMounted", true);
+            innerBuilder.AddAttribute(32, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class TooltipTriggerRemovalHost : ComponentBase
+{
+    private bool showTrigger = true;
+
+    public void RemoveTrigger()
+    {
+        showTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<TooltipRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-one");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            if (showTrigger)
+            {
+                innerBuilder.OpenComponent<TooltipTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<TooltipPortal>(10);
+            innerBuilder.AddAttribute(11, "KeepMounted", true);
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

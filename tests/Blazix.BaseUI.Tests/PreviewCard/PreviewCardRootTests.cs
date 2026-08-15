@@ -342,6 +342,51 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
     }
 
     [Fact]
+    public async Task ClosesWhenActiveTriggerUnmounts()
+    {
+        var cut = Render<PreviewCardTriggerRemovalHost>();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        await cut.InvokeAsync(cut.Instance.RemoveTrigger);
+
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue());
+    }
+
+    [Fact]
+    public async Task DoesNotReanchorToAnotherTriggerWhenActiveTriggerUnmountsAndCloseIsCanceled()
+    {
+        var cut = Render<PreviewCardCanceledCloseTriggerRemovalHost>();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        var triggerB = cut.FindComponents<PreviewCardTrigger>().Single(component => component.Instance.Id == "trigger-b");
+        var triggerBElement = triggerB.Instance.Element;
+        triggerBElement.ShouldNotBeNull();
+
+        var anchorInvocationsBeforeRemoval = CountAnchorInvocationsFor(triggerBElement.Value);
+
+        await cut.InvokeAsync(cut.Instance.RemoveActiveTrigger);
+
+        // The queued close is deferred, so wait until the canceled close has been processed and
+        // the popup is still open with `trigger-a` still owning it.
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+            cut.Instance.CanceledCloseCount.ShouldBeGreaterThan(0);
+        });
+
+        // The positioner resolves its anchor through this delegate on every render, so the
+        // unmounted trigger must resolve to no anchor rather than to the surviving trigger.
+        var resolvedAnchorId = cut.Instance.RootContext!.GetTriggerElement()?.Id;
+        resolvedAnchorId.ShouldNotBe(triggerBElement.Value.Id);
+        resolvedAnchorId.ShouldBeNull();
+
+        // ...and the positioner must not have pushed the surviving trigger to JS as the anchor.
+        CountAnchorInvocationsFor(triggerBElement.Value).ShouldBe(anchorInvocationsBeforeRemoval);
+    }
+
+    [Fact]
     public async Task ActionsRefCloseMethodClosesPreviewCard()
     {
         var closeRequested = false;
@@ -512,5 +557,130 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
                 handle.Payload.ShouldBe(expectedPayload);
             });
         }
+    }
+
+    private int CountAnchorInvocationsFor(ElementReference anchor) =>
+        JSInterop.Invocations.Count(invocation =>
+            invocation.Identifier is "initializePositioner" or "updatePosition"
+            && invocation.Arguments.Count > 1
+            && invocation.Arguments[1] is ElementReference argument
+            && argument.Id == anchor.Id);
+}
+
+internal sealed class PreviewCardCanceledCloseTriggerRemovalHost : ComponentBase
+{
+    private bool showActiveTrigger = true;
+
+    public PreviewCardRootContext? RootContext { get; private set; }
+
+    public int CanceledCloseCount { get; private set; }
+
+    public void RemoveActiveTrigger()
+    {
+        showActiveTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PreviewCardRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-a");
+        builder.AddAttribute(3, "OnOpenChange", EventCallback.Factory.Create<PreviewCardOpenChangeEventArgs>(this, args =>
+        {
+            if (args.Open)
+            {
+                return;
+            }
+
+            // Cancelling the close is what keeps the popup open with `trigger-a` still recorded
+            // as the active trigger after that trigger unmounts.
+            CanceledCloseCount++;
+            args.Cancel();
+        }));
+        builder.AddAttribute(4, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            innerBuilder.OpenComponent<CascadingValueCapture<PreviewCardRootContext>>(0);
+            innerBuilder.AddAttribute(1, "OnCaptured", EventCallback.Factory.Create<PreviewCardRootContext?>(
+                this, context => RootContext = context));
+            innerBuilder.CloseComponent();
+
+            if (showActiveTrigger)
+            {
+                innerBuilder.OpenComponent<PreviewCardTrigger>(10);
+                innerBuilder.AddAttribute(11, "Id", "trigger-a");
+                innerBuilder.AddAttribute(12, "Delay", 0);
+                innerBuilder.AddAttribute(13, "CloseDelay", 0);
+                innerBuilder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger A")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<PreviewCardTrigger>(20);
+            innerBuilder.AddAttribute(21, "Id", "trigger-b");
+            innerBuilder.AddAttribute(22, "Delay", 0);
+            innerBuilder.AddAttribute(23, "CloseDelay", 0);
+            innerBuilder.AddAttribute(24, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger B")));
+            innerBuilder.CloseComponent();
+
+            innerBuilder.OpenComponent<PreviewCardPortal>(30);
+            innerBuilder.AddAttribute(31, "KeepMounted", true);
+            innerBuilder.AddAttribute(32, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PreviewCardPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PreviewCardPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
+}
+
+internal sealed class PreviewCardTriggerRemovalHost : ComponentBase
+{
+    private bool showTrigger = true;
+
+    public void RemoveTrigger()
+    {
+        showTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PreviewCardRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-one");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            if (showTrigger)
+            {
+                innerBuilder.OpenComponent<PreviewCardTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<PreviewCardPortal>(10);
+            innerBuilder.AddAttribute(11, "KeepMounted", true);
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PreviewCardPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PreviewCardPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

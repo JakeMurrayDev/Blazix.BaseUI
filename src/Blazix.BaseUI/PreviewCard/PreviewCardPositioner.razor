@@ -299,6 +299,13 @@
         attrs["data-closed"] = !isOpen;
         attrs["data-anchor-hidden"] = computedAnchorHidden;
 
+        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        var instantAttr = instantType.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
+
         componentAttributes = attrs;
     }
 

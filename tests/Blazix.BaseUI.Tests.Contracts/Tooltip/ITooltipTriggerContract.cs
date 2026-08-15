@@ -9,6 +9,9 @@ public interface ITooltipTriggerContract
     Task HasDataPopupOpenWhenOpen();
     Task HasDisabledAttributeWhenDisabled();
     Task DoesNotOpenWhenDisabled();
+    Task ClosesOnPointerDownWhenOpen();
+    Task ReinitializesJsHoverWhenDisableHoverablePopupChanges();
+    Task DoesNotReopenOnFocusAfterEscapeCloseWithHandleBackedTrigger();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task RequiresContext();

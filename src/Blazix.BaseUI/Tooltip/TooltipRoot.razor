@@ -23,6 +23,7 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private bool isDisposed;
     private bool isOpen;
     private readonly TransitionLifecycleManager transition = new();
     private string? activeTriggerId;
@@ -411,6 +412,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        isDisposed = true;
         UnsubscribeFromHandle();
 
         if (subscribedDelayGroupContext is not null)
@@ -573,7 +575,7 @@
         {
             instantType = reason switch
             {
-                TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.OutsidePress => TooltipInstantType.Dismiss,
+                TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.TriggerPress => TooltipInstantType.Dismiss,
                 _ => TooltipInstantType.None
             };
             if (currentOpen)
@@ -662,10 +664,7 @@
 
         if (activeTriggerId == triggerId && state.Open)
         {
-            activeTriggerId = null;
-            context.ActiveTriggerId = null;
-            payload = null;
-            context.Payload = null;
+            QueueCloseOnActiveTriggerUnmount(triggerId);
         }
     }
 
@@ -729,19 +728,17 @@
     /// </summary>
     internal ElementReference? GetTriggerElement()
     {
-        if (activeTriggerId is not null && triggerElements.TryGetValue(activeTriggerId, out var element))
+        // An active trigger owns the popup. If its element is gone — for example the trigger
+        // unmounted while a canceled close kept the popup open — report no anchor instead of
+        // falling back to an unrelated trigger, which would re-anchor the open popup to it.
+        if (activeTriggerId is not null)
         {
-            return element;
-        }
-
-        // Try to get from handle if available
-        if (Handle is not null && activeTriggerId is not null)
-        {
-            var handleElement = GetTriggerElementFromHandle(activeTriggerId);
-            if (handleElement.HasValue)
+            if (triggerElements.TryGetValue(activeTriggerId, out var element))
             {
-                return handleElement;
+                return element;
             }
+
+            return Handle is not null ? GetTriggerElementFromHandle(activeTriggerId) : null;
         }
 
         return triggerElements.Values.FirstOrDefault();
@@ -1029,6 +1026,59 @@
         context.Payload = null;
         RefreshCascadingContext();
         _ = InvokeOpenChangeCompleteAsync(false);
+        StateHasChanged();
+    }
+
+    private void QueueCloseOnActiveTriggerUnmount(string lostTriggerId)
+    {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                // Defer so a same-tick replacement trigger with the same id can register first.
+                await Task.Yield();
+                await CloseOnActiveTriggerUnmountAsync(lostTriggerId);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                _ = ex; // Expected when the root is torn down together with its trigger.
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        });
+    }
+
+    private async Task CloseOnActiveTriggerUnmountAsync(string lostTriggerId)
+    {
+        if (isDisposed
+            || !state.Open
+            || activeTriggerId != lostTriggerId
+            || triggerElements.ContainsKey(lostTriggerId))
+        {
+            return;
+        }
+
+        await SetOpenAsync(false, TooltipOpenChangeReason.None, null);
+
+        // If closing is canceled, keep the previous active trigger ownership for the
+        // still-open popup instead of claiming another trigger implicitly.
+        if (state.Open)
+        {
+            return;
+        }
+
+        activeTriggerId = null;
+        context.ActiveTriggerId = null;
+        payload = null;
+        context.Payload = null;
+        RefreshCascadingContext();
         StateHasChanged();
     }
 
