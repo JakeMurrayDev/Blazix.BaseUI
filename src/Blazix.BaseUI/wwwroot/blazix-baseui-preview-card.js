@@ -100,6 +100,13 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
     });
 
     rootState.hoverInteractions.set(triggerId, hoverInteraction);
+
+    // `createHoverInteraction` binds the popup's mouseenter/mouseleave handlers only inside
+    // `setFloatingElement`, so an interaction created after the popup already exists would
+    // never clear the close timer while the pointer is over the card. Upstream wires the
+    // floating hover interaction for every trigger of the root
+    // (PreviewCardPopup.tsx:47-49 `useHoverFloatingInteraction`), so bind it here too.
+    hoverInteraction.setFloatingElement(rootState.popupElement ?? null);
 }
 
 export function disposeHoverInteraction(rootId, triggerId = null) {

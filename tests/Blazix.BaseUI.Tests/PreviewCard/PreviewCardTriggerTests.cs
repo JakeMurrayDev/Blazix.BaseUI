@@ -3,6 +3,7 @@ using Blazix.BaseUI.Tests.Infrastructure;
 using Blazix.BaseUI.PreviewCard;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace Blazix.BaseUI.Tests.PreviewCard;
 
@@ -21,7 +22,8 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         Func<PreviewCardTriggerState, string>? classValue = null,
         Func<PreviewCardTriggerState, string>? styleValue = null,
-        bool includePositioner = true)
+        bool includePositioner = true,
+        bool useJsHover = true)
     {
         return builder =>
         {
@@ -43,6 +45,7 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
                 if (additionalAttributes is not null)
                     innerBuilder.AddMultipleAttributes(7, additionalAttributes);
                 innerBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.AddAttribute(9, "UseJsHover", useJsHover);
                 innerBuilder.CloseComponent();
 
                 if (includePositioner)
@@ -124,6 +127,67 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
 
         var trigger = cut.Find("a");
         trigger.HasAttribute("data-popup-open").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotOpenOnFocusAfterPointerDown()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        cut.Find("a").Focus();
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        cut.Find("a").Blur();
+        cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue();
+
+        // Upstream gates the focus open on `:focus-visible`, which does not match a button
+        // focused in pointer modality (useFocus.ts).
+        cut.Find("a").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("a").Focus();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DoesNotOpenOnFocusAfterEscapeDismissal()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        cut.Find("a").Focus();
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        var root = cut.FindComponent<PreviewCardRoot>();
+        await cut.InvokeAsync(root.Instance.OnEscapeKey);
+
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue());
+
+        // Upstream keeps `blockFocusRef` set until the pointer leaves or focus moves elsewhere.
+        cut.Find("a").Focus();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeFalse();
+    }
+
+    [Fact]
+    public Task DoesNotOpenOnMouseEnterAfterTouchPointerDown()
+    {
+        var cut = Render(CreateTriggerInRoot(useJsHover: false));
+
+        // Upstream sets `mouseOnly: true`, so the compatibility mouse events a touch tap
+        // synthesizes must not open the card (useHoverReferenceInteraction.ts).
+        cut.Find("a").PointerDown(new PointerEventArgs { PointerType = "touch" });
+        cut.Find("a").MouseEnter();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeFalse();
+
+        cut.Find("a").MouseLeave();
+        cut.Find("a").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+        cut.Find("a").MouseEnter();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

@@ -120,6 +120,13 @@
         attrs["data-open"] = isOpen;
         attrs["data-closed"] = !isOpen;
 
+        var instantType = RootContext?.InstantType ?? PreviewCardInstantType.None;
+        var instantAttr = instantType.ToDataAttributeString();
+        if (!string.IsNullOrEmpty(instantAttr))
+        {
+            attrs["data-instant"] = instantAttr;
+        }
+
         var transitionStatus = RootContext?.TransitionStatus ?? TransitionStatus.Undefined;
         TransitionAttributeHelper.ApplyTransitionStyleAttributes(attrs, transitionStatus);
 

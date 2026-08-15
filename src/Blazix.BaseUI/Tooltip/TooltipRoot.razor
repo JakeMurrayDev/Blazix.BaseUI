@@ -23,6 +23,7 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private bool isDisposed;
     private bool isOpen;
     private readonly TransitionLifecycleManager transition = new();
     private string? activeTriggerId;
@@ -411,6 +412,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        isDisposed = true;
         UnsubscribeFromHandle();
 
         if (subscribedDelayGroupContext is not null)
@@ -573,7 +575,7 @@
         {
             instantType = reason switch
             {
-                TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.OutsidePress => TooltipInstantType.Dismiss,
+                TooltipOpenChangeReason.EscapeKey or TooltipOpenChangeReason.TriggerPress => TooltipInstantType.Dismiss,
                 _ => TooltipInstantType.None
             };
             if (currentOpen)
@@ -662,10 +664,7 @@
 
         if (activeTriggerId == triggerId && state.Open)
         {
-            activeTriggerId = null;
-            context.ActiveTriggerId = null;
-            payload = null;
-            context.Payload = null;
+            QueueCloseOnActiveTriggerUnmount(triggerId);
         }
     }
 
@@ -1029,6 +1028,59 @@
         context.Payload = null;
         RefreshCascadingContext();
         _ = InvokeOpenChangeCompleteAsync(false);
+        StateHasChanged();
+    }
+
+    private void QueueCloseOnActiveTriggerUnmount(string lostTriggerId)
+    {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                // Defer so a same-tick replacement trigger with the same id can register first.
+                await Task.Yield();
+                await CloseOnActiveTriggerUnmountAsync(lostTriggerId);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                _ = ex; // Expected when the root is torn down together with its trigger.
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        });
+    }
+
+    private async Task CloseOnActiveTriggerUnmountAsync(string lostTriggerId)
+    {
+        if (isDisposed
+            || !state.Open
+            || activeTriggerId != lostTriggerId
+            || triggerElements.ContainsKey(lostTriggerId))
+        {
+            return;
+        }
+
+        await SetOpenAsync(false, TooltipOpenChangeReason.None, null);
+
+        // If closing is canceled, keep the previous active trigger ownership for the
+        // still-open popup instead of claiming another trigger implicitly.
+        if (state.Open)
+        {
+            return;
+        }
+
+        activeTriggerId = null;
+        context.ActiveTriggerId = null;
+        payload = null;
+        context.Payload = null;
+        RefreshCascadingContext();
         StateHasChanged();
     }
 

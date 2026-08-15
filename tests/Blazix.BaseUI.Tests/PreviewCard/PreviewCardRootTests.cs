@@ -342,6 +342,18 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
     }
 
     [Fact]
+    public async Task ClosesWhenActiveTriggerUnmounts()
+    {
+        var cut = Render<PreviewCardTriggerRemovalHost>();
+
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        await cut.InvokeAsync(cut.Instance.RemoveTrigger);
+
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue());
+    }
+
+    [Fact]
     public async Task ActionsRefCloseMethodClosesPreviewCard()
     {
         var closeRequested = false;
@@ -512,5 +524,49 @@ public class PreviewCardRootTests : BunitContext, IPreviewCardRootContract
                 handle.Payload.ShouldBe(expectedPayload);
             });
         }
+    }
+}
+
+internal sealed class PreviewCardTriggerRemovalHost : ComponentBase
+{
+    private bool showTrigger = true;
+
+    public void RemoveTrigger()
+    {
+        showTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<PreviewCardRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-one");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            if (showTrigger)
+            {
+                innerBuilder.OpenComponent<PreviewCardTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<PreviewCardPortal>(10);
+            innerBuilder.AddAttribute(11, "KeepMounted", true);
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<PreviewCardPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<PreviewCardPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

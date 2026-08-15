@@ -172,15 +172,16 @@ public class PreviewCardPositionerTests : BunitContext, IPreviewCardPositionerCo
     }
 
     [Fact]
-    public async Task DoesNotRenderDataInstant()
+    public async Task RendersDataInstantFocusWhenOpenedByFocus()
     {
         var cut = Render(CreatePositionerInRoot(defaultOpen: false));
         var root = cut.FindComponent<PreviewCardRoot>();
 
         await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
 
+        // Upstream renders `instant: instantType` on the positioner (PreviewCardPositioner.tsx:93).
         var positioner = cut.Find("[role='presentation']");
-        positioner.HasAttribute("data-instant").ShouldBeFalse();
+        positioner.GetAttribute("data-instant").ShouldBe("focus");
     }
 
     [Fact]

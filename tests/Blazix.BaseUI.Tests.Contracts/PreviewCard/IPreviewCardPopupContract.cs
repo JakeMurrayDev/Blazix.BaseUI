@@ -10,6 +10,7 @@ public interface IPreviewCardPopupContract
     Task HasDataAlignAttribute();
     Task HasDataOpenWhenOpen();
     Task HasDataClosedWhenClosed();
+    Task RendersDataInstantFocusWhenOpenedByFocus();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task RequiresContext();

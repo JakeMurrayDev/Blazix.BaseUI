@@ -6,6 +6,9 @@ public interface IPreviewCardTriggerContract
     Task RendersWithCustomRender();
     Task ForwardsAdditionalAttributes();
     Task HasDataPopupOpenWhenOpen();
+    Task DoesNotOpenOnFocusAfterPointerDown();
+    Task DoesNotOpenOnFocusAfterEscapeDismissal();
+    Task DoesNotOpenOnMouseEnterAfterTouchPointerDown();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task RequiresContext();

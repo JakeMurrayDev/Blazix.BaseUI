@@ -156,6 +156,18 @@ public class PreviewCardPopupTests : BunitContext, IPreviewCardPopupContract
     }
 
     [Fact]
+    public async Task RendersDataInstantFocusWhenOpenedByFocus()
+    {
+        var cut = Render(CreatePopupInRoot(defaultOpen: false));
+        var root = cut.FindComponent<PreviewCardRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(true, PreviewCardOpenChangeReason.TriggerFocus, null));
+
+        // Upstream renders `instant: instantType` on the popup (PreviewCardPopup.tsx:55).
+        cut.Find("div[data-side][id]").GetAttribute("data-instant").ShouldBe("focus");
+    }
+
+    [Fact]
     public Task HasFloatingFocusableAttributes()
     {
         var cut = Render(CreatePopupInRoot(defaultOpen: true));

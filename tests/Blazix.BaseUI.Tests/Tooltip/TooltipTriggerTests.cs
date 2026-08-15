@@ -193,6 +193,38 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
     }
 
     [Fact]
+    public Task ClosesOnPointerDownWhenOpen()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultOpen: true));
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        // Upstream wires `closeOnReferencePress` to `onPointerDown` as well as `onClick`,
+        // so the press dismisses the tooltip before `mouseup`/`click`.
+        cut.Find("button").PointerDown(new PointerEventArgs { PointerType = "mouse" });
+
+        cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ReinitializesJsHoverWhenDisableHoverablePopupChanges()
+    {
+        var cut = Render<TooltipDisableHoverablePopupHost>();
+
+        cut.WaitForAssertion(() => JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            Equals(invocation.Arguments[5], false)).ShouldBeTrue());
+
+        await cut.InvokeAsync(() => cut.Instance.SetDisableHoverablePopup(true));
+
+        cut.WaitForAssertion(() => JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            Equals(invocation.Arguments[5], true)).ShouldBeTrue());
+    }
+
+    [Fact]
     public Task AppliesClassValueWithState()
     {
         var cut = Render(CreateTriggerInRoot(
@@ -418,5 +450,30 @@ internal sealed class TooltipTriggerRootContextClearHost : ComponentBase
             SetTriggerPayload = (_, _) => { },
             ForceUnmount = () => { }
         };
+    }
+}
+
+internal sealed class TooltipDisableHoverablePopupHost : ComponentBase
+{
+    private bool disableHoverablePopup;
+
+    public void SetDisableHoverablePopup(bool value)
+    {
+        disableHoverablePopup = value;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<TooltipRoot>(0);
+        builder.AddAttribute(1, "DisableHoverablePopup", disableHoverablePopup);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            innerBuilder.OpenComponent<TooltipTrigger>(0);
+            innerBuilder.AddAttribute(1, "Id", "trigger-one");
+            innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

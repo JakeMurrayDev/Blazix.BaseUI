@@ -33,6 +33,7 @@
     private CancellationTokenSource? hoverCts;
     private int lastEffectiveDelay = -1;
     private int lastEffectiveCloseDelay = -1;
+    private bool? lastDisableHoverablePopup;
     private bool lastUseJsHover;
     private bool recentPointerDown;
     private bool blockFocusOpen;
@@ -240,11 +241,20 @@
         // Re-initialize JS hover if effective delays changed
         else if (UseJsHover && hoverInitialized && !effectiveDisabled && !HasHandle && RootContext is not null && Element.HasValue)
         {
-            var effectiveDelay = GetEffectiveDelay();
-            var effectiveCloseDelay = GetEffectiveCloseDelay();
-            if (effectiveDelay != lastEffectiveDelay || effectiveCloseDelay != lastEffectiveCloseDelay)
+            // Upstream recomputes `handleClose` on every render from the live
+            // `disableHoverablePopup`/`trackCursorAxis` values, so re-arm safePolygon when they change.
+            if (ResolveDisableHoverablePopup() != lastDisableHoverablePopup)
             {
-                _ = UpdateHoverInteractionDelaysAsync();
+                QueueHoverReinitialize();
+            }
+            else
+            {
+                var effectiveDelay = GetEffectiveDelay();
+                var effectiveCloseDelay = GetEffectiveCloseDelay();
+                if (effectiveDelay != lastEffectiveDelay || effectiveCloseDelay != lastEffectiveCloseDelay)
+                {
+                    _ = UpdateHoverInteractionDelaysAsync();
+                }
             }
         }
 
@@ -475,7 +485,14 @@
     {
         recentPointerDown = true;
 
-        if (CloseOnClick && !IsOpenedByThisTrigger())
+        // Upstream wires `closeOnReferencePress` to both `onPointerDown` and `onClick`
+        // (useDismiss.ts reference props), so a press dismisses before `mouseup`.
+        if (!IsDisabled && CloseOnClick && IsOpenedByThisTrigger())
+        {
+            blockFocusOpen = true;
+            await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerPress);
+        }
+        else if (CloseOnClick && !IsOpenedByThisTrigger())
         {
             CancelHoverDelay();
             if (UseJsHover && hoverInitialized && RootContext is not null && moduleTask?.IsValueCreated == true)
@@ -510,12 +527,10 @@
             return;
         }
 
+        // Upstream creates the hover interaction with `enabled: !disabled`, so a disabled
+        // trigger installs no handlers and never closes another trigger's open tooltip.
         if (IsDisabled)
         {
-            if (IsAnyTooltipOpen())
-            {
-                await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerHover);
-            }
             await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
             return;
         }
@@ -631,12 +646,10 @@
             return;
         }
 
+        // Upstream creates the focus interaction with `enabled: !disabled`, so a disabled
+        // trigger installs no handlers and never closes another trigger's open tooltip.
         if (IsDisabled)
         {
-            if (IsAnyTooltipOpen())
-            {
-                await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerFocus);
-            }
             await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
             return;
         }
@@ -717,6 +730,7 @@
             hoverRootId = rootContext.RootId;
             lastEffectiveDelay = effectiveDelay;
             lastEffectiveCloseDelay = effectiveCloseDelay;
+            lastDisableHoverablePopup = disableHoverablePopup;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -757,6 +771,30 @@
         hoverRebindTask = RebindHoverInteractionAsync(previousTask, previousTriggerId, desiredTriggerId);
     }
 
+    private void QueueHoverReinitialize()
+    {
+        var previousTask = hoverRebindTask;
+        hoverRebindTask = ReinitializeHoverInteractionAsync(previousTask);
+    }
+
+    private async Task ReinitializeHoverInteractionAsync(Task previousTask)
+    {
+        try
+        {
+            await previousTask;
+            await DisposeHoverInteractionAsync();
+
+            if (UseJsHover && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+            {
+                await InitializeHoverInteractionAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            await DispatchExceptionAsync(ex);
+        }
+    }
+
     private async Task RebindHoverInteractionAsync(Task previousTask, string previousTriggerId, string desiredTriggerId)
     {
         try
@@ -781,6 +819,14 @@
         hoverRootId = null;
         lastEffectiveDelay = -1;
         lastEffectiveCloseDelay = -1;
+        lastDisableHoverablePopup = null;
+    }
+
+    private bool ResolveDisableHoverablePopup()
+    {
+        var rootContext = RootContext;
+        return rootContext is not null
+            && (rootContext.DisableHoverablePopup || rootContext.TrackCursorAxis == TrackCursorAxis.Both);
     }
 
     private async Task UpdateHoverInteractionDelaysAsync()

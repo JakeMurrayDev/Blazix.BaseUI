@@ -481,7 +481,41 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
     }
 
     [Fact]
-    public Task DisabledTriggerClosesActiveTooltip()
+    public async Task MapsTriggerPressCloseToInstantDismiss()
+    {
+        var cut = Render(CreateTooltip(defaultOpen: true));
+        var root = cut.FindComponent<TooltipRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, TooltipOpenChangeReason.TriggerPress, null));
+
+        cut.Find("[role='tooltip']").GetAttribute("data-instant").ShouldBe("dismiss");
+    }
+
+    [Fact]
+    public async Task DoesNotMapOutsidePressCloseToInstantDismiss()
+    {
+        var cut = Render(CreateTooltip(defaultOpen: true));
+        var root = cut.FindComponent<TooltipRoot>();
+
+        await cut.InvokeAsync(() => root.Instance.SetOpenAsync(false, TooltipOpenChangeReason.OutsidePress, null));
+
+        cut.Find("[role='tooltip']").HasAttribute("data-instant").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task ClosesWhenActiveTriggerUnmounts()
+    {
+        var cut = Render<TooltipTriggerRemovalHost>();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        await cut.InvokeAsync(cut.Instance.RemoveTrigger);
+
+        cut.WaitForAssertion(() => cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue());
+    }
+
+    [Fact]
+    public Task DisabledTriggerDoesNotCloseActiveTooltip()
     {
         RenderFragment content = builder =>
         {
@@ -519,7 +553,10 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
 
         cut.Find("#trigger-2").Focus();
 
-        cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue();
+        // Upstream builds the hover/focus interactions with `enabled: !disabled`, so a disabled
+        // trigger installs no handlers and leaves the sibling trigger's tooltip untouched.
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+        cut.Find("#trigger-1").HasAttribute("data-popup-open").ShouldBeTrue();
         cut.Find("#trigger-2").HasAttribute("data-popup-open").ShouldBeFalse();
 
         return Task.CompletedTask;
@@ -609,5 +646,49 @@ public class TooltipRootTests : BunitContext, ITooltipRootContract
                 handle.Payload.ShouldBe(expectedPayload);
             });
         }
+    }
+}
+
+internal sealed class TooltipTriggerRemovalHost : ComponentBase
+{
+    private bool showTrigger = true;
+
+    public void RemoveTrigger()
+    {
+        showTrigger = false;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<TooltipRoot>(0);
+        builder.AddAttribute(1, "DefaultOpen", true);
+        builder.AddAttribute(2, "DefaultTriggerId", "trigger-one");
+        builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
+        {
+            if (showTrigger)
+            {
+                innerBuilder.OpenComponent<TooltipTrigger>(0);
+                innerBuilder.AddAttribute(1, "Id", "trigger-one");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+            }
+
+            innerBuilder.OpenComponent<TooltipPortal>(10);
+            innerBuilder.AddAttribute(11, "KeepMounted", true);
+            innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<TooltipPositioner>(0);
+                portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                {
+                    posBuilder.OpenComponent<TooltipPopup>(0);
+                    posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                    posBuilder.CloseComponent();
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            innerBuilder.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }
