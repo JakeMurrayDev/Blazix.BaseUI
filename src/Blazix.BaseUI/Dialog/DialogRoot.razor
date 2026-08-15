@@ -23,6 +23,7 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private bool disposed;
     private bool isOpen;
     private readonly TransitionLifecycleManager transition = new(useIdleRestingState: true);
     private bool nested;
@@ -198,10 +199,31 @@
                 _ = SetBackdropElementJsAsync(el.Value);
             }
         };
+        context.SetInternalBackdropElement = el =>
+        {
+            context.InternalBackdropElement = el;
+            if (hasRendered && el.HasValue)
+            {
+                _ = SetInternalBackdropElementJsAsync(el.Value);
+            }
+        };
         context.SetViewportElement = el => context.ViewportElement = el;
         context.SetInteractionType = type => context.InteractionType = type;
-        context.OnNestedDialogOpen = () => { nestedCount++; context.NestedDialogCount = nestedCount; StateHasChanged(); };
-        context.OnNestedDialogClose = () => { nestedCount--; context.NestedDialogCount = nestedCount; StateHasChanged(); };
+        // A child reports the absolute number of open dialogs at and below itself. Storing it (rather
+        // than incrementing) and re-notifying our own parent propagates the count past one level,
+        // matching the upstream effect that notifies with `ownNestedOpenDialogs + 1`.
+        context.OnNestedDialogOpen = count =>
+        {
+            if (disposed || nestedCount == count)
+            {
+                return;
+            }
+
+            nestedCount = count;
+            context.NestedDialogCount = nestedCount;
+            NotifyParentOfNestedState(CurrentOpen);
+            StateHasChanged();
+        };
 
         if (ActionsRef is not null)
         {
@@ -210,6 +232,11 @@
         }
 
         SubscribeToHandle();
+
+        if (CurrentOpen)
+        {
+            NotifyParentOfNestedState(true);
+        }
     }
 
     /// <inheritdoc />
@@ -233,6 +260,10 @@
             context.TransitionStatus = transition.TransitionStatus;
             openChangeReason = DialogOpenChangeReason.None;
             context.DialogOpenChangeReason = openChangeReason;
+
+            // A controlled open/close must maintain the parent's nested count just like the imperative
+            // path does, otherwise `--nested-dialogs`/`data-nested-dialog-open` on the parent go stale.
+            NotifyParentOfNestedState(currentOpen);
 
             if (hasRendered)
             {
@@ -305,6 +336,22 @@
             try
             {
                 var module = await ModuleTask.Value;
+
+                // A close driven by the `Open` parameter must re-resolve a callback finalFocus the same
+                // way an imperative close does (see SetOpenAsync), otherwise the focus manager disposes
+                // with the target that was resolved at open time. React evaluates the finalFocus
+                // function at close regardless of how the close was initiated.
+                if (!CurrentOpen && context.ResolveFinalFocusForClose is { } resolveFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveFinalFocus(ResolveCloseInteractionType(openChangeReason));
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
+                else if (CurrentOpen && context.ResolveFinalFocusForOpen is { } resolveOpenFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveOpenFinalFocus();
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
+
                 await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen, context.InteractionType);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -390,6 +437,15 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
+
+        // Mirrors the upstream effect cleanup, which resets the parent's nested counts to zero when a
+        // nested dialog unmounts while open; without it the parent's count stays permanently elevated.
+        if (CurrentOpen)
+        {
+            ParentContext?.OnNestedDialogOpen?.Invoke(0);
+        }
+
         UnsubscribeFromHandle();
 
         if (moduleTask?.IsValueCreated == true && hasRendered)
@@ -550,14 +606,40 @@
 
     private void SetTitleId(string? id)
     {
+        if (titleId == id)
+        {
+            return;
+        }
+
         titleId = id;
         context.TitleId = id;
+        NotifyLabellingIdChanged();
     }
 
     private void SetDescriptionId(string? id)
     {
+        if (descriptionId == id)
+        {
+            return;
+        }
+
         descriptionId = id;
         context.DescriptionId = id;
+        NotifyLabellingIdChanged();
+    }
+
+    // Title/Description register their ids from their own lifecycle, i.e. after the popup that reads
+    // them has already rendered. Re-rendering the root here republishes the ids so `aria-labelledby`
+    // and `aria-describedby` land on the popup within the same open cycle, matching React, where the
+    // ids are written into the store and every subscriber (including the popup) re-renders.
+    private void NotifyLabellingIdChanged()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        StateHasChanged();
     }
 
     private void SetPopupId(string? id)
@@ -609,6 +691,19 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setBackdropElement", rootId, element);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SetInternalBackdropElementJsAsync(ElementReference element)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setInternalBackdropElement", rootId, element);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -684,14 +779,7 @@
         state = new DialogRootState(nextOpen);
         context.Open = nextOpen;
 
-        if (nextOpen)
-        {
-            ParentContext?.OnNestedDialogOpen?.Invoke();
-        }
-        else
-        {
-            ParentContext?.OnNestedDialogClose?.Invoke();
-        }
+        NotifyParentOfNestedState(nextOpen);
 
         SyncHandleState(nextOpen, activeTriggerId);
 
@@ -821,10 +909,7 @@
 
     private void ForceUnmount()
     {
-        if (CurrentOpen)
-        {
-            ParentContext?.OnNestedDialogClose?.Invoke();
-        }
+        ParentContext?.OnNestedDialogOpen?.Invoke(0);
 
         transition.ForceUnmount();
         context.Mounted = false;
@@ -875,6 +960,15 @@
     private void SyncHandleState(bool open, string? triggerId)
     {
         Handle?.SyncState(open, triggerId, payload);
+    }
+
+    // Reports this root's total open-dialog count to its parent: own nested count + 1 while open,
+    // zero while closed. Mirrors the upstream effect in DialogInteractions. The open state is passed
+    // explicitly because a controlled root does not observe it through CurrentOpen until the consumer
+    // echoes the new Open value back as a parameter.
+    private void NotifyParentOfNestedState(bool open)
+    {
+        ParentContext?.OnNestedDialogOpen?.Invoke(open ? nestedCount + 1 : 0);
     }
 
     // Maps the close reason to the interaction-type string consumed by a callback finalFocus,

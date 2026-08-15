@@ -64,6 +64,15 @@ internal sealed class DialogRootContext
     public ElementReference? BackdropElement { get; set; }
     public Action<ElementReference?> SetBackdropElement { get; set; } = null!;
 
+    /// <summary>
+    /// Gets or sets the internal backdrop rendered by <see cref="DialogPortal"/> for modal dialogs.
+    /// Kept separate from <see cref="BackdropElement"/> (the consumer's <c>Dialog.Backdrop</c>), which
+    /// mirrors the upstream store holding <c>backdropRef</c> and <c>internalBackdropRef</c> separately;
+    /// a single slot lets the two overwrite each other depending on render order.
+    /// </summary>
+    public ElementReference? InternalBackdropElement { get; set; }
+    public Action<ElementReference?> SetInternalBackdropElement { get; set; } = null!;
+
     public ElementReference? ViewportElement { get; set; }
     public Action<ElementReference?> SetViewportElement { get; set; } = null!;
 
@@ -103,7 +112,12 @@ internal sealed class DialogRootContext
 
     public IFloatingRootContext? FloatingRootContext { get; set; }
 
-    public Action? OnNestedDialogOpen { get; set; }
-
-    public Action? OnNestedDialogClose { get; set; }
+    /// <summary>
+    /// Gets or sets the callback a nested dialog root invokes on its parent to report the total number
+    /// of open dialogs at and below itself: its own nested count plus one while it is open, and zero
+    /// once it closes or unmounts. Mirrors the upstream <c>onNestedDialogOpen(dialogCount, drawerCount)</c>
+    /// contract, where the child reports an absolute count rather than a relative increment, so the
+    /// count propagates through more than one level of nesting.
+    /// </summary>
+    public Action<int>? OnNestedDialogOpen { get; set; }
 }

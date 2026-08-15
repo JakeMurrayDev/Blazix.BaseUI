@@ -726,4 +726,207 @@ public class DialogRootTests : BunitContext, IDialogRootContract
         }
     }
 
+
+    // Source: DialogPopup.tsx `returnFocus={finalFocus}` — FloatingFocusManager evaluates a function
+    // finalFocus at close regardless of how the close was initiated, so a controlled close through the
+    // `Open` parameter must re-resolve it exactly like the imperative close path does.
+    [Fact]
+    public Task FinalFocusCallbackIsReResolvedOnControlledClose()
+    {
+        var resolveCount = 0;
+        var finalFocus = (FocusTarget)new FocusTarget.Callback(_ =>
+        {
+            resolveCount++;
+            return null;
+        });
+
+        RenderFragment<DialogRootPayloadContext> childContent = _ => builder =>
+        {
+            builder.OpenComponent<DialogPortal>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<DialogPopup>(0);
+                portalBuilder.AddAttribute(1, "data-testid", "dialog-popup");
+                portalBuilder.AddAttribute(2, "FinalFocus", finalFocus);
+                portalBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Dialog content")));
+                portalBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render<DialogRoot>(parameters => parameters
+            .Add(root => root.Open, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, childContent));
+
+        // A callback finalFocus is intentionally not resolved at open time.
+        resolveCount.ShouldBe(0);
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Open, false)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, childContent));
+
+        cut.WaitForAssertion(() => resolveCount.ShouldBeGreaterThan(0));
+
+        return Task.CompletedTask;
+    }
+
+    // Source: useDialogRoot.ts — a child notifies its parent with `ownNestedOpenDialogs + 1`, so the
+    // count is absolute and propagates past a single level of nesting.
+    [Fact]
+    public Task NestedDialogCountPropagatesThroughThreeLevels()
+    {
+        var cut = Render<DialogRoot>(parameters => parameters
+            .Add(root => root.DefaultOpen, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, CreateNestedDialogContent(includeInnermost: true)));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='outer-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 2");
+            cut.Find("[data-testid='middle-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 1");
+            cut.Find("[data-testid='inner-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 0");
+
+            cut.Find("[data-testid='outer-popup']").HasAttribute("data-nested-dialog-open").ShouldBeTrue();
+            cut.Find("[data-testid='inner-popup']").HasAttribute("data-nested-dialog-open").ShouldBeFalse();
+        });
+
+        return Task.CompletedTask;
+    }
+
+    // Source: useDialogRoot.ts effect cleanup — `parentContext.onNestedDialogOpen(0, 0)` runs when a
+    // nested dialog unmounts while open, otherwise the parent's count stays permanently elevated.
+    [Fact]
+    public Task NestedDialogCountResetsWhenNestedRootUnmounts()
+    {
+        var cut = Render<DialogRoot>(parameters => parameters
+            .Add(root => root.DefaultOpen, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, CreateNestedDialogContent(includeInnermost: true)));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='outer-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 2"));
+
+        cut.Render(parameters => parameters
+            .Add(root => root.DefaultOpen, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, CreateNestedDialogContent(includeInnermost: false)));
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("[data-testid='outer-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 1");
+            cut.Find("[data-testid='middle-popup']").GetAttribute("style").ShouldContain("--nested-dialogs: 0");
+        });
+
+        return Task.CompletedTask;
+    }
+
+    // Source: DialogTitle.tsx writes the id into the store, which re-renders every subscriber including
+    // the popup. A title mounting after the popup has already rendered must still land in
+    // `aria-labelledby` without waiting for an unrelated re-render.
+    [Fact]
+    public Task AppliesAriaLabelledByWhenTitleMountsAfterPopup()
+    {
+        var cut = Render<DialogRoot>(parameters => parameters
+            .Add(root => root.Open, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, CreatePopupContent(includeTitle: false)));
+
+        cut.Find("[role='dialog']").HasAttribute("aria-labelledby").ShouldBeFalse();
+
+        cut.Render(parameters => parameters
+            .Add(root => root.Open, true)
+            .Add(root => root.Modal, Blazix.BaseUI.Dialog.DialogModalMode.False)
+            .Add(root => root.ChildContent, CreatePopupContent(includeTitle: true)));
+
+        var popup = cut.Find("[role='dialog']");
+        var title = cut.Find("h2");
+        popup.GetAttribute("aria-labelledby").ShouldBe(title.GetAttribute("id"));
+
+        return Task.CompletedTask;
+    }
+
+    private static RenderFragment<DialogRootPayloadContext> CreatePopupContent(bool includeTitle)
+    {
+        return _ => builder =>
+        {
+            builder.OpenComponent<DialogPortal>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+            {
+                portalBuilder.OpenComponent<DialogPopup>(0);
+                portalBuilder.AddAttribute(1, "data-testid", "dialog-popup");
+                portalBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(popupBuilder =>
+                {
+                    if (includeTitle)
+                    {
+                        popupBuilder.OpenComponent<DialogTitle>(0);
+                        popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "title text")));
+                        popupBuilder.CloseComponent();
+                    }
+
+                    popupBuilder.AddContent(10, "Dialog content");
+                }));
+                portalBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    private static RenderFragment<DialogRootPayloadContext> CreateNestedDialogContent(bool includeInnermost)
+    {
+        return _ => outerBuilder =>
+        {
+            outerBuilder.OpenComponent<DialogPortal>(0);
+            outerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(outerPortal =>
+            {
+                outerPortal.OpenComponent<DialogPopup>(0);
+                outerPortal.AddAttribute(1, "data-testid", "outer-popup");
+                outerPortal.AddAttribute(2, "ChildContent", (RenderFragment)(outerPopup =>
+                {
+                    outerPopup.OpenComponent<DialogRoot>(0);
+                    outerPopup.AddAttribute(1, "DefaultOpen", true);
+                    outerPopup.AddAttribute(2, "Modal", Blazix.BaseUI.Dialog.DialogModalMode.False);
+                    outerPopup.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => middleBuilder =>
+                    {
+                        middleBuilder.OpenComponent<DialogPortal>(0);
+                        middleBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(middlePortal =>
+                        {
+                            middlePortal.OpenComponent<DialogPopup>(0);
+                            middlePortal.AddAttribute(1, "data-testid", "middle-popup");
+                            middlePortal.AddAttribute(2, "ChildContent", (RenderFragment)(middlePopup =>
+                            {
+                                if (!includeInnermost)
+                                {
+                                    return;
+                                }
+
+                                middlePopup.OpenComponent<DialogRoot>(0);
+                                middlePopup.AddAttribute(1, "DefaultOpen", true);
+                                middlePopup.AddAttribute(2, "Modal", Blazix.BaseUI.Dialog.DialogModalMode.False);
+                                middlePopup.AddAttribute(3, "ChildContent", (RenderFragment<DialogRootPayloadContext>)(_ => innerBuilder =>
+                                {
+                                    innerBuilder.OpenComponent<DialogPortal>(0);
+                                    innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(innerPortal =>
+                                    {
+                                        innerPortal.OpenComponent<DialogPopup>(0);
+                                        innerPortal.AddAttribute(1, "data-testid", "inner-popup");
+                                        innerPortal.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Inner")));
+                                        innerPortal.CloseComponent();
+                                    }));
+                                    innerBuilder.CloseComponent();
+                                }));
+                                middlePopup.CloseComponent();
+                            }));
+                            middlePortal.CloseComponent();
+                        }));
+                        middleBuilder.CloseComponent();
+                    }));
+                    outerPopup.CloseComponent();
+                }));
+                outerPortal.CloseComponent();
+            }));
+            outerBuilder.CloseComponent();
+        };
+    }
 }

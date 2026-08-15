@@ -508,6 +508,7 @@
         triggerElements[triggerId] = element;
         triggerFocusTargetElements[triggerId] = focusTarget;
         triggerPayloads[triggerId] = triggerPayload;
+        context.TriggerCount = triggerElements.Count;
 
         var changed = SyncImplicitActiveTrigger();
         changed |= SyncActiveTriggerPayload(triggerId, triggerPayload);
@@ -534,6 +535,7 @@
         triggerElements.Remove(triggerId);
         triggerFocusTargetElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
+        context.TriggerCount = triggerElements.Count;
 
         ElementReference? replacementTriggerElement = null;
         var syncReplacementTriggerElement = false;
@@ -797,6 +799,11 @@
     [JSInvokable]
     public async Task OnHoverOpen()
     {
+        if (IsHoverSuppressedAfterTouchPress())
+        {
+            return;
+        }
+
         await SetOpenAsync(true, PopoverOpenChangeReason.TriggerHover, null, null, "mouse");
     }
 
@@ -806,6 +813,11 @@
     [JSInvokable]
     public async Task OnHoverClose()
     {
+        if (IsHoverSuppressedAfterTouchPress())
+        {
+            return;
+        }
+
         if (openChangeReason == PopoverOpenChangeReason.TriggerPress)
         {
             return;
@@ -1135,6 +1147,17 @@
             try
             {
                 var module = await ModuleTask.Value;
+
+                // On close, re-resolve a callback FinalFocus with the actual close interaction type and
+                // push the resolved target before the popup returns focus, so the callback observes how
+                // the popover was closed rather than how it was opened. Mirrors React, which evaluates
+                // the finalFocus function at close time.
+                if (!nextOpen && context.ResolveFinalFocusForClose is { } resolveFinalFocus)
+                {
+                    var (finalMode, finalElement) = resolveFinalFocus(ResolveCloseInteractionType(reason));
+                    await module.InvokeVoidAsync("setFinalFocusElement", rootId, finalMode, finalElement);
+                }
+
                 var reasonString = GetReasonString(reason);
                 await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, interactionType);
             }
@@ -1147,6 +1170,27 @@
         await OpenChanged.InvokeAsync(nextOpen);
         StateHasChanged();
     }
+
+    // Source: PopoverTrigger.tsx — the hover interaction is disabled while the popover was opened by a
+    // touch trigger press (`openMethod !== 'touch' || openReason !== REASONS.triggerPress`), so a tap
+    // on a hybrid device does not leave hover open/close active.
+    private bool IsHoverSuppressedAfterTouchPress()
+    {
+        return interactionType == "touch" && openChangeReason == PopoverOpenChangeReason.TriggerPress;
+    }
+
+    // Maps the close reason to the interaction-type string consumed by a callback FinalFocus,
+    // matching the close-reason mapping used by the sibling Dialog port.
+    private static string ResolveCloseInteractionType(PopoverOpenChangeReason reason) => reason switch
+    {
+        PopoverOpenChangeReason.EscapeKey => "keyboard",
+        PopoverOpenChangeReason.FocusOut => "keyboard",
+        PopoverOpenChangeReason.ClosePress => "mouse",
+        PopoverOpenChangeReason.OutsidePress => "mouse",
+        PopoverOpenChangeReason.TriggerPress => "mouse",
+        PopoverOpenChangeReason.TriggerHover => "mouse",
+        _ => string.Empty
+    };
 
     private async Task UpdateOpenTriggerPressAsync(string? triggerId, object? payloadFromContext, string? requestInteractionType)
     {

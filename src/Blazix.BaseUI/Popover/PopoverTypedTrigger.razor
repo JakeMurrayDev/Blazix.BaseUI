@@ -32,8 +32,14 @@
 }
 
 @code {
+    private const string ButtonJsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-button.min.js";
+
     private Lazy<Task<IJSObjectReference>>? moduleTask;
+    private Lazy<Task<IJSObjectReference>>? buttonModuleTask;
     private bool hasRendered;
+    private bool previousDisabled;
+    private bool previousNativeButton;
+    private bool previousHoverEnabled;
     private bool hoverInitialized;
     private string? hoverRootId;
     private string triggerId = null!;
@@ -53,6 +59,18 @@
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>(
             "import", "./_content/Blazix.BaseUI/blazix-baseui-popover.min.js").AsTask());
+
+    private Lazy<Task<IJSObjectReference>> ButtonModuleTask => buttonModuleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
+        JSRuntime.InvokeAsync<IJSObjectReference>("import", ButtonJsModulePath).AsTask());
+
+    // Source: PopoverTrigger.tsx `useButton({ disabled, native: nativeButton })` — a non-native
+    // trigger needs the ported keyboard-activation handlers (Enter on keydown, Space on keyup) that
+    // the button module implements, and a disabled trigger needs its click suppression.
+    private bool NeedsButtonJsInterop => !NativeButton || Disabled;
+
+    // Source: PopoverTrigger.tsx `enabled: !disabled && openOnHover && ...` — the hover interaction is
+    // re-evaluated whenever these change rather than being wired once.
+    private bool HoverEnabled => OpenOnHover && !Disabled;
 
     private bool HasHandle => Handle is not null;
 
@@ -204,14 +222,55 @@
         var open = IsOpenedByThisTrigger();
         state = new PopoverTriggerState(open, Disabled);
         BuildComponentAttributes();
+
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        if (Disabled != previousDisabled || NativeButton != previousNativeButton)
+        {
+            var previousNeedsJs = !previousNativeButton || previousDisabled;
+            var currentNeedsJs = NeedsButtonJsInterop;
+
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+
+            if (currentNeedsJs)
+            {
+                _ = SyncButtonJsAsync(dispose: false);
+            }
+            else if (previousNeedsJs)
+            {
+                _ = SyncButtonJsAsync(dispose: true);
+            }
+        }
+
+        if (HoverEnabled != previousHoverEnabled)
+        {
+            previousHoverEnabled = HoverEnabled;
+
+            if (HoverEnabled)
+            {
+                _ = InitializeHoverInteractionAsync();
+            }
+            else
+            {
+                CancelHoverOpenFallback();
+                _ = DisposeHoverInteractionAsync();
+            }
+        }
     }
 
     /// <inheritdoc />
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             hasRendered = true;
+            previousDisabled = Disabled;
+            previousNativeButton = NativeButton;
+            previousHoverEnabled = HoverEnabled;
 
             if (HasHandle)
             {
@@ -224,9 +283,14 @@
                 RootContext?.RegisterTrigger(triggerId, Element, postGuardRef?.Element, Payload);
             }
 
-            if (OpenOnHover && !hoverInitialized)
+            if (HoverEnabled && !hoverInitialized)
             {
                 _ = InitializeHoverInteractionAsync();
+            }
+
+            if (NeedsButtonJsInterop)
+            {
+                await SyncButtonJsAsync(dispose: false);
             }
         }
 
@@ -268,7 +332,7 @@
         var open = IsOpenedByThisTrigger();
         attrs["aria-expanded"] = open ? "true" : "false";
         var popupId = RootContext?.PopupId ?? Handle?.PopupId;
-        if (open && !string.IsNullOrEmpty(popupId))
+        if (OwnsPopupIdForAriaControls() && !string.IsNullOrEmpty(popupId))
         {
             attrs["aria-controls"] = popupId;
         }
@@ -314,7 +378,61 @@
             }
         }
 
+        if (buttonModuleTask?.IsValueCreated == true && Element.HasValue)
+        {
+            try
+            {
+                var module = await ButtonModuleTask.Value;
+                await module.InvokeVoidAsync("sync", Element.Value, false, false, false, true);
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
+        }
+
         hoverDotNetRef?.Dispose();
+    }
+
+    private async Task SyncButtonJsAsync(bool dispose)
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ButtonModuleTask.Value;
+            await module.InvokeVoidAsync("sync", Element.Value, Disabled, false, NativeButton, dispose);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task DisposeHoverInteractionAsync()
+    {
+        if (!hoverInitialized || hoverRootId is null)
+        {
+            return;
+        }
+
+        var disposedRootId = hoverRootId;
+        hoverInitialized = false;
+        hoverRootId = null;
+
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("disposeHoverInteraction", disposedRootId);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
     }
 
     private void OnElementChanged()
@@ -372,18 +490,17 @@
         }
     }
 
+    // Source: popups/store.ts `triggerOwnsOpenPopup` — the open state a trigger reports (and with it
+    // `aria-expanded` and `data-popup-open`) requires this trigger to be the active one. The active
+    // trigger is resolved implicitly when a single trigger is registered (SyncImplicitActiveTrigger),
+    // so no only-trigger fallback belongs here; without the strict check every registered trigger
+    // announces itself as expanded once the active trigger unregisters while the popover is open.
     private bool IsOpenedByThisTrigger()
     {
         // Check handle state first if using detached trigger pattern
         if (HasHandle)
         {
-            var isOpen = Handle!.IsOpen;
-            if (!isOpen)
-            {
-                return false;
-            }
-            var activeId = Handle.ActiveTriggerId;
-            return activeId == triggerId || (activeId is null && isOpen);
+            return Handle!.IsOpen && Handle.ActiveTriggerId == triggerId;
         }
 
         // Fall back to root context
@@ -392,14 +509,32 @@
             return false;
         }
 
-        var rootOpen = RootContext.GetOpen();
-        if (!rootOpen)
+        return RootContext.GetOpen() && RootContext.ActiveTriggerId == triggerId;
+    }
+
+    // Source: popups/store.ts `triggerOwnsOpenPopupOrIsOnlyTrigger`, which feeds `triggerPopupId` and
+    // therefore `aria-controls` only. Unlike the open state, this keeps the only-trigger fallback.
+    private bool OwnsPopupIdForAriaControls()
+    {
+        if (IsOpenedByThisTrigger())
         {
-            return false;
+            return true;
         }
 
-        var activeTriggerId = RootContext.ActiveTriggerId;
-        return activeTriggerId == triggerId || (activeTriggerId is null && rootOpen);
+        if (HasHandle)
+        {
+            // The only-trigger fallback requires `state.triggerCount === 1` upstream, so a
+            // handle-backed popup opened without an active trigger must not hand the same
+            // `aria-controls` to every registered trigger.
+            return Handle!.IsOpen
+                && Handle.ActiveTriggerId is null
+                && Handle.RegisteredTriggerCount == 1;
+        }
+
+        return RootContext is not null
+            && RootContext.GetOpen()
+            && RootContext.ActiveTriggerId is null
+            && RootContext.TriggerCount == 1;
     }
 
     private bool IsMountedByThisTrigger()

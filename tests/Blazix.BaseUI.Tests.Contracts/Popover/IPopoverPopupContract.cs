@@ -17,4 +17,6 @@ public interface IPopoverPopupContract
     Task DoesNotHaveAriaDescribedByWithoutDescription();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
+    Task UsesConsumerSuppliedIdForPopupAndAriaControls();
+    Task FinalFocusCallbackIsResolvedAtCloseNotOpen();
 }

@@ -53,6 +53,7 @@ export function initializeRoot(rootId, dotNetRef, modal, disablePointerDismissal
         triggerElement: null,
         popupElement: null,
         backdropElement: null,
+        internalBackdropElement: null,
         focusManagerId: null,
         transitionCleanup: null,
         fallbackTimeoutId: null,
@@ -252,9 +253,16 @@ function focusPopup(rootState, popupElement) {
 
     // Delegate to shared FloatingFocusManager
     const isModal = rootState.modal === 'true' || rootState.modal === 'trap-focus';
+    // Source: DialogStore.ts keeps `backdropRef` (the user's `Dialog.Backdrop`) and
+    // `internalBackdropRef` separately, and both are consulted. Both must stay outside the
+    // focus manager's avoid list, otherwise whichever backdrop is not listed is marked
+    // inert/aria-hidden while the dialog is open.
     const insideElements = [];
     if (rootState.backdropElement) {
         insideElements.push(rootState.backdropElement);
+    }
+    if (rootState.internalBackdropElement && rootState.internalBackdropElement !== rootState.backdropElement) {
+        insideElements.push(rootState.internalBackdropElement);
     }
     rootState.focusManagerId = createFloatingFocusManager({
         floatingElement: popupElement,
@@ -298,6 +306,8 @@ function setupOutsideClickListener(rootState) {
 
     cleanupOutsideClick(rootState);
 
+    let lastPointerType = '';
+
     const dismissOutside = (e, target) => {
         if (!rootState.outsidePressEnabled) return;
 
@@ -313,10 +323,18 @@ function setupOutsideClickListener(rootState) {
         }
     };
 
+    // Source: useDialogRoot.ts outsidePressEvent — the resolved event type is `intentional` for
+    // mouse/pen input (only `touch` is `sloppy`), so a mouse dismissal must wait for a completed
+    // click rather than firing on `pointerdown`. The pointer type of the press is recorded here so
+    // the synthesized click of a touch tap is ignored — that interaction is dismissed on `touchend`.
+    const recordPointerType = (e) => {
+        lastPointerType = e.pointerType || '';
+    };
+
     const handleOutsideClick = (e) => {
         // Primary button only (left-click)
         if (e.button !== 0) return;
-        if (e.pointerType === 'touch') return;
+        if (lastPointerType === 'touch') return;
 
         // Only the topmost dialog responds to outside press
         if (!isTopmostDialog(rootState.rootId)) return;
@@ -335,13 +353,15 @@ function setupOutsideClickListener(rootState) {
 
     // Use a small delay to avoid catching the click that opened the dialog
     const timeoutId = setTimeout(() => {
-        document.addEventListener('pointerdown', handleOutsideClick, true);
+        document.addEventListener('pointerdown', recordPointerType, true);
+        document.addEventListener('click', handleOutsideClick, true);
         document.addEventListener('touchend', handleOutsideTouchEnd, { capture: true, passive: true });
     }, 0);
 
     rootState.outsideClickCleanup = () => {
         clearTimeout(timeoutId);
-        document.removeEventListener('pointerdown', handleOutsideClick, true);
+        document.removeEventListener('pointerdown', recordPointerType, true);
+        document.removeEventListener('click', handleOutsideClick, true);
         document.removeEventListener('touchend', handleOutsideTouchEnd, true);
     };
 }
@@ -435,6 +455,13 @@ export function setBackdropElement(rootId, element) {
     const rootState = state.roots.get(rootId);
     if (rootState) {
         rootState.backdropElement = element;
+    }
+}
+
+export function setInternalBackdropElement(rootId, element) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.internalBackdropElement = element;
     }
 }
 

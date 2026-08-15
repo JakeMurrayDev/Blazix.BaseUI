@@ -67,6 +67,14 @@ public abstract class ComponentHandleBase<TPayload, TReason>
     internal IReadOnlyList<IComponentHandleSubscriberBase<TReason>> Subscribers => subscribers;
 
     /// <summary>
+    /// Gets the number of triggers registered against this handle. Mirrors upstream's
+    /// <c>state.triggerCount</c>, which gates the only-trigger fallback in
+    /// <c>triggerOwnsOpenPopupOrIsOnlyTrigger</c> so a popup opened without an active trigger
+    /// does not hand the same <c>aria-controls</c> to every trigger.
+    /// </summary>
+    internal int RegisteredTriggerCount => registeredTriggers.Count;
+
+    /// <summary>
     /// Gets a value indicating whether the component is currently open.
     /// </summary>
     public bool IsOpen => isOpen;
