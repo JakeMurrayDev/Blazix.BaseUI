@@ -34,7 +34,6 @@ public static class PreviewCardApi
             [
                 new ApiRow("Delay", "int", "600", "The delay in milliseconds before opening on hover or focus."),
                 new ApiRow("CloseDelay", "int", "300", "The delay in milliseconds before closing after hover leaves."),
-                new ApiRow("UseJsHover", "bool", "true", "Uses the JavaScript safe-polygon hover interaction."),
                 new ApiRow("Id", "string?", "null", "The trigger id, forwarded to the element and used for controlled active-trigger state."),
                 new ApiRow("Handle", "PreviewCardHandle<TPayload>?", "null", "Associates the trigger with a detached Root."),
                 new ApiRow("Payload", "TPayload?", "default", "Payload exposed to the Root when this trigger opens the preview card."),

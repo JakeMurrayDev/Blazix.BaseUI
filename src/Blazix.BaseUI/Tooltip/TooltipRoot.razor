@@ -271,6 +271,8 @@
             SubscribeToHandle();
         }
 
+        SyncHandleRootHoverState();
+
         if (currentOpen)
         {
             SyncHandleState(true, activeTriggerId);
@@ -1187,6 +1189,7 @@
 
         subscribedHandle = Handle;
         Handle.Subscribe(this);
+        SyncHandleRootHoverState();
     }
 
     private void UnsubscribeFromHandle()
@@ -1197,12 +1200,20 @@
         }
 
         subscribedHandle.Unsubscribe(this);
+        subscribedHandle.SyncRootHoverState(null, false);
         subscribedHandle = null;
     }
 
     private void SyncHandleState(bool open, string? triggerId)
     {
         Handle?.SyncState(open, triggerId, payload);
+    }
+
+    // Detached triggers create the JS hover interaction against this root's JS state, so they
+    // need the root ID and the live safePolygon gate that a cascaded root context would provide.
+    private void SyncHandleRootHoverState()
+    {
+        Handle?.SyncRootHoverState(rootId, DisableHoverablePopup || TrackCursorAxis == TrackCursorAxis.Both);
     }
 
     private object? GetPayloadFromHandle(string triggerId)

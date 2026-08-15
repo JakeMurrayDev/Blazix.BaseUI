@@ -173,10 +173,6 @@ export function updateHoverInteractionDelays(rootId, triggerId, openDelay, close
     rootState?.hoverInteractions.get(triggerId)?.setDelays(openDelay || 0, closeDelay || 0);
 }
 
-export function isPointerWithinElements(elements) {
-    return elements?.some(element => element?.matches?.(':hover')) ?? false;
-}
-
 // ============================================================================
 // Dismiss Interaction Support
 // ============================================================================

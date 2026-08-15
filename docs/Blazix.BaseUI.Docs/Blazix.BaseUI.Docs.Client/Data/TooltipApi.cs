@@ -50,7 +50,6 @@ public static class TooltipApi
                 new ApiRow("Disabled", "bool", "false", "Prevents tooltip interaction."),
                 new ApiRow("Delay", "int?", "null", "Per-trigger open delay in milliseconds."),
                 new ApiRow("CloseDelay", "int?", "null", "Per-trigger close delay in milliseconds."),
-                new ApiRow("UseJsHover", "bool", "true", "Uses JavaScript hover handling for pointer-safe transitions."),
                 new ApiRow("Id", "string?", "null", "The trigger id used for active-trigger state."),
                 new ApiRow("Handle", "TooltipHandle<TPayload>?", "null", "Associates this trigger with a detached TooltipRoot."),
                 new ApiRow("Payload", "TPayload?", "default", "Payload exposed to ChildContentWithPayload."),
