@@ -225,6 +225,95 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
     }
 
     [Fact]
+    public Task InitializesJsHoverForHandleBackedTrigger()
+    {
+        var handle = TooltipHandleFactory.CreateHandle<object>();
+
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<TooltipTrigger>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "Id", "detached-trigger");
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<TooltipRoot>(10);
+            builder.AddAttribute(11, "Handle", handle);
+            builder.AddAttribute(12, "DisableHoverablePopup", true);
+            builder.AddAttribute(13, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<TooltipPortal>(0);
+                innerBuilder.AddAttribute(1, "KeepMounted", true);
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<TooltipPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<TooltipPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+
+        // Upstream creates the hover interaction from `handleStore ?? rootContext`, so a detached
+        // trigger must bind to the handle-backed root's JS state with its live hover options.
+        cut.WaitForAssertion(() => JSInterop.Invocations.Any(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            Equals(invocation.Arguments[1], "detached-trigger")).ShouldBeTrue());
+
+        var rootId = JSInterop.Invocations
+            .First(invocation => invocation.Identifier == "initializeRoot")
+            .Arguments[0];
+        var hoverInvocation = JSInterop.Invocations.First(invocation =>
+            invocation.Identifier == "initializeHoverInteraction" &&
+            Equals(invocation.Arguments[1], "detached-trigger"));
+
+        hoverInvocation.Arguments[0].ShouldBe(rootId);
+        hoverInvocation.Arguments[5].ShouldBe(true);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotAttachMouseHandlersWhenConsumerSuppliesNone()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        // Hover is owned by the JS interaction, so no C# handler is attached and a Blazor Server
+        // circuit pays no round trip for pointer entries and exits.
+        var trigger = cut.Find("button");
+        Should.Throw<MissingEventHandlerException>(() => trigger.MouseEnter());
+        Should.Throw<MissingEventHandlerException>(() => trigger.MouseLeave());
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ForwardsConsumerMouseEnterHandler()
+    {
+        var invocations = 0;
+        var cut = Render(CreateTriggerInRoot(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                ["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, _ => invocations++)
+            }
+        ));
+
+        cut.Find("button").MouseEnter();
+
+        invocations.ShouldBe(1);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task AppliesClassValueWithState()
     {
         var cut = Render(CreateTriggerInRoot(

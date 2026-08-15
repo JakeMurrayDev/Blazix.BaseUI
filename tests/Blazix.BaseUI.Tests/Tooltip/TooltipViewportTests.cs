@@ -140,22 +140,20 @@ public class TooltipViewportTests : BunitContext, ITooltipViewportContract
     }
 
     [Fact]
-    public Task TriggerHandoffPreparesViewportWithoutDisablingItsAnimation()
+    public async Task TriggerHandoffPreparesViewportWithoutDisablingItsAnimation()
     {
         RenderFragment content = builder =>
         {
             builder.OpenComponent<TooltipTrigger>(0);
             builder.AddAttribute(1, "Id", "trigger-one");
             builder.AddAttribute(2, "Delay", 0);
-            builder.AddAttribute(3, "UseJsHover", false);
-            builder.AddAttribute(4, "ChildContent", (RenderFragment)(child => child.AddContent(0, "One")));
+            builder.AddAttribute(3, "ChildContent", (RenderFragment)(child => child.AddContent(0, "One")));
             builder.CloseComponent();
 
             builder.OpenComponent<TooltipTrigger>(10);
             builder.AddAttribute(11, "Id", "trigger-two");
             builder.AddAttribute(12, "Delay", 0);
-            builder.AddAttribute(13, "UseJsHover", false);
-            builder.AddAttribute(14, "ChildContent", (RenderFragment)(child => child.AddContent(0, "Two")));
+            builder.AddAttribute(13, "ChildContent", (RenderFragment)(child => child.AddContent(0, "Two")));
             builder.CloseComponent();
 
             builder.OpenComponent<TooltipPortal>(20);
@@ -181,13 +179,13 @@ public class TooltipViewportTests : BunitContext, ITooltipViewportContract
 
         var cut = Render<TooltipRoot>(parameters => parameters.Add(root => root.ChildContent, content));
 
-        cut.Find("#trigger-one").MouseEnter();
-        cut.Find("#trigger-two").MouseEnter();
+        // Hover is owned by the JS interaction, which reports back through the root's
+        // [JSInvokable] OnHoverOpen; bUnit mocks the module, so drive that entry point directly.
+        await cut.InvokeAsync(() => cut.Instance.OnHoverOpen("trigger-one"));
+        await cut.InvokeAsync(() => cut.Instance.OnHoverOpen("trigger-two"));
 
         JSInterop.Invocations.Any(invocation => invocation.Identifier == "prepareTransition").ShouldBeTrue();
         cut.Find("[data-current]").ParentElement!.HasAttribute("data-instant").ShouldBeFalse();
-
-        return Task.CompletedTask;
     }
 
     [Fact]

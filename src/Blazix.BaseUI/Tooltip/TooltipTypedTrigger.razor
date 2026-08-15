@@ -28,13 +28,12 @@
     private bool hasRendered;
     private string triggerId = null!;
     private TooltipHandle<TPayload>? registeredHandle;
+    private TooltipHandle<TPayload>? subscribedHandleRootHoverState;
     private RenderElement<TooltipTriggerState>? renderElementReference;
     private ElementReference? previousElement;
-    private CancellationTokenSource? hoverCts;
     private int lastEffectiveDelay = -1;
     private int lastEffectiveCloseDelay = -1;
     private bool? lastDisableHoverablePopup;
-    private bool lastUseJsHover;
     private bool recentPointerDown;
     private bool blockFocusOpen;
     private bool wasOpen;
@@ -84,15 +83,6 @@
     /// </summary>
     [Parameter]
     public int? CloseDelay { get; set; }
-
-    /// <summary>
-    /// When true, uses JavaScript-based hover interaction with safePolygon support,
-    /// allowing the user to move their cursor from the trigger to the tooltip popup
-    /// without it closing. When false, uses C# Task.Delay for hover handling.
-    /// Defaults to <see langword="true"/>.
-    /// </summary>
-    [Parameter]
-    public bool UseJsHover { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the ID of the trigger. In addition to being forwarded to the rendered element,
@@ -188,7 +178,18 @@
                 registeredHandle?.UnregisterTrigger(triggerId);
             }
 
+            if (subscribedHandleRootHoverState is not null)
+            {
+                subscribedHandleRootHoverState.RootHoverStateChanged -= HandleRootHoverStateChanged;
+            }
+
             registeredHandle = Handle;
+            subscribedHandleRootHoverState = Handle;
+            if (subscribedHandleRootHoverState is not null)
+            {
+                subscribedHandleRootHoverState.RootHoverStateChanged += HandleRootHoverStateChanged;
+            }
+
             RegisterWithCurrentStore();
         }
         else if (triggerIdChanged)
@@ -223,23 +224,22 @@
 
         var effectiveDisabled = IsDisabled;
 
-        // Handle UseJsHover and disabled-state changes
-        if (UseJsHover != lastUseJsHover || effectiveDisabled != lastIsDisabled)
+        // Handle disabled-state changes
+        if (effectiveDisabled != lastIsDisabled)
         {
-            if (UseJsHover && !effectiveDisabled && !hoverInitialized && !HasHandle && RootContext is not null && Element.HasValue)
+            if (!hoverInitialized && CanInitializeHoverInteraction())
             {
                 _ = InitializeHoverInteractionAsync();
             }
-            else if ((!UseJsHover || effectiveDisabled) && hoverInitialized)
+            else if (effectiveDisabled && hoverInitialized)
             {
                 _ = DisposeHoverInteractionAsync();
             }
 
-            lastUseJsHover = UseJsHover;
             lastIsDisabled = effectiveDisabled;
         }
         // Re-initialize JS hover if effective delays changed
-        else if (UseJsHover && hoverInitialized && !effectiveDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+        else if (hoverInitialized && CanInitializeHoverInteraction())
         {
             // Upstream recomputes `handleClose` on every render from the live
             // `disableHoverablePopup`/`trackCursorAxis` values, so re-arm safePolygon when they change.
@@ -278,9 +278,7 @@
                 RootContext?.RegisterTriggerElement(triggerId, Element);
             }
 
-            lastUseJsHover = UseJsHover;
-
-            if (UseJsHover && !IsDisabled && !hoverInitialized && !HasHandle)
+            if (!hoverInitialized && CanInitializeHoverInteraction())
             {
                 _ = InitializeHoverInteractionAsync();
             }
@@ -333,9 +331,11 @@
             attrs["data-popup-open"] = "";
         }
 
+        // No `onmouseenter`/`onmouseleave` handlers: hover is owned entirely by the JS
+        // interaction, so a C# handler would only cost an interop round trip per hover in and
+        // out. A consumer's own handlers still reach the element through AdditionalAttributes,
+        // which RenderElement merges before these component attributes.
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
-        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
@@ -346,13 +346,18 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        CancelHoverDelay();
         UnregisterFromCurrentStore(triggerId);
 
         if (subscribedRootContext is not null)
         {
             subscribedRootContext.StateChanged -= HandleRootContextStateChanged;
             subscribedRootContext = null;
+        }
+
+        if (subscribedHandleRootHoverState is not null)
+        {
+            subscribedHandleRootHoverState.RootHoverStateChanged -= HandleRootHoverStateChanged;
+            subscribedHandleRootHoverState = null;
         }
 
         await DisposeHoverInteractionAsync();
@@ -402,9 +407,35 @@
         {
             try
             {
-                if (UseJsHover && hoverInitialized && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+                if (hoverInitialized && CanInitializeHoverInteraction())
                 {
                     await UpdateHoverInteractionDelaysAsync();
+                }
+            }
+            finally
+            {
+                StateHasChanged();
+            }
+        });
+    }
+
+    // A detached trigger learns its root ID only once the handle-backed root has subscribed,
+    // which can happen after this trigger's first render.
+    private void HandleRootHoverStateChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                if (!hoverInitialized && CanInitializeHoverInteraction())
+                {
+                    await InitializeHoverInteractionAsync();
+                }
+                else if (hoverInitialized
+                    && CanInitializeHoverInteraction()
+                    && ResolveDisableHoverablePopup() != lastDisableHoverablePopup)
+                {
+                    QueueHoverReinitialize();
                 }
             }
             finally
@@ -494,13 +525,13 @@
         }
         else if (CloseOnClick && !IsOpenedByThisTrigger())
         {
-            CancelHoverDelay();
-            if (UseJsHover && hoverInitialized && RootContext is not null && moduleTask?.IsValueCreated == true)
+            var hoverRootIdForCancel = GetHoverRootId();
+            if (hoverInitialized && !string.IsNullOrEmpty(hoverRootIdForCancel) && moduleTask?.IsValueCreated == true)
             {
                 try
                 {
                     var module = await moduleTask.Value;
-                    await module.InvokeVoidAsync("cancelPendingHoverOpen", RootContext.RootId, triggerId);
+                    await module.InvokeVoidAsync("cancelPendingHoverOpen", hoverRootIdForCancel, triggerId);
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
@@ -510,119 +541,6 @@
         }
 
         await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
-    }
-
-    private async Task HandleMouseEnterAsync(MouseEventArgs e)
-    {
-        // When using JS hover, let JavaScript handle the hover interaction
-        if (UseJsHover && hoverInitialized)
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        if (!HasRootContext && !HasHandle)
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        // Upstream creates the hover interaction with `enabled: !disabled`, so a disabled
-        // trigger installs no handlers and never closes another trigger's open tooltip.
-        if (IsDisabled)
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (IsOpenedByThisTrigger())
-        {
-            return;
-        }
-
-        var effectiveDelay = GetEffectiveDelay();
-
-        if (effectiveDelay <= 0)
-        {
-            await RequestOpenAsync(true, TooltipOpenChangeReason.TriggerHover);
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(effectiveDelay, token);
-            if (!token.IsCancellationRequested)
-            {
-                await RequestOpenAsync(true, TooltipOpenChangeReason.TriggerHover);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            _ = ex; // Expected during task cancellation - safe to ignore.
-        }
-
-        await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-    }
-
-    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
-    {
-        // When using JS hover, let JavaScript handle the hover interaction
-        if (UseJsHover && hoverInitialized)
-        {
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        if (IsDisabled || (!HasRootContext && !HasHandle))
-        {
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (!IsOpenedByThisTrigger())
-        {
-            return;
-        }
-
-        var effectiveCloseDelay = GetEffectiveCloseDelay();
-
-        if (effectiveCloseDelay <= 0)
-        {
-            if (!await IsPointerWithinHandleTriggerAsync())
-            {
-                await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerHover);
-            }
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(effectiveCloseDelay, token);
-            if (!token.IsCancellationRequested
-                && IsOpenedByThisTrigger()
-                && !await IsPointerWithinHandleTriggerAsync())
-            {
-                await RequestOpenAsync(false, TooltipOpenChangeReason.TriggerHover);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            _ = ex; // Expected during task cancellation - safe to ignore.
-        }
-
-        await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleFocusAsync(FocusEventArgs e)
@@ -654,8 +572,6 @@
             return;
         }
 
-        CancelHoverDelay();
-
         if (IsOpenedByThisTrigger())
         {
             return;
@@ -674,8 +590,6 @@
             await EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
             return;
         }
-
-        CancelHoverDelay();
 
         if (!IsOpenedByThisTrigger())
         {
@@ -699,22 +613,28 @@
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private void CancelHoverDelay()
+    // Upstream builds the hover interaction from `handleStore ?? rootContext`
+    // (TooltipTrigger.tsx), so a detached handle-backed trigger installs the same safePolygon,
+    // mouseOnly and hoverable-popup behaviour as one nested inside a Tooltip.Root.
+    private bool CanInitializeHoverInteraction()
     {
-        if (hoverCts is not null)
-        {
-            hoverCts.Cancel();
-            hoverCts.Dispose();
-            hoverCts = null;
-        }
+        return hasRendered
+            && !IsDisabled
+            && !string.IsNullOrEmpty(GetHoverRootId())
+            && Element.HasValue;
+    }
+
+    private string? GetHoverRootId()
+    {
+        return RootContext?.RootId ?? Handle?.RootId;
     }
 
     private async Task InitializeHoverInteractionAsync(string? interactionTriggerId = null)
     {
-        var rootContext = RootContext;
+        var rootId = GetHoverRootId();
         var id = interactionTriggerId ?? triggerId;
         var element = Element;
-        if (rootContext is null || !element.HasValue || string.IsNullOrEmpty(id))
+        if (string.IsNullOrEmpty(rootId) || !element.HasValue || string.IsNullOrEmpty(id))
         {
             return;
         }
@@ -724,10 +644,10 @@
             var module = await ModuleTask.Value;
             var effectiveDelay = GetEffectiveDelay();
             var effectiveCloseDelay = GetEffectiveCloseDelay();
-            var disableHoverablePopup = rootContext.DisableHoverablePopup || rootContext.TrackCursorAxis == TrackCursorAxis.Both;
-            await module.InvokeVoidAsync("initializeHoverInteraction", rootContext.RootId, id, element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
+            var disableHoverablePopup = ResolveDisableHoverablePopup();
+            await module.InvokeVoidAsync("initializeHoverInteraction", rootId, id, element.Value, effectiveDelay, effectiveCloseDelay, disableHoverablePopup);
             hoverInitialized = true;
-            hoverRootId = rootContext.RootId;
+            hoverRootId = rootId;
             lastEffectiveDelay = effectiveDelay;
             lastEffectiveCloseDelay = effectiveCloseDelay;
             lastDisableHoverablePopup = disableHoverablePopup;
@@ -784,7 +704,7 @@
             await previousTask;
             await DisposeHoverInteractionAsync();
 
-            if (UseJsHover && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+            if (CanInitializeHoverInteraction())
             {
                 await InitializeHoverInteractionAsync();
             }
@@ -802,7 +722,7 @@
             await previousTask;
             await DisposeHoverInteractionAsync(previousTriggerId);
 
-            if (UseJsHover && !IsDisabled && !HasHandle && RootContext is not null && Element.HasValue)
+            if (CanInitializeHoverInteraction())
             {
                 await InitializeHoverInteractionAsync(desiredTriggerId);
             }
@@ -825,13 +745,18 @@
     private bool ResolveDisableHoverablePopup()
     {
         var rootContext = RootContext;
-        return rootContext is not null
-            && (rootContext.DisableHoverablePopup || rootContext.TrackCursorAxis == TrackCursorAxis.Both);
+        if (rootContext is not null)
+        {
+            return rootContext.DisableHoverablePopup || rootContext.TrackCursorAxis == TrackCursorAxis.Both;
+        }
+
+        return Handle?.DisableHoverablePopup ?? false;
     }
 
     private async Task UpdateHoverInteractionDelaysAsync()
     {
-        if (!hoverInitialized || RootContext is null)
+        var rootId = GetHoverRootId();
+        if (!hoverInitialized || string.IsNullOrEmpty(rootId))
         {
             return;
         }
@@ -846,7 +771,7 @@
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("updateHoverInteractionDelays", RootContext.RootId, triggerId, effectiveDelay, effectiveCloseDelay);
+            await module.InvokeVoidAsync("updateHoverInteractionDelays", rootId, triggerId, effectiveDelay, effectiveCloseDelay);
             lastEffectiveDelay = effectiveDelay;
             lastEffectiveCloseDelay = effectiveCloseDelay;
         }
@@ -877,31 +802,6 @@
         }
 
         return Task.CompletedTask;
-    }
-
-    private async Task<bool> IsPointerWithinHandleTriggerAsync()
-    {
-        if (!HasHandle)
-        {
-            return false;
-        }
-
-        var triggerElements = Handle!.GetTriggerElements();
-        if (triggerElements.Length == 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            var module = await ModuleTask.Value;
-            return await module.InvokeAsync<bool>("isPointerWithinElements", triggerElements);
-        }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-        {
-            _ = ex; // Expected during circuit disconnect - safe to ignore.
-            return false;
-        }
     }
 
     private bool IsAnyTooltipOpen()

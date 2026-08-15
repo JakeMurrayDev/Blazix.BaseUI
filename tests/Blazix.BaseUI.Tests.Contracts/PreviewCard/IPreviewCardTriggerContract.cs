@@ -8,7 +8,9 @@ public interface IPreviewCardTriggerContract
     Task HasDataPopupOpenWhenOpen();
     Task DoesNotOpenOnFocusAfterPointerDown();
     Task DoesNotOpenOnFocusAfterEscapeDismissal();
-    Task DoesNotOpenOnMouseEnterAfterTouchPointerDown();
+    Task DoesNotAttachMouseHandlersWhenConsumerSuppliesNone();
+    Task AttachesMouseLeaveHandlerWhileFocusOpenIsBlocked();
+    Task ForwardsConsumerMouseEnterHandler();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task RequiresContext();

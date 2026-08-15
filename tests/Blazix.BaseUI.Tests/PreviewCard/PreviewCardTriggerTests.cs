@@ -22,8 +22,7 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
         IReadOnlyDictionary<string, object>? additionalAttributes = null,
         Func<PreviewCardTriggerState, string>? classValue = null,
         Func<PreviewCardTriggerState, string>? styleValue = null,
-        bool includePositioner = true,
-        bool useJsHover = true)
+        bool includePositioner = true)
     {
         return builder =>
         {
@@ -45,7 +44,6 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
                 if (additionalAttributes is not null)
                     innerBuilder.AddMultipleAttributes(7, additionalAttributes);
                 innerBuilder.AddAttribute(8, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
-                innerBuilder.AddAttribute(9, "UseJsHover", useJsHover);
                 innerBuilder.CloseComponent();
 
                 if (includePositioner)
@@ -172,22 +170,56 @@ public class PreviewCardTriggerTests : BunitContext, IPreviewCardTriggerContract
     }
 
     [Fact]
-    public Task DoesNotOpenOnMouseEnterAfterTouchPointerDown()
+    public Task DoesNotAttachMouseHandlersWhenConsumerSuppliesNone()
     {
-        var cut = Render(CreateTriggerInRoot(useJsHover: false));
+        var cut = Render(CreateTriggerInRoot());
 
-        // Upstream sets `mouseOnly: true`, so the compatibility mouse events a touch tap
-        // synthesizes must not open the card (useHoverReferenceInteraction.ts).
-        cut.Find("a").PointerDown(new PointerEventArgs { PointerType = "touch" });
-        cut.Find("a").MouseEnter();
+        // Hover is owned by the JS interaction, so no C# handler is attached and a Blazor Server
+        // circuit pays no round trip for pointer entries and exits.
+        var trigger = cut.Find("a");
+        Should.Throw<MissingEventHandlerException>(() => trigger.MouseEnter());
+        Should.Throw<MissingEventHandlerException>(() => trigger.MouseLeave());
 
-        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeFalse();
+        return Task.CompletedTask;
+    }
 
-        cut.Find("a").MouseLeave();
-        cut.Find("a").PointerDown(new PointerEventArgs { PointerType = "mouse" });
-        cut.Find("a").MouseEnter();
+    [Fact]
+    public async Task AttachesMouseLeaveHandlerWhileFocusOpenIsBlocked()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        cut.Find("a").Focus();
+        cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+
+        var root = cut.FindComponent<PreviewCardRoot>();
+        await cut.InvokeAsync(root.Instance.OnEscapeKey);
+
+        cut.WaitForAssertion(() => cut.Find("[role='presentation']").HasAttribute("data-closed").ShouldBeTrue());
+
+        // The only remaining job of the C# mouseleave handler is clearing the focus block that the
+        // Escape dismissal set (useFocus.ts `onMouseLeave`), so it is attached exactly while that
+        // block is live and the reset still re-enables opening on a later focus.
+        cut.WaitForAssertion(() => cut.Find("a").MouseLeave());
+
+        cut.Find("a").Focus();
 
         cut.Find("[role='presentation']").HasAttribute("data-open").ShouldBeTrue();
+    }
+
+    [Fact]
+    public Task ForwardsConsumerMouseEnterHandler()
+    {
+        var invocations = 0;
+        var cut = Render(CreateTriggerInRoot(
+            additionalAttributes: new Dictionary<string, object>
+            {
+                ["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, _ => invocations++)
+            }
+        ));
+
+        cut.Find("a").MouseEnter();
+
+        invocations.ShouldBe(1);
 
         return Task.CompletedTask;
     }

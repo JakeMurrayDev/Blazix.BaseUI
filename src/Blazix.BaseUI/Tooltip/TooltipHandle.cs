@@ -19,6 +19,17 @@ public interface ITooltipHandle
     string? ActiveTriggerId { get; }
 
     /// <summary>
+    /// Gets the root ID associated with the subscribed tooltip.
+    /// </summary>
+    internal string? RootId { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the subscribed tooltip disables the hoverable popup,
+    /// which determines whether the JavaScript hover interaction arms safePolygon.
+    /// </summary>
+    internal bool DisableHoverablePopup { get; }
+
+    /// <summary>
     /// Opens the tooltip and associates it with the trigger with the given ID.
     /// </summary>
     /// <param name="triggerId">ID of the trigger to associate with the tooltip.</param>
@@ -53,6 +64,11 @@ public interface ITooltipHandle
     /// Called by root to sync state back to handle after processing.
     /// </summary>
     internal void SyncState(bool open, string? triggerId, object? payload);
+
+    /// <summary>
+    /// Called by root to expose the JavaScript root ID and hover options to detached triggers.
+    /// </summary>
+    internal void SyncRootHoverState(string? rootId, bool disableHoverablePopup);
 }
 
 /// <summary>
@@ -62,6 +78,27 @@ public interface ITooltipHandle
 /// <typeparam name="TPayload">The type of payload to pass to the tooltip.</typeparam>
 public class TooltipHandle<TPayload> : ComponentHandleBase<TPayload, TooltipOpenChangeReason>, ITooltipHandle
 {
+    /// <summary>
+    /// Occurs when the subscribed root ID or its hover options change.
+    /// </summary>
+    internal event Action? RootHoverStateChanged;
+
+    /// <summary>
+    /// Gets the root ID associated with the subscribed tooltip.
+    /// </summary>
+    internal string? RootId { get; private set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the subscribed tooltip disables the hoverable popup.
+    /// </summary>
+    internal bool DisableHoverablePopup { get; private set; }
+
+    /// <inheritdoc />
+    string? ITooltipHandle.RootId => RootId;
+
+    /// <inheritdoc />
+    bool ITooltipHandle.DisableHoverablePopup => DisableHoverablePopup;
+
     /// <inheritdoc />
     protected override TooltipOpenChangeReason ImperativeActionReason => TooltipOpenChangeReason.ImperativeAction;
 
@@ -83,6 +120,20 @@ public class TooltipHandle<TPayload> : ComponentHandleBase<TPayload, TooltipOpen
     /// <inheritdoc />
     void ITooltipHandle.SyncState(bool open, string? triggerId, object? payload)
         => SyncState(open, triggerId, payload is TPayload typedPayload ? typedPayload : default);
+
+    /// <inheritdoc />
+    void ITooltipHandle.SyncRootHoverState(string? rootId, bool disableHoverablePopup)
+    {
+        if (RootId == rootId && DisableHoverablePopup == disableHoverablePopup)
+        {
+            return;
+        }
+
+        RootId = rootId;
+        DisableHoverablePopup = disableHoverablePopup;
+        RootHoverStateChanged?.Invoke();
+        NotifyStateChanged();
+    }
 }
 
 /// <summary>

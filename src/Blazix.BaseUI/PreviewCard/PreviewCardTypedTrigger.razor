@@ -32,8 +32,6 @@
     private CancellationTokenSource? hoverCts;
     private int lastEffectiveDelay = -1;
     private int lastEffectiveCloseDelay = -1;
-    private bool lastUseJsHover;
-    private string? lastPointerType;
     private bool recentPointerDown;
     private bool blockFocusOpen;
     private bool wasOpen;
@@ -69,15 +67,6 @@
     /// </summary>
     [Parameter]
     public int CloseDelay { get; set; } = 300;
-
-    /// <summary>
-    /// When true, uses JavaScript-based hover interaction with safePolygon support,
-    /// allowing the user to move their cursor from the trigger to the preview card popup
-    /// without it closing. When false, uses C# Task.Delay for hover handling.
-    /// Defaults to <see langword="true"/>.
-    /// </summary>
-    [Parameter]
-    public bool UseJsHover { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the ID of the trigger. In addition to being forwarded to the rendered element,
@@ -222,22 +211,8 @@
             RootContext?.SetTriggerPayload(triggerId, Payload);
         }
 
-        // Handle UseJsHover parameter changes
-        if (UseJsHover != lastUseJsHover)
-        {
-            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
-            {
-                _ = InitializeHoverInteractionAsync();
-            }
-            else if (!UseJsHover && hoverInitialized)
-            {
-                _ = DisposeHoverInteractionAsync();
-            }
-
-            lastUseJsHover = UseJsHover;
-        }
-        // Re-initialize JS hover if effective delays changed
-        else if (UseJsHover && hoverInitialized && CanInitializeHoverInteraction())
+        // Push effective delay changes to the JS hover interaction
+        if (hoverInitialized && CanInitializeHoverInteraction())
         {
             if (Delay != lastEffectiveDelay || CloseDelay != lastEffectiveCloseDelay)
             {
@@ -263,9 +238,7 @@
                 RootContext?.RegisterTriggerElement(triggerId, Element);
             }
 
-            lastUseJsHover = UseJsHover;
-
-            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
+            if (!hoverInitialized && CanInitializeHoverInteraction())
             {
                 _ = InitializeHoverInteractionAsync();
             }
@@ -294,8 +267,17 @@
         }
 
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
-        attrs["onmouseenter"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseEnterAsync);
-        attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+
+        // Hover is owned entirely by the JS interaction, so no `onmouseenter` handler is needed
+        // and none is attached: it would only cost an interop round trip per hover in. The
+        // `onmouseleave` handler exists solely to clear the focus block an Escape/TriggerPress
+        // dismissal set (useFocus.ts `onMouseLeave`), so it is attached only while that block is
+        // active. A consumer's own handlers still reach the element through AdditionalAttributes.
+        if (blockFocusOpen)
+        {
+            attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        }
+
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
 
@@ -367,11 +349,11 @@
         {
             try
             {
-                if (UseJsHover && hoverInitialized && CanInitializeHoverInteraction())
+                if (hoverInitialized && CanInitializeHoverInteraction())
                 {
                     await UpdateHoverInteractionDelaysAsync();
                 }
-                else if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
+                else if (!hoverInitialized && CanInitializeHoverInteraction())
                 {
                     await InitializeHoverInteractionAsync();
                 }
@@ -388,7 +370,7 @@
     {
         _ = InvokeAsync(async () =>
         {
-            if (UseJsHover && !hoverInitialized && CanInitializeHoverInteraction())
+            if (!hoverInitialized && CanInitializeHoverInteraction())
             {
                 await InitializeHoverInteractionAsync();
             }
@@ -447,123 +429,17 @@
 
     private async Task HandlePointerDownAsync(PointerEventArgs e)
     {
-        lastPointerType = e.PointerType;
         recentPointerDown = true;
 
         await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
     }
 
-    private async Task HandleMouseEnterAsync(MouseEventArgs e)
-    {
-        // When using JS hover, let JavaScript handle the hover interaction
-        if (UseJsHover && hoverInitialized)
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        // Upstream sets `mouseOnly: true`, so touch-generated compatibility mouse events
-        // must not open the card (useHoverReferenceInteraction.ts).
-        if (!IsMouseLikePointerType(lastPointerType))
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        if (!HasRootContext && !HasHandle)
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (IsOpenedByThisTrigger())
-        {
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        var effectiveDelay = Delay;
-
-        if (effectiveDelay <= 0)
-        {
-            await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerHover);
-            await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(effectiveDelay, token);
-            if (!token.IsCancellationRequested)
-            {
-                await RequestOpenAsync(true, PreviewCardOpenChangeReason.TriggerHover);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            _ = ex; // Expected during task cancellation - safe to ignore.
-        }
-
-        await EventUtilities.InvokeOnMouseEnterAsync(AdditionalAttributes, e);
-    }
-
     private async Task HandleMouseLeaveAsync(MouseEventArgs e)
     {
-        // Upstream resets the blocked focus state and the tracked pointer type when the
-        // pointer leaves the trigger (useFocus.ts `onMouseLeave`, TooltipTrigger.tsx `onMouseLeave`).
+        // Upstream resets the blocked focus state when the pointer leaves the trigger
+        // (useFocus.ts `onMouseLeave`), which re-enables opening on a later focus.
         blockFocusOpen = false;
-        lastPointerType = null;
-
-        // When using JS hover, let JavaScript handle the hover interaction
-        if (UseJsHover && hoverInitialized)
-        {
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        if (!HasRootContext && !HasHandle)
-        {
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        CancelHoverDelay();
-
-        if (!IsOpenedByThisTrigger())
-        {
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        var effectiveCloseDelay = CloseDelay;
-
-        if (effectiveCloseDelay <= 0)
-        {
-            await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover);
-            await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
-            return;
-        }
-
-        hoverCts = new CancellationTokenSource();
-        var token = hoverCts.Token;
-
-        try
-        {
-            await Task.Delay(effectiveCloseDelay, token);
-            if (!token.IsCancellationRequested)
-            {
-                await RequestOpenAsync(false, PreviewCardOpenChangeReason.TriggerHover);
-            }
-        }
-        catch (TaskCanceledException ex)
-        {
-            _ = ex; // Expected during task cancellation - safe to ignore.
-        }
+        RefreshStateAndAttributes();
 
         await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
@@ -754,7 +630,7 @@
             await previousTask;
             await DisposeHoverInteractionAsync(previousTriggerId);
 
-            if (UseJsHover && CanInitializeHoverInteraction())
+            if (CanInitializeHoverInteraction())
             {
                 await InitializeHoverInteractionAsync(desiredTriggerId);
             }
@@ -825,13 +701,6 @@
         }
 
         return Task.CompletedTask;
-    }
-
-    // Mirrors `isMouseLikePointerType` (floating-ui-react/utils/event.ts): in the non-strict
-    // mode used by hover, an unknown pointer type is treated as mouse-like.
-    private static bool IsMouseLikePointerType(string? pointerType)
-    {
-        return string.IsNullOrEmpty(pointerType) || pointerType is "mouse" or "pen";
     }
 
     private bool IsAnyPreviewCardOpen()

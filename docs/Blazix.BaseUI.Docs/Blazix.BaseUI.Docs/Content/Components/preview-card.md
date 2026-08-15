@@ -110,7 +110,7 @@ Manages open state, active trigger id, payload, transitions, actions, and handle
 
 ### Trigger
 
-Renders an anchor that opens on hover or focus. Parameters: `Delay`, `CloseDelay`, `UseJsHover`, `Id`, `Handle`, `Payload`, `Render`, `ClassValue`, `StyleValue`, and `ChildContent`. The active trigger exposes `data-popup-open`.
+Renders an anchor that opens on hover or focus. Parameters: `Delay`, `CloseDelay`, `Id`, `Handle`, `Payload`, `Render`, `ClassValue`, `StyleValue`, and `ChildContent`. The active trigger exposes `data-popup-open`.
 
 ### Portal
 
