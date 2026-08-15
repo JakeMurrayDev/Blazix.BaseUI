@@ -54,6 +54,27 @@ public abstract class PreviewCardTestsBase : TestBase
         });
     }
 
+    /// <summary>
+    /// Replays the pointer sequence a pointer of <paramref name="pointerType"/> produces on a
+    /// trigger: the pointerdown that records the pointer type, then the mouseenter that asks the
+    /// hover interaction to open. The gap lets the trigger's own C# pointerdown handler complete
+    /// its round trip first, so the two events cannot interleave differently across render modes.
+    /// </summary>
+    protected async Task DispatchPointerDownThenMouseEnterAsync(ILocator trigger, string pointerType)
+    {
+        await trigger.DispatchEventAsync("pointerdown", new Dictionary<string, object>
+        {
+            ["pointerType"] = pointerType,
+            ["button"] = 0,
+            ["buttons"] = 1,
+            ["isPrimary"] = true
+        });
+
+        await WaitForDelayAsync(300);
+
+        await trigger.DispatchEventAsync("mouseenter");
+    }
+
     #endregion
 
     #region Hover Interaction Tests
@@ -148,6 +169,41 @@ public abstract class PreviewCardTestsBase : TestBase
 
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("true");
+    }
+
+    /// <summary>
+    /// Tests that a touch-originated pointer sequence does not open the preview card on the
+    /// compatibility mouseenter. The hover interaction is created with <c>mouseOnly: true</c>
+    /// (blazix-baseui-preview-card.js), so <c>handleMouseEnter</c> bails once the last recorded
+    /// pointerType is not mouse-like. bUnit has no pointer model, so this gate can only be
+    /// proven in a real browser.
+    /// </summary>
+    [Fact]
+    public virtual async Task DoesNotOpenOnMouseEnterAfterTouchPointerDown()
+    {
+        await NavigateAsync(CreateUrl("/tests/preview-card")
+            .WithDelay(100)
+            .WithCloseDelay(100));
+
+        // Wait for JS interop to initialize
+        await WaitForDelayAsync(500);
+
+        var trigger = GetByTestId("preview-card-trigger");
+        var openState = GetByTestId("open-state");
+
+        // A touch tap emits pointerdown with pointerType "touch" and only afterwards the
+        // compatibility mouseenter, which is the sequence the mouseOnly gate has to reject.
+        await DispatchPointerDownThenMouseEnterAsync(trigger, "touch");
+
+        // Settle for well beyond the 100ms open delay - the card must never open.
+        await WaitForDelayAsync(600);
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+
+        // Control: the identical dispatch with a mouse pointerType does open, so the assertion
+        // above cannot pass merely because the synthetic events never reached the interaction.
+        await DispatchPointerDownThenMouseEnterAsync(trigger, "mouse");
+
+        await WaitForPreviewCardOpenAsync();
     }
 
     #endregion

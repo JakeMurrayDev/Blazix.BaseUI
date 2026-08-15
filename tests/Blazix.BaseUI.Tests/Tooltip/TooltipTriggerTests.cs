@@ -296,6 +296,29 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
     }
 
     [Fact]
+    public async Task AttachesMouseLeaveHandlerWhileFocusOpenIsBlocked()
+    {
+        var cut = Render(CreateTriggerInRoot());
+
+        cut.Find("button").Focus();
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+
+        var root = cut.FindComponent<TooltipRoot>();
+        await cut.InvokeAsync(root.Instance.OnEscapeKey);
+
+        cut.WaitForAssertion(() => cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue());
+
+        // The only remaining job of the C# mouseleave handler is clearing the focus block that the
+        // Escape dismissal set (useFocus.ts:127-129 `onMouseLeave`), so it is attached exactly
+        // while that block is live and the reset still re-enables opening on a later focus.
+        cut.WaitForAssertion(() => cut.Find("button").MouseLeave());
+
+        cut.Find("button").Focus();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue();
+    }
+
+    [Fact]
     public Task ForwardsConsumerMouseEnterHandler()
     {
         var invocations = 0;

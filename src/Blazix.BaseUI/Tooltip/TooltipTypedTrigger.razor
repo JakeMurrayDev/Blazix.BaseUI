@@ -331,11 +331,20 @@
             attrs["data-popup-open"] = "";
         }
 
-        // No `onmouseenter`/`onmouseleave` handlers: hover is owned entirely by the JS
-        // interaction, so a C# handler would only cost an interop round trip per hover in and
-        // out. A consumer's own handlers still reach the element through AdditionalAttributes,
-        // which RenderElement merges before these component attributes.
+        // Hover is owned entirely by the JS interaction, so no `onmouseenter` handler is needed
+        // and none is attached: it would only cost an interop round trip per hover in. The
+        // `onmouseleave` handler exists solely to clear the focus block an Escape/OutsidePress/
+        // TriggerPress dismissal set (useFocus.ts:127-129 `onMouseLeave` calls
+        // `resetBlockedFocus`), so it is attached only while that block is active. A consumer's
+        // own handlers still reach the element through AdditionalAttributes, which RenderElement
+        // merges before these component attributes.
         attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
+
+        if (blockFocusOpen)
+        {
+            attrs["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleMouseLeaveAsync);
+        }
+
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
@@ -541,6 +550,15 @@
         }
 
         await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandleMouseLeaveAsync(MouseEventArgs e)
+    {
+        // Upstream resets the blocked focus state when the pointer leaves the trigger
+        // (useFocus.ts:127-129 `onMouseLeave`), which re-enables opening on a later focus.
+        blockFocusOpen = false;
+
+        await EventUtilities.InvokeOnMouseLeaveAsync(AdditionalAttributes, e);
     }
 
     private async Task HandleFocusAsync(FocusEventArgs e)

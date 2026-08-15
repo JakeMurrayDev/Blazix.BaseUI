@@ -13,6 +13,7 @@ public interface ITooltipTriggerContract
     Task ReinitializesJsHoverWhenDisableHoverablePopupChanges();
     Task InitializesJsHoverForHandleBackedTrigger();
     Task DoesNotAttachMouseHandlersWhenConsumerSuppliesNone();
+    Task AttachesMouseLeaveHandlerWhileFocusOpenIsBlocked();
     Task ForwardsConsumerMouseEnterHandler();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
