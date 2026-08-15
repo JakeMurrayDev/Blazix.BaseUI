@@ -207,7 +207,10 @@
 
         if (previousOpen && !open)
         {
-            var reason = HasHandle ? (TooltipOpenChangeReason?)null : RootContext?.OpenChangeReason;
+            // A handle-backed trigger can still sit inside a root, and the root records the close
+            // reason on its context either way, so read it whenever a root context exists. A
+            // genuinely detached trigger has no root context and simply yields null here.
+            var reason = RootContext?.OpenChangeReason;
             if (reason is TooltipOpenChangeReason.EscapeKey
                 or TooltipOpenChangeReason.OutsidePress
                 or TooltipOpenChangeReason.TriggerPress)

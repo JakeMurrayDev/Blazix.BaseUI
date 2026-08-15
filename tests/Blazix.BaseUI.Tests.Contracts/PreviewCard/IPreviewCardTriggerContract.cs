@@ -11,6 +11,7 @@ public interface IPreviewCardTriggerContract
     Task DoesNotAttachMouseHandlersWhenConsumerSuppliesNone();
     Task AttachesMouseLeaveHandlerWhileFocusOpenIsBlocked();
     Task ForwardsConsumerMouseEnterHandler();
+    Task DoesNotOpenOnFocusAfterEscapeDismissalWithHandleBackedTrigger();
     Task AppliesClassValueWithState();
     Task AppliesStyleValueWithState();
     Task RequiresContext();

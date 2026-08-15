@@ -18,6 +18,7 @@ public interface IPreviewCardRootContract : IControlledTriggerLifecycleContract
     Task DoesNotCallOnOpenChangeWhenStateUnchanged();
     Task OnOpenChangeCancelPreventsOpening();
     Task ClosesWhenActiveTriggerUnmounts();
+    Task DoesNotReanchorToAnotherTriggerWhenActiveTriggerUnmountsAndCloseIsCanceled();
     Task ActionsRefCloseMethodClosesPreviewCard();
     Task ActionsRefUnmountMethodUnmountsPreviewCard();
     Task CascadesContextToChildren();

@@ -484,6 +484,28 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
     }
 
     [Fact]
+    public async Task DoesNotReopenOnFocusAfterEscapeCloseWithHandleBackedTrigger()
+    {
+        var handle = new TooltipHandle<string>();
+        var cut = Render(CreateHandleBackedTriggerInRoot(handle));
+        var trigger = cut.Find("button");
+
+        trigger.Focus();
+        cut.WaitForAssertion(() => cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeTrue());
+
+        var root = cut.FindComponent<TooltipRoot>();
+        await cut.InvokeAsync(root.Instance.OnEscapeKey);
+
+        cut.WaitForAssertion(() => cut.Find("[role='tooltip']").HasAttribute("data-closed").ShouldBeTrue());
+
+        // A handle-backed trigger still reads its close reason from the root it sits in, so the
+        // escape dismissal must block the very next focus open just like a plain trigger does.
+        trigger.Focus();
+
+        cut.Find("[role='tooltip']").HasAttribute("data-open").ShouldBeFalse();
+    }
+
+    [Fact]
     public Task RequiresContext()
     {
         var cut = Render<TooltipTrigger>(parameters => parameters
@@ -493,6 +515,39 @@ public class TooltipTriggerTests : BunitContext, ITooltipTriggerContract
         cut.Markup.ShouldBeEmpty();
 
         return Task.CompletedTask;
+    }
+
+    private static RenderFragment CreateHandleBackedTriggerInRoot(TooltipHandle<string> handle)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<TooltipRoot>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<TooltipTypedTrigger<string>>(0);
+                innerBuilder.AddAttribute(1, "Handle", handle);
+                innerBuilder.AddAttribute(2, "Id", "trigger-one");
+                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<TooltipPortal>(10);
+                innerBuilder.AddAttribute(11, "KeepMounted", true);
+                innerBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<TooltipPositioner>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<TooltipPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                        posBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
     }
 }
 
