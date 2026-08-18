@@ -506,6 +506,7 @@ function handleGlobalPointerDown(e) {
     // the `mouse` rule. Only genuine touch input uses the deferred `touch: 'sloppy'` mapping.
     if (currentPointerType === 'touch') return;
 
+    clearTouchTimeout();
     touchState = null;
     suppressNextTouchClick = false;
     processOutsidePressForRoots(e,

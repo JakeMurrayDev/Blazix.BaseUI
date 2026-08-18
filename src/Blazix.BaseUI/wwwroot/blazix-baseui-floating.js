@@ -2489,7 +2489,10 @@ export function createDismissInteraction(options) {
     // Track pointer type
     function handlePointerType(event) {
         currentPointerType = event.pointerType || '';
-        if (currentPointerType !== 'touch') touchState = null;
+        if (currentPointerType !== 'touch') {
+            if (touchState?.timeout) clearTimeout(touchState.timeout);
+            touchState = null;
+        }
     }
 
     // Determine which event to listen for outside press
@@ -2739,7 +2742,7 @@ function isTypeableCombobox(el) {
 /**
  * Checks whether the event's relatedTarget is outside the given container.
  */
-function isOutsideEvent(event, container) {
+export function isOutsideEvent(event, container) {
     const relatedTarget = event.relatedTarget;
     return !relatedTarget || !contains(container, relatedTarget);
 }

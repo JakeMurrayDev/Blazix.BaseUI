@@ -184,7 +184,7 @@ public abstract class PopoverTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task SmallTouchDriftOutsideDoesNotDismiss()
+    public virtual async Task SmallTouchDriftDismissesOnlyViaSynthesizedMouseDown()
     {
         await NavigateAsync(CreateUrl("/tests/popover"));
         await OpenPopoverAsync();
@@ -201,6 +201,11 @@ public abstract class PopoverTestsBase : TestBase
         await WaitForDelayAsync(100);
 
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await outsideButton.DispatchEventAsync("mousedown");
+        await WaitForPopoverClosedAsync();
+
+        await OpenPopoverAsync();
 
         await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
         await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 7, y);
