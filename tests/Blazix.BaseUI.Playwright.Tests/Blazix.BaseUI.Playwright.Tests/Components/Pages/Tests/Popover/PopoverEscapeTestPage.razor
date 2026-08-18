@@ -1,0 +1,32 @@
+@page "/tests/popover-escape/server"
+@using Blazix.BaseUI.Dialog
+@using Blazix.BaseUI.Popover
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Popover Escape Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <DialogRoot @bind-Open="dialogOpen">
+        <DialogTrigger data-testid="dialog-trigger">Open dialog</DialogTrigger>
+        <DialogPortal>
+            <DialogPopup data-testid="dialog-popup">
+                <PopoverRoot Context="_" @bind-Open="popoverOpen">
+                    <PopoverTrigger data-testid="dialog-popover-trigger">Open popover</PopoverTrigger>
+                    <PopoverPortal>
+                        <PopoverPositioner>
+                            <PopoverPopup data-testid="dialog-popover-popup">Popover content</PopoverPopup>
+                        </PopoverPositioner>
+                    </PopoverPortal>
+                </PopoverRoot>
+            </DialogPopup>
+        </DialogPortal>
+    </DialogRoot>
+
+    <div>Dialog open: <span data-testid="dialog-open-state">@dialogOpen.ToString().ToLowerInvariant()</span></div>
+    <div>Dialog popover open: <span data-testid="dialog-popover-open-state">@popoverOpen.ToString().ToLowerInvariant()</span></div>
+</div>
+
+@code {
+    private bool dialogOpen;
+    private bool popoverOpen;
+}

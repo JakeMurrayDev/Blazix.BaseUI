@@ -66,7 +66,7 @@ function handleCompositionEnd() {
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
-    document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     document.addEventListener('compositionstart', handleCompositionStart);
     document.addEventListener('compositionend', handleCompositionEnd);
     document.addEventListener('pointerdown', handleGlobalPointerDown);

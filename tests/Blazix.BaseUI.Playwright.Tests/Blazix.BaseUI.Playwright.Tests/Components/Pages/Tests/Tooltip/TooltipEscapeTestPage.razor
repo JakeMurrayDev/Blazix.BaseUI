@@ -7,6 +7,9 @@
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
     <button data-testid="open-tooltips-sequentially" @onclick="OpenTooltipsSequentiallyAsync">Open tooltips</button>
+    <button data-testid="close-tooltip-a" @onclick="CloseTooltipA">Close tooltip A</button>
+    <button data-testid="open-tooltip-a" @onclick="OpenTooltipA">Open tooltip A</button>
+    <button data-testid="open-tooltip-b" @onclick="OpenTooltipB">Open tooltip B</button>
 
     <TooltipRoot @bind-Open="tooltipAOpen">
         <TooltipTrigger data-testid="tooltip-a-trigger">Tooltip A</TooltipTrigger>
@@ -58,6 +61,12 @@
     private bool showTooltipB;
     private bool dialogOpen;
     private bool dialogTooltipOpen;
+
+    private void CloseTooltipA() => tooltipAOpen = false;
+
+    private void OpenTooltipA() => tooltipAOpen = true;
+
+    private void OpenTooltipB() => tooltipBOpen = true;
 
     private async Task OpenTooltipsSequentiallyAsync()
     {

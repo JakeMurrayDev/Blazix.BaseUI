@@ -2,6 +2,7 @@ using System.Text.Json;
 using Blazix.BaseUI.Playwright.Tests.Fixtures;
 using Blazix.BaseUI.Playwright.Tests.Infrastructure;
 using Microsoft.Playwright;
+using Shouldly;
 
 namespace Blazix.BaseUI.Playwright.Tests.Tests.Tooltip;
 
@@ -632,12 +633,26 @@ public abstract class TooltipTestsBase : TestBase
 
         await Page.Keyboard.PressAsync("Escape");
 
-        await WaitForTextContentAsync(tooltipAOpenState, "true");
         await WaitForTextContentAsync(tooltipBOpenState, "false");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+
+        await GetByTestId("open-tooltip-b").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await GetByTestId("close-tooltip-a").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipAOpenState, "false");
+        await GetByTestId("open-tooltip-a").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
 
         await Page.Keyboard.PressAsync("Escape");
 
         await WaitForTextContentAsync(tooltipAOpenState, "false");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipBOpenState, "false");
     }
 
     [Fact]
@@ -685,7 +700,7 @@ public abstract class TooltipTestsBase : TestBase
 
         var defaultPrevented = await Page.EvaluateAsync<bool>(
             "() => window.tooltipEscapeDefaultPrevented === true");
-        Assert.True(defaultPrevented);
+        defaultPrevented.ShouldBeTrue();
     }
 
     #endregion

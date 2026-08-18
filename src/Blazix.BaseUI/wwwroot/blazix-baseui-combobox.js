@@ -196,17 +196,27 @@ function initializeDocumentListeners() {
       return;
     }
 
+    const activeElement = document.activeElement;
+    let focusedRoot = null;
     let topmostRoot = null;
     let highestOrder = -1;
     for (const root of state.roots.values()) {
-      if (canInvokeRoot(root) && root.isOpen && !root.inline && root.openOrderStamp > highestOrder) {
+      if (!canInvokeRoot(root) || !root.isOpen || root.inline) {
+        continue;
+      }
+      if (contains(root.inputElement, activeElement) || contains(root.popupElement, activeElement)) {
+        focusedRoot = root;
+        break;
+      }
+      if (root.openOrderStamp > highestOrder) {
         highestOrder = root.openOrderStamp;
         topmostRoot = root;
       }
     }
 
-    if (topmostRoot) {
-      topmostRoot.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
+    const rootToClose = focusedRoot ?? topmostRoot;
+    if (rootToClose) {
+      rootToClose.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
       event.preventDefault();
       event.stopPropagation();
     }

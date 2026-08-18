@@ -282,6 +282,31 @@ public abstract class PopoverTestsBase : TestBase
         await WaitForPopoverClosedAsync();
     }
 
+    [Fact]
+    public virtual async Task EscapeDoesNotAlsoCloseTheEnclosingDialog()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover-escape"));
+
+        await GetByTestId("dialog-trigger").ClickAsync();
+        var dialogOpenState = GetByTestId("dialog-open-state");
+        var popoverOpenState = GetByTestId("dialog-popover-open-state");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        var popoverTrigger = GetByTestId("dialog-popover-trigger");
+        await popoverTrigger.ClickAsync();
+        await WaitForTextContentAsync(popoverOpenState, "true");
+        await popoverTrigger.FocusAsync();
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(popoverOpenState, "false");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(dialogOpenState, "false");
+    }
+
     /// <summary>
     /// Tests that Enter key on trigger opens the popover.
     /// </summary>

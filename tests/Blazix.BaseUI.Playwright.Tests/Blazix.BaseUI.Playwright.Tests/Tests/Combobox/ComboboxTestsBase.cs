@@ -44,7 +44,7 @@ public abstract class ComboboxTestsBase : TestBase
     }
 
     [Fact]
-    public virtual async Task EscapeClosesOnlyTheTopmostCombobox()
+    public virtual async Task EscapeClosesTheFocusedComboboxBeforeTheTopmostCombobox()
     {
         await NavigateAsync(CreateUrl("/tests/combobox-escape"));
 
@@ -53,11 +53,12 @@ public abstract class ComboboxTestsBase : TestBase
         var comboboxBOpenState = GetByTestId("combobox-b-open-state");
         await Assertions.Expect(comboboxAOpenState).ToHaveTextAsync("true", TextTimeout);
         await Assertions.Expect(comboboxBOpenState).ToHaveTextAsync("true", TextTimeout);
+        await GetByTestId("combobox-a-input").FocusAsync();
 
         await Page.Keyboard.PressAsync("Escape");
 
-        await Assertions.Expect(comboboxAOpenState).ToHaveTextAsync("true", TextTimeout);
-        await Assertions.Expect(comboboxBOpenState).ToHaveTextAsync("false", TextTimeout);
+        await Assertions.Expect(comboboxAOpenState).ToHaveTextAsync("false", TextTimeout);
+        await Assertions.Expect(comboboxBOpenState).ToHaveTextAsync("true", TextTimeout);
     }
 
     [Fact]

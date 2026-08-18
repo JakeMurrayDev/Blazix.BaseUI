@@ -233,12 +233,12 @@ public abstract class PreviewCardTestsBase : TestBase
         var previewCardBOpenState = GetByTestId("preview-card-b-open-state");
         await WaitForTextContentAsync(previewCardAOpenState, "true");
         await WaitForTextContentAsync(previewCardBOpenState, "true");
-        await WaitForDelayAsync(200);
+        await Assertions.Expect(GetByTestId("preview-card-b-popup")).ToBeVisibleAsync();
 
         await Page.Keyboard.PressAsync("Escape");
 
-        await WaitForTextContentAsync(previewCardAOpenState, "true");
         await WaitForTextContentAsync(previewCardBOpenState, "false");
+        await WaitForTextContentAsync(previewCardAOpenState, "true");
 
         await Page.Keyboard.PressAsync("Escape");
 
