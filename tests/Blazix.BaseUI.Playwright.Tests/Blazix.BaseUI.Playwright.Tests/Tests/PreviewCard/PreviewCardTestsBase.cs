@@ -223,6 +223,28 @@ public abstract class PreviewCardTestsBase : TestBase
         await WaitForPreviewCardClosedAsync();
     }
 
+    [Fact]
+    public virtual async Task EscapeClosesOnlyTheInteractedPreviewCard()
+    {
+        await NavigateAsync(CreateUrl("/tests/preview-card-escape"));
+
+        await GetByTestId("open-preview-cards-sequentially").ClickAsync();
+        var previewCardAOpenState = GetByTestId("preview-card-a-open-state");
+        var previewCardBOpenState = GetByTestId("preview-card-b-open-state");
+        await WaitForTextContentAsync(previewCardAOpenState, "true");
+        await WaitForTextContentAsync(previewCardBOpenState, "true");
+        await WaitForDelayAsync(200);
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(previewCardAOpenState, "true");
+        await WaitForTextContentAsync(previewCardBOpenState, "false");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(previewCardAOpenState, "false");
+    }
+
     #endregion
 
     #region Positioning Tests

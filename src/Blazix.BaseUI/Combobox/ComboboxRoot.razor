@@ -510,7 +510,7 @@
             try
             {
                 var module = await ModuleTask;
-                await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen, activeIndex, typedContext.GetVisibleItemCount(), LoopFocus);
+                await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen, activeIndex, typedContext.GetVisibleItemCount(), LoopFocus, Inline);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

@@ -347,6 +347,8 @@ function handleGlobalKeyDown(e) {
 
     if (topmost) {
         topmost.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => { });
+        e.preventDefault();
+        e.stopPropagation();
     }
 }
 

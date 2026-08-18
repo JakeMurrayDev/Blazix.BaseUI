@@ -576,6 +576,75 @@ public abstract class TooltipTestsBase : TestBase
         await WaitForTooltipClosedAsync();
     }
 
+    [Fact]
+    public virtual async Task EscapeClosesOnlyTheInteractedTooltip()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("open-tooltips-sequentially").ClickAsync();
+        var tooltipAOpenState = GetByTestId("tooltip-a-open-state");
+        var tooltipBOpenState = GetByTestId("tooltip-b-open-state");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+        await WaitForTextContentAsync(tooltipBOpenState, "false");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipAOpenState, "false");
+    }
+
+    [Fact]
+    public virtual async Task EscapeDoesNotAlsoCloseTheEnclosingDialog()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("dialog-trigger").ClickAsync();
+        var dialogOpenState = GetByTestId("dialog-open-state");
+        var tooltipOpenState = GetByTestId("dialog-tooltip-open-state");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await GetByTestId("dialog-tooltip-trigger").FocusAsync();
+        await WaitForTextContentAsync(tooltipOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipOpenState, "false");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(dialogOpenState, "false");
+    }
+
+    [Fact]
+    public virtual async Task EscapePreventsBrowserDefault()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("open-tooltips-sequentially").ClickAsync();
+        await WaitForTextContentAsync(GetByTestId("tooltip-b-open-state"), "true");
+        await Page.EvaluateAsync("""
+            () => {
+                window.tooltipEscapeDefaultPrevented = false;
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') {
+                        window.tooltipEscapeDefaultPrevented = event.defaultPrevented;
+                    }
+                }, { capture: true, once: true });
+            }
+            """);
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        var defaultPrevented = await Page.EvaluateAsync<bool>(
+            "() => window.tooltipEscapeDefaultPrevented === true");
+        Assert.True(defaultPrevented);
+    }
+
     #endregion
 
     #region Disabled State Tests

@@ -1417,21 +1417,48 @@ export async function startSimpleTransition(rootState, isOpen) {
 }
 
 /**
- * Creates a keydown handler that closes the first open root on Escape.
+ * Creates a keydown handler that closes an open root on Escape.
  * @param {Map} roots - The component's roots Map
  * @param {string} methodName - The .NET method to invoke (e.g. 'OnEscapeKey')
+ * @param {object} options - Escape handling options
  * @returns {Function} The keydown event handler
  */
-export function createEscapeKeyHandler(roots, methodName) {
+export function createEscapeKeyHandler(roots, methodName, options = {}) {
+    const {
+        pick = 'first',
+        preventDefault = false,
+        stopPropagation = false,
+        ignoreComposition = false
+    } = options;
+
     return function handleKeyDown(e) {
         if (e.key !== 'Escape') return;
+        if (ignoreComposition && (e.isComposing || e.keyCode === 229)) return;
 
-        for (const [id, rootState] of roots) {
-            if (rootState.isOpen && rootState.dotNetRef) {
-                rootState.dotNetRef.invokeMethodAsync(methodName).catch(() => { });
-                break;
+        let rootToClose = null;
+
+        if (pick === 'topmost') {
+            let highestOrder = -1;
+            for (const rootState of roots.values()) {
+                if (rootState.isOpen && rootState.dotNetRef && rootState.openOrderStamp > highestOrder) {
+                    highestOrder = rootState.openOrderStamp;
+                    rootToClose = rootState;
+                }
+            }
+        } else {
+            for (const rootState of roots.values()) {
+                if (rootState.isOpen && rootState.dotNetRef) {
+                    rootToClose = rootState;
+                    break;
+                }
             }
         }
+
+        if (!rootToClose) return;
+
+        rootToClose.dotNetRef.invokeMethodAsync(methodName).catch(() => { });
+        if (preventDefault) e.preventDefault();
+        if (stopPropagation) e.stopPropagation();
     };
 }
 

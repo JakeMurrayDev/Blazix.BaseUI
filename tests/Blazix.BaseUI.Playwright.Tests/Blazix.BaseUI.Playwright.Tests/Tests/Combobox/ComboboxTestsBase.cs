@@ -44,6 +44,23 @@ public abstract class ComboboxTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task EscapeClosesOnlyTheTopmostCombobox()
+    {
+        await NavigateAsync(CreateUrl("/tests/combobox-escape"));
+
+        await GetByTestId("open-comboboxes-sequentially").ClickAsync();
+        var comboboxAOpenState = GetByTestId("combobox-a-open-state");
+        var comboboxBOpenState = GetByTestId("combobox-b-open-state");
+        await Assertions.Expect(comboboxAOpenState).ToHaveTextAsync("true", TextTimeout);
+        await Assertions.Expect(comboboxBOpenState).ToHaveTextAsync("true", TextTimeout);
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await Assertions.Expect(comboboxAOpenState).ToHaveTextAsync("true", TextTimeout);
+        await Assertions.Expect(comboboxBOpenState).ToHaveTextAsync("false", TextTimeout);
+    }
+
+    [Fact]
     public virtual async Task ItemPressSelectsSingleValueSerializesHiddenInputAndCloses()
     {
         await NavigateAsync(CreateUrl("/tests/combobox").WithDefaultOpen(true));
