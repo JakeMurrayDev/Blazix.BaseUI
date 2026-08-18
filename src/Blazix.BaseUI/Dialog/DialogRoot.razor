@@ -542,6 +542,7 @@
     internal void RegisterTriggerElement(string triggerId, ElementReference? element)
     {
         triggerElements[triggerId] = element;
+        context.TriggerCount = triggerElements.Count;
 
         if (CurrentOpen && string.IsNullOrEmpty(activeTriggerId) && triggerElements.Count == 1)
         {
@@ -559,6 +560,7 @@
     {
         triggerElements.Remove(triggerId);
         triggerPayloads.Remove(triggerId);
+        context.TriggerCount = triggerElements.Count;
     }
 
     internal void SetTriggerPayload(string triggerId, object? triggerPayload)

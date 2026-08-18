@@ -110,6 +110,15 @@
             attrs["style"] = $"position: absolute; {verticalProp}: 0; {horizontalProp}: 0";
         }
 
+        // Upstream `getDisabledMountTransitionStyles(transitionStatus)` disables transitions
+        // for the mount frame so the popup snaps to its starting style instead of animating to it.
+        if (state.TransitionStatus == TransitionStatus.Starting)
+        {
+            attrs["style"] = attrs.TryGetValue("style", out var existingStyle)
+                ? $"{existingStyle}; transition: none"
+                : "transition: none";
+        }
+
         attrs["data-side"] = state.Side.ToDataAttributeString()!;
         attrs["data-align"] = state.Align.ToDataAttributeString()!;
 

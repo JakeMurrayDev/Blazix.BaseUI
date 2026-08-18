@@ -10,4 +10,5 @@ public interface INavigationMenuPositionerContract
     Task IsInertWhenClosed();
     Task AppliesClassValue();
     Task RequiresContext();
+    Task IsInstantWhenInitiallyOpen();
 }

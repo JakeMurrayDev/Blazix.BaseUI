@@ -79,6 +79,7 @@ function createRoot(rootId) {
         activeSnapPointOffset: null,
         frontmostHeight: 0,
         hasNestedDrawer: false,
+        nested: false,
         nestedOpenDialogCount: 0,
         transitionEnding: false,
         swiping: false,
@@ -268,9 +269,11 @@ export function updatePopup(
     frontmostHeight,
     hasNestedDrawer,
     transitionEnding,
-    nestedOpenDialogCount
+    nestedOpenDialogCount,
+    nested
 ) {
     const root = getRoot(rootId);
+    root.nested = !!nested;
     root.isOpen = !!open;
     root.mounted = !!mounted;
     root.swipeDirection = swipeDirection || 'down';
@@ -335,9 +338,11 @@ export function updateViewport(
     swipeDirection,
     snapToSequentialPoints,
     snapPoints,
-    activeSnapPoint
+    activeSnapPoint,
+    nested
 ) {
     const root = getRoot(rootId);
+    root.nested = !!nested;
     root.isOpen = !!open;
     root.mounted = !!mounted;
     root.swipeDirection = swipeDirection || 'down';
@@ -1712,8 +1717,9 @@ function updateNestedSwipeActive(root, details) {
     }
 
     root.nestedSwipeActive = true;
-    const parent = state.roots.get(root.parentRootId);
-    parent?.popupElement?.setAttribute('data-nested-drawer-swiping', '');
+    forEachAncestorRoot(root, (ancestor) => {
+        ancestor.popupElement?.setAttribute('data-nested-drawer-swiping', '');
+    });
     invoke(root.viewportDotNetRef, 'OnNestedSwipingChanged', true);
 }
 
@@ -1723,14 +1729,17 @@ function finishNestedSwipe(root) {
     }
 
     root.nestedSwipeActive = false;
-    const parent = state.roots.get(root.parentRootId);
-    parent?.popupElement?.removeAttribute('data-nested-drawer-swiping');
+    forEachAncestorRoot(root, (ancestor) => {
+        ancestor.popupElement?.removeAttribute('data-nested-drawer-swiping');
+    });
     invoke(root.viewportDotNetRef, 'OnNestedSwipingChanged', false);
 }
 
 function applySwipeProgress(root, progress, shouldTrack, notifyParent = true) {
     const resolved = Number.isFinite(progress) ? clamp(progress, 0, 1) : 0;
-    const activeProgress = root.isOpen && !root.parentRootId && shouldTrack ? resolved : 0;
+    // Upstream `isActive = open && !nested && shouldTrackProgress`, where `nested` is the DIALOG
+    // store flag - a drawer nested inside a plain dialog must suppress it too.
+    const activeProgress = root.isOpen && !root.nested && shouldTrack ? resolved : 0;
     const nestedProgress = root.isOpen && shouldTrack ? resolved : 0;
     applyBackdropProgress(root, activeProgress);
     setProviderVisual(
@@ -1778,11 +1787,28 @@ function applyBackdropProgress(root, progress) {
 }
 
 function syncParentProgress(root, progress) {
-    const parent = state.roots.get(root.parentRootId);
-    if (!parent?.popupElement) {
-        return;
+    // Upstream forwards the nested progress up the whole chain (`onNestedSwipeProgressChange`
+    // stores it and re-notifies its own parent), so every ancestor's stacked transform moves.
+    const resolved = String(clamp(progress, 0, 1));
+    forEachAncestorRoot(root, (ancestor) => {
+        ancestor.popupElement?.style.setProperty('--drawer-swipe-progress', resolved);
+    });
+}
+
+function forEachAncestorRoot(root, callback) {
+    const visited = new Set([root.rootId]);
+    let parentId = root.parentRootId;
+
+    while (parentId && !visited.has(parentId)) {
+        visited.add(parentId);
+        const ancestor = state.roots.get(parentId);
+        if (!ancestor) {
+            return;
+        }
+
+        callback(ancestor);
+        parentId = ancestor.parentRootId;
     }
-    parent.popupElement.style.setProperty('--drawer-swipe-progress', String(clamp(progress, 0, 1)));
 }
 
 function setProviderVisual(root, progress, height) {
@@ -2396,6 +2422,12 @@ function refreshCloseWatchers() {
     }
 }
 
+// Upstream gates the virtual keyboard provider on `nestedOpenDialogCount > 0`, which is
+// deliberately broader than the drawer-only chain used for swipe.
+function isVirtualKeyboardSuspended(root) {
+    return hasOpenDescendant(root) || (root.nestedOpenDialogCount ?? 0) > 0;
+}
+
 function hasOpenDescendant(root) {
     for (const candidate of state.roots.values()) {
         if (!candidate.isOpen || candidate.rootId === root.rootId) {
@@ -2443,7 +2475,7 @@ function syncVirtualKeyboard(root) {
     };
     const align = () => {
         const target = keyboardState.focusedTarget;
-        if (hasOpenDescendant(root) || !target || !contains(element, target)) {
+        if (isVirtualKeyboardSuspended(root) || !target || !contains(element, target)) {
             resetInset();
             restoreAdjustment();
             return;
@@ -2498,7 +2530,7 @@ function syncVirtualKeyboard(root) {
         keyboardState.frame = requestAnimationFrame(align);
     };
     const capture = (target) => {
-        if (hasOpenDescendant(root)) {
+        if (isVirtualKeyboardSuspended(root)) {
             return false;
         }
         const resolved = resolveKeyboardInputTarget(target);
@@ -2550,7 +2582,7 @@ function cleanupVirtualKeyboard(root) {
 }
 
 function virtualKeyboardTouchStart(root, event) {
-    if (!root.virtualKeyboardEnabled || !root.isOpen || !root.mounted || hasOpenDescendant(root)) {
+    if (!root.virtualKeyboardEnabled || !root.isOpen || !root.mounted || isVirtualKeyboardSuspended(root)) {
         virtualKeyboardTouchCancel(root);
         return;
     }
@@ -2585,7 +2617,7 @@ function virtualKeyboardTouchEnd(root, event, currentTarget) {
         !root.virtualKeyboardEnabled ||
         !root.isOpen ||
         !root.mounted ||
-        hasOpenDescendant(root) ||
+        isVirtualKeyboardSuspended(root) ||
         !rootElement ||
         !keyboardState?.touchStart ||
         keyboardState.touchMoved

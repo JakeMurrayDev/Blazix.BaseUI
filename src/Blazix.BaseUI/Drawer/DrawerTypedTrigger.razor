@@ -327,11 +327,12 @@
         attrs["aria-expanded"] = open ? "true" : "false";
         attrs["id"] = triggerId;
 
-        if (open && RootContext?.PopupId is not null)
+        var ownsPopupId = OwnsPopupIdForAriaControls();
+        if (ownsPopupId && RootContext?.PopupId is not null)
         {
             attrs["aria-controls"] = RootContext.PopupId;
         }
-        else if (open && Handle?.PopupId is not null)
+        else if (ownsPopupId && Handle?.PopupId is not null)
         {
             attrs["aria-controls"] = Handle.PopupId;
         }
@@ -370,27 +371,44 @@
         }
     }
 
+    // Source: popups/store.ts `triggerOwnsOpenPopup`, which feeds `aria-expanded`, `data-popup-open`
+    // and the trigger state. It is strict - there is no only-trigger fallback here, so a drawer opened
+    // programmatically or through a handle does not mark every registered trigger as expanded.
     private bool IsOpenedByThisTrigger()
     {
         if (HasHandle)
         {
-            var isOpen = Handle!.IsOpen;
-            if (!isOpen)
-            {
-                return false;
-            }
-
-            var activeId = Handle.ActiveTriggerId;
-            return activeId == triggerId || (activeId is null && isOpen);
+            return Handle!.IsOpen && Handle.ActiveTriggerId == triggerId;
         }
 
-        if (RootContext is null || !RootContext.GetOpen())
+        return RootContext is not null
+            && RootContext.GetOpen()
+            && RootContext.ActiveTriggerId == triggerId;
+    }
+
+    // Source: popups/store.ts `triggerOwnsOpenPopupOrIsOnlyTrigger`, which feeds `triggerPopupId` and
+    // therefore `aria-controls` only. Unlike the open state, this keeps the only-trigger fallback.
+    private bool OwnsPopupIdForAriaControls()
+    {
+        if (IsOpenedByThisTrigger())
         {
-            return false;
+            return true;
         }
 
-        var activeTriggerId = RootContext.ActiveTriggerId;
-        return activeTriggerId == triggerId || (activeTriggerId is null && RootContext.GetOpen());
+        if (HasHandle)
+        {
+            // The only-trigger fallback requires `state.triggerCount === 1` upstream, so a
+            // handle-backed drawer opened without an active trigger must not hand the same
+            // `aria-controls` to every registered trigger.
+            return Handle!.IsOpen
+                && Handle.ActiveTriggerId is null
+                && Handle.RegisteredTriggerCount == 1;
+        }
+
+        return RootContext is not null
+            && RootContext.GetOpen()
+            && RootContext.ActiveTriggerId is null
+            && RootContext.TriggerCount == 1;
     }
 
     private Task HandlePointerDownAsync(PointerEventArgs e)

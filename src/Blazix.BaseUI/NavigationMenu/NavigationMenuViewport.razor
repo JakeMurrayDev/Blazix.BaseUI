@@ -42,6 +42,9 @@
     [CascadingParameter]
     private NavigationMenuRootContext? RootContext { get; set; }
 
+    [CascadingParameter]
+    private NavigationMenuPositionerContext? PositionerContext { get; set; }
+
     /// <summary>
     /// Allows you to replace the component's HTML element
     /// with a different tag, or compose it with another component.
@@ -102,7 +105,9 @@
         attrs["id"] = RootContext?.ViewportId ?? string.Empty;
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlurAsync);
 
-        if (RootContext?.ViewportInert == true)
+        // Upstream only inerts the viewport in the positioner-less (inline) configuration:
+        // `...(!hasPositioner && viewportInert && { inert: inertValue(true) })`.
+        if (PositionerContext is null && RootContext?.ViewportInert == true)
         {
             attrs["inert"] = true;
         }
@@ -112,7 +117,9 @@
 
     private Task HandleBlurAsync(FocusEventArgs e)
     {
-        RootContext?.SetViewportInert(true);
+        // The inert decision needs the blur event's related target, which Blazor's
+        // FocusEventArgs does not carry; the navigation menu JS module makes it from a
+        // `focusout` listener on this element instead.
         return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
     }
 

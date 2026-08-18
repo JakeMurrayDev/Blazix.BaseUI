@@ -32,6 +32,8 @@ internal sealed class DrawerRootContext
 
     public Action<bool> OnNestedDrawerPresenceChange { get; set; } = null!;
 
+    public Action<int> OnNestedOpenDrawerCountChange { get; set; } = null!;
+
     public Action<int> OnNestedFrontmostHeightChange { get; set; } = null!;
 
     public Action<bool> OnNestedSwipingChange { get; set; } = null!;
@@ -45,6 +47,8 @@ internal sealed class DrawerRootContext
     public Action<double>? NotifyParentSwipeProgressChange { get; set; }
 
     public Action<bool>? NotifyParentHasNestedDrawer { get; set; }
+
+    public Action<int>? NotifyParentNestedOpenDrawerCount { get; set; }
 
     public event Action? StateChanged;
 

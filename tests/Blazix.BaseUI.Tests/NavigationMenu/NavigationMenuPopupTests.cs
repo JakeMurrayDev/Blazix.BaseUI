@@ -130,6 +130,44 @@ public class NavigationMenuPopupTests : BunitContext, INavigationMenuPopupContra
         };
     }
 
+    private RenderFragment CreatePopupInDirectionProvider(Direction direction, Side side)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.DirectionProvider.DirectionProvider>(0);
+            builder.AddAttribute(1, "Direction", direction);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(providerBuilder =>
+            {
+                providerBuilder.OpenComponent<NavigationMenuRoot>(0);
+                providerBuilder.AddAttribute(1, "DefaultValue", "item1");
+                providerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(rootBuilder =>
+                {
+                    rootBuilder.OpenComponent<NavigationMenuItem>(0);
+                    rootBuilder.AddAttribute(1, "Value", "item1");
+                    rootBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                    {
+                        itemBuilder.OpenComponent<NavigationMenuTrigger>(0);
+                        itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                        itemBuilder.CloseComponent();
+                    }));
+                    rootBuilder.CloseComponent();
+
+                    rootBuilder.OpenComponent<NavigationMenuPositioner>(10);
+                    rootBuilder.AddAttribute(11, "Side", side);
+                    rootBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(posBuilder =>
+                    {
+                        posBuilder.OpenComponent<NavigationMenuPopup>(0);
+                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Popup content")));
+                        posBuilder.CloseComponent();
+                    }));
+                    rootBuilder.CloseComponent();
+                }));
+                providerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersNavByDefault()
     {
@@ -316,6 +354,36 @@ public class NavigationMenuPopupTests : BunitContext, INavigationMenuPopupContra
             mounted: true,
             direction: "rtl",
             side: Side.InlineEnd));
+
+        var popup = cut.Find("nav[tabindex='-1']");
+        var style = popup.GetAttribute("style");
+        style.ShouldContain("position: absolute");
+        style.ShouldContain("right: 0");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DisablesTransitionsDuringStartingStyle()
+    {
+        var cut = Render(CreatePopupWithContext(
+            value: "item1",
+            mounted: true,
+            transitionStatus: TransitionStatus.Starting,
+            side: Side.Top));
+
+        var popup = cut.Find("nav[tabindex='-1']");
+        var style = popup.GetAttribute("style");
+        style.ShouldContain("bottom: 0");
+        style.ShouldContain("transition: none");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ResolvesRtlDirectionFromDirectionProvider()
+    {
+        var cut = Render(CreatePopupInDirectionProvider(Direction.Rtl, Side.InlineEnd));
 
         var popup = cut.Find("nav[tabindex='-1']");
         var style = popup.GetAttribute("style");

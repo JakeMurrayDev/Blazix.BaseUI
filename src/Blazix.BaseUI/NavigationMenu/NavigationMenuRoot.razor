@@ -1,3 +1,4 @@
+@using Blazix.BaseUI.DirectionProvider
 @using Blazix.BaseUI.Utilities.FloatingTree
 @using Blazix.BaseUI.Utilities
 @using Microsoft.JSInterop
@@ -54,8 +55,13 @@
 
     private bool IsNested => ParentContext is not null;
 
+    private Direction ResolvedDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
     [CascadingParameter]
     private NavigationMenuRootContext? ParentContext { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
 
     /// <summary>
     /// Gets or sets the value of the currently active item.
@@ -160,6 +166,7 @@
             Mounted = transition.IsMounted,
             IsNested = IsNested,
             Orientation = Orientation,
+            Direction = ResolvedDirection.ToAttributeString() ?? "ltr",
             ActivationDirection = activationDirection,
             TransitionStatus = transition.TransitionStatus,
             GetValue = () => CurrentValue,
@@ -288,6 +295,16 @@
     }
 
     /// <summary>
+    /// Invoked from JavaScript when focus leaves the viewport for an element that is
+    /// neither inside the viewport nor the active trigger.
+    /// </summary>
+    [JSInvokable]
+    public void OnViewportFocusOut()
+    {
+        SetViewportInert(true);
+    }
+
+    /// <summary>
     /// Invoked from JavaScript when a native trigger key event opens an item.
     /// </summary>
     [JSInvokable]
@@ -323,7 +340,12 @@
             context.Mounted = false;
         }
 
-        _ = InvokeOpenChangeCompleteAsync(open);
+        // Upstream only invokes `onOpenChangeComplete` from `handleUnmount`, always with `false`.
+        if (!open)
+        {
+            _ = InvokeOpenChangeCompleteAsync(false);
+        }
+
         StateHasChanged();
     }
 
@@ -400,7 +422,8 @@
         {
             var module = await ModuleTask.Value;
             var orientationStr = Orientation.ToDataAttributeString();
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, orientationStr, Delay, CloseDelay, IsNested);
+            await module.InvokeVoidAsync(
+                "initializeRoot", rootId, dotNetRef, orientationStr, Delay, CloseDelay, IsNested, context.Direction);
 
             if (rootElementReference?.Element.HasValue == true)
             {

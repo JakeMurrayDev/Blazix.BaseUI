@@ -39,6 +39,8 @@ internal sealed class DialogRootContext
 
     public string? ActiveTriggerId { get; set; }
 
+    public int TriggerCount { get; set; }
+
     public bool PreventUnmountingOnClose { get; set; }
 
     public object? Payload { get; set; }

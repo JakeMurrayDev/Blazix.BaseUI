@@ -20,6 +20,8 @@
 @code {
     private PositionerInterop positionerInterop = null!;
     private ElementReference? arrowElement;
+    private ElementReference? lastAnchorElement;
+    private bool instant;
     private bool positioned;
     private NavigationMenuPositionerState state;
     private NavigationMenuPositionerContext positionerContext = null!;
@@ -158,6 +160,10 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        // When the menu is initially open, disable the positioner's transition for one frame
+        // so a default value does not animate in from the unpositioned portal state.
+        instant = RootContext?.GetValue() is not null;
+
         positionerInterop = new PositionerInterop(
             JSRuntime,
             "./_content/Blazix.BaseUI/blazix-baseui-navigation-menu.min.js");
@@ -176,7 +182,7 @@
     protected override void OnParametersSet()
     {
         var open = RootContext?.GetValue() is not null;
-        state = new NavigationMenuPositionerState(open, Side, Align, false, false);
+        state = new NavigationMenuPositionerState(open, Side, Align, false, instant);
 
         positionerContext.Side = Side;
         positionerContext.Align = Align;
@@ -199,8 +205,10 @@
             {
                 await InitializePositionerAsync();
             }
-            else if (!DisableAnchorTracking)
+            else if (!DisableAnchorTracking || !Nullable.Equals(ResolveAnchorElement(), lastAnchorElement))
             {
+                // Upstream anchors to the active trigger and re-runs when it changes;
+                // `disableAnchorTracking` only disables autoUpdate's resize/layout-shift tracking.
                 await UpdatePositionAsync();
             }
         }
@@ -220,6 +228,7 @@
     public Task OnPositionUpdated(string side, string align, bool anchorHidden, bool arrowUncentered)
     {
         positioned = true;
+        instant = false;
 
         if (Enum.TryParse<Side>(side, ignoreCase: true, out var parsedSide))
         {
@@ -238,7 +247,8 @@
         {
             Side = positionerContext.Side,
             Align = positionerContext.Align,
-            AnchorHidden = anchorHidden
+            AnchorHidden = anchorHidden,
+            Instant = false
         };
         BuildComponentAttributes();
         return InvokeAsync(StateHasChanged);
@@ -328,6 +338,18 @@
         UseCollisionAvoidanceObject = true
     };
 
+    private ElementReference? ResolveAnchorElement()
+    {
+        // For navigation menu, the anchor is the active trigger element
+        if (Anchor.HasValue || RootContext is null)
+        {
+            return Anchor;
+        }
+
+        var activeValue = RootContext.GetValue();
+        return activeValue is not null ? RootContext.GetTriggerElement(activeValue) : null;
+    }
+
     private async Task InitializePositionerAsync()
     {
         if (!Element.HasValue || RootContext is null)
@@ -335,18 +357,13 @@
             return;
         }
 
-        // For navigation menu, the anchor is the active trigger element
-        var activeValue = RootContext.GetValue();
-        var anchorElement = Anchor;
-        if (!anchorElement.HasValue && activeValue is not null)
-        {
-            anchorElement = RootContext.GetTriggerElement(activeValue);
-        }
-
+        var anchorElement = ResolveAnchorElement();
         if (!anchorElement.HasValue)
         {
             return;
         }
+
+        lastAnchorElement = anchorElement;
 
         await positionerInterop.InitializeAsync(
             Element.Value, anchorElement.Value, BuildConfig(), arrowElement, DotNetRef);
@@ -359,17 +376,13 @@
             return;
         }
 
-        var activeValue = RootContext.GetValue();
-        var anchorElement = Anchor;
-        if (!anchorElement.HasValue && activeValue is not null)
-        {
-            anchorElement = RootContext.GetTriggerElement(activeValue);
-        }
-
+        var anchorElement = ResolveAnchorElement();
         if (!anchorElement.HasValue)
         {
             return;
         }
+
+        lastAnchorElement = anchorElement;
 
         await positionerInterop.UpdateAsync(anchorElement.Value, BuildConfig(), arrowElement);
     }
