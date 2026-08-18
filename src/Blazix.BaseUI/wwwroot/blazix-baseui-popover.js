@@ -506,6 +506,7 @@ function handleGlobalPointerDown(e) {
     // the `mouse` rule. Only genuine touch input uses the deferred `touch: 'sloppy'` mapping.
     if (currentPointerType === 'touch') return;
 
+    touchState = null;
     suppressNextTouchClick = false;
     processOutsidePressForRoots(e,
         (rs) => rs.modal === 'trap-focus',
@@ -577,10 +578,10 @@ function handleGlobalTouchEnd(e) {
 
     if (touchState.dismissOnTouchEnd) {
         processOutsidePressForRoots(e, () => true, false);
+        touchState.dismissOnMouseDown = false;
     }
 
     clearTouchTimeout();
-    touchState = null;
 }
 
 function handleGlobalMouseDown(e) {
@@ -588,7 +589,9 @@ function handleGlobalMouseDown(e) {
 
     suppressNextTouchClick = true;
     clearTouchTimeout();
-    if (touchState?.dismissOnMouseDown === false) return;
+    const dismissOnMouseDown = touchState?.dismissOnMouseDown !== false;
+    touchState = null;
+    if (!dismissOnMouseDown) return;
     processOutsidePressForRoots(e, () => true, false);
 }
 

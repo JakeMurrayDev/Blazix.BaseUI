@@ -2470,9 +2470,8 @@ export function createDismissInteraction(options) {
 
         if (touchState.dismissOnTouchEnd) {
             closeOnPressOutside(event);
+            touchState.dismissOnMouseDown = false;
         }
-
-        touchState = null;
     }
 
     function handleMouseDown(event) {
@@ -2481,13 +2480,16 @@ export function createDismissInteraction(options) {
             clearTimeout(touchState.timeout);
             touchState.timeout = null;
         }
-        if (touchState?.dismissOnMouseDown === false) return;
+        const dismissOnMouseDown = touchState?.dismissOnMouseDown !== false;
+        touchState = null;
+        if (!dismissOnMouseDown) return;
         closeOnPressOutside(event);
     }
 
     // Track pointer type
     function handlePointerType(event) {
         currentPointerType = event.pointerType || '';
+        if (currentPointerType !== 'touch') touchState = null;
     }
 
     // Determine which event to listen for outside press

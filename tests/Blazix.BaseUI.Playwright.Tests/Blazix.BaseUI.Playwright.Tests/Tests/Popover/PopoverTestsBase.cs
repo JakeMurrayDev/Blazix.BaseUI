@@ -97,6 +97,31 @@ public abstract class PopoverTestsBase : TestBase
         });
     }
 
+    protected async Task DispatchSyntheticTouchEventAsync(ILocator target, string type, float x, float y)
+    {
+        var eventDataJson = System.Text.Json.JsonSerializer.Serialize(new { type, x, y });
+        await target.EvaluateAsync("""
+            (element, eventDataJson) => {
+                const eventData = JSON.parse(eventDataJson);
+                const touch = new Touch({
+                    identifier: 1,
+                    target: element,
+                    clientX: eventData.x,
+                    clientY: eventData.y
+                });
+                const activeTouches = eventData.type === 'touchend' ? [] : [touch];
+                element.dispatchEvent(new TouchEvent(eventData.type, {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    touches: activeTouches,
+                    targetTouches: activeTouches,
+                    changedTouches: [touch]
+                }));
+            }
+            """, eventDataJson);
+    }
+
     #endregion
 
     #region Popover Open/Close Interaction Tests
@@ -168,18 +193,18 @@ public abstract class PopoverTestsBase : TestBase
         Assert.NotNull(box);
         var x = box.X + box.Width / 2;
         var y = box.Y + box.Height / 2;
-        var session = await Page.Context.NewCDPSessionAsync(Page);
+        var outsideButton = GetByTestId("outside-button");
 
-        await DispatchTouchEventAsync(session, "touchStart", x, y);
-        await DispatchTouchEventAsync(session, "touchMove", x + 3, y);
-        await DispatchTouchEventAsync(session, "touchEnd", x + 3, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 3, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 3, y);
         await WaitForDelayAsync(100);
 
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
 
-        await DispatchTouchEventAsync(session, "touchStart", x, y);
-        await DispatchTouchEventAsync(session, "touchMove", x + 7, y);
-        await DispatchTouchEventAsync(session, "touchEnd", x + 7, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 7, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 7, y);
 
         await WaitForPopoverClosedAsync();
     }
@@ -199,10 +224,12 @@ public abstract class PopoverTestsBase : TestBase
         await DispatchTouchEventAsync(session, "touchStart", x, y);
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
 
-        await DispatchTouchEventAsync(session, "touchMove", x + 15, y);
+        // Chromium does not emit a DOM touchmove for the first few pixels of a CDP gesture.
+        // Move far enough past its native touch slop to exercise useDismiss's >10px branch.
+        await DispatchTouchEventAsync(session, "touchMove", x, y + 30);
         await WaitForPopoverClosedAsync();
 
-        await DispatchTouchEventAsync(session, "touchEnd", x + 15, y);
+        await DispatchTouchEventAsync(session, "touchEnd", x, y + 30);
     }
 
     [Fact]
