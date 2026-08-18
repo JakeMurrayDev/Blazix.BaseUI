@@ -179,6 +179,20 @@ function isInsideNavigationMenu(rootState, target) {
 
 // --- Root Management ---
 
+/**
+ * Updates the text direction of an initialized root. `DirectionProvider` can change direction at
+ * runtime, and the direction decides which arrow key opens a vertical menu, so the JS state has to
+ * follow instead of staying pinned to the value captured at initialization.
+ * @param {string} rootId - The root identifier
+ * @param {string} direction - Either `ltr` or `rtl`
+ */
+export function setDirection(rootId, direction) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.direction = direction === 'rtl' ? 'rtl' : 'ltr';
+    }
+}
+
 export function initializeRoot(rootId, dotNetRef, orientation, delay, closeDelay, isNested, direction) {
     initGlobalListeners();
 

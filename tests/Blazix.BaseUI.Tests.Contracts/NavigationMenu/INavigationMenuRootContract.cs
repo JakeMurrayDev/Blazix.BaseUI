@@ -12,4 +12,5 @@ public interface INavigationMenuRootContract
     Task ControlledValue();
     Task InvokesOnValueChange();
     Task HasAriaOrientation();
+    Task SyncsDirectionWhenDirectionProviderChangesAtRuntime();
 }

@@ -30,6 +30,7 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private Direction previousDirection;
     private string? currentValue;
     private readonly TransitionLifecycleManager transition = new();
     private ActivationDirection activationDirection = ActivationDirection.None;
@@ -148,6 +149,7 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        previousDirection = ResolvedDirection;
         currentValue = DefaultValue;
 
         if (CurrentValue is not null)
@@ -201,6 +203,20 @@
             if (hasRendered)
             {
                 _ = SyncRootValueAsync(CurrentValue);
+            }
+        }
+
+        // DirectionProvider can flip direction at runtime, and direction decides which arrow key
+        // opens a vertical menu, so both the cascaded context and the JS root state have to follow
+        // rather than staying pinned to the value captured during initialization.
+        if (context is not null && previousDirection != ResolvedDirection)
+        {
+            previousDirection = ResolvedDirection;
+            context.Direction = ResolvedDirection.ToAttributeString() ?? "ltr";
+
+            if (hasRendered)
+            {
+                _ = SyncDirectionAsync(context.Direction);
             }
         }
 
@@ -475,6 +491,19 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setRootValue", rootId, value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncDirectionAsync(string direction)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setDirection", rootId, direction);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

@@ -574,6 +574,7 @@ public static class JsInteropSetup
             module.SetupVoid("initializeRoot", _ => true).SetVoidResult();
             module.SetupVoid("disposeRoot", _ => true).SetVoidResult();
             module.SetupVoid("setRootValue", _ => true).SetVoidResult();
+            module.SetupVoid("setDirection", _ => true).SetVoidResult();
             module.SetupVoid("setRootElement", _ => true).SetVoidResult();
             module.SetupVoid("setTriggerElement", _ => true).SetVoidResult();
             module.SetupVoid("disposeTriggerElement", _ => true).SetVoidResult();
