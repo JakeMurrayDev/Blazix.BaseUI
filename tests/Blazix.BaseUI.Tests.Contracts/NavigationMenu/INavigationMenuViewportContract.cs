@@ -8,4 +8,6 @@ public interface INavigationMenuViewportContract
     Task HasBlurHandlerWired();
     Task AppliesClassValue();
     Task RequiresContext();
+    Task IsInertWhenViewportInertWithoutPositioner();
+    Task DoesNotApplyInertWhenInsidePositioner();
 }

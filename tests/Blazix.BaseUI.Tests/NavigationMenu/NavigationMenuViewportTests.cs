@@ -31,6 +31,70 @@ public class NavigationMenuViewportTests : BunitContext, INavigationMenuViewport
         };
     }
 
+    private RenderFragment CreateViewportWithContext(bool viewportInert, bool insidePositioner)
+    {
+        var rootContext = new NavigationMenuRootContext
+        {
+            RootId = "test-root",
+            ViewportId = "test-viewport-id",
+            ViewportTargetId = "test-viewport-target-id",
+            ViewportInert = viewportInert,
+            GetValue = () => null,
+            GetMounted = () => true,
+            SetValueAsync = (_, _) => Task.CompletedTask,
+            SetTriggerElement = (_, _) => { },
+            GetTriggerElement = _ => null,
+            SetPopupElement = _ => { },
+            SetPositionerElement = _ => { },
+            SetViewportElement = _ => { },
+            SetViewportTargetElement = _ => { },
+            RegisterItem = _ => { },
+            UnregisterItem = _ => { },
+            SetContentElement = (_, _) => { },
+            DisposeContentElement = _ => { },
+            EmitClose = _ => { },
+            SetViewportInert = _ => { },
+            EmitLinkCloseAsync = () => Task.CompletedTask,
+            RequestFocusPrevious = _ => { },
+            RequestFocusInside = (_, _) => { },
+        };
+
+        var positionerContext = new NavigationMenuPositionerContext
+        {
+            Side = Side.Bottom,
+            Align = Align.Center,
+            GetArrowElement = () => null,
+            SetArrowElement = _ => { },
+        };
+
+        RenderFragment viewportFragment = viewportBuilder =>
+        {
+            viewportBuilder.OpenComponent<NavigationMenuViewport>(0);
+            viewportBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Viewport content")));
+            viewportBuilder.CloseComponent();
+        };
+
+        return builder =>
+        {
+            builder.OpenComponent<CascadingValue<NavigationMenuRootContext>>(0);
+            builder.AddAttribute(1, "Value", rootContext);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
+            {
+                if (!insidePositioner)
+                {
+                    viewportFragment(inner);
+                    return;
+                }
+
+                inner.OpenComponent<CascadingValue<NavigationMenuPositionerContext>>(0);
+                inner.AddAttribute(1, "Value", positionerContext);
+                inner.AddAttribute(2, "ChildContent", viewportFragment);
+                inner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersDivByDefault()
     {
@@ -109,6 +173,26 @@ public class NavigationMenuViewportTests : BunitContext, INavigationMenuViewport
         );
 
         cut.Markup.ShouldBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task IsInertWhenViewportInertWithoutPositioner()
+    {
+        var cut = Render(CreateViewportWithContext(viewportInert: true, insidePositioner: false));
+
+        cut.Find("div[id]").HasAttribute("inert").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotApplyInertWhenInsidePositioner()
+    {
+        var cut = Render(CreateViewportWithContext(viewportInert: true, insidePositioner: true));
+
+        cut.Find("div[id]").HasAttribute("inert").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

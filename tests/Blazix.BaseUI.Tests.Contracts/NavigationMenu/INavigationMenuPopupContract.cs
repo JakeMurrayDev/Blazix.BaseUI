@@ -17,4 +17,6 @@ public interface INavigationMenuPopupContract
     Task HasDataAnchorHiddenWhenAnchorHidden();
     Task AppliesOriginSideStyleForTopSide();
     Task AppliesRtlOriginSideStyleForInlineEnd();
+    Task DisablesTransitionsDuringStartingStyle();
+    Task ResolvesRtlDirectionFromDirectionProvider();
 }

@@ -38,7 +38,8 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
         EventCallback<DrawerOpenChangeEventArgs>? onOpenChange = null,
         EventCallback<DrawerSnapPointChangeEventArgs>? onSnapPointChange = null,
         RenderFragment<RenderProps<DrawerPopupState>>? popupRender = null,
-        RenderFragment? popupContent = null)
+        RenderFragment? popupContent = null,
+        FocusTarget? finalFocus = null)
     {
         return builder =>
         {
@@ -111,13 +112,13 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
                         portalBuilder.AddAttribute(11, "data-testid", "viewport");
                         portalBuilder.AddAttribute(12, "ChildContent", (RenderFragment)(viewportBuilder =>
                         {
-                            RenderPopup(viewportBuilder, popupRender, popupContent);
+                            RenderPopup(viewportBuilder, popupRender, popupContent, finalFocus);
                         }));
                         portalBuilder.CloseComponent();
                     }
                     else
                     {
-                        RenderPopup(portalBuilder, popupRender, popupContent);
+                        RenderPopup(portalBuilder, popupRender, popupContent, finalFocus);
                     }
                 }));
                 innerBuilder.CloseComponent();
@@ -355,6 +356,8 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
     [Fact]
     public Task ParentPopupCssReportsNestedDrawerCount()
     {
+        // Upstream propagates an absolute count up the whole chain (`useDialogRoot` reports
+        // `ownNestedOpenDrawers + 1`), so a three-deep stack gives the outermost popup 2.
         var cut = Render(CreateDrawer(
             defaultOpen: true,
             popupContent: parentBuilder =>
@@ -363,12 +366,143 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
                 parentBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Parent")));
                 parentBuilder.CloseComponent();
 
-                RenderNestedOpenDrawer(parentBuilder, 10, "child-one");
-                RenderNestedOpenDrawer(parentBuilder, 20, "child-two");
+                RenderNestedOpenDrawer(
+                    parentBuilder,
+                    10,
+                    "child-one",
+                    grandchildBuilder => RenderNestedOpenDrawer(grandchildBuilder, 0, "child-two"));
             }));
 
-        var popup = cut.Find("[data-testid='popup']");
-        popup.GetAttribute("style").ShouldContain("--nested-drawers: 2");
+        cut.Find("[data-testid='popup']").GetAttribute("style").ShouldContain("--nested-drawers: 2");
+        cut.Find("[data-testid='child-one']").GetAttribute("style").ShouldContain("--nested-drawers: 1");
+        cut.Find("[data-testid='child-two']").GetAttribute("style").ShouldContain("--nested-drawers: 0");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task NestedSwipingPropagatesToEveryAncestorPopup()
+    {
+        var cut = Render(CreateDrawer(
+            defaultOpen: true,
+            popupContent: parentBuilder =>
+            {
+                parentBuilder.OpenComponent<DrawerTitle>(0);
+                parentBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Parent")));
+                parentBuilder.CloseComponent();
+
+                RenderNestedOpenDrawer(
+                    parentBuilder,
+                    10,
+                    "child-one",
+                    grandchildBuilder => RenderNestedOpenDrawer(grandchildBuilder, 0, "child-two"));
+            }));
+
+        var viewports = cut.FindComponents<DrawerViewport>();
+        viewports.Count.ShouldBe(3);
+
+        // The innermost drawer starts swiping; upstream forwards that up the whole chain.
+        await cut.InvokeAsync(() => viewports[2].Instance.OnNestedSwipingChanged(true));
+
+        cut.Find("[data-testid='child-one']").HasAttribute("data-nested-drawer-swiping").ShouldBeTrue();
+        cut.Find("[data-testid='popup']").HasAttribute("data-nested-drawer-swiping").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task HandleOpenWithoutActiveTriggerDoesNotExpandEveryTrigger()
+    {
+        var handle = DrawerHandleFactory.CreateHandle<string>();
+
+        RenderFragment fragment = builder =>
+        {
+            builder.OpenComponent<DrawerTypedTrigger<string>>(0);
+            builder.AddAttribute(1, "Handle", handle);
+            builder.AddAttribute(2, "Id", "external-one");
+            builder.AddAttribute(3, "data-testid", "trigger-one");
+            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "One")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<DrawerTypedTrigger<string>>(10);
+            builder.AddAttribute(11, "Handle", handle);
+            builder.AddAttribute(12, "Id", "external-two");
+            builder.AddAttribute(13, "data-testid", "trigger-two");
+            builder.AddAttribute(14, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Two")));
+            builder.CloseComponent();
+
+            builder.OpenComponent<DrawerRoot>(20);
+            builder.AddAttribute(21, "Handle", handle);
+            builder.AddAttribute(22, "ChildContent", (RenderFragment<DrawerRootPayloadContext>)(_ => innerBuilder =>
+            {
+                innerBuilder.OpenComponent<DrawerPortal>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(portalBuilder =>
+                {
+                    portalBuilder.OpenComponent<DrawerViewport>(0);
+                    portalBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(viewportBuilder =>
+                    {
+                        viewportBuilder.OpenComponent<DrawerPopup>(0);
+                        viewportBuilder.AddAttribute(1, "data-testid", "popup");
+                        viewportBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Content")));
+                        viewportBuilder.CloseComponent();
+                    }));
+                    portalBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+
+        var cut = Render(fragment);
+
+        // Opening without an active trigger must not make every registered trigger claim ownership:
+        // upstream feeds `aria-expanded`/`data-popup-open` from the strict `triggerOwnsOpenPopup`.
+        await cut.InvokeAsync(() => handle.Open(null));
+
+        cut.Find("[data-testid='popup']").HasAttribute("data-open").ShouldBeTrue();
+        handle.IsOpen.ShouldBeTrue();
+        handle.ActiveTriggerId.ShouldBeNull();
+
+        foreach (var testId in new[] { "trigger-one", "trigger-two" })
+        {
+            var trigger = cut.Find($"[data-testid='{testId}']");
+            trigger.GetAttribute("aria-expanded").ShouldBe("false");
+            trigger.HasAttribute("data-popup-open").ShouldBeFalse();
+            trigger.HasAttribute("aria-controls").ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public Task TriggerPressMarksOnlyThePressedTriggerExpanded()
+    {
+        var cut = Render(CreateDrawer());
+
+        var trigger = cut.Find("[data-testid='trigger']");
+        trigger.Click();
+
+        trigger = cut.Find("[data-testid='trigger']");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+        trigger.HasAttribute("data-popup-open").ShouldBeTrue();
+        trigger.GetAttribute("aria-controls").ShouldNotBeNullOrEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FinalFocusCallbackReceivesCloseInteractionType()
+    {
+        string? receivedCloseType = null;
+
+        var cut = Render(CreateDrawer(
+            defaultOpen: true,
+            finalFocus: new FocusTarget.Callback(type =>
+            {
+                receivedCloseType = type;
+                return null;
+            })));
+
+        // The callback must observe the close interaction type, not the open interaction type.
+        cut.Find("[data-testid='close']").Click();
+
+        receivedCloseType.ShouldBe("mouse");
 
         return Task.CompletedTask;
     }
@@ -718,10 +852,16 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
     private static void RenderPopup(
         RenderTreeBuilder builder,
         RenderFragment<RenderProps<DrawerPopupState>>? popupRender,
-        RenderFragment? popupContent)
+        RenderFragment? popupContent,
+        FocusTarget? finalFocus = null)
     {
         builder.OpenComponent<DrawerPopup>(0);
         builder.AddAttribute(1, "data-testid", "popup");
+
+        if (finalFocus is not null)
+        {
+            builder.AddAttribute(4, "FinalFocus", finalFocus);
+        }
 
         if (popupRender is not null)
         {
@@ -747,7 +887,11 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
         builder.CloseComponent();
     }
 
-    private static void RenderNestedOpenDrawer(RenderTreeBuilder builder, int sequence, string testId)
+    private static void RenderNestedOpenDrawer(
+        RenderTreeBuilder builder,
+        int sequence,
+        string testId,
+        RenderFragment? nestedContent = null)
     {
         builder.OpenComponent<DrawerRoot>(sequence);
         builder.AddAttribute(sequence + 1, "DefaultOpen", true);
@@ -766,6 +910,11 @@ public class DrawerTests : BunitContext, IDrawerIndentBackgroundContract, IDrawe
                         popupBuilder.OpenComponent<DrawerTitle>(0);
                         popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, testId)));
                         popupBuilder.CloseComponent();
+
+                        if (nestedContent is not null)
+                        {
+                            popupBuilder.AddContent(10, nestedContent);
+                        }
                     }));
                     viewportBuilder.CloseComponent();
                 }));

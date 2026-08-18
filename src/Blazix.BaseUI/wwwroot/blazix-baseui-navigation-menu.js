@@ -28,18 +28,30 @@ function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
     document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
-    document.addEventListener('mousedown', handleGlobalMouseDown);
+    // Upstream `outsidePressEvent: 'intentional'` dismisses on `click`, not on the press start,
+    // and suppresses the click of a press that started inside the menu and ended outside.
+    document.addEventListener('pointerdown', handleGlobalPressStart, { capture: true });
+    document.addEventListener('mousedown', handleGlobalPressStart, { capture: true });
+    document.addEventListener('pointerup', handleGlobalPressEnd, { capture: true });
+    document.addEventListener('mouseup', handleGlobalPressEnd, { capture: true });
+    document.addEventListener('click', handleGlobalClick, { capture: true });
     document.addEventListener('focusout', handleGlobalFocusOut, { capture: true });
     state.globalListenersInitialized = true;
 }
 
 function handleGlobalKeyDown(e) {
-    // Find the open navigation menu root
+    // Wait until IME is settled. Pressing `Escape` while composing should close the
+    // compose menu, but not the floating element.
+    if (e.isComposing || e.keyCode === 229) return;
+
+    // Find the innermost open navigation menu root so a nested menu dismisses before
+    // its ancestor (upstream `hasBlockingChild('__escapeKeyBubbles')`).
     let openRoot = null;
-    for (const [id, rootState] of state.roots) {
-        if (rootState.isOpen && rootState.dotNetRef) {
+    for (const [, rootState] of state.roots) {
+        if (!rootState.isOpen || !rootState.dotNetRef) continue;
+
+        if (!openRoot || (rootState.isNested && isInsideNavigationMenu(openRoot, rootState.rootElement))) {
             openRoot = rootState;
-            break;
         }
     }
 
@@ -53,9 +65,35 @@ function handleGlobalKeyDown(e) {
     }
 }
 
-function handleGlobalMouseDown(e) {
-    for (const [id, rootState] of state.roots) {
+function handleGlobalPressStart(e) {
+    for (const [, rootState] of state.roots) {
         if (!rootState.isOpen || !rootState.dotNetRef) continue;
+
+        rootState.pressStartedInside =
+            isInsideNavigationMenu(rootState, e.target) || isNavigationMenuTrigger(e.target);
+    }
+}
+
+function handleGlobalPressEnd(e) {
+    for (const [, rootState] of state.roots) {
+        if (!rootState.pressStartedInside) continue;
+
+        rootState.pressStartedInside = false;
+
+        // A press that starts inside and ends outside gets one suppressed outside click.
+        if (!isInsideNavigationMenu(rootState, e.target) && !isNavigationMenuTrigger(e.target)) {
+            rootState.suppressNextOutsideClick = true;
+        }
+    }
+}
+
+function handleGlobalClick(e) {
+    for (const [, rootState] of state.roots) {
+        const suppressed = rootState.suppressNextOutsideClick;
+        rootState.suppressNextOutsideClick = false;
+
+        if (!rootState.isOpen || !rootState.dotNetRef) continue;
+        if (suppressed) continue;
 
         if (!isInsideNavigationMenu(rootState, e.target) && !isNavigationMenuTrigger(e.target)) {
             rootState.closeReason = 'outside-press';
@@ -76,6 +114,15 @@ function handleGlobalFocusOut(e) {
         rootState.closeReason = 'focus-out';
         rootState.dotNetRef.invokeMethodAsync('OnFocusOut').catch(() => { });
     }
+}
+
+function containsActiveElement(element) {
+    const activeElement = element?.ownerDocument?.activeElement;
+    return activeElement != null && activeElement !== element.ownerDocument.body && element.contains(activeElement);
+}
+
+function isTriggerDisabled(element) {
+    return element?.disabled === true || element?.getAttribute?.('aria-disabled') === 'true';
 }
 
 function isNavigationMenuTrigger(target) {
@@ -132,18 +179,35 @@ function isInsideNavigationMenu(rootState, target) {
 
 // --- Root Management ---
 
-export function initializeRoot(rootId, dotNetRef, orientation, delay, closeDelay, isNested) {
+/**
+ * Updates the text direction of an initialized root. `DirectionProvider` can change direction at
+ * runtime, and the direction decides which arrow key opens a vertical menu, so the JS state has to
+ * follow instead of staying pinned to the value captured at initialization.
+ * @param {string} rootId - The root identifier
+ * @param {string} direction - Either `ltr` or `rtl`
+ */
+export function setDirection(rootId, direction) {
+    const rootState = state.roots.get(rootId);
+    if (rootState) {
+        rootState.direction = direction === 'rtl' ? 'rtl' : 'ltr';
+    }
+}
+
+export function initializeRoot(rootId, dotNetRef, orientation, delay, closeDelay, isNested, direction) {
     initGlobalListeners();
 
     const rootState = {
         rootId,
         dotNetRef,
         orientation,
+        direction: direction === 'rtl' ? 'rtl' : 'ltr',
         delay: delay ?? 200,
         closeDelay: closeDelay ?? 300,
         isOpen: false,
         value: null,
         isNested: !!isNested,
+        pressStartedInside: false,
+        suppressNextOutsideClick: false,
         rootElement: null,
         activeTriggerElement: null,
         closeReason: null,
@@ -287,13 +351,17 @@ function addHoverListeners(rootState, itemValue, element) {
         rootState.pointerType = event.pointerType || '';
     };
     const onEnter = () => {
-        if (rootState.pointerType === 'touch') {
+        if (rootState.pointerType === 'touch' || isTriggerDisabled(element)) {
             return;
         }
 
         clearTimeout(rootState.closeTimer);
         rootState.closeTimer = null;
         clearSafePolygon(rootState);
+
+        // Upstream `restMs: mounted && positionerElement ? 0 : delay` - the open delay only
+        // applies to the initial open; retargeting an already-open menu is instant.
+        const effectiveDelay = rootState.isOpen && rootState.positionerElement ? 0 : rootState.delay;
 
         rootState.openTimer = setTimeout(() => {
             const prev = rootState.activeTriggerElement;
@@ -316,7 +384,7 @@ function addHoverListeners(rootState, itemValue, element) {
             rootState.dotNetRef
                 .invokeMethodAsync('OnHoverOpen', itemValue, rootState.activationDirection)
                 .catch(() => { });
-        }, rootState.delay);
+        }, effectiveDelay);
     };
 
     const onLeave = (event) => {
@@ -344,12 +412,13 @@ function addHoverListeners(rootState, itemValue, element) {
         rootState.openedByHover = false;
     };
     const onKeyDown = (event) => {
-        if (rootState.isNested) {
+        if (rootState.isNested || isTriggerDisabled(element)) {
             return;
         }
 
+        const verticalOpenKey = rootState.direction === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
         const openHorizontal = rootState.orientation === 'horizontal' && event.key === 'ArrowDown';
-        const openVertical = rootState.orientation === 'vertical' && event.key === 'ArrowRight';
+        const openVertical = rootState.orientation === 'vertical' && event.key === verticalOpenKey;
 
         if (!openHorizontal && !openVertical) {
             return;
@@ -699,7 +768,11 @@ function syncContentVisibility(rootState) {
             element.style.setProperty('left', '0px');
             element.style.setProperty('visibility', 'hidden');
             element.style.setProperty('pointer-events', 'none');
-            element.setAttribute('inert', '');
+            // Upstream applies `inert: inertValue(!focusInside)`; inerting content that
+            // still holds focus would blow focus away while it animates out.
+            if (!containsActiveElement(element)) {
+                element.setAttribute('inert', '');
+            }
             element.setAttribute('data-closed', '');
             element.removeAttribute('data-open');
         }
@@ -784,10 +857,28 @@ export function setViewportElement(rootId, element) {
             }, rootState.closeDelay);
         };
 
+        // Blazor's `onblur` is capture-registered and carries no `relatedTarget`, so the
+        // inert decision is made here: only when focus leaves the viewport for something
+        // that is neither inside it nor the active trigger (upstream Viewport `onBlur`).
+        const onFocusOut = (event) => {
+            const relatedTarget = event.relatedTarget;
+            if (!relatedTarget) {
+                return;
+            }
+
+            if (element.contains(relatedTarget) || relatedTarget === rootState.activeTriggerElement) {
+                return;
+            }
+
+            rootState.dotNetRef?.invokeMethodAsync('OnViewportFocusOut').catch(() => { });
+        };
+
         element._navMenuViewportEnter = onEnter;
         element._navMenuViewportLeave = onLeave;
+        element._navMenuViewportFocusOut = onFocusOut;
         element.addEventListener('mouseenter', onEnter);
         element.addEventListener('mouseleave', onLeave);
+        element.addEventListener('focusout', onFocusOut);
     }
 }
 
@@ -971,6 +1062,20 @@ function disconnectSizeObservers(rootState) {
     rootState.autoSizeAbortController = null;
 }
 
+function getPositionerFixedSize(positionerElement) {
+    // Read the last fixed positioner size rather than measuring the popup now: during a
+    // controlled close, the popup can already be in its exit render and report 0 before the
+    // closing transition gets a stable size to animate from.
+    const width = parseFloat(positionerElement.style.getPropertyValue('--positioner-width')) || 0;
+    const height = parseFloat(positionerElement.style.getPropertyValue('--positioner-height')) || 0;
+
+    if (width <= 0 || height <= 0) {
+        return null;
+    }
+
+    return { width, height };
+}
+
 function setSharedFixedSize(rootState) {
     const popupElement = rootState.popupElement;
     const positionerElement = rootState.positionerElement;
@@ -979,8 +1084,9 @@ function setSharedFixedSize(rootState) {
         return;
     }
 
-    const width = popupElement.offsetWidth;
-    const height = popupElement.offsetHeight;
+    const fixedSize = getPositionerFixedSize(positionerElement);
+    const width = fixedSize ? fixedSize.width : popupElement.offsetWidth;
+    const height = fixedSize ? fixedSize.height : popupElement.offsetHeight;
 
     if (width === 0 || height === 0) {
         return;
@@ -1035,6 +1141,10 @@ function removeViewportHoverListeners(element) {
     if (element._navMenuViewportLeave) {
         element.removeEventListener('mouseleave', element._navMenuViewportLeave);
         delete element._navMenuViewportLeave;
+    }
+    if (element._navMenuViewportFocusOut) {
+        element.removeEventListener('focusout', element._navMenuViewportFocusOut);
+        delete element._navMenuViewportFocusOut;
     }
 }
 

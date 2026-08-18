@@ -31,6 +31,32 @@ public class NavigationMenuPositionerTests : BunitContext, INavigationMenuPositi
         };
     }
 
+    private RenderFragment CreatePositionerInOpenRoot()
+    {
+        return builder =>
+        {
+            builder.OpenComponent<NavigationMenuRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", "item1");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<NavigationMenuItem>(0);
+                innerBuilder.AddAttribute(1, "Value", "item1");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<NavigationMenuTrigger>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
+                    itemBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+
+                innerBuilder.OpenComponent<NavigationMenuPositioner>(10);
+                innerBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Positioner content")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
     [Fact]
     public Task RendersDivByDefault()
     {
@@ -134,6 +160,17 @@ public class NavigationMenuPositionerTests : BunitContext, INavigationMenuPositi
         );
 
         cut.Markup.ShouldBeEmpty();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task IsInstantWhenInitiallyOpen()
+    {
+        var cut = Render(CreatePositionerInOpenRoot());
+
+        var div = cut.Find("div[role='presentation']");
+        div.HasAttribute("data-instant").ShouldBeTrue();
 
         return Task.CompletedTask;
     }

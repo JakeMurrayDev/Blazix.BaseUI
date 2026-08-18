@@ -150,6 +150,21 @@
         BuildComponentAttributes();
         NotifyParentFrontmostHeight();
 
+        if (Context is not null)
+        {
+            // Only a callback finalFocus can depend on the close interaction type, so only then do we
+            // need the root to re-resolve the target at close. Static targets are resolved eagerly.
+            Context.ResolveFinalFocusForClose = FinalFocus is FocusTarget.Callback
+                ? ResolveFinalFocusForClose
+                : null;
+
+            // For a callback finalFocus, also let the root re-send the open-time target on every open
+            // so a kept-mounted popup is refreshed after a close overwrote the shared JS state.
+            Context.ResolveFinalFocusForOpen = FinalFocus is FocusTarget.Callback
+                ? ResolveFinalFocusTargetForOpen
+                : null;
+        }
+
         if (hasRendered)
         {
             if (!Equals(InitialFocus, previousInitialFocus))
@@ -162,7 +177,7 @@
             if (!Equals(FinalFocus, previousFinalFocus))
             {
                 previousFinalFocus = FinalFocus;
-                var (mode, element) = ResolveFocusTarget(FinalFocus);
+                var (mode, element) = ResolveFinalFocusTargetForOpen();
                 _ = SetFinalFocusElementAsync(mode, element);
             }
 
@@ -218,6 +233,12 @@
 
         await DisposePopupJsRegistrationsAsync(disposeModules: true);
 
+        if (Context is not null)
+        {
+            Context.ResolveFinalFocusForClose = null;
+            Context.ResolveFinalFocusForOpen = null;
+        }
+
         Context?.SetPopupId(null);
         dotNetRef?.Dispose();
     }
@@ -239,7 +260,7 @@
         }
 
         var (initialMode, initialElement) = ResolveFocusTarget(InitialFocus);
-        var (finalMode, finalElement) = ResolveFocusTarget(FinalFocus);
+        var (finalMode, finalElement) = ResolveFinalFocusTargetForOpen();
 
         try
         {
@@ -403,7 +424,9 @@
             attrs["data-expanded"] = true;
         }
 
-        if (DrawerContext.HasNestedDrawer)
+        // Upstream `nestedDrawerOpen = nestedOpenDrawerCount > 0`: this drops as soon as the nested
+        // drawer's open state flips, unlike `hasNestedDrawer`, which stays set while it animates out.
+        if (DrawerContext.NestedDrawerCount > 0)
         {
             attrs["data-nested-drawer-open"] = true;
         }
@@ -443,7 +466,7 @@
             Context.TransitionStatus,
             expanded,
             Context.Nested,
-            DrawerContext.HasNestedDrawer,
+            DrawerContext.NestedDrawerCount > 0,
             DrawerContext.NestedSwiping,
             DrawerContext.SwipeDirection,
             ViewportContext?.Swiping ?? false);
@@ -539,7 +562,8 @@
                 DrawerContext.FrontmostHeight,
                 DrawerContext.HasNestedDrawer,
                 Context.TransitionStatus == TransitionStatus.Ending,
-                Context.NestedDialogCount);
+                Context.NestedDialogCount,
+                Context.Nested);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
@@ -627,6 +651,34 @@
         var interactionType = Context?.InteractionType ?? string.Empty;
         var result = cb.Fn(interactionType);
         return result.HasValue ? ("element", result.Value) : ("default", null);
+    }
+
+    // Invoked by the root at close time with the resolved close interaction type, so a callback
+    // finalFocus observes how the drawer was closed (mirrors React's close-time evaluation of
+    // `returnFocus={finalFocus}`) instead of the open-time interaction type baked in at mount.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusForClose(string? closeInteractionType)
+    {
+        if (FinalFocus is FocusTarget.Callback cb)
+        {
+            var result = cb.Fn(closeInteractionType ?? string.Empty);
+            return result.HasValue ? ("element", result.Value) : ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
+    }
+
+    // At open, a callback finalFocus is deferred (the manager defaults to returning focus to the
+    // trigger) because its result can depend on the close interaction type, which is unknown until
+    // close. The root re-resolves it at close via ResolveFinalFocusForClose. Static targets resolve
+    // eagerly here, matching their unconditional behavior.
+    private (string? Mode, ElementReference? Element) ResolveFinalFocusTargetForOpen()
+    {
+        if (FinalFocus is FocusTarget.Callback)
+        {
+            return ("default", null);
+        }
+
+        return ResolveFocusTarget(FinalFocus);
     }
 
     private bool ComputeInitialFocus()

@@ -1,3 +1,4 @@
+@using Blazix.BaseUI.DirectionProvider
 @using Blazix.BaseUI.Utilities.FloatingTree
 @using Blazix.BaseUI.Utilities
 @using Microsoft.JSInterop
@@ -29,6 +30,7 @@
 
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
+    private Direction previousDirection;
     private string? currentValue;
     private readonly TransitionLifecycleManager transition = new();
     private ActivationDirection activationDirection = ActivationDirection.None;
@@ -54,8 +56,13 @@
 
     private bool IsNested => ParentContext is not null;
 
+    private Direction ResolvedDirection => DirectionContext?.Direction ?? Direction.Ltr;
+
     [CascadingParameter]
     private NavigationMenuRootContext? ParentContext { get; set; }
+
+    [CascadingParameter]
+    private DirectionProviderContext? DirectionContext { get; set; }
 
     /// <summary>
     /// Gets or sets the value of the currently active item.
@@ -142,6 +149,7 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        previousDirection = ResolvedDirection;
         currentValue = DefaultValue;
 
         if (CurrentValue is not null)
@@ -160,6 +168,7 @@
             Mounted = transition.IsMounted,
             IsNested = IsNested,
             Orientation = Orientation,
+            Direction = ResolvedDirection.ToAttributeString() ?? "ltr",
             ActivationDirection = activationDirection,
             TransitionStatus = transition.TransitionStatus,
             GetValue = () => CurrentValue,
@@ -194,6 +203,20 @@
             if (hasRendered)
             {
                 _ = SyncRootValueAsync(CurrentValue);
+            }
+        }
+
+        // DirectionProvider can flip direction at runtime, and direction decides which arrow key
+        // opens a vertical menu, so both the cascaded context and the JS root state have to follow
+        // rather than staying pinned to the value captured during initialization.
+        if (context is not null && previousDirection != ResolvedDirection)
+        {
+            previousDirection = ResolvedDirection;
+            context.Direction = ResolvedDirection.ToAttributeString() ?? "ltr";
+
+            if (hasRendered)
+            {
+                _ = SyncDirectionAsync(context.Direction);
             }
         }
 
@@ -288,6 +311,16 @@
     }
 
     /// <summary>
+    /// Invoked from JavaScript when focus leaves the viewport for an element that is
+    /// neither inside the viewport nor the active trigger.
+    /// </summary>
+    [JSInvokable]
+    public void OnViewportFocusOut()
+    {
+        SetViewportInert(true);
+    }
+
+    /// <summary>
     /// Invoked from JavaScript when a native trigger key event opens an item.
     /// </summary>
     [JSInvokable]
@@ -323,7 +356,12 @@
             context.Mounted = false;
         }
 
-        _ = InvokeOpenChangeCompleteAsync(open);
+        // Upstream only invokes `onOpenChangeComplete` from `handleUnmount`, always with `false`.
+        if (!open)
+        {
+            _ = InvokeOpenChangeCompleteAsync(false);
+        }
+
         StateHasChanged();
     }
 
@@ -400,7 +438,8 @@
         {
             var module = await ModuleTask.Value;
             var orientationStr = Orientation.ToDataAttributeString();
-            await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, orientationStr, Delay, CloseDelay, IsNested);
+            await module.InvokeVoidAsync(
+                "initializeRoot", rootId, dotNetRef, orientationStr, Delay, CloseDelay, IsNested, context.Direction);
 
             if (rootElementReference?.Element.HasValue == true)
             {
@@ -452,6 +491,19 @@
         {
             var module = await ModuleTask.Value;
             await module.InvokeVoidAsync("setRootValue", rootId, value);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+    }
+
+    private async Task SyncDirectionAsync(string direction)
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            await module.InvokeVoidAsync("setDirection", rootId, direction);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

@@ -16,6 +16,8 @@
     private bool hasRendered;
     private bool previousOpen;
     private bool previousPresence;
+    private int previousReportedOpenCount;
+    private DrawerRootContext? subscribedDrawerContext;
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask());
@@ -37,6 +39,8 @@
             return;
         }
 
+        SubscribeDrawerContext();
+
         ProviderContext?.SetDrawerOpen(reporterId, DialogContext.Open);
 
         var present = DialogContext.Open || DialogContext.TransitionStatus == TransitionStatus.Ending;
@@ -45,6 +49,8 @@
             previousPresence = present;
             DrawerContext.NotifyParentHasNestedDrawer?.Invoke(present);
         }
+
+        ReportNestedOpenDrawerCount();
 
         if (hasRendered && previousOpen != DialogContext.Open)
         {
@@ -85,10 +91,17 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        UnsubscribeDrawerContext();
         ProviderContext?.RemoveDrawer(reporterId);
         if (previousPresence)
         {
             DrawerContext?.NotifyParentHasNestedDrawer?.Invoke(false);
+        }
+
+        if (previousReportedOpenCount != 0)
+        {
+            previousReportedOpenCount = 0;
+            DrawerContext?.NotifyParentNestedOpenDrawerCount?.Invoke(0);
         }
 
         DrawerContext?.NotifyParentFrontmostHeight?.Invoke(0);
@@ -122,6 +135,57 @@
         {
             await DialogContext.SetOpenAsync(false, DialogOpenChangeReason.CloseWatcher);
         }
+    }
+
+    private void SubscribeDrawerContext()
+    {
+        if (ReferenceEquals(subscribedDrawerContext, DrawerContext))
+        {
+            return;
+        }
+
+        UnsubscribeDrawerContext();
+        subscribedDrawerContext = DrawerContext;
+
+        if (subscribedDrawerContext is not null)
+        {
+            subscribedDrawerContext.StateChanged += OnDrawerContextStateChanged;
+        }
+    }
+
+    private void UnsubscribeDrawerContext()
+    {
+        if (subscribedDrawerContext is not null)
+        {
+            subscribedDrawerContext.StateChanged -= OnDrawerContextStateChanged;
+            subscribedDrawerContext = null;
+        }
+    }
+
+    // The reported count depends on this drawer's own nested count, which changes after the initial
+    // render when a descendant opens; without this the value would stop propagating past one level.
+    private void OnDrawerContextStateChanged()
+    {
+        ReportNestedOpenDrawerCount();
+    }
+
+    // Upstream reports an absolute count to the parent: `ownNestedOpenDrawers + 1` while open,
+    // and 0 while closed, so every ancestor sees the depth of the open chain below it.
+    private void ReportNestedOpenDrawerCount()
+    {
+        if (DialogContext is null || DrawerContext is null)
+        {
+            return;
+        }
+
+        var openCount = DialogContext.Open ? DrawerContext.NestedDrawerCount + 1 : 0;
+        if (openCount == previousReportedOpenCount)
+        {
+            return;
+        }
+
+        previousReportedOpenCount = openCount;
+        DrawerContext.NotifyParentNestedOpenDrawerCount?.Invoke(openCount);
     }
 
     private async Task SetRootOpenAsync(bool open)

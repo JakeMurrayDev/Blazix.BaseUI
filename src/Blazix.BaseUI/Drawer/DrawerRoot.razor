@@ -11,8 +11,8 @@
                 OnOpenChange="HandleDialogOpenChangeAsync"
                 OnOpenChangeComplete="OnOpenChangeComplete"
                 DisablePointerDismissal="DisablePointerDismissal"
-                TriggerId="TriggerId"
-                DefaultTriggerId="DefaultTriggerId">
+                TriggerId="@TriggerId"
+                DefaultTriggerId="@DefaultTriggerId">
         <ChildContent Context="dialogPayload">
             <DrawerRootReporter />
             @if (ChildContent is not null)
@@ -31,6 +31,7 @@
     private int popupHeight;
     private int frontmostHeight;
     private int nestedDrawerCount;
+    private int nestedOpenDrawerCount;
     private bool hasNestedDrawer;
     private bool nestedSwiping;
     private double nestedSwipeProgress;
@@ -191,19 +192,21 @@
             PopupHeight = popupHeight,
             FrontmostHeight = frontmostHeight,
             HasNestedDrawer = hasNestedDrawer,
-            NestedDrawerCount = nestedDrawerCount,
+            NestedDrawerCount = nestedOpenDrawerCount,
             NestedSwiping = nestedSwiping,
             NestedSwipeProgress = nestedSwipeProgress,
             SetActiveSnapPointAsync = SetActiveSnapPointAsync,
             OnPopupHeightChange = OnPopupHeightChange,
             OnNestedDrawerPresenceChange = OnNestedDrawerPresenceChange,
+            OnNestedOpenDrawerCountChange = OnNestedOpenDrawerCountChange,
             OnNestedFrontmostHeightChange = OnNestedFrontmostHeightChange,
             OnNestedSwipingChange = OnNestedSwipingChange,
             OnNestedSwipeProgressChange = OnNestedSwipeProgressChange,
             NotifyParentFrontmostHeight = ParentDrawerContext?.OnNestedFrontmostHeightChange,
             NotifyParentSwipingChange = ParentDrawerContext?.OnNestedSwipingChange,
             NotifyParentSwipeProgressChange = ParentDrawerContext?.OnNestedSwipeProgressChange,
-            NotifyParentHasNestedDrawer = ParentDrawerContext?.OnNestedDrawerPresenceChange
+            NotifyParentHasNestedDrawer = ParentDrawerContext?.OnNestedDrawerPresenceChange,
+            NotifyParentNestedOpenDrawerCount = ParentDrawerContext?.OnNestedOpenDrawerCountChange
         };
 
         SyncActions();
@@ -229,13 +232,14 @@
         context.PopupHeight = popupHeight;
         context.FrontmostHeight = frontmostHeight;
         context.HasNestedDrawer = hasNestedDrawer;
-        context.NestedDrawerCount = nestedDrawerCount;
+        context.NestedDrawerCount = nestedOpenDrawerCount;
         context.NestedSwiping = nestedSwiping;
         context.NestedSwipeProgress = nestedSwipeProgress;
         context.NotifyParentFrontmostHeight = ParentDrawerContext?.OnNestedFrontmostHeightChange;
         context.NotifyParentSwipingChange = ParentDrawerContext?.OnNestedSwipingChange;
         context.NotifyParentSwipeProgressChange = ParentDrawerContext?.OnNestedSwipeProgressChange;
         context.NotifyParentHasNestedDrawer = ParentDrawerContext?.OnNestedDrawerPresenceChange;
+        context.NotifyParentNestedOpenDrawerCount = ParentDrawerContext?.OnNestedOpenDrawerCountChange;
         context.NotifyStateChanged();
 
         SyncActions();
@@ -349,7 +353,22 @@
         nestedDrawerCount = nextNestedDrawerCount;
         hasNestedDrawer = nestedDrawerCount > 0;
         context.HasNestedDrawer = hasNestedDrawer;
-        context.NestedDrawerCount = nestedDrawerCount;
+        context.NotifyStateChanged();
+        StateHasChanged();
+    }
+
+    // Mirrors upstream `useDialogRoot`'s `onNestedDialogOpen(dialogCount, drawerCount)`: a nested
+    // drawer reports its own absolute open-drawer count plus itself, so the value propagates up the
+    // whole chain instead of counting only direct children.
+    private void OnNestedOpenDrawerCountChange(int count)
+    {
+        if (nestedOpenDrawerCount == count)
+        {
+            return;
+        }
+
+        nestedOpenDrawerCount = count;
+        context.NestedDrawerCount = nestedOpenDrawerCount;
         context.NotifyStateChanged();
         StateHasChanged();
     }
@@ -363,6 +382,7 @@
 
         nestedSwiping = swiping;
         context.NestedSwiping = nestedSwiping;
+        context.NotifyParentSwipingChange?.Invoke(swiping);
         context.NotifyStateChanged();
         StateHasChanged();
     }
@@ -377,6 +397,7 @@
 
         nestedSwipeProgress = nextProgress;
         context.NestedSwipeProgress = nestedSwipeProgress;
+        context.NotifyParentSwipeProgressChange?.Invoke(nextProgress);
         // Nested swipe progress is high-frequency; descendants consume the context notification without forcing a root rerender per frame.
         context.NotifyStateChanged();
     }

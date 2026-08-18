@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Components.Rendering;
 namespace Blazix.BaseUI.Tests.NavigationMenu;
 
 public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
@@ -329,5 +330,51 @@ public class NavigationMenuRootTests : BunitContext, INavigationMenuRootContract
         nav.HasAttribute("aria-orientation").ShouldBeFalse();
 
         return Task.CompletedTask;
+    }
+
+    // DirectionProvider can flip direction at runtime and direction decides which arrow key opens a
+    // vertical menu, so the root must push the new value to JS rather than keeping the one captured
+    // at initialization. Sibling roots (Menu, Select, Tabs) already re-sync this way.
+    [Fact]
+    public async Task SyncsDirectionWhenDirectionProviderChangesAtRuntime()
+    {
+        var host = Render<NavigationMenuDirectionHost>();
+
+        JSInterop.Invocations
+            .Count(i => i.Identifier == "setDirection")
+            .ShouldBe(0);
+
+        await host.InvokeAsync(() => host.Instance.SetDirection(Direction.Rtl));
+
+        host.WaitForAssertion(() =>
+        {
+            var call = JSInterop.Invocations.LastOrDefault(i => i.Identifier == "setDirection");
+            call.Identifier.ShouldBe("setDirection");
+            call.Arguments[1].ShouldBe("rtl");
+        });
+    }
+}
+
+internal sealed class NavigationMenuDirectionHost : ComponentBase
+{
+    private Direction direction = Direction.Ltr;
+
+    public void SetDirection(Direction next)
+    {
+        direction = next;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<Blazix.BaseUI.DirectionProvider.DirectionProvider>(0);
+        builder.AddAttribute(1, "Direction", direction);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
+        {
+            inner.OpenComponent<NavigationMenuRoot>(0);
+            inner.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, string.Empty)));
+            inner.CloseComponent();
+        }));
+        builder.CloseComponent();
     }
 }

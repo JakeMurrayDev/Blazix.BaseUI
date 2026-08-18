@@ -68,7 +68,7 @@ internal sealed class NavigationMenuRootContext
     /// <summary>
     /// Gets or sets the text direction used for physical side calculations.
     /// </summary>
-    public string Direction { get; init; } = "ltr";
+    public string Direction { get; set; } = "ltr";
 
     /// <summary>
     /// Gets the delegate that returns the current active value.
