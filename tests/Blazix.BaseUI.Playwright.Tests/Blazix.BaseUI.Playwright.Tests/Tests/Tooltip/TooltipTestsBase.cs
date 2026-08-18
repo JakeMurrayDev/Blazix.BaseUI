@@ -72,6 +72,13 @@ public abstract class TooltipTestsBase : TestBase
         }
     }
 
+    protected async Task MovePointerToOuterTriggerPaddingAsync()
+    {
+        var box = await GetByTestId("outer-trigger").BoundingBoxAsync();
+        Assert.NotNull(box);
+        await Page.Mouse.MoveAsync(box.X + 20, box.Y + 20);
+    }
+
     #endregion
 
     #region Hover Interaction Tests
@@ -109,6 +116,113 @@ public abstract class TooltipTestsBase : TestBase
         await Assertions.Expect(openState).ToHaveTextAsync("false");
 
         await WaitForTextContentAsync(openState, "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringInnerDoesNotOpenOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(GetByTestId("outer-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringOuterOnlyOpensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+
+        await WaitForTextContentAsync(GetByTestId("outer-open-state"), "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringInnerClosesHoverOpenedOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+        var outerOpenState = GetByTestId("outer-open-state");
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+
+        await WaitForTextContentAsync(outerOpenState, "false", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_LeavingInnerReopensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+        var outerOpenState = GetByTestId("outer-open-state");
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(outerOpenState, "false", 1000);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_FocusOpenedOuterIsNotClosedByNestedHover()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        var outerTrigger = GetByTestId("outer-trigger");
+        var outerOpenState = GetByTestId("outer-open-state");
+        await outerTrigger.FocusAsync();
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+        await WaitForDelayAsync(100);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(outerOpenState).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_DisabledInnerOpensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithNestedInnerDisabled(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+
+        await WaitForTextContentAsync(GetByTestId("outer-open-state"), "true", 1000);
+        await Assertions.Expect(GetByTestId("inner-open-state")).ToHaveTextAsync("false");
     }
 
     /// <summary>

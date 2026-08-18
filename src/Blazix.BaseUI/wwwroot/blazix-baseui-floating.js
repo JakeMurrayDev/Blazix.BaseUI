@@ -1834,6 +1834,7 @@ export function createHoverInteraction(options) {
         safePolygonOptions = {},
         isRelatedTargetInside = null,
         shouldOpenImmediately = null,
+        shouldOpen = null,
         treeId = null,
         nodeId = null,
         guardStaleOpen = false
@@ -1882,12 +1883,12 @@ export function createHoverInteraction(options) {
         const resolvedOpenDelay = openImmediately ? 0 : currentOpenDelay;
         if (resolvedOpenDelay > 0) {
             openTimeout.start(resolvedOpenDelay, () => {
-                if (!isOpen) {
+                if (!isOpen && shouldOpen?.() !== false) {
                     isOpen = true;
                     onOpen?.('trigger-hover');
                 }
             });
-        } else if (!isOpen) {
+        } else if (!isOpen && shouldOpen?.() !== false) {
             isOpen = true;
             onOpen?.('trigger-hover');
         }
@@ -2056,7 +2057,7 @@ export function createHoverInteraction(options) {
 
         const openFromRest = () => {
             restTimeoutPending = false;
-            if (!blockMouseMove && !isOpen) {
+            if (!blockMouseMove && !isOpen && shouldOpen?.() !== false) {
                 isOpen = true;
                 onOpen?.('trigger-hover');
             }
