@@ -55,9 +55,61 @@ public abstract class TooltipTestsBase : TestBase
         });
     }
 
+    protected async Task MovePointerWithinTriggerAsync(ILocator trigger, int stepCount)
+    {
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var centerX = box.X + box.Width / 2;
+        var centerY = box.Y + box.Height / 2;
+        var offsets = new[] { -12, 0, 12, 0 };
+
+        await Page.Mouse.MoveAsync(centerX + offsets[0], centerY);
+        for (var index = 1; index <= stepCount; index++)
+        {
+            await Page.Mouse.MoveAsync(centerX + offsets[index % offsets.Length], centerY);
+            await WaitForDelayAsync(60);
+        }
+    }
+
     #endregion
 
     #region Hover Interaction Tests
+
+    [Fact]
+    public virtual async Task ContinuousPointerMovementDoesNotOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 15);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task PointerRestOpensAfterRestDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("tooltip-trigger").HoverAsync();
+
+        await WaitForTextContentAsync(GetByTestId("open-state"), "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task PointerRestAfterMovementOpens()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 5);
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+
+        await WaitForTextContentAsync(openState, "true", 1000);
+    }
 
     /// <summary>
     /// Tests that the tooltip opens on hover after the delay period.

@@ -76,8 +76,9 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
         interactionId: `tooltip-hover-${rootId}-${triggerId}`,
         triggerElement,
         floatingElement: rootState.popupElement,
-        openDelay: openDelay || 0,
+        openDelay: 0,
         closeDelay: closeDelay || 0,
+        restMs: openDelay || 0,
         mouseOnly: true,
         // Use safePolygon when hoverable popup is enabled (disableHoverablePopup=false)
         useSafePolygon: !disableHoverablePopup,
@@ -170,7 +171,7 @@ export function cancelPendingHoverOpen(rootId, triggerId) {
 
 export function updateHoverInteractionDelays(rootId, triggerId, openDelay, closeDelay) {
     const rootState = state.roots.get(rootId);
-    rootState?.hoverInteractions.get(triggerId)?.setDelays(openDelay || 0, closeDelay || 0);
+    rootState?.hoverInteractions.get(triggerId)?.setDelays(0, closeDelay || 0, openDelay || 0);
 }
 
 export function isPointerWithinElements(elements) {

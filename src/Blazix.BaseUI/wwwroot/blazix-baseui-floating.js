@@ -1828,6 +1828,7 @@ export function createHoverInteraction(options) {
         onClose,
         openDelay = 0,
         closeDelay = 0,
+        restMs = 0,
         mouseOnly = false,
         useSafePolygon = true,
         safePolygonOptions = {},
@@ -1843,6 +1844,9 @@ export function createHoverInteraction(options) {
     let isOpen = false;
     let openTimeout = new Timeout();
     let closeTimeout = new Timeout();
+    let restTimeout = new Timeout();
+    let restTimeoutPending = false;
+    let blockMouseMove = true;
     let lastCursorX = 0;
     let lastCursorY = 0;
     let mouseMoveHandler = null;
@@ -1852,6 +1856,8 @@ export function createHoverInteraction(options) {
     let childCloseCleanup = null;
     let currentOpenDelay = openDelay;
     let currentCloseDelay = closeDelay;
+    let currentRestMs = restMs;
+    const supportsRestMs = Object.prototype.hasOwnProperty.call(options, 'restMs');
 
     function cleanupChildCloseListener() {
         if (childCloseCleanup) {
@@ -1866,8 +1872,14 @@ export function createHoverInteraction(options) {
         }
 
         closeTimeout.clear();
+        blockMouseMove = false;
 
-        const resolvedOpenDelay = shouldOpenImmediately?.() ? 0 : currentOpenDelay;
+        const openImmediately = shouldOpenImmediately?.() === true;
+        if (currentRestMs > 0 && !currentOpenDelay && !openImmediately) {
+            return;
+        }
+
+        const resolvedOpenDelay = openImmediately ? 0 : currentOpenDelay;
         if (resolvedOpenDelay > 0) {
             openTimeout.start(resolvedOpenDelay, () => {
                 if (!isOpen) {
@@ -1883,6 +1895,9 @@ export function createHoverInteraction(options) {
 
     function handleMouseLeave(event) {
         openTimeout.clear();
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
         lastCursorX = event.clientX;
         lastCursorY = event.clientY;
 
@@ -1949,6 +1964,9 @@ export function createHoverInteraction(options) {
             return; // moved within the trigger's own subtree
         }
         openTimeout.clear();
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
     }
 
     function handleFloatingMouseEnter() {
@@ -2021,7 +2039,41 @@ export function createHoverInteraction(options) {
         handleMouseEnter(event);
     }
 
+    function handleTriggerMouseMove(event) {
+        if (mouseOnly && pointerType && !isMouseLikePointerType(pointerType)) {
+            return;
+        }
+
+        if (isOpen || currentRestMs === 0) {
+            return;
+        }
+
+        if (restTimeoutPending && event.movementX ** 2 + event.movementY ** 2 < 2) {
+            return;
+        }
+
+        restTimeout.clear();
+
+        const openFromRest = () => {
+            restTimeoutPending = false;
+            if (!blockMouseMove && !isOpen) {
+                isOpen = true;
+                onOpen?.('trigger-hover');
+            }
+        };
+
+        if (pointerType === 'touch' || shouldOpenImmediately?.() === true) {
+            openFromRest();
+        } else {
+            restTimeoutPending = true;
+            restTimeout.start(currentRestMs, openFromRest);
+        }
+    }
+
     function closeWithDelay() {
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
         if (currentCloseDelay > 0) {
             closeTimeout.start(currentCloseDelay, () => {
                 if (isOpen) {
@@ -2048,6 +2100,9 @@ export function createHoverInteraction(options) {
     triggerElement.addEventListener('mouseover', handleMouseOver);
     triggerElement.addEventListener('mouseleave', handleMouseLeave);
     triggerElement.addEventListener('pointerdown', handlePointerDown);
+    if (supportsRestMs) {
+        triggerElement.addEventListener('mousemove', handleTriggerMouseMove);
+    }
     if (guardStaleOpen) {
         triggerElement.addEventListener('mouseout', handleMouseOut);
     }
@@ -2076,6 +2131,9 @@ export function createHoverInteraction(options) {
         setOpen(open) {
             isOpen = open;
             if (!open) {
+                restTimeout.clear();
+                restTimeoutPending = false;
+                blockMouseMove = true;
                 interactedInside = false;
                 cleanupChildCloseListener();
                 // Notify tree that this node has closed
@@ -2088,18 +2146,25 @@ export function createHoverInteraction(options) {
             }
         },
 
-        setDelays(open, close) {
+        setDelays(open, close, rest) {
             currentOpenDelay = open ?? 0;
             currentCloseDelay = close ?? 0;
+            currentRestMs = rest ?? 0;
         },
 
         cancelPendingOpen() {
             openTimeout.clear();
+            restTimeout.clear();
+            restTimeoutPending = false;
+            blockMouseMove = true;
         },
 
         cleanup() {
             openTimeout.clear();
             closeTimeout.clear();
+            restTimeout.clear();
+            restTimeoutPending = false;
+            blockMouseMove = true;
             cleanupMouseMove();
             cleanupChildCloseListener();
 
@@ -2108,6 +2173,9 @@ export function createHoverInteraction(options) {
             triggerElement.removeEventListener('mouseover', handleMouseOver);
             triggerElement.removeEventListener('mouseleave', handleMouseLeave);
             triggerElement.removeEventListener('pointerdown', handlePointerDown);
+            if (supportsRestMs) {
+                triggerElement.removeEventListener('mousemove', handleTriggerMouseMove);
+            }
             if (guardStaleOpen) {
                 triggerElement.removeEventListener('mouseout', handleMouseOut);
             }
