@@ -188,8 +188,7 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
             hoverInteraction.cancelPendingOpen();
         }
 
-        if (!wasNestedTriggerHovered &&
-            nestedTriggerHovered &&
+        if (nestedTriggerHovered &&
             rootState.isOpen &&
             rootState.openReason === 'trigger-hover') {
             hoverInteraction.setOpen(false);

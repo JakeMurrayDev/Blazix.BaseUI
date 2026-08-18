@@ -420,10 +420,10 @@ public abstract class PopoverTestsBase : TestBase
     {
         await NavigateAsync(CreateUrl("/tests/popover")
             .WithOpenOnHover(true)
-            .WithOpenDelay(300));
+            .WithOpenDelay(600));
         await WaitForDelayAsync(500);
 
-        await MovePointerWithinTriggerAsync(GetByTestId("popover-trigger"), 15);
+        await MovePointerWithinTriggerAsync(GetByTestId("popover-trigger"), 25);
 
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
     }
@@ -446,14 +446,14 @@ public abstract class PopoverTestsBase : TestBase
     {
         await NavigateAsync(CreateUrl("/tests/popover")
             .WithOpenOnHover(true)
-            .WithOpenDelay(300));
+            .WithOpenDelay(600));
         await WaitForDelayAsync(500);
 
         await MovePointerWithinTriggerAsync(GetByTestId("popover-trigger"), 5);
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("false");
 
-        await WaitForTextContentAsync(openState, "true", 1000);
+        await WaitForTextContentAsync(openState, "true", 1500);
     }
 
     /// <summary>

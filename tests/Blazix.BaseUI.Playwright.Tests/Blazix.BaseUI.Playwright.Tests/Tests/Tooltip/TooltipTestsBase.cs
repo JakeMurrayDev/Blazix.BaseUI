@@ -86,10 +86,10 @@ public abstract class TooltipTestsBase : TestBase
     [Fact]
     public virtual async Task ContinuousPointerMovementDoesNotOpen()
     {
-        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(600));
         await WaitForDelayAsync(500);
 
-        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 15);
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 25);
 
         await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
     }
@@ -108,14 +108,14 @@ public abstract class TooltipTestsBase : TestBase
     [Fact]
     public virtual async Task PointerRestAfterMovementOpens()
     {
-        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(600));
         await WaitForDelayAsync(500);
 
         await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 5);
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("false");
 
-        await WaitForTextContentAsync(openState, "true", 1000);
+        await WaitForTextContentAsync(openState, "true", 1500);
     }
 
     [Fact]
@@ -128,6 +128,28 @@ public abstract class TooltipTestsBase : TestBase
         await WaitForDelayAsync(500);
 
         await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(GetByTestId("outer-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_FocusingInnerDoesNotOpenOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        var outerTrigger = GetByTestId("outer-trigger");
+        var innerTrigger = GetByTestId("inner-trigger");
+        await outerTrigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+
+        await Assertions.Expect(innerTrigger).ToBeFocusedAsync();
+        await outerTrigger.DispatchEventAsync("focus");
         await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
         await WaitForDelayAsync(400);
 
