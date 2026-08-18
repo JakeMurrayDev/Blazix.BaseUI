@@ -55,8 +55,6 @@ public class NavigationMenuViewportTests : BunitContext, INavigationMenuViewport
             EmitClose = _ => { },
             SetViewportInert = _ => { },
             EmitLinkCloseAsync = () => Task.CompletedTask,
-            RequestFocusPrevious = _ => { },
-            RequestFocusInside = (_, _) => { },
         };
 
         var positionerContext = new NavigationMenuPositionerContext

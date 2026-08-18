@@ -38,6 +38,10 @@
     private ElementReference? popupElement;
     private ElementReference? viewportElement;
     private ElementReference? viewportTargetElement;
+    private ElementReference? triggerBeforeGuardElement;
+    private ElementReference? triggerAfterGuardElement;
+    private ElementReference? viewportBeforeGuardElement;
+    private ElementReference? viewportAfterGuardElement;
     private NavigationMenuRootState state;
     private NavigationMenuRootContext context = null!;
     private RenderElement<NavigationMenuRootState>? rootElementReference;
@@ -187,8 +191,8 @@
             EmitClose = EmitClose,
             SetViewportInert = SetViewportInert,
             EmitLinkCloseAsync = EmitLinkCloseAsync,
-            RequestFocusPrevious = RequestFocusPrevious,
-            RequestFocusInside = RequestFocusInside
+            SetTriggerGuardElements = SetTriggerGuardElements,
+            SetViewportGuardElements = SetViewportGuardElements
         };
         BuildComponentAttributes();
     }
@@ -245,7 +249,7 @@
                 await module.InvokeVoidAsync("disposeRoot", rootId);
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
                 _ = ex; // Expected during circuit disconnect - safe to ignore.
             }
@@ -318,6 +322,21 @@
     public void OnViewportFocusOut()
     {
         SetViewportInert(true);
+    }
+
+    /// <summary>
+    /// Updates whether the inline viewport should be inert.
+    /// </summary>
+    [JSInvokable]
+    public void SetViewportInert(bool inert)
+    {
+        if (context.ViewportInert == inert)
+        {
+            return;
+        }
+
+        context.ViewportInert = inert;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     /// <summary>
@@ -474,12 +493,30 @@
                 await module.InvokeVoidAsync("setViewportTargetElement", rootId, viewportTargetElement.Value);
             }
 
+            if (triggerBeforeGuardElement.HasValue && triggerAfterGuardElement.HasValue)
+            {
+                await module.InvokeVoidAsync(
+                    "setTriggerGuardElements",
+                    rootId,
+                    triggerBeforeGuardElement.Value,
+                    triggerAfterGuardElement.Value);
+            }
+
+            if (viewportBeforeGuardElement.HasValue && viewportAfterGuardElement.HasValue)
+            {
+                await module.InvokeVoidAsync(
+                    "setViewportGuardElements",
+                    rootId,
+                    viewportBeforeGuardElement.Value,
+                    viewportAfterGuardElement.Value);
+            }
+
             if (CurrentValue is not null)
             {
                 await module.InvokeVoidAsync("setRootValue", rootId, CurrentValue);
             }
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
@@ -759,17 +796,6 @@
         }
     }
 
-    private void SetViewportInert(bool inert)
-    {
-        if (context.ViewportInert == inert)
-        {
-            return;
-        }
-
-        context.ViewportInert = inert;
-        _ = InvokeAsync(StateHasChanged);
-    }
-
     private async Task SetPositionerElementAsync(ElementReference element)
     {
         try
@@ -783,43 +809,65 @@
         }
     }
 
-    private void RequestFocusPrevious(ElementReference? guardElement)
+    private void SetTriggerGuardElements(
+        ElementReference? beforeGuardElement,
+        ElementReference? afterGuardElement)
     {
-        if (hasRendered && guardElement.HasValue)
+        triggerBeforeGuardElement = beforeGuardElement;
+        triggerAfterGuardElement = afterGuardElement;
+
+        if (hasRendered && beforeGuardElement.HasValue && afterGuardElement.HasValue)
         {
-            _ = RequestFocusPreviousAsync(guardElement.Value);
+            _ = SetTriggerGuardElementsAsync(beforeGuardElement.Value, afterGuardElement.Value);
         }
     }
 
-    private async Task RequestFocusPreviousAsync(ElementReference guardElement)
+    private async Task SetTriggerGuardElementsAsync(
+        ElementReference beforeGuardElement,
+        ElementReference afterGuardElement)
     {
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("focusPreviousTabbable", guardElement);
+            await module.InvokeVoidAsync(
+                "setTriggerGuardElements",
+                rootId,
+                beforeGuardElement,
+                afterGuardElement);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 
-    private void RequestFocusInside(ElementReference? guardElement, ElementReference? triggerElement)
+    private void SetViewportGuardElements(
+        ElementReference? beforeGuardElement,
+        ElementReference? afterGuardElement)
     {
-        if (hasRendered && guardElement.HasValue)
+        viewportBeforeGuardElement = beforeGuardElement;
+        viewportAfterGuardElement = afterGuardElement;
+
+        if (hasRendered && beforeGuardElement.HasValue && afterGuardElement.HasValue)
         {
-            _ = RequestFocusInsideAsync(guardElement.Value, triggerElement);
+            _ = SetViewportGuardElementsAsync(beforeGuardElement.Value, afterGuardElement.Value);
         }
     }
 
-    private async Task RequestFocusInsideAsync(ElementReference guardElement, ElementReference? triggerElement)
+    private async Task SetViewportGuardElementsAsync(
+        ElementReference beforeGuardElement,
+        ElementReference afterGuardElement)
     {
         try
         {
             var module = await ModuleTask.Value;
-            await module.InvokeVoidAsync("focusNavigationMenuContent", rootId, guardElement, triggerElement);
+            await module.InvokeVoidAsync(
+                "setViewportGuardElements",
+                rootId,
+                beforeGuardElement,
+                afterGuardElement);
         }
-        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }

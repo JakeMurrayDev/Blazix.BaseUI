@@ -1,0 +1,45 @@
+@page "/tests/navigation-menu-focus-guards/wasm"
+@using Blazix.BaseUI.NavigationMenu
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Navigation Menu Focus Guards Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="before-menu">Before menu</button>
+
+    <NavigationMenuRoot @bind-Value="currentValue">
+        <NavigationMenuList>
+            <NavigationMenuItem Value="one">
+                <NavigationMenuTrigger data-testid="nav-trigger-one">Item one</NavigationMenuTrigger>
+                <NavigationMenuContent>
+                    <NavigationMenuLink Href="#content-one" data-testid="content-link-one">Content link one</NavigationMenuLink>
+                    <NavigationMenuLink Href="#content-two" data-testid="content-link-two">Content link two</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+        </NavigationMenuList>
+
+        <NavigationMenuPortal>
+            <NavigationMenuPositioner>
+                <NavigationMenuPopup>
+                    <NavigationMenuViewport />
+                </NavigationMenuPopup>
+            </NavigationMenuPositioner>
+        </NavigationMenuPortal>
+    </NavigationMenuRoot>
+
+    <button data-testid="after-menu">After menu</button>
+    <span data-testid="nav-open-state">@(currentValue is null ? "false" : "true")</span>
+</div>
+
+@code {
+    private string? currentValue;
+
+    [SupplyParameterFromQuery(Name = "defaultOpen")]
+    public bool DefaultOpen { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        currentValue = DefaultOpen ? "one" : null;
+    }
+}

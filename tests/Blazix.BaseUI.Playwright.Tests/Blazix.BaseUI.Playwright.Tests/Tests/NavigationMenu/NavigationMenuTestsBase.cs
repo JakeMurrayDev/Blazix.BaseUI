@@ -35,6 +35,42 @@ public abstract class NavigationMenuTestsBase : TestBase
         });
     }
 
+    protected async Task OpenFocusGuardMenuAsync(bool defaultOpen = false)
+    {
+        var url = CreateUrl("/tests/navigation-menu-focus-guards");
+        if (defaultOpen)
+        {
+            url.WithDefaultOpen(true);
+        }
+
+        await NavigateAsync(url);
+
+        if (!defaultOpen)
+        {
+            await GetByTestId("nav-trigger-one").FocusAsync();
+            await Page.Keyboard.PressAsync("Enter");
+        }
+
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("true");
+        await Assertions.Expect(GetByTestId("content-link-one")).ToBeVisibleAsync();
+    }
+
+    protected async Task TabForwardThroughFocusGuardMenuAsync()
+    {
+        await Page.Keyboard.PressAsync("Tab");
+        Assert.Equal("content-link-one", await GetActiveTestIdAsync());
+
+        await Page.Keyboard.PressAsync("Tab");
+        Assert.Equal("content-link-two", await GetActiveTestIdAsync());
+
+        await Page.Keyboard.PressAsync("Tab");
+    }
+
+    protected Task<string?> GetActiveTestIdAsync()
+    {
+        return Page.EvaluateAsync<string?>("() => document.activeElement?.getAttribute('data-testid')");
+    }
+
     #endregion
 
     #region Trigger Click Tests
@@ -56,6 +92,63 @@ public abstract class NavigationMenuTestsBase : TestBase
         // Trigger should have aria-expanded="true"
         var triggerButton = Page.Locator("button[id='nav-trigger-item1']");
         await Assertions.Expect(triggerButton).ToHaveAttributeAsync("aria-expanded", "true");
+    }
+
+    #endregion
+
+    #region Focus Guard Tests
+
+    [Fact]
+    public virtual async Task TabForwardOutOfMenuFocusesNextPageControl()
+    {
+        await OpenFocusGuardMenuAsync();
+
+        await TabForwardThroughFocusGuardMenuAsync();
+
+        Assert.Equal("after-menu", await GetActiveTestIdAsync());
+    }
+
+    [Fact]
+    public virtual async Task TabForwardOutOfMenuClosesMenu()
+    {
+        await OpenFocusGuardMenuAsync();
+
+        await TabForwardThroughFocusGuardMenuAsync();
+
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task ShiftTabFromAfterControlReentersMenuContent()
+    {
+        await OpenFocusGuardMenuAsync(defaultOpen: true);
+        await GetByTestId("after-menu").FocusAsync();
+
+        await Page.Keyboard.PressAsync("Shift+Tab");
+
+        Assert.Equal("content-link-two", await GetActiveTestIdAsync());
+    }
+
+    [Fact]
+    public virtual async Task ShiftTabFromMenuStartFocusesPreviousPageControl()
+    {
+        await OpenFocusGuardMenuAsync();
+        await GetByTestId("content-link-one").FocusAsync();
+
+        await Page.Keyboard.PressAsync("Shift+Tab");
+
+        Assert.Equal("before-menu", await GetActiveTestIdAsync());
+    }
+
+    [Fact]
+    public virtual async Task FocusFallingToBodyDoesNotCloseMenu()
+    {
+        await OpenFocusGuardMenuAsync();
+
+        await Page.EvaluateAsync("() => document.activeElement.blur()");
+        await WaitForDelayAsync(200);
+
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("true");
     }
 
     #endregion

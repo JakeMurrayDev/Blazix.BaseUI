@@ -16,9 +16,9 @@
 
 @if (ShouldRenderFocusGuards)
 {
-    <FocusGuard OnFocus="HandleBeforeGuardFocusAsync" />
+    <FocusGuard @ref="beforeGuardRef" />
     <span aria-owns="@RootContext?.ViewportId" style="@OwnerVisuallyHiddenStyle"></span>
-    <FocusGuard OnFocus="HandleAfterGuardFocusAsync" @ref="afterGuardRef" />
+    <FocusGuard @ref="afterGuardRef" />
 }
 
 @code {
@@ -27,6 +27,7 @@
 
     private NavigationMenuTriggerState state;
     private RenderElement<NavigationMenuTriggerState>? renderElementReference;
+    private FocusGuard? beforeGuardRef;
     private FocusGuard? afterGuardRef;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -95,6 +96,11 @@
         if (firstRender && ItemContext is not null)
         {
             RootContext?.SetTriggerElement(ItemContext.Value, Element);
+        }
+
+        if (ShouldRenderFocusGuards && beforeGuardRef is not null && afterGuardRef is not null)
+        {
+            RootContext?.SetTriggerGuardElements(beforeGuardRef.Element, afterGuardRef.Element);
         }
     }
 
@@ -198,15 +204,4 @@
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private Task HandleBeforeGuardFocusAsync()
-    {
-        RootContext?.RequestFocusPrevious(Element);
-        return Task.CompletedTask;
-    }
-
-    private Task HandleAfterGuardFocusAsync()
-    {
-        RootContext?.RequestFocusInside(afterGuardRef?.Element, Element);
-        return Task.CompletedTask;
-    }
 }

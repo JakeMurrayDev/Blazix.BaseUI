@@ -584,8 +584,8 @@ public static class JsInteropSetup
             module.SetupVoid("setPositionerElement", _ => true).SetVoidResult();
             module.SetupVoid("setViewportElement", _ => true).SetVoidResult();
             module.SetupVoid("setViewportTargetElement", _ => true).SetVoidResult();
-            module.SetupVoid("focusPreviousTabbable", _ => true).SetVoidResult();
-            module.SetupVoid("focusNavigationMenuContent", _ => true).SetVoidResult();
+            module.SetupVoid("setTriggerGuardElements", _ => true).SetVoidResult();
+            module.SetupVoid("setViewportGuardElements", _ => true).SetVoidResult();
             module.Setup<string?>("initializePositioner", _ => true).SetResult("positioner-id");
             module.SetupVoid("updatePosition", _ => true).SetVoidResult();
             module.SetupVoid("disposePositioner", _ => true).SetVoidResult();

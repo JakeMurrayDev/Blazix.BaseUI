@@ -15,6 +15,7 @@
 
 @code {
     private ElementReference viewportTargetElement;
+    private FocusGuard? beforeGuardReference;
     private FocusGuard? afterGuardReference;
     private NavigationMenuViewportState state;
     private RenderElement<NavigationMenuViewportState>? renderElementReference;
@@ -23,7 +24,7 @@
     private RenderFragment ViewportContent => builder =>
     {
         builder.OpenComponent<FocusGuard>(0);
-        builder.AddAttribute(1, "OnFocus", EventCallback.Factory.Create(this, HandleBeforeGuardFocusAsync));
+        builder.AddComponentReferenceCapture(1, instance => beforeGuardReference = (FocusGuard)instance);
         builder.CloseComponent();
 
         builder.OpenElement(2, "div");
@@ -34,8 +35,7 @@
         builder.CloseElement();
 
         builder.OpenComponent<FocusGuard>(7);
-        builder.AddAttribute(8, "OnFocus", EventCallback.Factory.Create(this, HandleAfterGuardFocusAsync));
-        builder.AddComponentReferenceCapture(9, instance => afterGuardReference = (FocusGuard)instance);
+        builder.AddComponentReferenceCapture(8, instance => afterGuardReference = (FocusGuard)instance);
         builder.CloseComponent();
     };
 
@@ -96,6 +96,11 @@
             RootContext?.SetViewportElement(Element);
             RootContext?.SetViewportTargetElement(viewportTargetElement);
         }
+
+        if (beforeGuardReference is not null && afterGuardReference is not null)
+        {
+            RootContext?.SetViewportGuardElements(beforeGuardReference.Element, afterGuardReference.Element);
+        }
     }
 
     private void BuildComponentAttributes()
@@ -123,15 +128,4 @@
         return EventUtilities.InvokeOnBlurAsync(AdditionalAttributes, e);
     }
 
-    private Task HandleBeforeGuardFocusAsync()
-    {
-        RootContext?.RequestFocusInside(Element, null);
-        return Task.CompletedTask;
-    }
-
-    private Task HandleAfterGuardFocusAsync()
-    {
-        RootContext?.RequestFocusPrevious(afterGuardReference?.Element);
-        return Task.CompletedTask;
-    }
 }
