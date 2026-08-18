@@ -43,6 +43,9 @@ const state = window[STATE_KEY];
 // Track where the pointer press started for intentional-mode drag-out suppression
 let pointerDownTarget = null;
 let pointerDownTime = 0;
+let currentPointerType = '';
+let suppressNextTouchClick = false;
+let touchState = null;
 
 // Source: useDismiss.ts `isComposingRef` — pressing Escape while an IME composition is active
 // should close the compose menu, not the floating element. Safari fires `compositionend` before
@@ -67,6 +70,10 @@ function initGlobalListeners() {
     document.addEventListener('compositionstart', handleCompositionStart);
     document.addEventListener('compositionend', handleCompositionEnd);
     document.addEventListener('pointerdown', handleGlobalPointerDown);
+    document.addEventListener('mousedown', handleGlobalMouseDown, true);
+    document.addEventListener('touchstart', handleGlobalTouchStart, { capture: true, passive: true });
+    document.addEventListener('touchmove', handleGlobalTouchMove, { capture: true, passive: true });
+    document.addEventListener('touchend', handleGlobalTouchEnd, { capture: true, passive: true });
     document.addEventListener('click', handleGlobalClick);
     state.globalListenersInitialized = true;
 }
@@ -487,21 +494,102 @@ function processOutsidePressForRoots(e, rootFilter, checkDragOut) {
 }
 
 /**
- * Sloppy mode: fires immediately on pointerdown.
- * Applied to trap-focus roots (any pointer type) and all roots on touch/pen.
+ * Sloppy mouse mode: fires immediately on pointerdown for trap-focus roots.
+ * Touch pointerdown is deferred to the touch gesture state machine.
  */
 function handleGlobalPointerDown(e) {
     pointerDownTarget = e.target;
     pointerDownTime = performance.now();
+    currentPointerType = e.pointerType || '';
 
     // Source: useDismiss.ts getOutsidePressEvent — `pen` (and an unknown pointer type) resolve to
-    // the `mouse` rule, so only genuine touch input uses the `touch: 'sloppy'` mapping configured by
-    // PopoverRoot.tsx:233-237. A pen press outside therefore dismisses on the completed click.
-    const isTouch = e.pointerType === 'touch';
+    // the `mouse` rule. Only genuine touch input uses the deferred `touch: 'sloppy'` mapping.
+    if (currentPointerType === 'touch') return;
+
+    suppressNextTouchClick = false;
     processOutsidePressForRoots(e,
-        (rs) => rs.modal === 'trap-focus' || isTouch,
+        (rs) => rs.modal === 'trap-focus',
         false
     );
+}
+
+function isEventWithinOpenRoot(e) {
+    for (const rootState of state.roots.values()) {
+        if (rootState.isOpen && isInsideRootElements(e.target, rootState)) return true;
+    }
+
+    return false;
+}
+
+function clearTouchTimeout() {
+    if (touchState?.timeout) clearTimeout(touchState.timeout);
+}
+
+function handleGlobalTouchStart(e) {
+    currentPointerType = 'touch';
+    if (isEventWithinOpenRoot(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    clearTouchTimeout();
+    touchState = {
+        startTime: Date.now(),
+        startX: touch.clientX,
+        startY: touch.clientY,
+        dismissOnTouchEnd: false,
+        dismissOnMouseDown: true,
+        timeout: null
+    };
+
+    touchState.timeout = setTimeout(() => {
+        if (touchState) {
+            touchState.dismissOnTouchEnd = false;
+            touchState.dismissOnMouseDown = false;
+            touchState.timeout = null;
+        }
+    }, 1000);
+}
+
+function handleGlobalTouchMove(e) {
+    if (!touchState || isEventWithinOpenRoot(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const deltaX = Math.abs(touch.clientX - touchState.startX);
+    const deltaY = Math.abs(touch.clientY - touchState.startY);
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    if (distance > 5) {
+        touchState.dismissOnTouchEnd = true;
+    }
+
+    if (distance > 10) {
+        processOutsidePressForRoots(e, () => true, false);
+        clearTouchTimeout();
+        touchState = null;
+    }
+}
+
+function handleGlobalTouchEnd(e) {
+    if (!touchState || isEventWithinOpenRoot(e)) return;
+
+    if (touchState.dismissOnTouchEnd) {
+        processOutsidePressForRoots(e, () => true, false);
+    }
+
+    clearTouchTimeout();
+    touchState = null;
+}
+
+function handleGlobalMouseDown(e) {
+    if (currentPointerType !== 'touch') return;
+
+    suppressNextTouchClick = true;
+    clearTouchTimeout();
+    if (touchState?.dismissOnMouseDown === false) return;
+    processOutsidePressForRoots(e, () => true, false);
 }
 
 /**
@@ -509,6 +597,13 @@ function handleGlobalPointerDown(e) {
  * Applied to non-trap-focus roots. Suppresses drag-out (pointerdown inside, click outside).
  */
 function handleGlobalClick(e) {
+    if (suppressNextTouchClick) {
+        suppressNextTouchClick = false;
+        pointerDownTarget = null;
+        pointerDownTime = 0;
+        return;
+    }
+
     processOutsidePressForRoots(e,
         (rs) => rs.modal !== 'trap-focus',
         true

@@ -13,6 +13,8 @@ namespace Blazix.BaseUI.Playwright.Tests.Tests.Tooltip;
 /// </summary>
 public abstract class TooltipTestsBase : TestBase
 {
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     protected TooltipTestsBase(PlaywrightFixture playwrightFixture)
         : base(playwrightFixture)
     {
@@ -77,6 +79,25 @@ public abstract class TooltipTestsBase : TestBase
         var box = await GetByTestId("outer-trigger").BoundingBoxAsync();
         Assert.NotNull(box);
         await Page.Mouse.MoveAsync(box.X + 20, box.Y + 20);
+    }
+
+    #endregion
+
+    #region Touch Outside Press Tests
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesTooltip()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDefaultOpen(true));
+
+        await WaitForTooltipOpenAsync();
+        var outsideButton = GetByTestId("outside-button");
+        var box = await outsideButton.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForTooltipClosedAsync();
     }
 
     #endregion

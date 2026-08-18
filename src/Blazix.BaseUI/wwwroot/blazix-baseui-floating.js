@@ -2255,6 +2255,7 @@ export function getHoverInteraction(interactionId) {
  * @param {string} [options.nodeId] - Node ID within the FloatingTree
  * @param {boolean|Object} [options.bubbles] - Bubble prevention configuration
  * @param {string|Object|Function} [options.outsidePressEvent='sloppy'] - Outside press event mode
+ * @param {boolean} [options.consumeTouchMouseDown=false] - Whether to consume synthesized touch mousedown events
  * @returns {Object} Interaction controller with cleanup method
  */
 export function createDismissInteraction(options) {
@@ -2269,7 +2270,8 @@ export function createDismissInteraction(options) {
         treeId = null,
         nodeId = null,
         bubbles = undefined,
-        outsidePressEvent = 'sloppy'
+        outsidePressEvent = 'sloppy',
+        consumeTouchMouseDown = false
     } = options;
 
     const doc = getDocument(floatingElement);
@@ -2403,35 +2405,42 @@ export function createDismissInteraction(options) {
     }
 
     // Touch dismiss state machine
-    const touchState = {
-        startTime: 0,
-        startX: 0,
-        startY: 0,
-        dismissOnTouchEnd: false,
-        dismissOnMouseDown: true,
-        timeout: null
-    };
+    let touchState = null;
+
+    function isEventWithinOwnElements(event) {
+        return isEventTargetWithin(event, floatingElement) || isEventTargetWithin(event, triggerElement);
+    }
 
     function handleTouchStart(event) {
+        currentPointerType = 'touch';
+        if (isEventWithinOwnElements(event)) return;
+
         const touch = event.touches[0];
         if (!touch) return;
 
-        touchState.startTime = Date.now();
-        touchState.startX = touch.clientX;
-        touchState.startY = touch.clientY;
-        touchState.dismissOnTouchEnd = false;
-        touchState.dismissOnMouseDown = true;
+        if (touchState?.timeout) clearTimeout(touchState.timeout);
+        touchState = {
+            startTime: Date.now(),
+            startX: touch.clientX,
+            startY: touch.clientY,
+            dismissOnTouchEnd: false,
+            dismissOnMouseDown: true,
+            timeout: null
+        };
 
         // 1-second timeout: long press = no dismiss
-        if (touchState.timeout) clearTimeout(touchState.timeout);
         touchState.timeout = setTimeout(() => {
-            touchState.dismissOnTouchEnd = false;
-            touchState.dismissOnMouseDown = false;
-            touchState.timeout = null;
+            if (touchState) {
+                touchState.dismissOnTouchEnd = false;
+                touchState.dismissOnMouseDown = false;
+                touchState.timeout = null;
+            }
         }, 1000);
     }
 
     function handleTouchMove(event) {
+        if (!touchState || isEventWithinOwnElements(event)) return;
+
         const touch = event.touches[0];
         if (!touch) return;
 
@@ -2439,35 +2448,41 @@ export function createDismissInteraction(options) {
         const dy = touch.clientY - touchState.startY;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance > 10) {
-            // Fast scroll gesture — immediate dismiss
-            if (touchState.timeout) {
-                clearTimeout(touchState.timeout);
-                touchState.timeout = null;
-            }
-            closeOnPressOutside(event);
-            touchState.dismissOnTouchEnd = false;
-            touchState.dismissOnMouseDown = false;
-            return;
-        }
-
         if (distance > 5) {
             // Scroll gesture — arm for touchend dismiss
             touchState.dismissOnTouchEnd = true;
         }
+
+        if (distance > 10) {
+            // Fast scroll gesture — immediate dismiss
+            closeOnPressOutside(event);
+            if (touchState.timeout) clearTimeout(touchState.timeout);
+            touchState = null;
+        }
     }
 
     function handleTouchEnd(event) {
+        if (!touchState || isEventWithinOwnElements(event)) return;
+
         if (touchState.timeout) {
             clearTimeout(touchState.timeout);
-            touchState.timeout = null;
         }
 
         if (touchState.dismissOnTouchEnd) {
             closeOnPressOutside(event);
         }
 
-        touchState.dismissOnTouchEnd = false;
+        touchState = null;
+    }
+
+    function handleMouseDown(event) {
+        if (!consumeTouchMouseDown || currentPointerType !== 'touch') return;
+        if (touchState?.timeout) {
+            clearTimeout(touchState.timeout);
+            touchState.timeout = null;
+        }
+        if (touchState?.dismissOnMouseDown === false) return;
+        closeOnPressOutside(event);
     }
 
     // Track pointer type
@@ -2496,12 +2511,14 @@ export function createDismissInteraction(options) {
         if (isDynamic || resolvedEvent === '__touch_state_machine__' || outsidePressEvent === 'sloppy') {
             // Sloppy/dynamic mode: pointerdown for mouse, touch state machine for touch
             doc.addEventListener('pointerdown', handlePointerDown);
+            doc.addEventListener('mousedown', handleMouseDown, true);
             doc.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
             doc.addEventListener('touchmove', handleTouchMove, { capture: true, passive: true });
             doc.addEventListener('touchend', handleTouchEnd, { capture: true, passive: true });
 
             outsidePressCleanup = () => {
                 doc.removeEventListener('pointerdown', handlePointerDown);
+                doc.removeEventListener('mousedown', handleMouseDown, true);
                 doc.removeEventListener('touchstart', handleTouchStart, { capture: true });
                 doc.removeEventListener('touchmove', handleTouchMove, { capture: true });
                 doc.removeEventListener('touchend', handleTouchEnd, { capture: true });
@@ -2544,7 +2561,7 @@ export function createDismissInteraction(options) {
             triggerMaps.delete(interactionId);
 
             // Clean up touch timeout
-            if (touchState.timeout) clearTimeout(touchState.timeout);
+            if (touchState?.timeout) clearTimeout(touchState.timeout);
 
             state.interactions.delete(interactionId);
         }

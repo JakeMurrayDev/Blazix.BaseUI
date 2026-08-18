@@ -13,6 +13,8 @@ namespace Blazix.BaseUI.Playwright.Tests.Tests.Popover;
 /// </summary>
 public abstract class PopoverTestsBase : TestBase
 {
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     protected PopoverTestsBase(PlaywrightFixture playwrightFixture)
         : base(playwrightFixture)
     {
@@ -74,6 +76,27 @@ public abstract class PopoverTestsBase : TestBase
         }
     }
 
+    protected async Task DispatchTouchEventAsync(ICDPSession session, string type, float x, float y)
+    {
+        var touchPoints = type == "touchEnd"
+            ? Array.Empty<object>()
+            : new object[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["id"] = 1
+                }
+            };
+
+        await session.SendAsync("Input.dispatchTouchEvent", new Dictionary<string, object>
+        {
+            ["type"] = type,
+            ["touchPoints"] = touchPoints
+        });
+    }
+
     #endregion
 
     #region Popover Open/Close Interaction Tests
@@ -107,6 +130,104 @@ public abstract class PopoverTestsBase : TestBase
 
         var popup = GetByTestId("popover-popup");
         await Assertions.Expect(popup).ToBeVisibleAsync();
+    }
+
+    #endregion
+
+    #region Touch Outside Press Tests
+
+    [Fact]
+    public virtual async Task LongPressOutsideDoesNotDismissPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await WaitForDelayAsync(1200);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task SmallTouchDriftOutsideDoesNotDismiss()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await DispatchTouchEventAsync(session, "touchMove", x + 3, y);
+        await DispatchTouchEventAsync(session, "touchEnd", x + 3, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await DispatchTouchEventAsync(session, "touchMove", x + 7, y);
+        await DispatchTouchEventAsync(session, "touchEnd", x + 7, y);
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task ScrollGestureOutsideDismissesAfterTenPixels()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchMove", x + 15, y);
+        await WaitForPopoverClosedAsync();
+
+        await DispatchTouchEventAsync(session, "touchEnd", x + 15, y);
+    }
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MousePressOutsideDismissesPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        await GetByTestId("outside-button").ClickAsync();
+
+        await WaitForPopoverClosedAsync();
     }
 
     #endregion

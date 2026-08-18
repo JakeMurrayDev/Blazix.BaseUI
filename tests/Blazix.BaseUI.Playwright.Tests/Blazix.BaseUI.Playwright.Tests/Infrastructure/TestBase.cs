@@ -9,6 +9,8 @@ public abstract class TestBase : IAsyncLifetime
     private IBrowserContext? context;
     private bool testFailed;
 
+    protected virtual BrowserNewContextOptions BrowserContextOptions => new();
+
     protected IPage Page { get; private set; } = null!;
 
     /// <summary>
@@ -31,7 +33,7 @@ public abstract class TestBase : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        context = await playwrightFixture.Browser.NewContextAsync();
+        context = await playwrightFixture.Browser.NewContextAsync(BrowserContextOptions);
 
         // Start tracing for debugging CI failures
         await context.Tracing.StartAsync(new TracingStartOptions

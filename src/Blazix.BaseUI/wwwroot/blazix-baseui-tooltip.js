@@ -336,6 +336,7 @@ function updateDismissInteraction(rootState) {
         floatingElement: rootState.popupElement,
         escapeKey: false, // Already handled by global escape key handler
         outsidePress: true,
+        consumeTouchMouseDown: true,
         onDismiss: (reason) => {
             if (reason === 'outside-press' && rootState.dotNetRef) {
                 rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
