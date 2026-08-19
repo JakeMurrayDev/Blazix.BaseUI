@@ -1417,21 +1417,48 @@ export async function startSimpleTransition(rootState, isOpen) {
 }
 
 /**
- * Creates a keydown handler that closes the first open root on Escape.
+ * Creates a keydown handler that closes an open root on Escape.
  * @param {Map} roots - The component's roots Map
  * @param {string} methodName - The .NET method to invoke (e.g. 'OnEscapeKey')
+ * @param {object} options - Escape handling options
  * @returns {Function} The keydown event handler
  */
-export function createEscapeKeyHandler(roots, methodName) {
+export function createEscapeKeyHandler(roots, methodName, options = {}) {
+    const {
+        pick = 'first',
+        preventDefault = false,
+        stopPropagation = false,
+        ignoreComposition = false
+    } = options;
+
     return function handleKeyDown(e) {
         if (e.key !== 'Escape') return;
+        if (ignoreComposition && (e.isComposing || e.keyCode === 229)) return;
 
-        for (const [id, rootState] of roots) {
-            if (rootState.isOpen && rootState.dotNetRef) {
-                rootState.dotNetRef.invokeMethodAsync(methodName).catch(() => { });
-                break;
+        let rootToClose = null;
+
+        if (pick === 'topmost') {
+            let highestOrder = -1;
+            for (const rootState of roots.values()) {
+                if (rootState.isOpen && rootState.dotNetRef && rootState.openOrderStamp > highestOrder) {
+                    highestOrder = rootState.openOrderStamp;
+                    rootToClose = rootState;
+                }
+            }
+        } else {
+            for (const rootState of roots.values()) {
+                if (rootState.isOpen && rootState.dotNetRef) {
+                    rootToClose = rootState;
+                    break;
+                }
             }
         }
+
+        if (!rootToClose) return;
+
+        rootToClose.dotNetRef.invokeMethodAsync(methodName).catch(() => { });
+        if (preventDefault) e.preventDefault();
+        if (stopPropagation) e.stopPropagation();
     };
 }
 
@@ -1828,11 +1855,13 @@ export function createHoverInteraction(options) {
         onClose,
         openDelay = 0,
         closeDelay = 0,
+        restMs = 0,
         mouseOnly = false,
         useSafePolygon = true,
         safePolygonOptions = {},
         isRelatedTargetInside = null,
         shouldOpenImmediately = null,
+        shouldOpen = null,
         treeId = null,
         nodeId = null,
         guardStaleOpen = false
@@ -1843,6 +1872,9 @@ export function createHoverInteraction(options) {
     let isOpen = false;
     let openTimeout = new Timeout();
     let closeTimeout = new Timeout();
+    let restTimeout = new Timeout();
+    let restTimeoutPending = false;
+    let blockMouseMove = true;
     let lastCursorX = 0;
     let lastCursorY = 0;
     let mouseMoveHandler = null;
@@ -1852,6 +1884,8 @@ export function createHoverInteraction(options) {
     let childCloseCleanup = null;
     let currentOpenDelay = openDelay;
     let currentCloseDelay = closeDelay;
+    let currentRestMs = restMs;
+    const supportsRestMs = Object.prototype.hasOwnProperty.call(options, 'restMs');
 
     function cleanupChildCloseListener() {
         if (childCloseCleanup) {
@@ -1866,16 +1900,22 @@ export function createHoverInteraction(options) {
         }
 
         closeTimeout.clear();
+        blockMouseMove = false;
 
-        const resolvedOpenDelay = shouldOpenImmediately?.() ? 0 : currentOpenDelay;
+        const openImmediately = shouldOpenImmediately?.() === true;
+        if (currentRestMs > 0 && !currentOpenDelay && !openImmediately) {
+            return;
+        }
+
+        const resolvedOpenDelay = openImmediately ? 0 : currentOpenDelay;
         if (resolvedOpenDelay > 0) {
             openTimeout.start(resolvedOpenDelay, () => {
-                if (!isOpen) {
+                if (!isOpen && shouldOpen?.() !== false) {
                     isOpen = true;
                     onOpen?.('trigger-hover');
                 }
             });
-        } else if (!isOpen) {
+        } else if (!isOpen && shouldOpen?.() !== false) {
             isOpen = true;
             onOpen?.('trigger-hover');
         }
@@ -1883,6 +1923,9 @@ export function createHoverInteraction(options) {
 
     function handleMouseLeave(event) {
         openTimeout.clear();
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
         lastCursorX = event.clientX;
         lastCursorY = event.clientY;
 
@@ -1949,6 +1992,9 @@ export function createHoverInteraction(options) {
             return; // moved within the trigger's own subtree
         }
         openTimeout.clear();
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
     }
 
     function handleFloatingMouseEnter() {
@@ -2021,7 +2067,41 @@ export function createHoverInteraction(options) {
         handleMouseEnter(event);
     }
 
+    function handleTriggerMouseMove(event) {
+        if (mouseOnly && pointerType && !isMouseLikePointerType(pointerType)) {
+            return;
+        }
+
+        if (isOpen || currentRestMs === 0) {
+            return;
+        }
+
+        if (restTimeoutPending && event.movementX ** 2 + event.movementY ** 2 < 2) {
+            return;
+        }
+
+        restTimeout.clear();
+
+        const openFromRest = () => {
+            restTimeoutPending = false;
+            if (!blockMouseMove && !isOpen && shouldOpen?.() !== false) {
+                isOpen = true;
+                onOpen?.('trigger-hover');
+            }
+        };
+
+        if (pointerType === 'touch' || shouldOpenImmediately?.() === true) {
+            openFromRest();
+        } else {
+            restTimeoutPending = true;
+            restTimeout.start(currentRestMs, openFromRest);
+        }
+    }
+
     function closeWithDelay() {
+        restTimeout.clear();
+        restTimeoutPending = false;
+        blockMouseMove = true;
         if (currentCloseDelay > 0) {
             closeTimeout.start(currentCloseDelay, () => {
                 if (isOpen) {
@@ -2048,6 +2128,9 @@ export function createHoverInteraction(options) {
     triggerElement.addEventListener('mouseover', handleMouseOver);
     triggerElement.addEventListener('mouseleave', handleMouseLeave);
     triggerElement.addEventListener('pointerdown', handlePointerDown);
+    if (supportsRestMs) {
+        triggerElement.addEventListener('mousemove', handleTriggerMouseMove);
+    }
     if (guardStaleOpen) {
         triggerElement.addEventListener('mouseout', handleMouseOut);
     }
@@ -2076,6 +2159,9 @@ export function createHoverInteraction(options) {
         setOpen(open) {
             isOpen = open;
             if (!open) {
+                restTimeout.clear();
+                restTimeoutPending = false;
+                blockMouseMove = true;
                 interactedInside = false;
                 cleanupChildCloseListener();
                 // Notify tree that this node has closed
@@ -2088,18 +2174,25 @@ export function createHoverInteraction(options) {
             }
         },
 
-        setDelays(open, close) {
+        setDelays(open, close, rest) {
             currentOpenDelay = open ?? 0;
             currentCloseDelay = close ?? 0;
+            currentRestMs = rest ?? 0;
         },
 
         cancelPendingOpen() {
             openTimeout.clear();
+            restTimeout.clear();
+            restTimeoutPending = false;
+            blockMouseMove = true;
         },
 
         cleanup() {
             openTimeout.clear();
             closeTimeout.clear();
+            restTimeout.clear();
+            restTimeoutPending = false;
+            blockMouseMove = true;
             cleanupMouseMove();
             cleanupChildCloseListener();
 
@@ -2108,6 +2201,9 @@ export function createHoverInteraction(options) {
             triggerElement.removeEventListener('mouseover', handleMouseOver);
             triggerElement.removeEventListener('mouseleave', handleMouseLeave);
             triggerElement.removeEventListener('pointerdown', handlePointerDown);
+            if (supportsRestMs) {
+                triggerElement.removeEventListener('mousemove', handleTriggerMouseMove);
+            }
             if (guardStaleOpen) {
                 triggerElement.removeEventListener('mouseout', handleMouseOut);
             }
@@ -2159,6 +2255,7 @@ export function getHoverInteraction(interactionId) {
  * @param {string} [options.nodeId] - Node ID within the FloatingTree
  * @param {boolean|Object} [options.bubbles] - Bubble prevention configuration
  * @param {string|Object|Function} [options.outsidePressEvent='sloppy'] - Outside press event mode
+ * @param {boolean} [options.consumeTouchMouseDown=false] - Whether to consume synthesized touch mousedown events
  * @returns {Object} Interaction controller with cleanup method
  */
 export function createDismissInteraction(options) {
@@ -2173,7 +2270,8 @@ export function createDismissInteraction(options) {
         treeId = null,
         nodeId = null,
         bubbles = undefined,
-        outsidePressEvent = 'sloppy'
+        outsidePressEvent = 'sloppy',
+        consumeTouchMouseDown = false
     } = options;
 
     const doc = getDocument(floatingElement);
@@ -2307,35 +2405,42 @@ export function createDismissInteraction(options) {
     }
 
     // Touch dismiss state machine
-    const touchState = {
-        startTime: 0,
-        startX: 0,
-        startY: 0,
-        dismissOnTouchEnd: false,
-        dismissOnMouseDown: true,
-        timeout: null
-    };
+    let touchState = null;
+
+    function isEventWithinOwnElements(event) {
+        return isEventTargetWithin(event, floatingElement) || isEventTargetWithin(event, triggerElement);
+    }
 
     function handleTouchStart(event) {
+        currentPointerType = 'touch';
+        if (isEventWithinOwnElements(event)) return;
+
         const touch = event.touches[0];
         if (!touch) return;
 
-        touchState.startTime = Date.now();
-        touchState.startX = touch.clientX;
-        touchState.startY = touch.clientY;
-        touchState.dismissOnTouchEnd = false;
-        touchState.dismissOnMouseDown = true;
+        if (touchState?.timeout) clearTimeout(touchState.timeout);
+        touchState = {
+            startTime: Date.now(),
+            startX: touch.clientX,
+            startY: touch.clientY,
+            dismissOnTouchEnd: false,
+            dismissOnMouseDown: true,
+            timeout: null
+        };
 
         // 1-second timeout: long press = no dismiss
-        if (touchState.timeout) clearTimeout(touchState.timeout);
         touchState.timeout = setTimeout(() => {
-            touchState.dismissOnTouchEnd = false;
-            touchState.dismissOnMouseDown = false;
-            touchState.timeout = null;
+            if (touchState) {
+                touchState.dismissOnTouchEnd = false;
+                touchState.dismissOnMouseDown = false;
+                touchState.timeout = null;
+            }
         }, 1000);
     }
 
     function handleTouchMove(event) {
+        if (!touchState || isEventWithinOwnElements(event)) return;
+
         const touch = event.touches[0];
         if (!touch) return;
 
@@ -2343,40 +2448,51 @@ export function createDismissInteraction(options) {
         const dy = touch.clientY - touchState.startY;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance > 10) {
-            // Fast scroll gesture — immediate dismiss
-            if (touchState.timeout) {
-                clearTimeout(touchState.timeout);
-                touchState.timeout = null;
-            }
-            closeOnPressOutside(event);
-            touchState.dismissOnTouchEnd = false;
-            touchState.dismissOnMouseDown = false;
-            return;
-        }
-
         if (distance > 5) {
             // Scroll gesture — arm for touchend dismiss
             touchState.dismissOnTouchEnd = true;
         }
+
+        if (distance > 10) {
+            // Fast scroll gesture — immediate dismiss
+            closeOnPressOutside(event);
+            if (touchState.timeout) clearTimeout(touchState.timeout);
+            touchState = null;
+        }
     }
 
     function handleTouchEnd(event) {
+        if (!touchState || isEventWithinOwnElements(event)) return;
+
         if (touchState.timeout) {
             clearTimeout(touchState.timeout);
-            touchState.timeout = null;
         }
 
         if (touchState.dismissOnTouchEnd) {
             closeOnPressOutside(event);
+            touchState.dismissOnMouseDown = false;
         }
+    }
 
-        touchState.dismissOnTouchEnd = false;
+    function handleMouseDown(event) {
+        if (!consumeTouchMouseDown || currentPointerType !== 'touch') return;
+        if (touchState?.timeout) {
+            clearTimeout(touchState.timeout);
+            touchState.timeout = null;
+        }
+        const dismissOnMouseDown = touchState?.dismissOnMouseDown !== false;
+        touchState = null;
+        if (!dismissOnMouseDown) return;
+        closeOnPressOutside(event);
     }
 
     // Track pointer type
     function handlePointerType(event) {
         currentPointerType = event.pointerType || '';
+        if (currentPointerType !== 'touch') {
+            if (touchState?.timeout) clearTimeout(touchState.timeout);
+            touchState = null;
+        }
     }
 
     // Determine which event to listen for outside press
@@ -2400,12 +2516,14 @@ export function createDismissInteraction(options) {
         if (isDynamic || resolvedEvent === '__touch_state_machine__' || outsidePressEvent === 'sloppy') {
             // Sloppy/dynamic mode: pointerdown for mouse, touch state machine for touch
             doc.addEventListener('pointerdown', handlePointerDown);
+            doc.addEventListener('mousedown', handleMouseDown, true);
             doc.addEventListener('touchstart', handleTouchStart, { capture: true, passive: true });
             doc.addEventListener('touchmove', handleTouchMove, { capture: true, passive: true });
             doc.addEventListener('touchend', handleTouchEnd, { capture: true, passive: true });
 
             outsidePressCleanup = () => {
                 doc.removeEventListener('pointerdown', handlePointerDown);
+                doc.removeEventListener('mousedown', handleMouseDown, true);
                 doc.removeEventListener('touchstart', handleTouchStart, { capture: true });
                 doc.removeEventListener('touchmove', handleTouchMove, { capture: true });
                 doc.removeEventListener('touchend', handleTouchEnd, { capture: true });
@@ -2448,7 +2566,7 @@ export function createDismissInteraction(options) {
             triggerMaps.delete(interactionId);
 
             // Clean up touch timeout
-            if (touchState.timeout) clearTimeout(touchState.timeout);
+            if (touchState?.timeout) clearTimeout(touchState.timeout);
 
             state.interactions.delete(interactionId);
         }
@@ -2624,7 +2742,7 @@ function isTypeableCombobox(el) {
 /**
  * Checks whether the event's relatedTarget is outside the given container.
  */
-function isOutsideEvent(event, container) {
+export function isOutsideEvent(event, container) {
     const relatedTarget = event.relatedTarget;
     return !relatedTarget || !contains(container, relatedTarget);
 }

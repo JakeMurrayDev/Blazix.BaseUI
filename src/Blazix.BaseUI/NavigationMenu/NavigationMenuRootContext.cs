@@ -181,12 +181,12 @@ internal sealed class NavigationMenuRootContext
     public Func<Task> EmitLinkCloseAsync { get; init; } = null!;
 
     /// <summary>
-    /// Gets the delegate that asks JavaScript to focus the previous tabbable element.
+    /// Gets the delegate that registers the active trigger's focus guards.
     /// </summary>
-    public Action<ElementReference?> RequestFocusPrevious { get; init; } = null!;
+    public Action<ElementReference?, ElementReference?> SetTriggerGuardElements { get; init; } = (_, _) => { };
 
     /// <summary>
-    /// Gets the delegate that asks JavaScript to focus inside the active navigation menu content.
+    /// Gets the delegate that registers the viewport's focus guards.
     /// </summary>
-    public Action<ElementReference?, ElementReference?> RequestFocusInside { get; init; } = null!;
+    public Action<ElementReference?, ElementReference?> SetViewportGuardElements { get; init; } = (_, _) => { };
 }

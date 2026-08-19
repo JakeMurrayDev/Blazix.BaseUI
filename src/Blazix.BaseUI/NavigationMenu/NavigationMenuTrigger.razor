@@ -16,9 +16,9 @@
 
 @if (ShouldRenderFocusGuards)
 {
-    <FocusGuard OnFocus="HandleBeforeGuardFocusAsync" />
+    <FocusGuard @ref="beforeGuardRef" />
     <span aria-owns="@RootContext?.ViewportId" style="@OwnerVisuallyHiddenStyle"></span>
-    <FocusGuard OnFocus="HandleAfterGuardFocusAsync" @ref="afterGuardRef" />
+    <FocusGuard @ref="afterGuardRef" />
 }
 
 @code {
@@ -27,7 +27,10 @@
 
     private NavigationMenuTriggerState state;
     private RenderElement<NavigationMenuTriggerState>? renderElementReference;
+    private FocusGuard? beforeGuardRef;
     private FocusGuard? afterGuardRef;
+    private ElementReference? lastBeforeGuardElement;
+    private ElementReference? lastAfterGuardElement;
     private Dictionary<string, object> componentAttributes = new();
 
     private bool ShouldRenderFocusGuards => IsItemActive();
@@ -95,6 +98,19 @@
         if (firstRender && ItemContext is not null)
         {
             RootContext?.SetTriggerElement(ItemContext.Value, Element);
+        }
+
+        if (ShouldRenderFocusGuards && beforeGuardRef is not null && afterGuardRef is not null)
+        {
+            var beforeGuardElement = beforeGuardRef.Element;
+            var afterGuardElement = afterGuardRef.Element;
+            if (!Nullable.Equals(beforeGuardElement, lastBeforeGuardElement) ||
+                !Nullable.Equals(afterGuardElement, lastAfterGuardElement))
+            {
+                lastBeforeGuardElement = beforeGuardElement;
+                lastAfterGuardElement = afterGuardElement;
+                RootContext?.SetTriggerGuardElements(beforeGuardElement, afterGuardElement);
+            }
         }
     }
 
@@ -198,15 +214,4 @@
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
-    private Task HandleBeforeGuardFocusAsync()
-    {
-        RootContext?.RequestFocusPrevious(Element);
-        return Task.CompletedTask;
-    }
-
-    private Task HandleAfterGuardFocusAsync()
-    {
-        RootContext?.RequestFocusInside(afterGuardRef?.Element, Element);
-        return Task.CompletedTask;
-    }
 }

@@ -1,0 +1,48 @@
+@page "/tests/preview-card-escape/wasm"
+@using Blazix.BaseUI.PreviewCard
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>PreviewCard Escape Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="open-preview-cards-sequentially" @onclick="OpenPreviewCardsSequentiallyAsync">Open preview cards</button>
+
+    <PreviewCardRoot @bind-Open="previewCardAOpen">
+        <PreviewCardTrigger data-testid="preview-card-a-trigger">Preview card A</PreviewCardTrigger>
+        <PreviewCardPortal>
+            <PreviewCardPositioner>
+                <PreviewCardPopup data-testid="preview-card-a-popup">Preview card A content</PreviewCardPopup>
+            </PreviewCardPositioner>
+        </PreviewCardPortal>
+    </PreviewCardRoot>
+
+    @if (showPreviewCardB)
+    {
+        <PreviewCardRoot @bind-Open="previewCardBOpen">
+            <PreviewCardTrigger data-testid="preview-card-b-trigger">Preview card B</PreviewCardTrigger>
+            <PreviewCardPortal>
+                <PreviewCardPositioner>
+                    <PreviewCardPopup data-testid="preview-card-b-popup">Preview card B content</PreviewCardPopup>
+                </PreviewCardPositioner>
+            </PreviewCardPortal>
+        </PreviewCardRoot>
+    }
+
+    <div>Preview card A open: <span data-testid="preview-card-a-open-state">@previewCardAOpen.ToString().ToLowerInvariant()</span></div>
+    <div>Preview card B open: <span data-testid="preview-card-b-open-state">@previewCardBOpen.ToString().ToLowerInvariant()</span></div>
+</div>
+
+@code {
+    private bool previewCardAOpen;
+    private bool previewCardBOpen;
+    private bool showPreviewCardB;
+
+    private async Task OpenPreviewCardsSequentiallyAsync()
+    {
+        previewCardAOpen = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+        showPreviewCardB = true;
+        previewCardBOpen = true;
+    }
+}

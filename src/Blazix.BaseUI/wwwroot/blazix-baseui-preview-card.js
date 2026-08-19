@@ -32,17 +32,23 @@ if (!window[STATE_KEY]) {
         roots: new Map(),
         positioners: new Map(),
         popups: new WeakMap(),
-        globalListenersInitialized: false
+        globalListenersInitialized: false,
+        openOrderCounter: 0
     };
 }
 const state = window[STATE_KEY];
 
-const handleGlobalKeyDown = createEscapeKeyHandler(state.roots, 'OnEscapeKey');
+const handleGlobalKeyDown = createEscapeKeyHandler(state.roots, 'OnEscapeKey', {
+    pick: 'topmost',
+    preventDefault: true,
+    stopPropagation: true,
+    ignoreComposition: true
+});
 
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
-    document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     state.globalListenersInitialized = true;
 }
 
@@ -183,6 +189,7 @@ function updateDismissInteraction(rootState) {
         floatingElement: rootState.popupElement,
         escapeKey: false,
         outsidePress: true,
+        consumeTouchMouseDown: true,
         onDismiss: (reason) => {
             if (reason === 'outside-press' && rootState.dotNetRef) {
                 rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
@@ -213,6 +220,7 @@ export function initializeRoot(rootId, dotNetRef) {
         rootId,
         dotNetRef,
         isOpen: false,
+        openOrderStamp: 0,
         activeTriggerId: null,
         triggerElement: null,
         triggerElements: new Map(),
@@ -251,6 +259,7 @@ export function disposeRoot(rootId) {
 export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
+    const wasOpen = rootState.isOpen;
 
     if (activeTriggerId) {
         rootState.activeTriggerId = activeTriggerId;
@@ -259,6 +268,9 @@ export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
 
     rootState.isOpen = isOpen;
     rootState.pendingOpen = isOpen;
+    if (isOpen && !wasOpen) {
+        rootState.openOrderStamp = ++state.openOrderCounter;
+    }
     applyTriggerOpenAttributes(rootState);
 
     if (isOpen) {
@@ -305,9 +317,13 @@ export function setTriggerElement(rootId, triggerId, element) {
 export function syncTriggerOpenAttributes(rootId, isOpen, activeTriggerId = null) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
+    const wasOpen = rootState.isOpen;
 
     rootState.isOpen = isOpen;
     rootState.activeTriggerId = activeTriggerId;
+    if (isOpen && !wasOpen) {
+        rootState.openOrderStamp = ++state.openOrderCounter;
+    }
     if (activeTriggerId) {
         rootState.triggerElement = rootState.triggerElements.get(activeTriggerId) || rootState.triggerElement;
     }

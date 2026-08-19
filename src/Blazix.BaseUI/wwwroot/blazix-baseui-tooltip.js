@@ -6,6 +6,8 @@
 
 import {
     createHoverInteraction,
+    Timeout,
+    activeElement,
     createEscapeKeyHandler,
     createDismissInteraction,
     createVirtualElement,
@@ -14,6 +16,7 @@ import {
     waitForPopupAndStartTransition as floatingWaitForPopup,
     startSimpleTransition,
     contains,
+    isMouseLikePointerType,
     disposeHoverInteractionOnRoot,
     updateHoverInteractionFloatingOnRoot,
     setHoverInteractionOpenOnRoot,
@@ -22,23 +25,67 @@ import {
     disposePositioner as floatingDisposePositioner
 } from './blazix-baseui-floating.min.js';
 
+const TOOLTIP_TRIGGER_IDENTIFIER = ['data', 'base', 'ui', 'tooltip', 'trigger'].join('-');
+
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Tooltip.State');
 
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
         roots: new Map(),
         positioners: new Map(),
-        globalListenersInitialized: false
+        globalListenersInitialized: false,
+        openOrderCounter: 0
     };
 }
 const state = window[STATE_KEY];
 
-const handleGlobalKeyDown = createEscapeKeyHandler(state.roots, 'OnEscapeKey');
+const handleGlobalKeyDown = createEscapeKeyHandler(state.roots, 'OnEscapeKey', {
+    pick: 'topmost',
+    preventDefault: true,
+    stopPropagation: true,
+    ignoreComposition: true
+});
+
+function getTargetElement(event) {
+    if ('composedPath' in event) {
+        for (const target of event.composedPath()) {
+            if (target instanceof Element) {
+                return target;
+            }
+        }
+    }
+
+    return event.target instanceof Element ? event.target : null;
+}
+
+function closestEnabledTooltipTrigger(element) {
+    let current = element;
+    while (current) {
+        const trigger = current.closest(`[${TOOLTIP_TRIGGER_IDENTIFIER}]`);
+        if (trigger) {
+            return trigger;
+        }
+
+        const root = current.getRootNode();
+        current = 'host' in root && root.host instanceof Element ? root.host : null;
+    }
+
+    return null;
+}
+
+function isEnabledNestedTriggerTarget(triggerElement, target) {
+    if (!triggerElement || !target) {
+        return false;
+    }
+
+    const nearestTrigger = closestEnabledTooltipTrigger(target);
+    return nearestTrigger !== null && nearestTrigger !== triggerElement && contains(triggerElement, nearestTrigger);
+}
 
 function initGlobalListeners() {
     if (state.globalListenersInitialized) return;
 
-    document.addEventListener('keydown', handleGlobalKeyDown);
+    document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     state.globalListenersInitialized = true;
 }
 
@@ -72,12 +119,37 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
         existing.cleanup();
     }
 
+    let isNestedTriggerHovered = false;
+    let pointerType = null;
+    const nestedTriggerOpenTimeout = new Timeout();
+
+    const requestHoverOpen = () => {
+        if (rootState.dotNetRef && (!rootState.isOpen || rootState.activeTriggerId !== triggerId)) {
+            rootState.activeTriggerId = triggerId;
+            rootState.triggerElement = triggerElement;
+            for (const [interactionTriggerId, interaction] of rootState.hoverInteractions) {
+                interaction.setOpen(interactionTriggerId === triggerId);
+            }
+            applyTriggerOpenAttributes(rootState);
+            rootState.dotNetRef.invokeMethodAsync('OnHoverOpen', triggerId).catch(() => { });
+            setTimeout(() => applyTriggerOpenAttributes(rootState), 0);
+            setTimeout(() => applyTriggerOpenAttributes(rootState), 50);
+        }
+    };
+
+    const requestHoverClose = () => {
+        if (rootState.dotNetRef && rootState.isOpen && (!rootState.activeTriggerId || rootState.activeTriggerId === triggerId)) {
+            rootState.dotNetRef.invokeMethodAsync('OnHoverClose', triggerId).catch(() => { });
+        }
+    };
+
     const hoverInteraction = createHoverInteraction({
         interactionId: `tooltip-hover-${rootId}-${triggerId}`,
         triggerElement,
         floatingElement: rootState.popupElement,
-        openDelay: openDelay || 0,
+        openDelay: 0,
         closeDelay: closeDelay || 0,
+        restMs: openDelay || 0,
         mouseOnly: true,
         // Use safePolygon when hoverable popup is enabled (disableHoverablePopup=false)
         useSafePolygon: !disableHoverablePopup,
@@ -91,27 +163,85 @@ export async function initializeHoverInteraction(rootId, triggerId, triggerEleme
             return false;
         },
         shouldOpenImmediately: () => rootState.isOpen,
-        onOpen: (reason) => {
-            if (rootState.dotNetRef && (!rootState.isOpen || rootState.activeTriggerId !== triggerId)) {
-                rootState.activeTriggerId = triggerId;
-                rootState.triggerElement = triggerElement;
-                for (const [interactionTriggerId, interaction] of rootState.hoverInteractions) {
-                    interaction.setOpen(interactionTriggerId === triggerId);
-                }
-                applyTriggerOpenAttributes(rootState);
-                rootState.dotNetRef.invokeMethodAsync('OnHoverOpen', triggerId).catch(() => { });
-                setTimeout(() => applyTriggerOpenAttributes(rootState), 0);
-                setTimeout(() => applyTriggerOpenAttributes(rootState), 50);
-            }
-        },
-        onClose: (reason) => {
-            if (rootState.dotNetRef && rootState.isOpen && (!rootState.activeTriggerId || rootState.activeTriggerId === triggerId)) {
-                rootState.dotNetRef.invokeMethodAsync('OnHoverClose', triggerId).catch(() => { });
-            }
-        }
+        shouldOpen: () => !isNestedTriggerHovered,
+        onOpen: requestHoverOpen,
+        onClose: requestHoverClose
     });
 
+    const detectNestedTriggerHover = (target) => {
+        const nestedTriggerHovered = isEnabledNestedTriggerTarget(triggerElement, target);
+        isNestedTriggerHovered = nestedTriggerHovered;
+        if (nestedTriggerHovered) {
+            hoverInteraction.cancelPendingOpen();
+            nestedTriggerOpenTimeout.clear();
+        }
+        return nestedTriggerHovered;
+    };
+
+    const handleNestedTriggerHover = (event) => {
+        const wasNestedTriggerHovered = isNestedTriggerHovered;
+        const target = getTargetElement(event);
+        const nestedTriggerHovered = detectNestedTriggerHover(target);
+        const targetInsideTrigger = target && contains(triggerElement, target);
+
+        if (wasNestedTriggerHovered && !nestedTriggerHovered) {
+            hoverInteraction.cancelPendingOpen();
+        }
+
+        if (nestedTriggerHovered &&
+            rootState.isOpen &&
+            rootState.openReason === 'trigger-hover') {
+            hoverInteraction.setOpen(false);
+            requestHoverClose();
+            return;
+        }
+
+        if (wasNestedTriggerHovered &&
+            !nestedTriggerHovered &&
+            targetInsideTrigger &&
+            !rootState.isOpen &&
+            isMouseLikePointerType(pointerType)) {
+            const open = () => {
+                if (!isNestedTriggerHovered && !rootState.isOpen) {
+                    hoverInteraction.setOpen(true);
+                    requestHoverOpen();
+                }
+            };
+            const delay = rootState.hoverOpenDelays.get(triggerId) || 0;
+            if (delay === 0) {
+                nestedTriggerOpenTimeout.clear();
+                open();
+            } else {
+                nestedTriggerOpenTimeout.start(delay, open);
+            }
+        }
+    };
+
+    const handleNestedTriggerMouseLeave = () => {
+        isNestedTriggerHovered = false;
+        nestedTriggerOpenTimeout.clear();
+        pointerType = null;
+    };
+
+    const handleNestedTriggerPointerEnter = (event) => {
+        pointerType = event.pointerType;
+    };
+
+    triggerElement.addEventListener('mouseover', handleNestedTriggerHover);
+    triggerElement.addEventListener('mouseleave', handleNestedTriggerMouseLeave);
+    triggerElement.addEventListener('pointerenter', handleNestedTriggerPointerEnter);
+
+    const cleanupHoverInteraction = hoverInteraction.cleanup;
+    hoverInteraction.cleanup = () => {
+        nestedTriggerOpenTimeout.clear();
+        triggerElement.removeEventListener('mouseover', handleNestedTriggerHover);
+        triggerElement.removeEventListener('mouseleave', handleNestedTriggerMouseLeave);
+        triggerElement.removeEventListener('pointerenter', handleNestedTriggerPointerEnter);
+        cleanupHoverInteraction();
+    };
+
     rootState.hoverInteractions.set(triggerId, hoverInteraction);
+    rootState.hoverOpenDelays.set(triggerId, openDelay || 0);
 }
 
 export function disposeHoverInteraction(rootId, triggerId = null) {
@@ -133,6 +263,7 @@ export function disposeHoverInteraction(rootId, triggerId = null) {
         rootState.hoverInteractions.delete(triggerId);
     }
     rootState.triggerElements.delete(triggerId);
+    rootState.hoverOpenDelays.delete(triggerId);
 }
 
 export function updateHoverInteractionFloatingElement(rootId) {
@@ -170,7 +301,13 @@ export function cancelPendingHoverOpen(rootId, triggerId) {
 
 export function updateHoverInteractionDelays(rootId, triggerId, openDelay, closeDelay) {
     const rootState = state.roots.get(rootId);
-    rootState?.hoverInteractions.get(triggerId)?.setDelays(openDelay || 0, closeDelay || 0);
+    rootState?.hoverOpenDelays.set(triggerId, openDelay || 0);
+    rootState?.hoverInteractions.get(triggerId)?.setDelays(0, closeDelay || 0, openDelay || 0);
+}
+
+export function isNestedTooltipFocusTarget(triggerElement) {
+    const focusedElement = activeElement(triggerElement?.ownerDocument || document);
+    return isEnabledNestedTriggerTarget(triggerElement, focusedElement);
 }
 
 export function isPointerWithinElements(elements) {
@@ -199,6 +336,7 @@ function updateDismissInteraction(rootState) {
         floatingElement: rootState.popupElement,
         escapeKey: false, // Already handled by global escape key handler
         outsidePress: true,
+        consumeTouchMouseDown: true,
         onDismiss: (reason) => {
             if (reason === 'outside-press' && rootState.dotNetRef) {
                 rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
@@ -229,9 +367,11 @@ export function initializeRoot(rootId, dotNetRef) {
         rootId,
         dotNetRef,
         isOpen: false,
+        openOrderStamp: 0,
         activeTriggerId: null,
         triggerElement: null,
         triggerElements: new Map(),
+        hoverOpenDelays: new Map(),
         positionerElement: null,
         popupElement: null,
         hoverInteraction: null,
@@ -264,9 +404,10 @@ export function disposeRoot(rootId) {
     state.roots.delete(rootId);
 }
 
-export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
+export function setRootOpen(rootId, isOpen, activeTriggerId = null, openReason = null) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
+    const wasOpen = rootState.isOpen;
 
     if (activeTriggerId) {
         rootState.activeTriggerId = activeTriggerId;
@@ -274,7 +415,11 @@ export function setRootOpen(rootId, isOpen, activeTriggerId = null) {
     }
 
     rootState.isOpen = isOpen;
+    rootState.openReason = openReason;
     rootState.pendingOpen = isOpen;
+    if (isOpen && !wasOpen) {
+        rootState.openOrderStamp = ++state.openOrderCounter;
+    }
     applyTriggerOpenAttributes(rootState);
 
     // Sync with hover interaction
@@ -325,9 +470,13 @@ export function setTriggerElement(rootId, triggerId, element) {
 export function syncTriggerOpenAttributes(rootId, isOpen, activeTriggerId = null) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
+    const wasOpen = rootState.isOpen;
 
     rootState.isOpen = isOpen;
     rootState.activeTriggerId = activeTriggerId;
+    if (isOpen && !wasOpen) {
+        rootState.openOrderStamp = ++state.openOrderCounter;
+    }
     if (activeTriggerId) {
         rootState.triggerElement = rootState.triggerElements.get(activeTriggerId) || rootState.triggerElement;
     }

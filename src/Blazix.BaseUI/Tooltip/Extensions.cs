@@ -18,4 +18,21 @@ internal static class Extensions
         TooltipInstantType.TrackingCursor => "tracking-cursor",
         _ => null
     };
+
+    /// <summary>
+    /// Converts a <see cref="TooltipOpenChangeReason"/> value to its JavaScript interaction string.
+    /// </summary>
+    /// <param name="reason">The reason to convert.</param>
+    /// <returns>The JavaScript interaction reason.</returns>
+    public static string ToReasonString(this TooltipOpenChangeReason reason) => reason switch
+    {
+        TooltipOpenChangeReason.TriggerHover => "trigger-hover",
+        TooltipOpenChangeReason.TriggerFocus => "trigger-focus",
+        TooltipOpenChangeReason.TriggerPress => "trigger-press",
+        TooltipOpenChangeReason.OutsidePress => "outside-press",
+        TooltipOpenChangeReason.EscapeKey => "escape-key",
+        TooltipOpenChangeReason.Disabled => "disabled",
+        TooltipOpenChangeReason.ImperativeAction => "imperative-action",
+        _ => "none"
+    };
 }

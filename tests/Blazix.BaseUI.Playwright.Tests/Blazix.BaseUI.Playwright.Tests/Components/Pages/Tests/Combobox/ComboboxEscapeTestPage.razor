@@ -1,0 +1,57 @@
+@page "/tests/combobox-escape/server"
+@using Blazix.BaseUI.Combobox
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Combobox Escape Test Page (Server)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="open-comboboxes-sequentially" @onclick="OpenComboboxesSequentiallyAsync">Open comboboxes</button>
+
+    <ComboboxRoot TValue="string" Items="items" @bind-Open="comboboxAOpen">
+        <ComboboxInput data-testid="combobox-a-input" />
+        <ComboboxPositioner>
+            <ComboboxPopup data-testid="combobox-a-popup">
+                <ComboboxList>
+                    <ComboboxCollection TValue="string" Context="entry">
+                        <ComboboxItem TValue="string" Value="@entry.Item" Index="@entry.Index">@entry.Item</ComboboxItem>
+                    </ComboboxCollection>
+                </ComboboxList>
+            </ComboboxPopup>
+        </ComboboxPositioner>
+    </ComboboxRoot>
+
+    @if (showComboboxB)
+    {
+        <ComboboxRoot TValue="string" Items="items" @bind-Open="comboboxBOpen">
+            <ComboboxInput data-testid="combobox-b-input" />
+            <ComboboxPositioner>
+                <ComboboxPopup data-testid="combobox-b-popup">
+                    <ComboboxList>
+                        <ComboboxCollection TValue="string" Context="entry">
+                            <ComboboxItem TValue="string" Value="@entry.Item" Index="@entry.Index">@entry.Item</ComboboxItem>
+                        </ComboboxCollection>
+                    </ComboboxList>
+                </ComboboxPopup>
+            </ComboboxPositioner>
+        </ComboboxRoot>
+    }
+
+    <div>Combobox A open: <span data-testid="combobox-a-open-state">@comboboxAOpen.ToString().ToLowerInvariant()</span></div>
+    <div>Combobox B open: <span data-testid="combobox-b-open-state">@comboboxBOpen.ToString().ToLowerInvariant()</span></div>
+</div>
+
+@code {
+    private readonly IReadOnlyList<string> items = ["Apple", "Banana"];
+    private bool comboboxAOpen;
+    private bool comboboxBOpen;
+    private bool showComboboxB;
+
+    private async Task OpenComboboxesSequentiallyAsync()
+    {
+        comboboxAOpen = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+        showComboboxB = true;
+        comboboxBOpen = true;
+    }
+}

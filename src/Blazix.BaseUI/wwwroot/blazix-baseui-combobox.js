@@ -17,6 +17,7 @@ if (!window[stateKey]) {
     roots: new Map(),
     positioners: new Map(),
     documentListenersInitialized: false,
+    openOrderCounter: 0,
   };
 }
 
@@ -73,6 +74,8 @@ function createRootState(rootId, dotNetRef = null) {
     rootId,
     dotNetRef,
     isOpen: false,
+    inline: false,
+    openOrderStamp: 0,
     activeIndex: -1,
     itemCount: 0,
     loopFocus: true,
@@ -189,13 +192,35 @@ function initializeDocumentListeners() {
     if (event.key !== 'Escape') {
       return;
     }
+    if (event.isComposing || event.keyCode === 229) {
+      return;
+    }
 
+    const activeElement = document.activeElement;
+    let focusedRoot = null;
+    let topmostRoot = null;
+    let highestOrder = -1;
     for (const root of state.roots.values()) {
-      if (canInvokeRoot(root) && root.isOpen) {
-        root.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
+      if (!canInvokeRoot(root) || !root.isOpen || root.inline) {
+        continue;
+      }
+      if (contains(root.inputElement, activeElement) || contains(root.popupElement, activeElement)) {
+        focusedRoot = root;
+        break;
+      }
+      if (root.openOrderStamp > highestOrder) {
+        highestOrder = root.openOrderStamp;
+        topmostRoot = root;
       }
     }
-  });
+
+    const rootToClose = focusedRoot ?? topmostRoot;
+    if (rootToClose) {
+      rootToClose.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, { capture: true });
 
   state.documentListenersInitialized = true;
 }
@@ -302,7 +327,10 @@ function attachKeyboardHandlers(root, element, key) {
       return;
     }
 
-    if (event.key === 'Escape' && root.isOpen) {
+    if (event.key === 'Escape' && root.isOpen && !root.inline) {
+      if (event.isComposing || event.keyCode === 229) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       root.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
@@ -553,11 +581,15 @@ export function disposeRoot(rootId) {
   state.roots.delete(rootId);
 }
 
-export function setRootOpen(rootId, open, activeIndex = -1, itemCount = 0, loopFocus = true) {
+export function setRootOpen(rootId, open, activeIndex = -1, itemCount = 0, loopFocus = true, inline = false) {
   const root = ensureRoot(rootId);
   const wasOpen = root.isOpen;
   root.pendingOpen = open;
   root.isOpen = open;
+  root.inline = inline;
+  if (open && !wasOpen) {
+    root.openOrderStamp = ++state.openOrderCounter;
+  }
   root.activeIndex = activeIndex;
   root.itemCount = Math.max(0, Number(itemCount) || 0);
   root.loopFocus = !!loopFocus;

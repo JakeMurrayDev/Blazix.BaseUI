@@ -180,6 +180,47 @@
             </ChildContentWithPayload>
         </TooltipRoot>
     }
+    else if (NestedTrigger)
+    {
+        <div style="padding: 40px;">
+            <TooltipRoot @bind-Open="outerOpen">
+                <TooltipTrigger
+                    Render="@RenderNestedOuterTrigger"
+                    Delay="@Delay"
+                    CloseDelay="@CloseDelay"
+                    tabindex="0"
+                    role="button"
+                    style="display: flex; align-items: center; justify-content: center; position: relative; width: 320px; height: 160px; border: 1px solid #9ca3af;"
+                    data-testid="outer-trigger">
+                    <span style="position: absolute; top: 12px; left: 12px; pointer-events: none;">Outer trigger</span>
+                    <TooltipRoot @bind-Open="innerOpen">
+                        <TooltipTrigger
+                            Disabled="@NestedInnerDisabled"
+                            Delay="@Delay"
+                            CloseDelay="@CloseDelay"
+                            data-testid="inner-trigger">
+                            Inner trigger
+                        </TooltipTrigger>
+                        <TooltipPortal>
+                            <TooltipPositioner data-testid="inner-positioner">
+                                <TooltipPopup data-testid="inner-popup">Inner tooltip</TooltipPopup>
+                            </TooltipPositioner>
+                        </TooltipPortal>
+                    </TooltipRoot>
+                </TooltipTrigger>
+                <TooltipPortal>
+                    <TooltipPositioner data-testid="outer-positioner">
+                        <TooltipPopup data-testid="outer-popup">Outer tooltip</TooltipPopup>
+                    </TooltipPositioner>
+                </TooltipPortal>
+            </TooltipRoot>
+        </div>
+
+        <div data-testid="nested-state-display">
+            <div>Outer Open: <span data-testid="outer-open-state">@outerOpen.ToString().ToLowerInvariant()</span></div>
+            <div>Inner Open: <span data-testid="inner-open-state">@innerOpen.ToString().ToLowerInvariant()</span></div>
+        </div>
+    }
     else
     {
         @if (FlexLayout)
@@ -358,6 +399,12 @@
     [SupplyParameterFromQuery(Name = "multiTrigger")]
     public bool MultiTrigger { get; set; }
 
+    [SupplyParameterFromQuery(Name = "nestedTrigger")]
+    public bool NestedTrigger { get; set; }
+
+    [SupplyParameterFromQuery(Name = "nestedInnerDisabled")]
+    public bool NestedInnerDisabled { get; set; }
+
     [SupplyParameterFromQuery(Name = "providerGroup")]
     public bool ProviderGroup { get; set; }
 
@@ -374,6 +421,8 @@
     public string Align { get; set; } = "center";
 
     private bool isOpen;
+    private bool outerOpen;
+    private bool innerOpen;
     private bool providerOpenOne;
     private bool providerOpenTwo;
     private int changeCount;
@@ -417,6 +466,18 @@
     {
         isOpen = false;
     }
+
+    private RenderFragment RenderNestedOuterTrigger(RenderProps<TooltipTriggerState> props) => builder =>
+    {
+        builder.OpenElement(0, "div");
+        builder.AddMultipleAttributes(1, props.Attributes);
+        if (props.ElementReferenceCallback is not null)
+        {
+            builder.AddElementReferenceCapture(2, props.ElementReferenceCallback);
+        }
+        builder.AddContent(3, props.ChildContent);
+        builder.CloseElement();
+    };
 
     private static readonly RenderFragment ArrowSvg = __builder =>
     {

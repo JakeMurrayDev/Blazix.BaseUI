@@ -13,6 +13,8 @@ namespace Blazix.BaseUI.Playwright.Tests.Tests.Popover;
 /// </summary>
 public abstract class PopoverTestsBase : TestBase
 {
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     protected PopoverTestsBase(PlaywrightFixture playwrightFixture)
         : base(playwrightFixture)
     {
@@ -57,6 +59,52 @@ public abstract class PopoverTestsBase : TestBase
         return Page.WaitForTimeoutAsync(milliseconds);
     }
 
+    protected async Task DispatchTouchEventAsync(ICDPSession session, string type, float x, float y)
+    {
+        var touchPoints = type == "touchEnd"
+            ? Array.Empty<object>()
+            : new object[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["id"] = 1
+                }
+            };
+
+        await session.SendAsync("Input.dispatchTouchEvent", new Dictionary<string, object>
+        {
+            ["type"] = type,
+            ["touchPoints"] = touchPoints
+        });
+    }
+
+    protected async Task DispatchSyntheticTouchEventAsync(ILocator target, string type, float x, float y)
+    {
+        var eventDataJson = System.Text.Json.JsonSerializer.Serialize(new { type, x, y });
+        await target.EvaluateAsync("""
+            (element, eventDataJson) => {
+                const eventData = JSON.parse(eventDataJson);
+                const touch = new Touch({
+                    identifier: 1,
+                    target: element,
+                    clientX: eventData.x,
+                    clientY: eventData.y
+                });
+                const activeTouches = eventData.type === 'touchend' ? [] : [touch];
+                element.dispatchEvent(new TouchEvent(eventData.type, {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    touches: activeTouches,
+                    targetTouches: activeTouches,
+                    changedTouches: [touch]
+                }));
+            }
+            """, eventDataJson);
+    }
+
     #endregion
 
     #region Popover Open/Close Interaction Tests
@@ -94,6 +142,111 @@ public abstract class PopoverTestsBase : TestBase
 
     #endregion
 
+    #region Touch Outside Press Tests
+
+    [Fact]
+    public virtual async Task LongPressOutsideDoesNotDismissPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await WaitForDelayAsync(1200);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task SmallTouchDriftDismissesOnlyViaSynthesizedMouseDown()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var outsideButton = GetByTestId("outside-button");
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 3, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 3, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await outsideButton.DispatchEventAsync("mousedown");
+        await WaitForPopoverClosedAsync();
+
+        await OpenPopoverAsync();
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 7, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 7, y);
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task ScrollGestureOutsideDismissesAfterTenPixels()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // Chromium does not emit a DOM touchmove for the first few pixels of a CDP gesture.
+        // Move far enough past its native touch slop to exercise useDismiss's >10px branch.
+        await DispatchTouchEventAsync(session, "touchMove", x, y + 30);
+        await WaitForPopoverClosedAsync();
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y + 30);
+    }
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task MousePressOutsideDismissesPopover()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        await GetByTestId("outside-button").ClickAsync();
+
+        await WaitForPopoverClosedAsync();
+    }
+
+    #endregion
+
     #region Keyboard Interaction Tests
 
     /// <summary>
@@ -115,6 +268,31 @@ public abstract class PopoverTestsBase : TestBase
         await Page.Keyboard.PressAsync("Escape");
 
         await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task EscapeDoesNotAlsoCloseTheEnclosingDialog()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover-escape"));
+
+        await GetByTestId("dialog-trigger").ClickAsync();
+        var dialogOpenState = GetByTestId("dialog-open-state");
+        var popoverOpenState = GetByTestId("dialog-popover-open-state");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        var popoverTrigger = GetByTestId("dialog-popover-trigger");
+        await popoverTrigger.ClickAsync();
+        await WaitForTextContentAsync(popoverOpenState, "true");
+        await popoverTrigger.FocusAsync();
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(popoverOpenState, "false");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(dialogOpenState, "false");
     }
 
     /// <summary>
@@ -397,6 +575,47 @@ public abstract class PopoverTestsBase : TestBase
     #endregion
 
     #region Hover Behavior Tests
+
+    [Fact]
+    public virtual async Task ContinuousPointerMovementDoesNotOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("popover-trigger"), 25);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task PointerRestOpensAfterRestDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(300));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("popover-trigger").HoverAsync();
+
+        await WaitForTextContentAsync(GetByTestId("open-state"), "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task PointerRestAfterMovementOpens()
+    {
+        await NavigateAsync(CreateUrl("/tests/popover")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("popover-trigger"), 5);
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+
+        await WaitForTextContentAsync(openState, "true", 1500);
+    }
 
     /// <summary>
     /// Tests that popover opens on hover when OpenOnHover is true.

@@ -789,7 +789,7 @@
 
             if (state.Open)
             {
-                await module.InvokeVoidAsync("setRootOpen", rootId, true, activeTriggerId);
+                await module.InvokeVoidAsync("setRootOpen", rootId, true, activeTriggerId, openChangeReason.ToReasonString());
             }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
@@ -948,7 +948,7 @@
 
             if (syncRootOpen)
             {
-                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, activeTriggerId);
+                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, activeTriggerId, openChangeReason.ToReasonString());
             }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Blazix.BaseUI.Playwright.Tests.Fixtures;
 using Blazix.BaseUI.Playwright.Tests.Infrastructure;
 using Microsoft.Playwright;
+using Shouldly;
 
 namespace Blazix.BaseUI.Playwright.Tests.Tests.Tooltip;
 
@@ -13,6 +14,8 @@ namespace Blazix.BaseUI.Playwright.Tests.Tests.Tooltip;
 /// </summary>
 public abstract class TooltipTestsBase : TestBase
 {
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     protected TooltipTestsBase(PlaywrightFixture playwrightFixture)
         : base(playwrightFixture)
     {
@@ -55,9 +58,199 @@ public abstract class TooltipTestsBase : TestBase
         });
     }
 
+    protected async Task MovePointerToOuterTriggerPaddingAsync()
+    {
+        var box = await GetByTestId("outer-trigger").BoundingBoxAsync();
+        Assert.NotNull(box);
+        await Page.Mouse.MoveAsync(box.X + 20, box.Y + 20);
+    }
+
+    #endregion
+
+    #region Touch Outside Press Tests
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesTooltip()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDefaultOpen(true));
+
+        await WaitForTooltipOpenAsync();
+        var outsideButton = GetByTestId("outside-button");
+        var box = await outsideButton.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForTooltipClosedAsync();
+    }
+
     #endregion
 
     #region Hover Interaction Tests
+
+    [Fact]
+    public virtual async Task ContinuousPointerMovementDoesNotOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 25);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task PointerRestOpensAfterRestDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(300));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("tooltip-trigger").HoverAsync();
+
+        await WaitForTextContentAsync(GetByTestId("open-state"), "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task PointerRestAfterMovementOpens()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 5);
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+
+        await WaitForTextContentAsync(openState, "true", 1500);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringInnerDoesNotOpenOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(GetByTestId("outer-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_FocusingInnerDoesNotOpenOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        var outerTrigger = GetByTestId("outer-trigger");
+        var innerTrigger = GetByTestId("inner-trigger");
+        await outerTrigger.FocusAsync();
+        await Page.Keyboard.PressAsync("Tab");
+
+        await Assertions.Expect(innerTrigger).ToBeFocusedAsync();
+        await outerTrigger.DispatchEventAsync("focus");
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(GetByTestId("outer-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringOuterOnlyOpensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+
+        await WaitForTextContentAsync(GetByTestId("outer-open-state"), "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_HoveringInnerClosesHoverOpenedOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+        var outerOpenState = GetByTestId("outer-open-state");
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+
+        await WaitForTextContentAsync(outerOpenState, "false", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_LeavingInnerReopensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+        var outerOpenState = GetByTestId("outer-open-state");
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(outerOpenState, "false", 1000);
+
+        await MovePointerToOuterTriggerPaddingAsync();
+
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_FocusOpenedOuterIsNotClosedByNestedHover()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        var outerTrigger = GetByTestId("outer-trigger");
+        var outerOpenState = GetByTestId("outer-open-state");
+        await outerTrigger.FocusAsync();
+        await WaitForTextContentAsync(outerOpenState, "true", 1000);
+        await WaitForDelayAsync(100);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+        await WaitForTextContentAsync(GetByTestId("inner-open-state"), "true", 1000);
+        await WaitForDelayAsync(400);
+
+        await Assertions.Expect(outerOpenState).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task NestedTrigger_DisabledInnerOpensOuter()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip")
+            .WithNestedTrigger(true)
+            .WithNestedInnerDisabled(true)
+            .WithDelay(200)
+            .WithCloseDelay(0));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("inner-trigger").HoverAsync();
+
+        await WaitForTextContentAsync(GetByTestId("outer-open-state"), "true", 1000);
+        await Assertions.Expect(GetByTestId("inner-open-state")).ToHaveTextAsync("false");
+    }
 
     /// <summary>
     /// Tests that the tooltip opens on hover after the delay period.
@@ -408,6 +601,89 @@ public abstract class TooltipTestsBase : TestBase
         await Page.Keyboard.PressAsync("Escape");
 
         await WaitForTooltipClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task EscapeClosesOnlyTheInteractedTooltip()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("open-tooltips-sequentially").ClickAsync();
+        var tooltipAOpenState = GetByTestId("tooltip-a-open-state");
+        var tooltipBOpenState = GetByTestId("tooltip-b-open-state");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipBOpenState, "false");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+
+        await GetByTestId("open-tooltip-b").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await GetByTestId("close-tooltip-a").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipAOpenState, "false");
+        await GetByTestId("open-tooltip-a").DispatchEventAsync("click");
+        await WaitForTextContentAsync(tooltipAOpenState, "true");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipAOpenState, "false");
+        await WaitForTextContentAsync(tooltipBOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipBOpenState, "false");
+    }
+
+    [Fact]
+    public virtual async Task EscapeDoesNotAlsoCloseTheEnclosingDialog()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("dialog-trigger").ClickAsync();
+        var dialogOpenState = GetByTestId("dialog-open-state");
+        var tooltipOpenState = GetByTestId("dialog-tooltip-open-state");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await GetByTestId("dialog-tooltip-trigger").FocusAsync();
+        await WaitForTextContentAsync(tooltipOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(tooltipOpenState, "false");
+        await WaitForTextContentAsync(dialogOpenState, "true");
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await WaitForTextContentAsync(dialogOpenState, "false");
+    }
+
+    [Fact]
+    public virtual async Task EscapePreventsBrowserDefault()
+    {
+        await NavigateAsync(CreateUrl("/tests/tooltip-escape"));
+
+        await GetByTestId("open-tooltips-sequentially").ClickAsync();
+        await WaitForTextContentAsync(GetByTestId("tooltip-b-open-state"), "true");
+        await Page.EvaluateAsync("""
+            () => {
+                window.tooltipEscapeDefaultPrevented = false;
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') {
+                        window.tooltipEscapeDefaultPrevented = event.defaultPrevented;
+                    }
+                }, { capture: true, once: true });
+            }
+            """);
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        var defaultPrevented = await Page.EvaluateAsync<bool>(
+            "() => window.tooltipEscapeDefaultPrevented === true");
+        defaultPrevented.ShouldBeTrue();
     }
 
     #endregion

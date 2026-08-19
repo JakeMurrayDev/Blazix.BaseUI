@@ -9,6 +9,8 @@ public abstract class TestBase : IAsyncLifetime
     private IBrowserContext? context;
     private bool testFailed;
 
+    protected virtual BrowserNewContextOptions BrowserContextOptions => new();
+
     protected IPage Page { get; private set; } = null!;
 
     /// <summary>
@@ -31,7 +33,7 @@ public abstract class TestBase : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        context = await playwrightFixture.Browser.NewContextAsync();
+        context = await playwrightFixture.Browser.NewContextAsync(BrowserContextOptions);
 
         // Start tracing for debugging CI failures
         await context.Tracing.StartAsync(new TracingStartOptions
@@ -321,6 +323,23 @@ public abstract class TestBase : IAsyncLifetime
     protected async Task WaitForDelayAsync(int baseMs)
     {
         await Page.WaitForTimeoutAsync(baseMs * TimeoutMultiplier);
+    }
+
+    protected async Task MovePointerWithinTriggerAsync(ILocator trigger, int stepCount)
+    {
+        var box = await trigger.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var centerX = box.X + box.Width / 2;
+        var centerY = box.Y + box.Height / 2;
+        var offsets = new[] { -12, 0, 12, 0 };
+
+        await Page.Mouse.MoveAsync(centerX + offsets[0], centerY);
+        for (var index = 1; index <= stepCount; index++)
+        {
+            await Page.Mouse.MoveAsync(centerX + offsets[index % offsets.Length], centerY);
+            await WaitForDelayAsync(60);
+        }
     }
 
     protected async Task WaitForAttributeValueAsync(ILocator element, string attribute, string value, int timeout = 5000)

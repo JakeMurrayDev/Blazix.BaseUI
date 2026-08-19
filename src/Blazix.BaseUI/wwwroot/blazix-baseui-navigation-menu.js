@@ -10,7 +10,8 @@ import {
     updatePositioner as updateFloatingPositioner,
     disposePositioner as disposeFloatingPositioner,
     cleanupTransitionState,
-    startSimpleTransition
+    startSimpleTransition,
+    isOutsideEvent
 } from './blazix-baseui-floating.min.js';
 
 const STATE_KEY = Symbol.for('Blazix.BaseUI.NavigationMenu.State');
@@ -104,16 +105,26 @@ function handleGlobalClick(e) {
 
 function handleGlobalFocusOut(e) {
     const target = e.target;
-    const relatedTarget = e.relatedTarget || target?.ownerDocument?.activeElement || null;
+    const relatedTarget = e.relatedTarget;
+
+    // Blazor transient re-renders produce null relatedTarget values that would spuriously close the menu.
+    if (!relatedTarget) return;
 
     for (const [, rootState] of state.roots) {
         if (!rootState.isOpen || !rootState.dotNetRef) continue;
         if (!isInsideNavigationMenu(rootState, target)) continue;
+        if (isRootFocusGuard(rootState, relatedTarget)) continue;
         if (isInsideNavigationMenu(rootState, relatedTarget) || isInsideAnyNavigationMenu(relatedTarget)) continue;
 
-        rootState.closeReason = 'focus-out';
-        rootState.dotNetRef.invokeMethodAsync('OnFocusOut').catch(() => { });
+        closeNavigationMenuOnFocusOut(rootState);
     }
+}
+
+function closeNavigationMenuOnFocusOut(rootState) {
+    if (!rootState.isOpen || !rootState.dotNetRef) return;
+
+    rootState.closeReason = 'focus-out';
+    rootState.dotNetRef.invokeMethodAsync('OnFocusOut').catch(() => { });
 }
 
 function containsActiveElement(element) {
@@ -137,6 +148,13 @@ function isInsideAnyNavigationMenu(target) {
     }
 
     return false;
+}
+
+function isRootFocusGuard(rootState, target) {
+    return target === rootState.triggerBeforeGuardElement ||
+        target === rootState.triggerAfterGuardElement ||
+        target === rootState.viewportBeforeGuardElement ||
+        target === rootState.viewportAfterGuardElement;
 }
 
 function isInsideNavigationMenu(rootState, target) {
@@ -218,6 +236,12 @@ export function initializeRoot(rootId, dotNetRef, orientation, delay, closeDelay
         popupElement: null,
         viewportElement: null,
         viewportTargetElement: null,
+        triggerBeforeGuardElement: null,
+        triggerAfterGuardElement: null,
+        triggerGuardCleanup: null,
+        viewportBeforeGuardElement: null,
+        viewportAfterGuardElement: null,
+        viewportGuardCleanup: null,
         positionerElement: null,
         currentContentElement: null,
         resizeObserver: null,
@@ -270,6 +294,9 @@ export function disposeRoot(rootId) {
             removeViewportHoverListeners(rootState.viewportElement);
         }
 
+        removeTriggerGuardListeners(rootState);
+        removeViewportGuardListeners(rootState);
+
         disconnectSizeObservers(rootState);
         removePositionerResizeListener(rootState);
 
@@ -287,6 +314,7 @@ export function setRootValue(rootId, value) {
     rootState.pendingOpen = rootState.isOpen;
 
     if (!rootState.isOpen) {
+        removeTriggerGuardListeners(rootState);
         clearSafePolygon(rootState);
         syncContentVisibility(rootState);
         setSharedFixedSize(rootState);
@@ -897,22 +925,141 @@ export function setViewportTargetElement(rootId, element) {
 
 // --- Focus Management ---
 
-export function focusPreviousTabbable(guardElement) {
-    const previous = getPreviousTabbable(guardElement);
-    previous?.focus({ preventScroll: true });
-}
-
-export function focusNavigationMenuContent(rootId, guardElement, fallbackElement) {
+export function setTriggerGuardElements(rootId, beforeGuardElement, afterGuardElement) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;
 
-    const focusTarget =
-        getNextTabbable(rootState.popupElement) ||
-        getNextTabbable(rootState.viewportElement) ||
-        fallbackElement ||
-        guardElement;
+    removeTriggerGuardListeners(rootState);
+    rootState.triggerBeforeGuardElement = beforeGuardElement;
+    rootState.triggerAfterGuardElement = afterGuardElement;
 
-    focusTarget?.focus?.({ preventScroll: true });
+    const handleBeforeFocus = (event) => {
+        const referenceElement = rootState.positionerElement || rootState.viewportElement;
+        if (referenceElement && isOutsideEvent(event, referenceElement)) {
+            rootState.viewportBeforeGuardElement?.focus();
+        } else {
+            rootState.activeTriggerElement?.focus();
+        }
+    };
+
+    const handleAfterFocus = (event) => {
+        const referenceElement = rootState.positionerElement || rootState.viewportElement;
+        if (referenceElement && isOutsideEvent(event, referenceElement)) {
+            rootState.viewportElement?.removeAttribute('inert');
+            rootState.dotNetRef?.invokeMethodAsync('SetViewportInert', false).catch(() => { });
+            (rootState.viewportAfterGuardElement || rootState.activeTriggerElement)?.focus();
+            return;
+        }
+
+        let nextTabbable = getFocusTargetAfterGuardElement(rootState.triggerAfterGuardElement) ||
+            rootState.activeTriggerElement;
+        if (
+            rootState.isNested &&
+            !rootState.positionerElement &&
+            referenceElement &&
+            nextTabbable &&
+            referenceElement.contains(nextTabbable)
+        ) {
+            nextTabbable = getFocusTargetAfterGuardElement(rootState.viewportAfterGuardElement);
+        }
+
+        nextTabbable?.focus();
+
+        if (
+            (!rootState.isNested || rootState.positionerElement) &&
+            !rootState.rootElement?.contains(nextTabbable)
+        ) {
+            closeNavigationMenuOnFocusOut(rootState);
+        }
+    };
+
+    beforeGuardElement?.addEventListener('focus', handleBeforeFocus);
+    afterGuardElement?.addEventListener('focus', handleAfterFocus);
+    rootState.triggerGuardCleanup = () => {
+        beforeGuardElement?.removeEventListener('focus', handleBeforeFocus);
+        afterGuardElement?.removeEventListener('focus', handleAfterFocus);
+    };
+}
+
+export function setViewportGuardElements(rootId, beforeGuardElement, afterGuardElement) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return;
+
+    removeViewportGuardListeners(rootState);
+    rootState.viewportBeforeGuardElement = beforeGuardElement;
+    rootState.viewportAfterGuardElement = afterGuardElement;
+
+    const handleBeforeFocus = (event) => {
+        const referenceElement = rootState.positionerElement || rootState.viewportElement;
+        if (referenceElement && isOutsideEvent(event, referenceElement)) {
+            getFirstTabbable(referenceElement)?.focus();
+        } else {
+            rootState.triggerBeforeGuardElement?.focus();
+        }
+    };
+
+    const handleAfterFocus = (event) => {
+        const referenceElement = rootState.positionerElement || rootState.viewportElement;
+        if (referenceElement && isOutsideEvent(event, referenceElement)) {
+            getLastTabbable(referenceElement)?.focus();
+        } else {
+            rootState.triggerAfterGuardElement?.focus();
+        }
+    };
+
+    beforeGuardElement?.addEventListener('focus', handleBeforeFocus);
+    afterGuardElement?.addEventListener('focus', handleAfterFocus);
+    rootState.viewportGuardCleanup = () => {
+        beforeGuardElement?.removeEventListener('focus', handleBeforeFocus);
+        afterGuardElement?.removeEventListener('focus', handleAfterFocus);
+    };
+}
+
+function removeTriggerGuardListeners(rootState) {
+    rootState.triggerGuardCleanup?.();
+    rootState.triggerGuardCleanup = null;
+    rootState.triggerBeforeGuardElement = null;
+    rootState.triggerAfterGuardElement = null;
+}
+
+function removeViewportGuardListeners(rootState) {
+    rootState.viewportGuardCleanup?.();
+    rootState.viewportGuardCleanup = null;
+    rootState.viewportBeforeGuardElement = null;
+    rootState.viewportAfterGuardElement = null;
+}
+
+function getFirstTabbable(root) {
+    return getTabbableElements(root)[0] ?? null;
+}
+
+function getLastTabbable(root) {
+    return getTabbableElements(root).at(-1) ?? null;
+}
+
+function getFocusTargetAfterGuardElement(element) {
+    if (!element?.ownerDocument) return null;
+
+    const focusTargets = new Set(getTabbableElements(element.ownerDocument.body));
+    const registeredGuards = new Set();
+    for (const [, rootState] of state.roots) {
+        registeredGuards.add(rootState.triggerBeforeGuardElement);
+        registeredGuards.add(rootState.triggerAfterGuardElement);
+        registeredGuards.add(rootState.viewportBeforeGuardElement);
+        registeredGuards.add(rootState.viewportAfterGuardElement);
+    }
+    for (const guardElement of registeredGuards) {
+        focusTargets.add(guardElement);
+    }
+
+    return Array.from(focusTargets)
+        .filter((focusTarget) =>
+            focusTarget?.ownerDocument === element.ownerDocument &&
+            focusTarget.isConnected &&
+            (registeredGuards.has(focusTarget) || isFocusable(focusTarget)) &&
+            (element.compareDocumentPosition(focusTarget) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
+        .sort((first, second) =>
+            (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? -1 : 1)[0] ?? null;
 }
 
 function getTabbableElements(root) {
@@ -928,25 +1075,15 @@ function getTabbableElements(root) {
     ].join(',');
 
     return Array.from(root.querySelectorAll(selector))
+        .filter((element) => !element.hasAttribute('data-blazix-base-ui-focus-guard'))
         .filter((element) => isFocusable(element));
-}
-
-function getPreviousTabbable(element) {
-    if (!element?.ownerDocument) return null;
-
-    const tabbables = getTabbableElements(element.ownerDocument.body);
-    const index = tabbables.indexOf(element);
-    return index > 0 ? tabbables[index - 1] : null;
-}
-
-function getNextTabbable(root) {
-    return getTabbableElements(root)[0] ?? null;
 }
 
 function isFocusable(element) {
     if (!(element instanceof HTMLElement)) return false;
     if (element.hidden || element.getAttribute('aria-hidden') === 'true') return false;
     if (element.closest('[inert]')) return false;
+    if (element.getClientRects().length === 0) return false;
 
     const style = element.ownerDocument.defaultView.getComputedStyle(element);
     return style.visibility !== 'hidden' && style.display !== 'none';

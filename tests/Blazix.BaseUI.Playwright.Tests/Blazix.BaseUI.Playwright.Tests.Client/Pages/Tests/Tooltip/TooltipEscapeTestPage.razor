@@ -1,0 +1,79 @@
+@page "/tests/tooltip-escape/wasm"
+@using Blazix.BaseUI.Dialog
+@using Blazix.BaseUI.Tooltip
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Tooltip Escape Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <button data-testid="open-tooltips-sequentially" @onclick="OpenTooltipsSequentiallyAsync">Open tooltips</button>
+    <button data-testid="close-tooltip-a" @onclick="CloseTooltipA">Close tooltip A</button>
+    <button data-testid="open-tooltip-a" @onclick="OpenTooltipA">Open tooltip A</button>
+    <button data-testid="open-tooltip-b" @onclick="OpenTooltipB">Open tooltip B</button>
+
+    <TooltipRoot @bind-Open="tooltipAOpen">
+        <TooltipTrigger data-testid="tooltip-a-trigger">Tooltip A</TooltipTrigger>
+        <TooltipPortal>
+            <TooltipPositioner>
+                <TooltipPopup data-testid="tooltip-a-popup">Tooltip A content</TooltipPopup>
+            </TooltipPositioner>
+        </TooltipPortal>
+    </TooltipRoot>
+
+    @if (showTooltipB)
+    {
+        <TooltipRoot @bind-Open="tooltipBOpen">
+            <TooltipTrigger data-testid="tooltip-b-trigger">Tooltip B</TooltipTrigger>
+            <TooltipPortal>
+                <TooltipPositioner>
+                    <TooltipPopup data-testid="tooltip-b-popup">Tooltip B content</TooltipPopup>
+                </TooltipPositioner>
+            </TooltipPortal>
+        </TooltipRoot>
+    }
+
+    <div>Tooltip A open: <span data-testid="tooltip-a-open-state">@tooltipAOpen.ToString().ToLowerInvariant()</span></div>
+    <div>Tooltip B open: <span data-testid="tooltip-b-open-state">@tooltipBOpen.ToString().ToLowerInvariant()</span></div>
+
+    <DialogRoot @bind-Open="dialogOpen">
+        <DialogTrigger data-testid="dialog-trigger">Open dialog</DialogTrigger>
+        <DialogPortal>
+            <DialogPopup data-testid="dialog-popup">
+                <TooltipRoot @bind-Open="dialogTooltipOpen">
+                    <TooltipTrigger data-testid="dialog-tooltip-trigger">Dialog tooltip</TooltipTrigger>
+                    <TooltipPortal>
+                        <TooltipPositioner>
+                            <TooltipPopup data-testid="dialog-tooltip-popup">Dialog tooltip content</TooltipPopup>
+                        </TooltipPositioner>
+                    </TooltipPortal>
+                </TooltipRoot>
+            </DialogPopup>
+        </DialogPortal>
+    </DialogRoot>
+
+    <div>Dialog open: <span data-testid="dialog-open-state">@dialogOpen.ToString().ToLowerInvariant()</span></div>
+    <div>Dialog tooltip open: <span data-testid="dialog-tooltip-open-state">@dialogTooltipOpen.ToString().ToLowerInvariant()</span></div>
+</div>
+
+@code {
+    private bool tooltipAOpen;
+    private bool tooltipBOpen;
+    private bool showTooltipB;
+    private bool dialogOpen;
+    private bool dialogTooltipOpen;
+
+    private void CloseTooltipA() => tooltipAOpen = false;
+
+    private void OpenTooltipA() => tooltipAOpen = true;
+
+    private void OpenTooltipB() => tooltipBOpen = true;
+
+    private async Task OpenTooltipsSequentiallyAsync()
+    {
+        tooltipAOpen = true;
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(50);
+        showTooltipB = true;
+        tooltipBOpen = true;
+    }
+}

@@ -668,6 +668,18 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithNestedTrigger(bool value)
+    {
+        queryParams["nestedTrigger"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
+    public TestPageUrlBuilder WithNestedInnerDisabled(bool value)
+    {
+        queryParams["nestedInnerDisabled"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithProviderGroup(bool value)
     {
         queryParams["providerGroup"] = value.ToString().ToLowerInvariant();
