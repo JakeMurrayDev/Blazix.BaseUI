@@ -126,7 +126,8 @@
                 {
                     var module = await ModuleTask.Value;
                     var side = PositionerContext?.Side ?? Side.Top;
-                    await module.InvokeVoidAsync("initializeAutoResize", viewportId, popupEl.Value, positionerEl.Value, side.ToDataAttributeString());
+                    // Upstream #5370: TooltipRootContext has no direction, so auto-resize defaults to LTR.
+                    await module.InvokeVoidAsync("initializeAutoResize", viewportId, popupEl.Value, positionerEl.Value, side.ToDataAttributeString(), "ltr");
                     autoResizeInitialized = true;
                 }
                 catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)

@@ -89,20 +89,20 @@ function supportsStableScrollbarGutter(referenceElement) {
 
     const doc = ownerDocument(referenceElement);
     const html = doc.documentElement;
-
-    const originalStyles = {
-        scrollbarGutter: html.style.scrollbarGutter,
-        overflowY: html.style.overflowY
-    };
+    const body = doc.body;
+    const scrollContainer = getViewportScroller(html, body);
+    const originalScrollContainerOverflowY = scrollContainer.style.overflowY;
+    const originalHtmlStyleGutter = html.style.scrollbarGutter;
 
     html.style.scrollbarGutter = 'stable';
-    html.style.overflowY = 'scroll';
-    const before = html.offsetWidth;
+    scrollContainer.style.overflowY = 'scroll';
+    const before = scrollContainer.offsetWidth;
 
-    html.style.overflowY = 'hidden';
-    const after = html.offsetWidth;
+    scrollContainer.style.overflowY = 'hidden';
+    const after = scrollContainer.offsetWidth;
 
-    Object.assign(html.style, originalStyles);
+    scrollContainer.style.overflowY = originalScrollContainerOverflowY;
+    html.style.scrollbarGutter = originalHtmlStyleGutter;
     return before === after;
 }
 
@@ -117,6 +117,16 @@ function isOverflowElement(element) {
         overflowX !== 'visible' ||
         overflowY !== 'visible'
     );
+}
+
+// The viewport's overflow comes from <html> when it establishes its own scroll container, and
+// propagates from <body> otherwise. An `overflow` style on the other element doesn't lock the page.
+function getViewportScroller(html, body) {
+    return isOverflowElement(html) ? html : body;
+}
+
+function isPageScrollLocked(win, html, body) {
+    return /hidden|clip/.test(win.getComputedStyle(getViewportScroller(html, body)).overflowY);
 }
 
 // ============================================================================
@@ -136,12 +146,16 @@ function preventScrollOverlayScrollbars(referenceElement) {
     // won't have any effect.
     // But if <body> has an `overflow` style (like `overflow-x: hidden`), we need to lock it
     // instead, as sticky elements shift otherwise.
-    const elementToLock = isOverflowElement(html) ? html : body;
-    const originalOverflow = elementToLock.style.overflow;
-    elementToLock.style.overflow = 'hidden';
+    const elementToLock = getViewportScroller(html, body);
+    const originalElementToLockStyles = {
+        overflowY: elementToLock.style.overflowY,
+        overflowX: elementToLock.style.overflowX
+    };
+
+    Object.assign(elementToLock.style, { overflowY: 'hidden', overflowX: 'hidden' });
 
     return () => {
-        elementToLock.style.overflow = originalOverflow;
+        Object.assign(elementToLock.style, originalElementToLockStyles);
     };
 }
 
@@ -213,7 +227,7 @@ function preventScrollInsetScrollbars(referenceElement) {
         // Avoid shift due to the default <body> margin.
         const marginY = parseFloat(bodyStyles.marginTop) + parseFloat(bodyStyles.marginBottom);
         const marginX = parseFloat(bodyStyles.marginLeft) + parseFloat(bodyStyles.marginRight);
-        const elementToLock = isOverflowElement(html) ? html : body;
+        const elementToLock = getViewportScroller(html, body);
 
         updateGutterOnly = supportsStableScrollbarGutter(referenceElement);
 
@@ -248,7 +262,9 @@ function preventScrollInsetScrollbars(referenceElement) {
                 marginY || scrollbarHeight ? `calc(100dvh - ${marginY + scrollbarHeight}px)` : '100dvh',
             width: marginX || scrollbarWidth ? `calc(100vw - ${marginX + scrollbarWidth}px)` : '100vw',
             boxSizing: 'border-box',
-            overflow: 'hidden',
+            // Assign the longhands that `cleanup` restores, so nothing is left behind.
+            overflowY: 'hidden',
+            overflowX: 'hidden',
             scrollBehavior: 'unset'
         });
 
@@ -358,11 +374,30 @@ class ScrollLocker {
 
         const doc = ownerDocument(referenceElement);
         const html = doc.documentElement;
-        const htmlOverflowY = ownerWindow(html).getComputedStyle(html).overflowY;
+        const body = doc.body;
+        const win = ownerWindow(html);
 
-        // If the site author already hid overflow on <html>, respect it and bail out.
-        if (htmlOverflowY === 'hidden' || htmlOverflowY === 'clip') {
-            this.restore = () => {};
+        // The page is already locked, either by the site author or by a non-Base UI overlay that
+        // hasn't cleaned up yet. Leave it alone and wait for the lock to clear before taking over,
+        // otherwise we'd snapshot the locked state and restore it after our own lock is released.
+        if (isPageScrollLocked(win, html, body)) {
+            const observer = new win.MutationObserver(() => {
+                if (isPageScrollLocked(win, html, body)) {
+                    return;
+                }
+                observer.disconnect();
+                this.restore = null;
+                this.lock(referenceElement);
+            });
+
+            // Watch every attribute: locks are applied through inline styles, classes, or attributes
+            // paired with a stylesheet (`data-scroll-locked` in react-remove-scroll, for example).
+            const options = { attributes: true };
+
+            observer.observe(html, options);
+            observer.observe(body, options);
+
+            this.restore = () => observer.disconnect();
             return;
         }
 

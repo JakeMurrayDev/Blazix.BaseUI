@@ -1372,6 +1372,8 @@ export async function initializePositioner(
         collisionAvoidance,
         preservePositionerStyles: false,
         hasViewport: true,
+        // Use the Layout Viewport to avoid shifting around when pinch-zooming.
+        shiftLayoutViewport: true,
         onPositionUpdated: (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
             dotNetRef?.invokeMethodAsync('OnPositionUpdated', effectiveSide, effectiveAlign, anchorHidden, arrowUncentered).catch(() => { });
         }
@@ -1413,7 +1415,8 @@ export async function updatePosition(
         arrowElement,
         sticky,
         positionMethod,
-        collisionAvoidance
+        collisionAvoidance,
+        shiftLayoutViewport: true
     });
 }
 

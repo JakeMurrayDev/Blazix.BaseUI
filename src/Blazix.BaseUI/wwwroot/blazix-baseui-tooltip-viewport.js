@@ -156,8 +156,26 @@ function waitForAnimationsFinished(elements, signal) {
         const timeoutId = setTimeout(() => complete(!signal.aborted), MaximumTransitionWait);
 
         signal.addEventListener('abort', handleAbort, { once: true });
-        Promise.allSettled(animations.map(animation => animation.finished))
-            .then(() => complete(!signal.aborted));
+
+        // Upstream #5401: canceled animations must wait for any replacement animations.
+        function attach(animationList) {
+            Promise.all(animationList.map(animation => animation.finished)).then(
+                () => complete(!signal.aborted),
+                () => {
+                    if (signal.aborted) return;
+
+                    const currentAnimations = elements.flatMap(getRunningAnimations);
+                    if (currentAnimations.length > 0) {
+                        attach(currentAnimations);
+                        return;
+                    }
+
+                    complete(!signal.aborted);
+                }
+            );
+        }
+
+        attach(animations);
     });
 }
 
@@ -167,16 +185,16 @@ function applyAnchoringStyles(viewportState) {
 
     const popupElement = viewportState.popupElement;
     const side = viewportState.side;
-    if (!popupElement || (side !== 'top' && side !== 'left')) return;
+    const direction = viewportState.direction;
+    // Upstream #5370: physical-left anchoring applies in both text directions.
+    const isPhysicalTop = side === 'top';
+    const isPhysicalLeft = side === 'left'
+        || side === (direction === 'rtl' ? 'inline-end' : 'inline-start');
+    if (!popupElement || (!isPhysicalTop && !isPhysicalLeft)) return;
 
     const restorers = [overrideStyle(popupElement, 'position', 'absolute')];
-    if (side === 'top') {
-        restorers.push(overrideStyle(popupElement, 'bottom', '0'));
-        restorers.push(overrideStyle(popupElement, 'left', '0'));
-    } else {
-        restorers.push(overrideStyle(popupElement, 'top', '0'));
-        restorers.push(overrideStyle(popupElement, 'right', '0'));
-    }
+    restorers.push(overrideStyle(popupElement, isPhysicalTop ? 'bottom' : 'top', '0'));
+    restorers.push(overrideStyle(popupElement, isPhysicalLeft ? 'right' : 'left', '0'));
 
     viewportState.anchoringCleanup = () => {
         for (const restore of restorers) restore();
@@ -301,6 +319,7 @@ export function initializeViewport(viewportId, viewportElement, dotNetRef) {
         anchoringCleanup: null,
         armTimeoutId: null,
         side: 'top',
+        direction: 'ltr',
         transitionArmed: false,
         pendingSnapshot: null,
         pendingDirection: null,
@@ -349,13 +368,15 @@ export function prepareTransition(viewportId, previousTriggerElement, nextTrigge
     }, MaximumTransitionWait);
 }
 
-export function initializeAutoResize(viewportId, popupElement, positionerElement, side) {
+// Upstream #5370: auto-resize anchoring tracks logical sides using text direction.
+export function initializeAutoResize(viewportId, popupElement, positionerElement, side, direction = 'ltr') {
     const viewportState = getViewportState(viewportId);
     if (!viewportState) return;
 
     viewportState.popupElement = popupElement;
     viewportState.positionerElement = positionerElement;
     viewportState.side = side;
+    viewportState.direction = direction;
     applyAnchoringStyles(viewportState);
 
     const initialDimensions = getDimensions(popupElement);
@@ -383,11 +404,13 @@ export function initializeAutoResize(viewportId, popupElement, positionerElement
     }
 }
 
-export function updateAutoResizeSide(viewportId, side) {
+// Upstream #5370: side updates carry the current text direction.
+export function updateAutoResizeSide(viewportId, side, direction = 'ltr') {
     const viewportState = getViewportState(viewportId);
     if (!viewportState) return;
 
     viewportState.side = side;
+    viewportState.direction = direction;
     applyAnchoringStyles(viewportState);
 }
 

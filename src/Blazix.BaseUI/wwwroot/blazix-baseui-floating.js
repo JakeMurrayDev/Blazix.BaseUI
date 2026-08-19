@@ -596,6 +596,7 @@ export async function initializePositioner(options) {
         // position/top/left/visibility/data-positioned. Component-specific
         // align-item passes own those writes.
         alignItemWithTriggerActive: !!options.alignItemWithTriggerActive,
+        shiftLayoutViewport: !!options.shiftLayoutViewport,
         onPositionUpdated: options.onPositionUpdated || null,
         dotNetRef: options.dotNetRef || null,
         hasSideOffsetFn: options.hasSideOffsetFn || false,
@@ -635,6 +636,24 @@ export async function updatePositioner(positionerId, options) {
     }
 }
 
+function parkPositionerAtViewportOrigin(positionerState) {
+    const positionerElement = positionerState?.positionerElement;
+    if (!positionerElement) return;
+    // Mirrors React's `alignItemWithTriggerActive ? FIXED : positioning.positionerStyles`:
+    // the align-item pass owns `top`/`bottom`/`left` on the positioner, so parking would
+    // strand a `top: 0` alongside the `bottom: 0` it commits.
+    if (positionerState.alignItemWithTriggerActive) return;
+    // Until a position for the current open is computed, ignore any coordinates retained from a
+    // previous open (or from a pass that measured the hidden popup as 0x0). Rendering the
+    // full-size popup at such stale coordinates can overflow the layout viewport, which makes
+    // mobile Chrome zoom the page out and reflow everything the popup is anchored to.
+    positionerElement.style.setProperty('position', 'fixed', 'important');
+    positionerElement.style.top = '0px';
+    positionerElement.style.left = '0px';
+    positionerElement.style.right = '';
+    positionerElement.style.bottom = '';
+}
+
 export function resetPositioner(positionerId) {
     const positionerState = state.positioners.get(positionerId);
     if (!positionerState) return;
@@ -643,6 +662,7 @@ export function resetPositioner(positionerId) {
     positionerState.suspended = true;
     positionerState.hasPositioned = false;
     positionerState.positionerElement?.removeAttribute('data-positioned');
+    parkPositionerAtViewportOrigin(positionerState);
 }
 
 export function disposePositioner(positionerId) {
@@ -652,6 +672,7 @@ export function disposePositioner(positionerId) {
     if (positionerState) {
         cleanupAutoUpdate(positionerState);
         positionerState.positionerElement?.removeAttribute('data-positioned');
+        parkPositionerAtViewportOrigin(positionerState);
         state.positioners.delete(positionerId);
     }
 }
@@ -840,10 +861,19 @@ async function updatePositionInternal(positionerState) {
         const shiftDisabled = ca.align === 'none' && ca.side !== 'shift';
         const crossAxisShiftEnabled = !shiftDisabled && (sticky || ca.side === 'shift');
         const shiftCrossAxis = positionerState.shiftCrossAxis || false;
+        let shiftRootBoundary = null;
+        if (positionerState.shiftLayoutViewport) {
+            // Use the Layout Viewport to avoid shifting around when pinch-zooming.
+            const html = positionerElement.ownerDocument.documentElement;
+            shiftRootBoundary = {
+                rootBoundary: { x: 0, y: 0, width: html.clientWidth, height: html.clientHeight }
+            };
+        }
 
         const shiftMiddleware = shiftDisabled ? null : FloatingUI.shift({
             padding: rawPadding,
             ...overflowBoundary,
+            ...(shiftRootBoundary || {}),
             mainAxis: ca.align !== 'none',
             crossAxis: crossAxisShiftEnabled,
             limiter: (sticky || shiftCrossAxis) ? undefined : FloatingUI.limitShift(arrowElement ? (limitData) => {
