@@ -112,6 +112,37 @@ public abstract class NavigationMenuTestsBase : TestBase
             Timeout = 1500 * TimeoutMultiplier
         });
     }
+
+    // While the menu is mounted with a positioner, upstream resolves restMs to 0, so
+    // hovering another trigger retargets the open menu instantly. This needs the
+    // viewport composition (Portal > Positioner > Popup > Viewport): the inline main
+    // test page never registers a positioner and keeps the rest delay on retarget.
+
+    [Fact]
+    public virtual async Task HoverRetargetsOpenMenuInstantly()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu-viewport").WithDelay(600));
+        await WaitForDelayAsync(500);
+
+        await GetByTestId("nav-trigger-1").HoverAsync();
+        await WaitForActiveValueAsync("item1");
+
+        // data-positioned is only set once JS has registered the positioner element,
+        // which is what arms the instant-retarget branch.
+        await Assertions.Expect(Page.Locator("[data-positioned]")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions
+        {
+            Timeout = 5000 * TimeoutMultiplier
+        });
+
+        await GetByTestId("nav-trigger-2").HoverAsync();
+
+        // Flat budget, deliberately not scaled by TimeoutMultiplier: a broken instant
+        // branch retargets only after the 600ms rest delay and must fail this assertion.
+        await Assertions.Expect(GetByTestId("active-value")).ToHaveTextAsync("item2", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 500
+        });
+    }
     #endregion
 
     #region Trigger Click Tests
