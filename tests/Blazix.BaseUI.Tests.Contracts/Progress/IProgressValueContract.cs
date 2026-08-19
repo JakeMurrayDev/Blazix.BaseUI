@@ -18,6 +18,8 @@ public interface IProgressValueContract
     Task ChildContentReceivesFormattedValueAndNumber();
     Task ChildContentReceivesIndeterminateAndNull();
     Task RendersNothingForIndeterminateWhenNoChildContent();
+    Task RendersNothingForNonFiniteValueWhenNoChildContent();
+    Task ChildContentReceivesIndeterminateForNonFiniteValue();
 
     // Data attributes
     Task HasDataStatusAttribute();

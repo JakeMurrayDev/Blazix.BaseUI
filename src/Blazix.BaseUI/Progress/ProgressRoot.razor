@@ -19,6 +19,8 @@
 
     private string? labelId;
     private string ariaValueText = string.Empty;
+    private double? clampedValue;
+    private double? percentageValue;
     private ProgressStatus previousStatus;
     private ProgressRootContext context = new();
     private ProgressRootState state = new(ProgressStatus.Indeterminate);
@@ -133,6 +135,21 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        // A null or non-finite value keeps Progress indeterminate. Otherwise a single clamped value
+        // and normalized percentage drive completion status, aria-valuenow, the formatted text and the
+        // default aria-valuetext, so they stay in sync for any Min/Max, not just the default 0-100.
+        if (Value.HasValue && double.IsFinite(Value.Value))
+        {
+            clampedValue = SliderUtilities.Clamp(Value.Value, Min, Max);
+            var rawPercentage = SliderUtilities.ValueToPercent(Value.Value, Min, Max);
+            percentageValue = SliderUtilities.Clamp(double.IsNaN(rawPercentage) ? 0 : rawPercentage, 0, 100);
+        }
+        else
+        {
+            clampedValue = null;
+            percentageValue = null;
+        }
+
         var status = ComputeStatus();
         if (status != previousStatus)
         {
@@ -164,7 +181,7 @@
         SetDefaultAttribute(attrs, "aria-labelledby", labelId);
         SetDefaultAttribute(attrs, "aria-valuemax", Max);
         SetDefaultAttribute(attrs, "aria-valuemin", Min);
-        SetDefaultAttribute(attrs, "aria-valuenow", Value);
+        SetDefaultAttribute(attrs, "aria-valuenow", clampedValue);
         SetDefaultAttribute(attrs, "aria-valuetext", ariaValueText);
         SetDefaultAttribute(attrs, "role", "progressbar");
         attrs[$"data-{state.Status.ToDataAttributeString()}"] = (object)true;
@@ -174,12 +191,12 @@
 
     private ProgressStatus ComputeStatus()
     {
-        if (!Value.HasValue || !double.IsFinite(Value.Value))
+        if (!clampedValue.HasValue)
         {
             return ProgressStatus.Indeterminate;
         }
 
-        return Value.Value == Max ? ProgressStatus.Complete : ProgressStatus.Progressing;
+        return clampedValue.Value == Max ? ProgressStatus.Complete : ProgressStatus.Progressing;
     }
 
     private string ComputeAriaValueText(string? formattedValue, double? value)
@@ -194,28 +211,30 @@
 
     private string FormatValue(double? value)
     {
-        if (!value.HasValue)
+        if (!clampedValue.HasValue || !percentageValue.HasValue)
         {
             return string.Empty;
         }
 
         if (Format is not null)
         {
-            return SliderUtilities.FormatNumber(value.Value, Locale, Format);
+            return SliderUtilities.FormatNumber(clampedValue.Value, Locale, Format);
         }
 
         if (!string.IsNullOrEmpty(FormatString))
         {
-            return value.Value.ToString(FormatString, ResolvedFormatProvider);
+            return clampedValue.Value.ToString(FormatString, ResolvedFormatProvider);
         }
 
-        var percentage = value.Value / 100.0;
+        // Without an explicit format the value is displayed as its position within the range, so the
+        // text stays in sync with the indicator fill.
+        var percentage = percentageValue.Value / 100.0;
         return percentage.ToString("P0", ResolvedFormatProvider);
     }
 
     private static string GetDefaultAriaValueText(string? formattedValue, double? value)
     {
-        if (!value.HasValue)
+        if (!value.HasValue || !double.IsFinite(value.Value))
         {
             return "indeterminate progress";
         }
