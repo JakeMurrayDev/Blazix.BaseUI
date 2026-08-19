@@ -10,6 +10,5 @@ public interface IContextMenuRootContract
     Task SupportsOrientations();
     Task SetsParentTypeToContextMenu();
     Task OmitsModalOpenOnHoverDelayCloseDelayProps();
-    Task ForwardsDefaultTriggerIdToMenuRoot();
-    Task ForwardsHandleToMenuRoot();
+    Task OmitsDetachedTriggerAndPayloadProps();
 }

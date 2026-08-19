@@ -82,9 +82,10 @@ re-pin `bdcb685fadcc` → `1a2ca3c9f8a3` (2026-08-03, the exact upper bound of t
 then: shared-layer sweep; non-popup tranche 1 (Field/Fieldset/Form, ScrollArea, Slider, Progress) in
 parallel; popup tranche 1 (Combobox/Autocomplete, Drawer, Toast, Menu family, Select) after the
 shared sweep; tranche-2 refreshes (NavigationMenu, Meter, Tabs, Tooltip, ContextMenu, MenuBar,
-Slider). Deferred this cycle: popup-handle fixes #5339/#5387/#5394 (defer-with-spec pending the
-Handle decision), effect-timing refactors #5337/#5341 (revisit-on-symptom), zero-delta surfaces, and
-audit refreshes beyond the stalest corners.
+Slider). Deferred this cycle: popup-handle fixes #5339/#5387/#5394 (defer-with-spec; the Handle
+surface decision was ratified on #157 and executed 2026-08-19 — MenuSubmenuRoot/ContextMenuRoot no
+longer expose detached-trigger params), effect-timing refactors #5337/#5341 (revisit-on-symptom),
+zero-delta surfaces, and audit refreshes beyond the stalest corners.
 
 ## Parity-harness boundary ([#152](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/152))
 

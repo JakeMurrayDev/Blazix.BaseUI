@@ -221,133 +221,20 @@ public class ContextMenuRootTests : BunitContext, IContextMenuRootContract
     }
 
     [Fact]
-    public Task ForwardsDefaultTriggerIdToMenuRoot()
+    public Task OmitsDetachedTriggerAndPayloadProps()
     {
-        MenuRootContext? capturedContext = null;
+        // ContextMenuRoot mirrors the upstream Omit list: no detached-trigger support
+        // (Handle/TriggerId/DefaultTriggerId) and no payload render-function children.
+        typeof(ContextMenuRoot).GetProperty("Handle").ShouldBeNull();
+        typeof(ContextMenuRoot).GetProperty("TriggerId").ShouldBeNull();
+        typeof(ContextMenuRoot).GetProperty("DefaultTriggerId").ShouldBeNull();
+        typeof(ContextMenuRoot).GetProperty("PayloadChildContent").ShouldBeNull();
 
-        var cut = Render(builder =>
-        {
-            builder.OpenComponent<ContextMenuRoot>(0);
-            builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "DefaultTriggerId", "context-trigger-2");
-            builder.AddAttribute(3, "ChildContent", (RenderFragment)(innerBuilder =>
-            {
-                innerBuilder.OpenComponent<MenuRootContextCapture>(0);
-                innerBuilder.AddAttribute(1, "Capture", (Action<MenuRootContext?>)(context => capturedContext = context));
-                innerBuilder.CloseComponent();
-            }));
-            builder.CloseComponent();
-        });
-
-        capturedContext.ShouldNotBeNull();
-        capturedContext!.TriggerId.ShouldBe("context-trigger-2");
+        // ContextMenuSubmenuRoot (via MenuSubmenuRoot) likewise omits detached-trigger props.
+        typeof(ContextMenuSubmenuRoot).GetProperty("Handle").ShouldBeNull();
+        typeof(ContextMenuSubmenuRoot).GetProperty("TriggerId").ShouldBeNull();
+        typeof(ContextMenuSubmenuRoot).GetProperty("DefaultTriggerId").ShouldBeNull();
 
         return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task ForwardsHandleToMenuRoot()
-    {
-        var handle = new MenuHandle();
-        MenuRootPayloadContext? capturedPayloadContext = null;
-
-        var cut = Render(builder =>
-        {
-            builder.OpenComponent<MenuTrigger>(0);
-            builder.AddAttribute(1, "Handle", (IMenuHandle)handle);
-            builder.AddAttribute(2, "id", "context-detached-trigger");
-            builder.AddAttribute(3, "Payload", "detached payload");
-            builder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Detached")));
-            builder.CloseComponent();
-
-            builder.OpenComponent<ContextMenuRoot>(10);
-            builder.AddAttribute(11, "Handle", (IMenuHandle)handle);
-            builder.AddAttribute(12, "PayloadChildContent", (RenderFragment<MenuRootPayloadContext>)(ctx =>
-            {
-                capturedPayloadContext = ctx;
-                return innerBuilder =>
-                {
-                    innerBuilder.OpenComponent<MenuPositioner>(0);
-                    innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(posBuilder =>
-                    {
-                        posBuilder.OpenComponent<MenuPopup>(0);
-                        posBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(popupBuilder =>
-                        {
-                            popupBuilder.OpenComponent<MenuItem>(0);
-                            popupBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, ctx.Payload?.ToString())));
-                            popupBuilder.CloseComponent();
-                        }));
-                        posBuilder.CloseComponent();
-                    }));
-                    innerBuilder.CloseComponent();
-                };
-            }));
-            builder.CloseComponent();
-        });
-
-        var trigger = cut.Find("button#context-detached-trigger");
-        trigger.GetAttribute("aria-expanded")!.ShouldBe("false");
-
-        handle.Open("context-detached-trigger");
-        cut.Render();
-
-        handle.IsOpen.ShouldBeTrue();
-        handle.ActiveTriggerId.ShouldBe("context-detached-trigger");
-        handle.Payload.ShouldBe("detached payload");
-
-        trigger = cut.Find("button#context-detached-trigger");
-        trigger.GetAttribute("aria-expanded")!.ShouldBe("true");
-        cut.WaitForAssertion(() =>
-        {
-            capturedPayloadContext.ShouldNotBeNull();
-            capturedPayloadContext.Value.Payload.ShouldBe("detached payload");
-        });
-
-        return Task.CompletedTask;
-    }
-
-    [Fact]
-    public Task SubmenuRootForwardsDefaultTriggerIdToMenuRoot()
-    {
-        MenuRootContext? capturedContext = null;
-
-        var cut = Render(builder =>
-        {
-            builder.OpenComponent<ContextMenuRoot>(0);
-            builder.AddAttribute(1, "DefaultOpen", true);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
-            {
-                innerBuilder.OpenComponent<ContextMenuSubmenuRoot>(0);
-                innerBuilder.AddAttribute(1, "DefaultOpen", true);
-                innerBuilder.AddAttribute(2, "DefaultTriggerId", "context-sub-trigger");
-                innerBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(submenuBuilder =>
-                {
-                    submenuBuilder.OpenComponent<MenuRootContextCapture>(0);
-                    submenuBuilder.AddAttribute(1, "Capture", (Action<MenuRootContext?>)(context => capturedContext = context));
-                    submenuBuilder.CloseComponent();
-                }));
-                innerBuilder.CloseComponent();
-            }));
-            builder.CloseComponent();
-        });
-
-        capturedContext.ShouldNotBeNull();
-        capturedContext!.TriggerId.ShouldBe("context-sub-trigger");
-
-        return Task.CompletedTask;
-    }
-
-    private sealed class MenuRootContextCapture : ComponentBase
-    {
-        [CascadingParameter]
-        public MenuRootContext? RootContext { get; set; }
-
-        [Parameter]
-        public Action<MenuRootContext?> Capture { get; set; } = _ => { };
-
-        protected override void OnParametersSet()
-        {
-            Capture(RootContext);
-        }
     }
 }
