@@ -89,6 +89,15 @@
         BuildComponentAttributes();
     }
 
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        // A replacement legend registers before this instance is disposed, so the root ignores the
+        // clear unless this instance is still the registered owner. Ownership is tracked by
+        // instance rather than by id so a replacement reusing the same explicit id also survives.
+        FieldsetContext?.SetLegendId(this, null);
+    }
+
     private void BuildComponentAttributes()
     {
         var attrs = new Dictionary<string, object>();
@@ -98,14 +107,5 @@
             attrs["data-disabled"] = true;
 
         componentAttributes = attrs;
-    }
-
-    /// <inheritdoc />
-    public void Dispose()
-    {
-        // A replacement legend registers before this instance is disposed, so the root ignores the
-        // clear unless this instance is still the registered owner. Ownership is tracked by
-        // instance rather than by id so a replacement reusing the same explicit id also survives.
-        FieldsetContext?.SetLegendId(this, null);
     }
 }
