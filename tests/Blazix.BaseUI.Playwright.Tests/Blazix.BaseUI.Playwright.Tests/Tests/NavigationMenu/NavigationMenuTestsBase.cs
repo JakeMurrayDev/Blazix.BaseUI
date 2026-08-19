@@ -100,7 +100,10 @@ public abstract class NavigationMenuTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/navigation-menu").WithDelay(600));
         await WaitForDelayAsync(500);
 
-        await MovePointerWithinTriggerAsync(GetByTestId("nav-trigger-1"), 5);
+        // 12 steps x 60ms of movement outlast the 600ms delay, so an implementation
+        // that arms one timer on entry without restarting it on mousemove opens DURING
+        // the movement and fails the closed assertion below.
+        await MovePointerWithinTriggerAsync(GetByTestId("nav-trigger-1"), 12);
         var activeValue = GetByTestId("active-value");
         await Assertions.Expect(activeValue).ToHaveTextAsync("none");
 
