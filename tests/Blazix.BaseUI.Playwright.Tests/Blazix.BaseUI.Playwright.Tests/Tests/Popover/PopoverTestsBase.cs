@@ -59,52 +59,6 @@ public abstract class PopoverTestsBase : TestBase
         return Page.WaitForTimeoutAsync(milliseconds);
     }
 
-    protected async Task DispatchTouchEventAsync(ICDPSession session, string type, float x, float y)
-    {
-        var touchPoints = type == "touchEnd"
-            ? Array.Empty<object>()
-            : new object[]
-            {
-                new Dictionary<string, object>
-                {
-                    ["x"] = x,
-                    ["y"] = y,
-                    ["id"] = 1
-                }
-            };
-
-        await session.SendAsync("Input.dispatchTouchEvent", new Dictionary<string, object>
-        {
-            ["type"] = type,
-            ["touchPoints"] = touchPoints
-        });
-    }
-
-    protected async Task DispatchSyntheticTouchEventAsync(ILocator target, string type, float x, float y)
-    {
-        var eventDataJson = System.Text.Json.JsonSerializer.Serialize(new { type, x, y });
-        await target.EvaluateAsync("""
-            (element, eventDataJson) => {
-                const eventData = JSON.parse(eventDataJson);
-                const touch = new Touch({
-                    identifier: 1,
-                    target: element,
-                    clientX: eventData.x,
-                    clientY: eventData.y
-                });
-                const activeTouches = eventData.type === 'touchend' ? [] : [touch];
-                element.dispatchEvent(new TouchEvent(eventData.type, {
-                    bubbles: true,
-                    cancelable: true,
-                    composed: true,
-                    touches: activeTouches,
-                    targetTouches: activeTouches,
-                    changedTouches: [touch]
-                }));
-            }
-            """, eventDataJson);
-    }
-
     #endregion
 
     #region Popover Open/Close Interaction Tests

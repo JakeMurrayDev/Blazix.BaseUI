@@ -325,6 +325,62 @@ public abstract class TestBase : IAsyncLifetime
         await Page.WaitForTimeoutAsync(baseMs * TimeoutMultiplier);
     }
 
+    /// <summary>
+    /// Dispatches a real CDP touch event (Chromium only). The browser derives pointer and
+    /// synthesized mouse events from it exactly as it would for hardware touch input.
+    /// Requires a context created with HasTouch = true.
+    /// </summary>
+    protected async Task DispatchTouchEventAsync(ICDPSession session, string type, float x, float y)
+    {
+        var touchPoints = type == "touchEnd"
+            ? Array.Empty<object>()
+            : new object[]
+            {
+                new Dictionary<string, object>
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["id"] = 1
+                }
+            };
+
+        await session.SendAsync("Input.dispatchTouchEvent", new Dictionary<string, object>
+        {
+            ["type"] = type,
+            ["touchPoints"] = touchPoints
+        });
+    }
+
+    /// <summary>
+    /// Dispatches a synthetic DOM TouchEvent directly on the element. Unlike CDP touch,
+    /// the browser does NOT synthesize pointer/mouse events from it, so sub-slop drift
+    /// sequences can be exercised deterministically.
+    /// </summary>
+    protected async Task DispatchSyntheticTouchEventAsync(ILocator target, string type, float x, float y)
+    {
+        var eventDataJson = System.Text.Json.JsonSerializer.Serialize(new { type, x, y });
+        await target.EvaluateAsync("""
+            (element, eventDataJson) => {
+                const eventData = JSON.parse(eventDataJson);
+                const touch = new Touch({
+                    identifier: 1,
+                    target: element,
+                    clientX: eventData.x,
+                    clientY: eventData.y
+                });
+                const activeTouches = eventData.type === 'touchend' ? [] : [touch];
+                element.dispatchEvent(new TouchEvent(eventData.type, {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                    touches: activeTouches,
+                    targetTouches: activeTouches,
+                    changedTouches: [touch]
+                }));
+            }
+            """, eventDataJson);
+    }
+
     protected async Task MovePointerWithinTriggerAsync(ILocator trigger, int stepCount)
     {
         var box = await trigger.BoundingBoxAsync();

@@ -17,6 +17,8 @@ public abstract class DialogTestsBase : TestBase
     {
     }
 
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     #region Helper Methods
 
     protected async Task OpenDialogAsync()
@@ -514,6 +516,120 @@ public abstract class DialogTestsBase : TestBase
 
         var lastReason = GetByTestId("last-reason");
         await Assertions.Expect(lastReason).ToHaveTextAsync("OutsidePress");
+    }
+
+    #endregion
+
+    #region Touch Outside Press Tests
+
+    // Sloppy-touch semantics for backdrop-less non-modal dialogs (upstream
+    // useDialogRoot.ts outsidePressEvent: touch resolves to 'sloppy'): a bare touchend
+    // must not dismiss. Drift > 5px dismisses on touchend, > 10px immediately, a clean
+    // tap dismisses via the browser-synthesized mousedown, and a long press does not
+    // dismiss at all. Chromium-only (CDP touch + synthetic TouchEvents).
+
+    [Fact]
+    public virtual async Task LongPressOutsideDoesNotDismissDialog()
+    {
+        await NavigateAsync(CreateUrl("/tests/dialog").WithModal(false));
+        await OpenDialogAsync();
+        await WaitForDelayAsync(200);
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await WaitForDelayAsync(1200);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task SmallTouchDriftDismissesOnlyViaSynthesizedMouseDown()
+    {
+        await NavigateAsync(CreateUrl("/tests/dialog").WithModal(false));
+        await OpenDialogAsync();
+        await WaitForDelayAsync(200);
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var outsideButton = GetByTestId("outside-button");
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 3, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 3, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // The synthesized mousedown after a touch tap performs the dismissal. Prime the
+        // pointer-type record the way a real tap would.
+        await outsideButton.DispatchEventAsync("pointerdown", new Dictionary<string, object>
+        {
+            ["pointerType"] = "touch"
+        });
+        await outsideButton.DispatchEventAsync("mousedown");
+        await WaitForDialogClosedAsync();
+
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("OutsidePress");
+
+        await OpenDialogAsync();
+        await WaitForDelayAsync(200);
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 7, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 7, y);
+
+        await WaitForDialogClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task ScrollGestureOutsideDismissesAfterTenPixels()
+    {
+        await NavigateAsync(CreateUrl("/tests/dialog").WithModal(false));
+        await OpenDialogAsync();
+        await WaitForDelayAsync(200);
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // Chromium does not emit a DOM touchmove for the first few pixels of a CDP gesture.
+        // Move far enough past its native touch slop to exercise the >10px branch.
+        await DispatchTouchEventAsync(session, "touchMove", x, y + 30);
+        await WaitForDialogClosedAsync();
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y + 30);
+    }
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesDialogWithOutsidePressReason()
+    {
+        await NavigateAsync(CreateUrl("/tests/dialog").WithModal(false));
+        await OpenDialogAsync();
+        await WaitForDelayAsync(200);
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForDialogClosedAsync();
+        await Assertions.Expect(GetByTestId("last-reason")).ToHaveTextAsync("OutsidePress");
     }
 
     #endregion
