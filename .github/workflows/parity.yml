@@ -11,6 +11,7 @@ on:
     paths:
       - 'tests/Blazix.BaseUI.Parity.Tests/**'
       - 'scripts/parity-freshness-canary.mjs'
+      - 'scripts/parity-canary-issue-number.mjs'
       - 'scripts/tests/parity-freshness-canary-tests.sh'
       - '.github/workflows/parity.yml'
   schedule:
@@ -72,12 +73,7 @@ jobs:
         run: |
           title="$(cat title.txt)"
           gh issue list --state open --search "$title in:title" --json number,title > open-issues.json
-          number="$(node -e '
-            const fs = require("node:fs");
-            const title = process.argv[1];
-            const issues = JSON.parse(fs.readFileSync("open-issues.json", "utf8"));
-            process.stdout.write(String(issues.find(issue => issue.title === title)?.number ?? ""));
-          ' "$title")"
+          number="$(node scripts/parity-canary-issue-number.mjs open-issues.json "$title")"
           if [[ -n "$number" ]]; then
             gh issue edit "$number" --body-file body.md
           else

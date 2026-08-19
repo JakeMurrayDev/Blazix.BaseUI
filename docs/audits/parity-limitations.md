@@ -131,7 +131,8 @@ Why the registry is empty rather than populated:
   real Error from a real run (`Waivers/Waiver.cs`).
 - `WaiverMatcher` emits a blocking diagnostic for any waiver matching zero findings, for any
   ambiguous match, for any expired entry, and for any non-waivable kind
-  (`ActionCompletionUnmet`, `FixtureError`, and the selector kinds).
+  (`CorrespondenceUncertain`, `ActionCompletionUnmet`, and `FixtureError`); the selector kinds are
+  waivable.
 - No run report is committed, so no finding identity from the #178 run is citable. Writing waivers
   from PR prose would produce unused entries, which block the suite instead of documenting anything.
 

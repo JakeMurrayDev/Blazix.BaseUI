@@ -43,20 +43,26 @@ an explicitly tracked blocker.
 run at upstream pin `bdcb685fadcca9d18b18f013c052795a53b6aa33`, capture schema 3, chromium
 143.0.7499.4 on macos/arm64, 7m19s wall clock.
 
-### A.1 Execution findings — none outstanding
+### A.1 Execution findings — none outstanding; one comparator count unreported
 
 | Measure | Result | Disposition |
 | --- | --- | --- |
 | Fixtures executed | 29 / 29 | met |
 | Complete candidate legs (Server + WASM) | 58 / 58 | met |
+| `CorrespondenceUncertain` (comparator kind, not an execution finding) | not reported | unknown — folded into A-3.1 |
 | `ActionCompletionUnmet` | 0 | none raised |
 | `FixtureError` | 0 | none raised |
 | `SelectorUnresolved` / `SelectorNonActionable` | 0 / 0 | none raised |
 | Settle timeouts, report diagnostics | 0 / 0 | none raised |
 | Deliberately broken canary | passes in both render modes | met |
 
-The four non-waivable kinds — `ActionCompletionUnmet`, `FixtureError`, `SelectorUnresolved`,
-`SelectorNonActionable` — produced zero findings, so nothing in this class needed a disposition.
+The non-waivable set is `CorrespondenceUncertain`, `ActionCompletionUnmet`, and `FixtureError`
+(`Diff/ComparatorRegistry.cs:23-29`, asserted by
+`Tests/HarnessTests/ComparatorRegistryTests.cs:44-50`). The selector kinds are waivable, and their
+zero counts above are execution health, not waivability. Of the three non-waivable kinds, only the
+two runner-owned kinds (`ActionCompletionUnmet` and `FixtureError`) are reported at zero.
+`CorrespondenceUncertain` is a comparator kind whose count #178 never broke out, so **some of the
+4149 blocking findings in A-3.1 may be permanently un-waivable**.
 
 ### A.2 Harness defects — fixed
 
@@ -79,7 +85,7 @@ prerequisites.
 
 | ID | Blocker | Prerequisites before the population can be dispositioned |
 | --- | --- | --- |
-| A-3.1 | 4149 blocking comparator findings from the pin-`bdcb685` run remain undisposed. The `ParityStaticShard*`/`ParityTiming` theories assert `verdict.Blocking == false`, so on the last recorded evidence the suite does not pass; no run since #178 has been recorded either way. | (a) the component fixes PR #178 names as prerequisites for its own green state — Menu, OtpField, NavigationMenu, `select.js`, `collapsible.js` — of which the Menu and NavigationMenu work landed in #182/#189/#192 while the OtpField and `collapsible.js` items have **not** landed on master; (b) a re-baseline, because the committed baselines are at `bdcb685` and cycle-1 work runs at pin `1a2ca3c9f`; (c) a full serial re-run (the parity project must not run concurrently with other Playwright work on this machine); (d) a committed run report so identities become citable. |
+| A-3.1 | 4149 blocking comparator findings from the pin-`bdcb685` run remain undisposed. The `ParityStaticShard*`/`ParityTiming` theories assert `verdict.Blocking == false`, so on the last recorded evidence the suite does not pass; no run since #178 has been recorded either way. | (a) the component fixes PR #178 names as prerequisites for its own green state — Menu, OtpField, NavigationMenu, `select.js`, `collapsible.js` — of which the Menu and NavigationMenu work landed in #182/#189/#192 and the `select.js` work landed in #181 (`d72685d9`), while the OtpField and `collapsible.js` items have **not** landed on master; (b) a re-baseline, because the committed baselines are at `bdcb685` and cycle-1 work runs at pin `1a2ca3c9f`; (c) a full serial re-run (the parity project must not run concurrently with other Playwright work on this machine); (d) a committed run report so identities and per-kind counts become citable, explicitly including the un-waivable `CorrespondenceUncertain`. |
 | A-3.2 | Server-leg finding counts are not reproducible (A-2.3), so a re-run's per-fixture numbers cannot be compared against #178's until the settle protocol gains a transition-start gate. | Settle-protocol change, then a repeat run to demonstrate stability. |
 | A-3.3 | Pixel baselines exist only for `chromium-macos-arm64`. The design spec requires Linux-captured or explicitly per-OS pixel baselines before the required CI job may block. | Generate a Linux platform set, or scope the required job's pixel dimension explicitly. |
 
@@ -103,6 +109,8 @@ Disposition vocabulary used below:
 - **maintainer decision** — a public-API or architecture choice, not mechanical parity; recorded and
   waiting on the maintainer, not on work.
 - **deviation** — a reviewed, deliberate divergence from upstream that ships.
+- **not landed** — the pull request that carried the fix was merged into another feature branch
+  instead of `master`, so nothing shipped; the finding is still open.
 
 ### B.1 Checkbox and Switch — PR #180
 
@@ -133,8 +141,8 @@ Disposition vocabulary used below:
 | B-181.7 | Select: a failed typeahead match poisoned subsequent keystrokes. | fixed |
 | B-181.8 | Select: repeated first letters collapsed even when a label legitimately starts with a doubled letter ("Aaron", "Llama"). | fixed |
 | B-181.9 | Select: pointer-leave focus fallback dropped focus to `<body>` when `Select.List` was used. | fixed |
-| B-181.10 | Upstream `9798cd1e8` (#5194) — React-internal handler dedup. | declined — refactor-only, no observable behavior |
-| B-181.11 | Upstream `def0eade0` (#5195) locale filtering. | maintainer decision — no `Locale` parameter; `CurrentCultureIgnoreCase` is the runtime-locale analogue |
+| B-181.10 | Upstream `9798cd1e8` (#5194) — React-internal handler dedup. | declined — refactor-only, no observable behavior; see §B.12 |
+| B-181.11 | Upstream `def0eade0` (#5195) locale filtering. | maintainer decision — no `Locale` parameter; `CurrentCultureIgnoreCase` is the runtime-locale analogue; see §B.12 |
 
 ### B.3 Menu family and shared composite — PR #182
 
@@ -143,8 +151,8 @@ Disposition vocabulary used below:
 | B-182.1 | A submenu stayed queued to open after Chrome dropped `mouseleave` (upstream #5153). | fixed — opt-in `guardStaleOpen` |
 | B-182.2 | Menu had no slip-out release cancel at all (upstream #5159); a press-and-release-elsewhere still opened the menu. | fixed |
 | B-182.3 | List navigation and typeahead did not skip natively `:disabled` items (upstream #5185). | fixed |
-| B-182.4 | Upstream `2437d817e` composite nested-list reorder `MutationObserver`. | declined — the port re-queries the DOM per navigation, so reordering is always read fresh |
-| B-182.5 | Upstream's `findRootOwnerId` early return in the slip-out handler. | declined — omitted consistently with Select/Combobox; containment checks cover the observable cases |
+| B-182.4 | Upstream `2437d817e` composite nested-list reorder `MutationObserver`. | declined — the port re-queries the DOM per navigation, so reordering is always read fresh; see §B.12 |
+| B-182.5 | Upstream's `findRootOwnerId` early return in the slip-out handler. | deferred with spec — see §B.12 |
 
 ### B.4 ScrollArea and Button — PR #183
 
@@ -185,7 +193,7 @@ Disposition vocabulary used below:
 | B-185.13 | Slider: thumb blur `relatedTarget` handling and `restoringFocusVisible` suppression. | maintainer decision — needs focus/blur moved from Razor bindings into JS `[JSInvokable]`s, dropping bUnit coverage and adding a Server round trip per focus event |
 | B-185.14 | Slider: `tabindex="-1"` on the control/thumb wrappers. | maintainer decision — deliberate local additions asserted by existing tests |
 | B-185.15 | Slider: cancelable `OnKeyDown` args. | maintainer decision — new public args type |
-| B-185.16 | Upstream `99018b2c7` (#5003) prehydration-script bundling. | declined — moot for Blazor |
+| B-185.16 | Upstream `99018b2c7` (#5003) prehydration-script bundling. | declined — see §B.12 for the exact local mechanism |
 | B-185.17 | Slider: with no realtime subscriber attached, JS never calls `OnDragMove`, so a drag that leaves and returns to its origin does not commit where upstream would. | deviation — recorded; with a subscriber attached, behavior matches upstream |
 
 ### B.7 Dialog and Popover — PR #186
@@ -212,7 +220,14 @@ Disposition vocabulary used below:
 | B-186.16 | `data-instant="trigger-change"` without a Viewport. | declined — needs a positioner-scoped "animations finished" signal the port lacks; half the fix is worse than none |
 | B-186.17 | `PopoverRoot.SyncImplicitActiveTrigger` runs during each trigger registration, so with several triggers the first registered becomes the implicit active trigger; upstream applies it only when the final `triggerCount` is 1. | **tracked blocker** — reported in #186, still open, recorded in the sweep handoff as a genuine defect |
 
-### B.8 Tooltip and PreviewCard — PRs #187 and #188
+### B.8 Tooltip and PreviewCard — PR #187 landed; PR #188 did not
+
+> **PR [#188](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/188) never reached `master`.** It
+> targeted `fix/tooltip-previewcard-parity` rather than `master`, and its merge commit `50c72af2`
+> landed 19 seconds *after* that branch's own merge into `master` (`6167ebfc`, PR #187), so
+> `git merge-base --is-ancestor 50c72af2 origin/master` is false. The four rows it was to close are
+> therefore **not landed**: they are live parity gaps, not history. Verified against: local HEAD
+> `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20.
 
 | ID | Symptom | Disposition |
 | --- | --- | --- |
@@ -226,13 +241,13 @@ Disposition vocabulary used below:
 | B-187.8 | `restMs` rest-timer hover open (shared `createHoverInteraction`). | retired — #190 |
 | B-187.9 | Nested tooltip triggers opened both tooltips. | retired — #190 |
 | B-187.10 | Global Escape closed only the first-registered open root and leaked the event. | retired — #190 (and the combobox empty-list corner by #199) |
-| B-187.11 | Detached, handle-backed triggers bypassed the JS interaction layer, losing safePolygon, `mouseOnly`, and popup-hover keep-open. | retired — #188 (`internal` interface members only; no public API change) |
+| B-187.11 | Detached, handle-backed triggers bypassed the JS interaction layer, losing safePolygon, `mouseOnly`, and popup-hover keep-open. | not landed — #188 carried the fix and never reached master; TooltipHandle.cs still has no RootId, so handle-backed triggers still bypass the JS interaction layer |
 | B-187.12 | Delay-group same-member reopen conflates per-member and group instant-phase signals in one context field. | **tracked blocker** — needs its own design; recorded in #187 |
 | B-187.13 | Blur closes unconditionally; upstream defers and skips when focus moved into the popup, another trigger, or off-page. | **tracked blocker** — recorded in #187 |
-| B-188.1 | `UseJsHover` was a public parameter with no upstream counterpart selecting a permanently degraded C# hover path, forcing every hover fix to be written twice. | fixed — parameter removed, JS owns hover (breaking change, recorded in #188) |
-| B-188.2 | Mouse handlers were attached unconditionally, costing a Server round trip per hover in/out. | fixed |
-| B-188.3 | `DoesNotOpenOnMouseEnterAfterTouchPointerDown` could not observe the `mouseOnly` gate under bUnit and was deleted. | fixed — re-expressed as Playwright coverage in #188 |
-| B-188.4 | Tooltip clears `blockFocusOpen` only on blur; upstream and PreviewCard also clear on mouseleave. | **tracked blocker** — pre-existing asymmetry, flagged in #188 |
+| B-188.1 | `UseJsHover` was a public parameter with no upstream counterpart selecting a permanently degraded C# hover path, forcing every hover fix to be written twice. | not landed — UseJsHover is still a public parameter (TooltipTypedTrigger.razor:95, PreviewCardTypedTrigger.razor:80) with the C# Task.Delay hover fallback at TooltipTypedTrigger.razor:562/615 |
+| B-188.2 | Mouse handlers were attached unconditionally, costing a Server round trip per hover in/out. | not landed — the mouse handlers are still attached unconditionally (TooltipTypedTrigger.razor:340-341) |
+| B-188.3 | `DoesNotOpenOnMouseEnterAfterTouchPointerDown` could not observe the `mouseOnly` gate under bUnit and was deleted. | not landed — the test still exists (PreviewCardTriggerTests.cs:196, IPreviewCardTriggerContract.cs:12) and no Playwright replacement landed |
+| B-188.4 | Tooltip clears `blockFocusOpen` only on blur; upstream and PreviewCard also clear on mouseleave. | **tracked blocker** — pre-existing asymmetry; flagged in #188, which never reached master, so the flag lives only in that PR's discussion |
 
 ### B.9 NavigationMenu and Drawer — PR #189
 
@@ -296,6 +311,19 @@ un-inert/`flushSync` window) are **deviations — recorded, deliberate** and are
 | B-190.12 | Pre-existing: `Dialog.OnOpenChange_FiresOnOutsidePress` on WASM. | fixed — #195 |
 | B-190.13 | Pre-existing: `Switch.DisabledSwitch_HasAriaDisabledAndDoesNotInvokeClickCallback`. | fixed — #193, with the checkbox sibling in #196 |
 
+### B.12 Upstream-commit rows in METHODOLOGY form
+
+These five dispositions attach to real upstream commits and so are restated in the
+`docs/audits/METHODOLOGY.md` standard row format.
+
+| ID | Upstream | Verdict | Symptom | Evidence | Verified against |
+| --- | --- | --- | --- | --- | --- |
+| B-181.10 | `9798cd1e8` #5194 ("[select][combobox] Remove dead code and deduplicate handlers") | `(a)` | no user-observable symptom — the same attributes, ARIA, handler set and ordering are emitted before and after; the commit consolidates duplicated React prop objects into `combobox/utils/parts.ts` and deletes unreachable branches | 29 upstream files, all under `packages/react/src/{select,combobox,autocomplete}/`, **no test file changed** (304 additions / 472 deletions), and the port builds each part's attribute dictionary once in its own `.razor`, so there is no duplicated handler registration to consolidate | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-181.11 | `def0eade0` #5195 ("[autocomplete] Respect locale when filtering") | `(b) — escalated (METHODOLOGY tier 3: adds public API surface)` | with a caller-supplied locale, filtering must compare using that locale's collation instead of the ambient one, so locale-sensitive matches (accents, casing rules) differ | the port filters with `StringComparison.CurrentCultureIgnoreCase` at `src/Blazix.BaseUI/Combobox/ComboboxRootContext.cs:546` and `:557`, which is the runtime-locale analogue but is not caller-selectable; porting upstream's behavior means adding a public `Locale` parameter, which is the maintainer's call | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-182.4 | `2437d817e` #5156 ("[composite] Fix nested list reorder detection") | `(d:moot)` | after a nested list's items are reordered in the DOM, arrow navigation follows the stale order captured when the list was registered | exact local mechanism inspected: `getMenuItems` in `src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js:408-417` runs `popupElement.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]')` on every call, and every navigation site calls it fresh (`:104`, `:160`, `:508`, `:1310`, `:1402`, `:1895`); no item array is cached, so there is no stale registration for a `MutationObserver` to repair | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-182.5 | (current-state parity) `findRootOwnerId` early return in `MenuTrigger.tsx:145-147` | `(c) — deferred with spec (METHODOLOGY tier 2)`, correcting the earlier "declined" | after a hover-open, releasing the mouse over a node that belongs to the same menu root but sits outside both the trigger and the positioner — a portalled submenu popup, for instance — cancels the open, where upstream keeps it open | upstream walks up from the mouseup target with `findRootOwnerId` (`packages/react/src/menu/utils/findRootOwnerId.ts`) and returns early when the nearest `data-rootownerid` equals the root's id. The port's `armHoverOpenSlipOutCancel` (`src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js:898-934`) checks only `contains(trigger, target)`, `contains(positionerElement, target)` and `isMouseWithinBounds`, and has no `data-rootownerid` walk — yet `src/Blazix.BaseUI/Menu/MenuPopup.razor:216` does emit `data-rootownerid`, and `src/Blazix.BaseUI/wwwroot/blazix-baseui-context-menu.js:347-353` already implements the same walk. The symptom is therefore reachable, not moot; METHODOLOGY forbids default-skip, so this is a recorded debt with the mechanism written down, not a decline. | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-185.16 | `99018b2c7` #5003 ("[tabs][slider] Exclude the prehydration script from client bundles") | `(d:moot)` | the published client JavaScript bundle carried the server-only prehydration script string, so browsers downloaded (and the bundler kept alive) code that only ever runs during server rendering | exact local mechanism inspected: the port has no client JS bundle that could carry it. `src/Blazix.BaseUI/Tabs/TabsIndicator.razor:21` emits the prehydration script inline in the component's own rendered markup from the `PrehydrationScript` constant at `:26`, and `src/Blazix.BaseUI/Slider/` contains no prehydration script at all (grep for "Prehydration" across `src/` matches only `TabsIndicator.razor`). There is no separate bundle from which to exclude it. | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+
 ## Summary
 
 | Population | Findings | Disposition |
@@ -303,9 +331,10 @@ un-inert/`flushSync` window) are **deviations — recorded, deliberate** and are
 | A.1 execution | 0 raised | nothing outstanding |
 | A.2 harness defects | 3 | 2 fixed, 1 tracked blocker |
 | A.3 comparator differences | 4149 blocking (undisposed as individuals) | 1 explicitly tracked blocker with 3 named prerequisites |
-| B source-parity | 118 named findings | 82 fixed, 13 retired, 8 declined, 8 maintainer decisions, 2 recorded deviations, 5 tracked blockers |
+| B source-parity | 118 named findings | 79 fixed, 12 retired, 4 not landed, 7 declined, 8 maintainer decisions, 2 recorded deviations, 5 tracked blockers, 1 deferred with spec |
 
-The B counts are the row counts of the §B tables (`grep -cE '^\| B-[0-9.]+ \|'`), not an estimate.
+The B count is the 118 unique IDs in the §B ledger tables, not an estimate. The §B.12 methodology
+table restates five existing IDs, so `grep -cE '^\| B-[0-9.]+ \|'` counts 123 rendered rows.
 The eight further deviations #190 recorded about its own fixes are listed in
 [`parity-limitations.md`](parity-limitations.md) instead of being given rows here.
 

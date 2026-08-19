@@ -14,7 +14,9 @@ source directly. Assume that is where the remaining bugs are too.
 
 ## What was completed
 
-11 PRs merged (master `3c467edd`). 15 components swept plus two cross-cutting fixes:
+9 of the 10 pull requests below landed on master (`3c467edd`); #188 merged into
+`fix/tooltip-previewcard-parity` only, after that branch had already merged into master.
+15 components swept plus two cross-cutting fixes:
 
 | PR | Scope |
 |----|-------|
@@ -26,7 +28,7 @@ source directly. Assume that is where the remaining bugs are too.
 | #185 | Radio + Slider |
 | #186 | Dialog + Popover |
 | #187 | Tooltip + PreviewCard |
-| #188 | Removed `UseJsHover`; JS-only hover; Playwright `mouseOnly` coverage |
+| #188 | **Did not land on master** — targeted `fix/tooltip-previewcard-parity`; merge commit `50c72af2` landed 19 seconds after that branch's merge into master (`6167ebfc`, PR #187) |
 | #189 | NavigationMenu + Drawer |
 
 Roughly 100 behavioral gaps fixed. Representative finds: inverted instant-dismiss mapping,
@@ -97,9 +99,9 @@ One branch with Playwright coverage retires the whole cluster.
 - Popover sloppy-touch dismissal timing (touchstart bookkeeping, 5px/10px thresholds, 1s window).
 - NavigationMenu focus-guard `isOutsideEvent` (needs a cross-component guard registry and a
   `focusOut` close path).
-Precedent to copy: #188 added a Playwright `mouseOnly` test to the shared `*TestsBase.cs` so both
-Server and WASM inherit it, with an identical mouse-pointer positive control, and validated it by
-flipping the gate in both `.js` and `.min.js`.
+Precedent recorded only on #188's unlanded branch: it added a Playwright `mouseOnly` test to the
+shared `*TestsBase.cs` so both Server and WASM inherit it, with an identical mouse-pointer positive
+control, and validated it by flipping the gate in both `.js` and `.min.js`.
 
 ### 2. Two genuine defects, cheap relative to impact
 - **Dialog runs two focus managers** — the C# `FloatingFocusManager` and JS `focusPopup` both

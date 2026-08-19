@@ -19,7 +19,12 @@ const FindingKinds = new Set([
     "SelectorUnresolved", "SelectorNonActionable", "ActionCompletionUnmet", "FixtureError"
 ]);
 const IdentityFields = ["fixture", "leg", "step", "nodePath", "kind", "property"];
-const RequiredWaiverStrings = ["fixture", "step", "nodePath", "property", "reason", "docLink"];
+const RequiredWaiverStrings = ["fixture", "step", "reason", "docLink"];
+// nodePath and property are identity components. WaiverFile.RequiredIdentityString and
+// ValidateRuntimeString(allowEmpty: true) accept an empty string for both, because
+// Finding.NodePath/Property default to string.Empty and Pixel/Console/selector findings carry
+// no node path while Focus findings carry no property. Only whitespace-only values are invalid.
+const IdentityWaiverStrings = ["nodePath", "property"];
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const options = parseOptions(process.argv.slice(2));
@@ -246,6 +251,13 @@ function validateWaivers(path, nowValue, resultIssues) {
         for (const field of RequiredWaiverStrings) {
             if (typeof entry[field] !== "string" || entry[field].trim().length === 0)
                 addIssue(resultIssues, "waiver", `Waiver entry ${index} field '${field}' must be a non-empty string.`);
+        }
+        for (const field of IdentityWaiverStrings) {
+            if (typeof entry[field] !== "string") {
+                addIssue(resultIssues, "waiver", `Waiver entry ${index} field '${field}' must be a string.`);
+            } else if (entry[field].length > 0 && entry[field].trim().length === 0) {
+                addIssue(resultIssues, "waiver", `Waiver entry ${index} field '${field}' must not contain only whitespace.`);
+            }
         }
         if (!WaiverLegs.has(entry.leg))
             addIssue(resultIssues, "waiver", `Waiver entry ${index} field 'leg' must be BlazorServer or BlazorWasm.`);

@@ -55,14 +55,48 @@ expect_failure() {
 write_valid_waiver() {
     local extra="${1:-}"
     local expires="${2:-2026-03-01}"
+    local node_path="${3-main/button}"
+    local property="${4-aria-checked}"
     printf '%s\n' \
-        "[{\"fixture\":\"switch/hero@light\",\"leg\":\"BlazorServer\",\"step\":\"initial\",\"nodePath\":\"main/button\",\"kind\":\"Attribute\",\"property\":\"aria-checked\",\"reason\":\"Fixture reason\",\"disposition\":\"accepted-limitation\",\"docLink\":\"docs/audits/parity-limitations.md\",\"expires\":\"$expires\"$extra}]" \
+        "[{\"fixture\":\"switch/hero@light\",\"leg\":\"BlazorServer\",\"step\":\"initial\",\"nodePath\":\"$node_path\",\"kind\":\"Attribute\",\"property\":\"$property\",\"reason\":\"Fixture reason\",\"disposition\":\"accepted-limitation\",\"docLink\":\"docs/audits/parity-limitations.md\",\"expires\":\"$expires\"$extra}]" \
         > "$fixture/waivers.json"
 }
 
 write_fixture
 canary --observed-sha "$pin" > "$output"
 assert_json "if (result.status !== 'fresh') throw new Error('expected fresh status');"
+issue_title="$(node -e "const fs = require('node:fs'); const result = JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); process.stdout.write(result.issueTitle);" "$output")"
+
+printf '[{"number":11,"title":"%s prefix"},{"number":42,"title":"%s"},{"number":43,"title":"%s suffix"}]\n' \
+    "$issue_title" "$issue_title" "$issue_title" > "$fixture/issues-with-exact.json"
+number="$(node "$repo_root/scripts/parity-canary-issue-number.mjs" "$fixture/issues-with-exact.json" "$issue_title")"
+if [[ "$number" != "42" ]]; then
+    echo "Expected exact-title issue 42, got '$number'." >&2
+    exit 1
+fi
+
+printf '[{"number":51,"title":"%s prefix"},{"number":52,"title":"%s suffix"}]\n' \
+    "$issue_title" "$issue_title" > "$fixture/issues-near-misses.json"
+number="$(node "$repo_root/scripts/parity-canary-issue-number.mjs" "$fixture/issues-near-misses.json" "$issue_title")"
+if [[ -n "$number" ]]; then
+    echo "Expected near-miss titles to return no issue number, got '$number'." >&2
+    exit 1
+fi
+
+printf '[]\n' > "$fixture/issues-empty.json"
+number="$(node "$repo_root/scripts/parity-canary-issue-number.mjs" "$fixture/issues-empty.json" "$issue_title")"
+if [[ -n "$number" ]]; then
+    echo "Expected an empty issue list to return no issue number, got '$number'." >&2
+    exit 1
+fi
+
+printf '[{"number":61,"title":"Closed: %s"},{"number":62,"title":"Reopened: %s"},{"number":63,"title":"%s"}]\n' \
+    "$issue_title" "$issue_title" "$issue_title" > "$fixture/issues-reopened.json"
+number="$(node "$repo_root/scripts/parity-canary-issue-number.mjs" "$fixture/issues-reopened.json" "$issue_title")"
+if [[ "$number" != "63" ]]; then
+    echo "Expected the exact reopened-style issue 63, got '$number'." >&2
+    exit 1
+fi
 
 write_fixture
 expect_failure --observed-sha "$other_pin"
@@ -106,6 +140,19 @@ assert_json "
 "
 
 write_fixture
+write_valid_waiver '' "2026-03-01" "" "aria-checked"
+canary --observed-sha "$pin" > "$output"
+assert_json "if (result.status !== 'fresh') throw new Error('expected an empty nodePath to be accepted');"
+
+write_fixture
+write_valid_waiver '' "2026-03-01" " " "aria-checked"
+expect_failure --observed-sha "$pin"
+assert_json "
+    if (result.status !== 'invalid') throw new Error('expected whitespace-only nodePath to be invalid');
+    if (!result.issues.some(issue => issue.code === 'waiver' && issue.message.includes('only whitespace'))) throw new Error('missing whitespace-only waiver issue');
+"
+
+write_fixture
 write_valid_waiver
 node -e "
     const fs = require('node:fs');
@@ -130,4 +177,4 @@ assert_json "
 node "$repo_root/scripts/parity-freshness-canary.mjs" --offline > "$output"
 assert_json "if (result.status !== 'fresh') throw new Error('expected real repository tree to be valid');"
 
-echo "Validated parity freshness, drift, provenance, waiver, offline, and repository fixtures."
+echo "Validated parity freshness, drift, provenance, waiver, issue deduplication, offline, and repository fixtures."
