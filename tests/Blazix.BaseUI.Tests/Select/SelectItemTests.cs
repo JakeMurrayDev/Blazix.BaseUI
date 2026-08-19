@@ -12,6 +12,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     private RenderFragment CreateSelectWithItems(
         string? defaultValue = null,
         bool defaultOpen = false,
+        bool rootDisabled = false,
         bool disabledItem = false,
         bool useNativeButton = false,
         string? firstItemLabel = null,
@@ -24,6 +25,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
             var i = 1;
             if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
+            if (rootDisabled) builder.AddAttribute(i++, "Disabled", true);
             builder.AddAttribute(i++, "HighlightItemOnHover", highlightItemOnHover);
             builder.AddAttribute(i++, "ChildContent", (RenderFragment)(innerBuilder =>
             {
@@ -204,6 +206,26 @@ public class SelectItemTests : BunitContext, ISelectItemContract
 
         items = cut.FindAll("[role='option']");
         items[1].HasAttribute("data-selected").ShouldBeFalse();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Item_ShouldInheritRootDisabledState()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, rootDisabled: true));
+
+        var items = cut.FindAll("[role='option']");
+        items.ShouldAllBe(item => item.HasAttribute("data-disabled"));
+        items.ShouldAllBe(item => item.GetAttribute("aria-disabled") == "true");
+
+        items[0].Click();
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-selected").ShouldBeFalse();
 
         var trigger = cut.Find("button");
         trigger.GetAttribute("aria-expanded").ShouldBe("true");

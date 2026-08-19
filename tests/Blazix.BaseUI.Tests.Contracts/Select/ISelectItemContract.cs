@@ -19,6 +19,9 @@ public interface ISelectItemContract
     // Disabled item click guard
     Task DisabledItem_ShouldNotSelectOnClickAndKeepOpen();
 
+    // Root disabled inheritance
+    Task Item_ShouldInheritRootDisabledState();
+
     // React parity additions
     Task ShouldNotEmitDataLabel();
     Task ShouldEmitDataBlazixBaseUiLabelWhenLabelSet();

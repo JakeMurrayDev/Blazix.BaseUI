@@ -22,6 +22,7 @@
 
     private bool highlighted;
     private bool selected;
+    private bool disabledState;
     private int itemIndex = -1;
     private SelectItemState state;
     private SelectItemContext itemContext = new();
@@ -43,6 +44,9 @@
 
     private Lazy<Task<IJSObjectReference>> ModuleTask => moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", SelectModule).AsTask());
+
+    // React SelectItem.tsx: const disabled = selectDisabled || disabledProp.
+    private bool EffectiveDisabled => Disabled || RootContext?.Disabled == true;
 
     [CascadingParameter]
     private ISelectRootContext? RootContext { get; set; }
@@ -375,20 +379,23 @@
         var newHighlighted = idx >= 0 && (RootContext?.ActiveIndex ?? -1) == idx;
         var newHasRegistered = idx >= 0;
         var newSelectedByFocus = idx >= 0 && (RootContext?.IsSelectedByFocus(idx) ?? false);
+        var newDisabled = EffectiveDisabled;
 
         var changed = selected != newSelected
             || highlighted != newHighlighted
+            || disabledState != newDisabled
             || itemContext.HasRegistered != newHasRegistered
             || itemContext.SelectedByFocus != newSelectedByFocus
             || itemContext.Index != idx;
 
         selected = newSelected;
         highlighted = newHighlighted;
+        disabledState = newDisabled;
         itemContext.Selected = newSelected;
         itemContext.Index = idx;
         itemContext.HasRegistered = newHasRegistered;
         itemContext.SelectedByFocus = newSelectedByFocus;
-        state = new SelectItemState(Disabled, newSelected, newHighlighted);
+        state = new SelectItemState(newDisabled, newSelected, newHighlighted);
 
         // The root's SelectedItemTextElement is owned by <SelectItemText> — see its
         // OnAfterRender for the React-parity claim/release logic (selectedByFocus or
@@ -408,7 +415,7 @@
         {
             ["data-selected"] = selected,
             ["data-highlighted"] = highlighted,
-            ["data-disabled"] = Disabled,
+            ["data-disabled"] = EffectiveDisabled,
             ["aria-selected"] = selected ? "true" : "false",
         };
 
@@ -416,7 +423,7 @@
         {
             AccessibilityUtilities.ApplyNativeButtonAttributes(
                 attrs,
-                Disabled,
+                EffectiveDisabled,
                 focusableWhenDisabled: true,
                 tabIndex: RootContext?.Open == true && highlighted ? 0 : -1);
         }
@@ -424,7 +431,7 @@
         {
             AccessibilityUtilities.ApplyButtonAttributes(
                 attrs,
-                Disabled,
+                EffectiveDisabled,
                 focusableWhenDisabled: true,
                 tabIndex: RootContext?.Open == true && highlighted ? 0 : -1);
         }
@@ -481,7 +488,7 @@
         var isInvalidMouseClick = isMouseClick && !isVirtualMouseClick && !allowMouseSelection;
         allowMouseSelection = false;
 
-        if (Disabled || RootContext?.Disabled == true || TypedRootContext is null || RootContext is null)
+        if (EffectiveDisabled || TypedRootContext is null || RootContext is null)
         {
             return;
         }
@@ -552,7 +559,7 @@
     {
         ResetDragMovement();
 
-        if (Disabled || RootContext?.Disabled == true || TypedRootContext is null || RootContext is null)
+        if (EffectiveDisabled || TypedRootContext is null || RootContext is null)
         {
             return;
         }

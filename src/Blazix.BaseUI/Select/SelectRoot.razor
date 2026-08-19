@@ -496,7 +496,12 @@
             reconciledMountedOpen = true;
         }
 
-        context.Disabled = ResolvedDisabled;
+        if (context.Disabled != ResolvedDisabled)
+        {
+            context.Disabled = ResolvedDisabled;
+            typedContext.NotifyStateChanged();
+        }
+
         context.ReadOnly = ReadOnly;
         context.Required = Required;
         context.Multiple = Multiple;
