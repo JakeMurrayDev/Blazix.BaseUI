@@ -30,6 +30,9 @@
     private bool hasRendered;
     private bool swiping;
     private ToastSwipeDirection? swipeDirection;
+    private string? lastToastId;
+    private TransitionStatus? lastTransitionStatus;
+    private bool pendingLifecycleReset;
     private ElementReference? previousElement;
     private bool? previousEnding;
     private bool? previousSwipeEnabled;
@@ -112,6 +115,22 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
+        // Re-adding an ending toast retains this root instance (keyed by the toast id), and an
+        // index-keyed list can hand it a different toast. A retained root must not keep the previous
+        // lifecycle's swipe direction or offset, and the new toast has to be measured again.
+        if (lastToastId != Toast.Id || lastTransitionStatus != Toast.TransitionStatus)
+        {
+            var startsNewLifecycle = lastToastId != Toast.Id || Toast.TransitionStatus == TransitionStatus.Starting;
+            if (startsNewLifecycle && lastToastId is not null)
+            {
+                swipeDirection = null;
+                pendingLifecycleReset = true;
+            }
+
+            lastToastId = Toast.Id;
+            lastTransitionStatus = Toast.TransitionStatus;
+        }
+
         UpdateContextAndState();
         BuildComponentAttributes();
     }
@@ -173,6 +192,20 @@
                 previousEnding = ending;
                 previousSwipeEnabled = swipeEnabled;
                 previousSwipeDirections = swipeDirections;
+            }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+            {
+                _ = ex;
+            }
+        }
+
+        if (!firstRender && hasRendered && Element.HasValue && pendingLifecycleReset)
+        {
+            pendingLifecycleReset = false;
+            try
+            {
+                var module = await ModuleTask.Value;
+                await module.InvokeVoidAsync("resetRootLifecycle", rootId);
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
             {
