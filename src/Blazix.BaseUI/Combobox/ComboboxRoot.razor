@@ -511,6 +511,7 @@
             {
                 var module = await ModuleTask;
                 await module.InvokeVoidAsync("setRootOpen", rootId, CurrentOpen, activeIndex, typedContext.GetVisibleItemCount(), LoopFocus, Inline);
+                await module.InvokeVoidAsync("setEscapeBubbles", rootId, ComputeEscapeBubbles());
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {
@@ -705,8 +706,39 @@
         }
     }
 
+    // Upstream AriaCombobox.tsx setOpen: when an escape-key close finds a data-driven list
+    // whose current filter yields zero items and no Empty part is rendered, the popup is
+    // expected to be CSS-hidden, so the Escape must bubble (and keep its default) to also
+    // close an enclosing popup. The JS Escape handlers consult this pushed flag because the
+    // suppression decision is made synchronously at keydown time.
+    private bool ComputeEscapeBubbles()
+    {
+        return (Items is not null || ItemGroups is not null) &&
+               typedContext.GetVisibleItemCount() == 0 &&
+               !typedContext.HasEmptyPart;
+    }
+
+    private async Task SyncEscapeBubblesAsync()
+    {
+        if (!hasRendered)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await ModuleTask;
+            await module.InvokeVoidAsync("setEscapeBubbles", rootId, ComputeEscapeBubbles());
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+        {
+            _ = ex;
+        }
+    }
+
     private void SyncAutoHighlight()
     {
+        _ = SyncEscapeBubblesAsync();
         var count = typedContext.GetVisibleItemCount();
         if (count == 0)
         {

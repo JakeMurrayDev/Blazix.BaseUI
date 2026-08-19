@@ -169,8 +169,10 @@ function initializeDocumentListeners() {
     const rootToClose = focusedRoot ?? topmostRoot;
     if (rootToClose) {
       rootToClose.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
-      event.preventDefault();
-      event.stopPropagation();
+      if (!rootToClose.escapeBubbles) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     }
   }, { capture: true });
 
@@ -283,8 +285,10 @@ function attachKeyboardHandlers(root, element, key) {
       if (event.isComposing || event.keyCode === 229) {
         return;
       }
-      event.preventDefault();
-      event.stopPropagation();
+      if (!root.escapeBubbles) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       root.dotNetRef.invokeMethodAsync('OnEscapeKey').catch(() => {});
     }
   };
@@ -494,6 +498,17 @@ export function disposeRoot(rootId) {
   cleanupElement(root, 'list');
   cleanupElement(root, 'popup');
   state.roots.delete(rootId);
+}
+
+// Upstream AriaCombobox.tsx setOpen allowPropagation(): when a data-driven list has zero
+// filtered items and no Empty part, the popup is expected to be CSS-hidden and an
+// escape-key close must let the event bubble (and keep its default) so an enclosing
+// popup also closes. Pushed from .NET because the item/Empty state lives there.
+export function setEscapeBubbles(rootId, value) {
+  const root = state.roots.get(rootId);
+  if (root) {
+    root.escapeBubbles = !!value;
+  }
 }
 
 export function setRootOpen(rootId, open, activeIndex = -1, itemCount = 0, loopFocus = true, inline = false) {

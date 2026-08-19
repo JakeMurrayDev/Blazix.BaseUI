@@ -67,6 +67,21 @@ internal interface IAutocompleteRootContext
     void UnregisterItem(IAutocompleteItemRegistration item);
     int GetItemIndex(IAutocompleteItemRegistration item);
     int GetVisibleItemCount();
+
+    /// <summary>
+    /// Gets whether an <c>AutocompleteEmpty</c> part is currently rendered for this root.
+    /// </summary>
+    bool HasEmptyPart { get; }
+
+    /// <summary>
+    /// Registers a rendered <c>AutocompleteEmpty</c> part.
+    /// </summary>
+    void RegisterEmptyPart();
+
+    /// <summary>
+    /// Unregisters a disposed <c>AutocompleteEmpty</c> part.
+    /// </summary>
+    void UnregisterEmptyPart();
     void SetInputElement(ElementReference? element);
     void SetTriggerElement(ElementReference? element);
     void SetListElement(ElementReference? element);

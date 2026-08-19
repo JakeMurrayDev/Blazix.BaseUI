@@ -68,6 +68,17 @@ internal sealed class AutocompleteRootContext<TValue> : IAutocompleteRootContext
 
     public bool ListEmpty => GetVisibleItemCount() == 0;
 
+    private int emptyPartCount;
+
+    /// <inheritdoc />
+    public bool HasEmptyPart => emptyPartCount > 0;
+
+    /// <inheritdoc />
+    public void RegisterEmptyPart() => emptyPartCount++;
+
+    /// <inheritdoc />
+    public void UnregisterEmptyPart() => emptyPartCount = Math.Max(0, emptyPartCount - 1);
+
     public string GetInputValue() => GetInputValueFunc();
 
     public string GetTypedInputValue() => GetTypedInputValueFunc();

@@ -55,6 +55,7 @@
         if (RootContext is not null)
         {
             RootContext.StateChanged += OnRootStateChanged;
+            RootContext.RegisterEmptyPart();
             subscribed = true;
         }
 
@@ -67,6 +68,7 @@
         if (subscribed && RootContext is not null)
         {
             RootContext.StateChanged -= OnRootStateChanged;
+            RootContext.UnregisterEmptyPart();
         }
     }
 
