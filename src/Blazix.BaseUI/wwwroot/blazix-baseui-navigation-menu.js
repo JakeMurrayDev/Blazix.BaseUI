@@ -107,12 +107,13 @@ function handleGlobalFocusOut(e) {
     const target = e.target;
     const relatedTarget = e.relatedTarget;
 
-    if (relatedTarget?.hasAttribute('data-blazix-base-ui-focus-guard')) return;
+    // Blazor transient re-renders produce null relatedTarget values that would spuriously close the menu.
     if (!relatedTarget) return;
 
     for (const [, rootState] of state.roots) {
         if (!rootState.isOpen || !rootState.dotNetRef) continue;
         if (!isInsideNavigationMenu(rootState, target)) continue;
+        if (isRootFocusGuard(rootState, relatedTarget)) continue;
         if (isInsideNavigationMenu(rootState, relatedTarget) || isInsideAnyNavigationMenu(relatedTarget)) continue;
 
         closeNavigationMenuOnFocusOut(rootState);
@@ -147,6 +148,13 @@ function isInsideAnyNavigationMenu(target) {
     }
 
     return false;
+}
+
+function isRootFocusGuard(rootState, target) {
+    return target === rootState.triggerBeforeGuardElement ||
+        target === rootState.triggerAfterGuardElement ||
+        target === rootState.viewportBeforeGuardElement ||
+        target === rootState.viewportAfterGuardElement;
 }
 
 function isInsideNavigationMenu(rootState, target) {
@@ -930,7 +938,7 @@ export function setTriggerGuardElements(rootId, beforeGuardElement, afterGuardEl
         if (referenceElement && isOutsideEvent(event, referenceElement)) {
             rootState.viewportBeforeGuardElement?.focus();
         } else {
-            getTabbableBeforeElement(rootState.activeTriggerElement)?.focus();
+            rootState.activeTriggerElement?.focus();
         }
     };
 
@@ -943,7 +951,8 @@ export function setTriggerGuardElements(rootId, beforeGuardElement, afterGuardEl
             return;
         }
 
-        let nextTabbable = getTabbableAfterElement(rootState.activeTriggerElement);
+        let nextTabbable = getFocusTargetAfterGuardElement(rootState.triggerAfterGuardElement) ||
+            rootState.activeTriggerElement;
         if (
             rootState.isNested &&
             !rootState.positionerElement &&
@@ -951,7 +960,7 @@ export function setTriggerGuardElements(rootId, beforeGuardElement, afterGuardEl
             nextTabbable &&
             referenceElement.contains(nextTabbable)
         ) {
-            nextTabbable = getTabbableAfterElement(rootState.viewportAfterGuardElement);
+            nextTabbable = getFocusTargetAfterGuardElement(rootState.viewportAfterGuardElement);
         }
 
         nextTabbable?.focus();
@@ -1028,20 +1037,29 @@ function getLastTabbable(root) {
     return getTabbableElements(root).at(-1) ?? null;
 }
 
-function getTabbableBeforeElement(element) {
+function getFocusTargetAfterGuardElement(element) {
     if (!element?.ownerDocument) return null;
 
-    const tabbables = getTabbableElements(element.ownerDocument.body);
-    const index = tabbables.indexOf(element);
-    return index > 0 ? tabbables[index - 1] : null;
-}
+    const focusTargets = new Set(getTabbableElements(element.ownerDocument.body));
+    const registeredGuards = new Set();
+    for (const [, rootState] of state.roots) {
+        registeredGuards.add(rootState.triggerBeforeGuardElement);
+        registeredGuards.add(rootState.triggerAfterGuardElement);
+        registeredGuards.add(rootState.viewportBeforeGuardElement);
+        registeredGuards.add(rootState.viewportAfterGuardElement);
+    }
+    for (const guardElement of registeredGuards) {
+        focusTargets.add(guardElement);
+    }
 
-function getTabbableAfterElement(element) {
-    if (!element?.ownerDocument) return null;
-
-    const tabbables = getTabbableElements(element.ownerDocument.body);
-    const index = tabbables.indexOf(element);
-    return index >= 0 ? tabbables[index + 1] ?? null : null;
+    return Array.from(focusTargets)
+        .filter((focusTarget) =>
+            focusTarget?.ownerDocument === element.ownerDocument &&
+            focusTarget.isConnected &&
+            (registeredGuards.has(focusTarget) || isFocusable(focusTarget)) &&
+            (element.compareDocumentPosition(focusTarget) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
+        .sort((first, second) =>
+            (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0 ? -1 : 1)[0] ?? null;
 }
 
 function getTabbableElements(root) {
@@ -1065,6 +1083,7 @@ function isFocusable(element) {
     if (!(element instanceof HTMLElement)) return false;
     if (element.hidden || element.getAttribute('aria-hidden') === 'true') return false;
     if (element.closest('[inert]')) return false;
+    if (element.getClientRects().length === 0) return false;
 
     const style = element.ownerDocument.defaultView.getComputedStyle(element);
     return style.visibility !== 'hidden' && style.display !== 'none';

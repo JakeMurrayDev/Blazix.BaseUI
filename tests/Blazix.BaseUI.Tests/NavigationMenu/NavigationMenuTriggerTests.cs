@@ -2,10 +2,12 @@ namespace Blazix.BaseUI.Tests.NavigationMenu;
 
 public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerContract
 {
+    private readonly BunitJSModuleInterop navigationMenuModule;
+
     public NavigationMenuTriggerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupNavigationMenuModule(JSInterop);
+        navigationMenuModule = JsInteropSetup.SetupNavigationMenuModule(JSInterop);
         JsInteropSetup.SetupFloatingTreeModule(JSInterop);
     }
 
@@ -296,6 +298,26 @@ public class NavigationMenuTriggerTests : BunitContext, INavigationMenuTriggerCo
 
         var guards = cut.FindAll("[data-blazix-base-ui-focus-guard]");
         guards.Count.ShouldBe(2);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotReregisterUnchangedFocusGuards()
+    {
+        var cut = Render(CreateTriggerInRoot(defaultValue: "item1"));
+
+        cut.WaitForAssertion(() => navigationMenuModule.Invocations
+            .Count(invocation => invocation.Identifier == "setTriggerGuardElements")
+            .ShouldBeGreaterThan(0));
+        var registrationCount = navigationMenuModule.Invocations
+            .Count(invocation => invocation.Identifier == "setTriggerGuardElements");
+
+        cut.FindComponent<NavigationMenuTrigger>().Render();
+
+        navigationMenuModule.Invocations
+            .Count(invocation => invocation.Identifier == "setTriggerGuardElements")
+            .ShouldBe(registrationCount);
 
         return Task.CompletedTask;
     }

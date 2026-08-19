@@ -29,6 +29,8 @@
     private RenderElement<NavigationMenuTriggerState>? renderElementReference;
     private FocusGuard? beforeGuardRef;
     private FocusGuard? afterGuardRef;
+    private ElementReference? lastBeforeGuardElement;
+    private ElementReference? lastAfterGuardElement;
     private Dictionary<string, object> componentAttributes = new();
 
     private bool ShouldRenderFocusGuards => IsItemActive();
@@ -100,7 +102,15 @@
 
         if (ShouldRenderFocusGuards && beforeGuardRef is not null && afterGuardRef is not null)
         {
-            RootContext?.SetTriggerGuardElements(beforeGuardRef.Element, afterGuardRef.Element);
+            var beforeGuardElement = beforeGuardRef.Element;
+            var afterGuardElement = afterGuardRef.Element;
+            if (!Nullable.Equals(beforeGuardElement, lastBeforeGuardElement) ||
+                !Nullable.Equals(afterGuardElement, lastAfterGuardElement))
+            {
+                lastBeforeGuardElement = beforeGuardElement;
+                lastAfterGuardElement = afterGuardElement;
+                RootContext?.SetTriggerGuardElements(beforeGuardElement, afterGuardElement);
+            }
         }
     }
 

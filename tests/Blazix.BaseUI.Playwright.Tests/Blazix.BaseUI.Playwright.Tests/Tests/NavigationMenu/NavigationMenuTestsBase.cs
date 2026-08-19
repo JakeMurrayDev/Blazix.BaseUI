@@ -35,12 +35,16 @@ public abstract class NavigationMenuTestsBase : TestBase
         });
     }
 
-    protected async Task OpenFocusGuardMenuAsync(bool defaultOpen = false)
+    protected async Task OpenFocusGuardMenuAsync(bool defaultOpen = false, string? scenario = null)
     {
         var url = CreateUrl("/tests/navigation-menu-focus-guards");
         if (defaultOpen)
         {
             url.WithDefaultOpen(true);
+        }
+        if (scenario is not null)
+        {
+            url.WithTestScenario(scenario);
         }
 
         await NavigateAsync(url);
@@ -137,7 +141,55 @@ public abstract class NavigationMenuTestsBase : TestBase
 
         await Page.Keyboard.PressAsync("Shift+Tab");
 
+        Assert.Equal("nav-trigger-one", await GetActiveTestIdAsync());
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("true");
+
+        await Page.Keyboard.PressAsync("Shift+Tab");
+
         Assert.Equal("before-menu", await GetActiveTestIdAsync());
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task TabForwardFromInlineNestedLastLinkFocusesNextTopLevelTrigger()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu-focus-guards")
+            .WithTestScenario("inline-nested-boundary"));
+        await GetByTestId("nav-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("nested-last-link")).ToBeVisibleAsync();
+        await GetByTestId("nested-last-link").FocusAsync();
+
+        await Page.Keyboard.PressAsync("Tab");
+
+        Assert.Equal("nav-trigger-two", await GetActiveTestIdAsync());
+        await Assertions.Expect(GetByTestId("nested-content-two")).ToBeVisibleAsync();
+        await Assertions.Expect(GetByTestId("nested-trigger-two")).ToHaveAttributeAsync("aria-expanded", "true");
+    }
+
+    [Fact]
+    public virtual async Task AfterGuardAtDocumentEndReturnsToTriggerAndKeepsMenuOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu-focus-guards")
+            .WithTestScenario("document-end"));
+        await GetByTestId("nav-trigger-one").ClickAsync();
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("true");
+        await GetByTestId("non-tabbable-content").FocusAsync();
+
+        await Page.Locator("[data-testid='nav-trigger-one'] ~ [data-blazix-base-ui-focus-guard]").Last.FocusAsync();
+
+        Assert.Equal("nav-trigger-one", await GetActiveTestIdAsync());
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task FocusOutToForeignGuardClosesMenu()
+    {
+        await OpenFocusGuardMenuAsync(scenario: "foreign-guard");
+        await GetByTestId("content-link-one").FocusAsync();
+
+        await GetByTestId("foreign-focus-guard").FocusAsync();
+
+        await Assertions.Expect(GetByTestId("nav-open-state")).ToHaveTextAsync("false");
     }
 
     [Fact]

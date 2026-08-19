@@ -1,34 +1,105 @@
 @page "/tests/navigation-menu-focus-guards/wasm"
 @using Blazix.BaseUI.NavigationMenu
+@using Blazix.BaseUI.Utilities.FocusGuard
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 
 <PageTitle>Navigation Menu Focus Guards Test Page (WASM)</PageTitle>
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
-    <button data-testid="before-menu">Before menu</button>
+    @if (Scenario == "inline-nested-boundary")
+    {
+        <NavigationMenuRoot>
+            <NavigationMenuList>
+                <NavigationMenuItem Value="one">
+                    <NavigationMenuTrigger data-testid="nav-trigger-one">Product</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                        <NavigationMenuRoot DefaultValue="nested-two">
+                            <NavigationMenuList>
+                                <NavigationMenuItem Value="nested-one">
+                                    <NavigationMenuTrigger data-testid="nested-trigger-one">Engineering leads</NavigationMenuTrigger>
+                                    <NavigationMenuContent>
+                                        <NavigationMenuLink Href="#releases">Releases</NavigationMenuLink>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+                                <NavigationMenuItem Value="nested-two">
+                                    <NavigationMenuTrigger data-testid="nested-trigger-two">Startups</NavigationMenuTrigger>
+                                    <NavigationMenuContent data-testid="nested-content-two">
+                                        <NavigationMenuLink Href="#quick-start">Quick start</NavigationMenuLink>
+                                        <NavigationMenuLink Href="#menu">Menu</NavigationMenuLink>
+                                        <NavigationMenuLink Href="#select" data-testid="nested-last-link">Select</NavigationMenuLink>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+                            </NavigationMenuList>
 
-    <NavigationMenuRoot @bind-Value="currentValue">
-        <NavigationMenuList>
-            <NavigationMenuItem Value="one">
-                <NavigationMenuTrigger data-testid="nav-trigger-one">Item one</NavigationMenuTrigger>
-                <NavigationMenuContent>
-                    <NavigationMenuLink Href="#content-one" data-testid="content-link-one">Content link one</NavigationMenuLink>
-                    <NavigationMenuLink Href="#content-two" data-testid="content-link-two">Content link two</NavigationMenuLink>
-                </NavigationMenuContent>
-            </NavigationMenuItem>
-        </NavigationMenuList>
+                            <NavigationMenuViewport />
+                        </NavigationMenuRoot>
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem Value="two">
+                    <NavigationMenuTrigger data-testid="nav-trigger-two">Learn</NavigationMenuTrigger>
+                    <NavigationMenuContent>
+                        <NavigationMenuLink Href="#learn">Learn link</NavigationMenuLink>
+                    </NavigationMenuContent>
+                </NavigationMenuItem>
+            </NavigationMenuList>
 
-        <NavigationMenuPortal>
-            <NavigationMenuPositioner>
-                <NavigationMenuPopup>
-                    <NavigationMenuViewport />
-                </NavigationMenuPopup>
-            </NavigationMenuPositioner>
-        </NavigationMenuPortal>
-    </NavigationMenuRoot>
+            <NavigationMenuPortal>
+                <NavigationMenuPositioner>
+                    <NavigationMenuPopup>
+                        <NavigationMenuViewport />
+                    </NavigationMenuPopup>
+                </NavigationMenuPositioner>
+            </NavigationMenuPortal>
+        </NavigationMenuRoot>
+    }
+    else
+    {
+        <button data-testid="before-menu">Before menu</button>
 
-    <button data-testid="after-menu">After menu</button>
-    <span data-testid="nav-open-state">@(currentValue is null ? "false" : "true")</span>
+        @if (Scenario == "document-end")
+        {
+            <NavigationMenuRoot @bind-Value="currentValue">
+                <NavigationMenuList>
+                    <NavigationMenuItem Value="one">
+                        <NavigationMenuTrigger data-testid="nav-trigger-one">Item one</NavigationMenuTrigger>
+                        <NavigationMenuContent data-testid="non-tabbable-content" tabindex="-1">
+                            Non-tabbable content
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+            </NavigationMenuRoot>
+        }
+        else
+        {
+            <NavigationMenuRoot @bind-Value="currentValue">
+                <NavigationMenuList>
+                    <NavigationMenuItem Value="one">
+                        <NavigationMenuTrigger data-testid="nav-trigger-one">Item one</NavigationMenuTrigger>
+                        <NavigationMenuContent>
+                            <NavigationMenuLink Href="#content-one" data-testid="content-link-one">Content link one</NavigationMenuLink>
+                            <NavigationMenuLink Href="#content-two" data-testid="content-link-two">Content link two</NavigationMenuLink>
+                        </NavigationMenuContent>
+                    </NavigationMenuItem>
+                </NavigationMenuList>
+
+                <NavigationMenuPortal>
+                    <NavigationMenuPositioner>
+                        <NavigationMenuPopup>
+                            <NavigationMenuViewport />
+                        </NavigationMenuPopup>
+                    </NavigationMenuPositioner>
+                </NavigationMenuPortal>
+            </NavigationMenuRoot>
+
+            <button data-testid="after-menu">After menu</button>
+        }
+        <span data-testid="nav-open-state">@(currentValue is null ? "false" : "true")</span>
+
+        @if (Scenario == "foreign-guard")
+        {
+            <FocusGuard data-testid="foreign-focus-guard" />
+        }
+    }
 </div>
 
 @code {
@@ -36,6 +107,9 @@
 
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
+
+    [SupplyParameterFromQuery(Name = "scenario")]
+    public string? Scenario { get; set; }
 
     /// <inheritdoc />
     protected override void OnInitialized()
