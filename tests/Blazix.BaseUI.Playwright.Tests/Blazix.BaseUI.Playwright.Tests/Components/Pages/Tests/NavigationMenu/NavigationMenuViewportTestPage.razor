@@ -46,15 +46,15 @@
 </div>
 
 @code {
+    private string? currentValue;
+    private int changeCount;
+    private string? lastChangedValue;
+
     [SupplyParameterFromQuery(Name = "delay")]
     public int Delay { get; set; } = 50;
 
     [SupplyParameterFromQuery(Name = "closeDelay")]
     public int CloseDelay { get; set; } = 50;
-
-    private string? currentValue;
-    private int changeCount;
-    private string? lastChangedValue;
 
     private void HandleValueChange(NavigationMenuValueChangeEventArgs args)
     {
