@@ -350,6 +350,8 @@ function initGlobalListeners() {
     document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     document.addEventListener('pointerdown', handleGlobalPointerDown, { capture: true });
     document.addEventListener('touchstart', handleGlobalTouchStart, { capture: true, passive: true });
+    document.addEventListener('touchmove', handleGlobalTouchMove, { capture: true, passive: true });
+    document.addEventListener('touchend', handleGlobalTouchEnd, { capture: true, passive: true });
     document.addEventListener('mousedown', handleGlobalMouseDown);
     state.globalListenersInitialized = true;
 }
@@ -540,19 +542,52 @@ function clearOutsidePointer(rootState) {
     rootState.lastOutsidePointerHandled = false;
 }
 
-function handleGlobalPointerDown(e) {
+// Sloppy-touch outside press machine, mirroring blazix-baseui-popover.js (source:
+// useDismiss.ts outsidePressEvent — Select resolves to 'sloppy', so only touch input is
+// deferred to a gesture state machine). A touch outside arms the machine instead of
+// dismissing at press-start: drift > 5px dismisses on touchend, drift > 10px dismisses
+// immediately, a clean tap dismisses via the browser-synthesized mousedown after
+// touchend, and a long press (>= 1000ms) does not dismiss at all.
+let touchState = null;
+let suppressBlurCloseUntil = 0;
+
+function clearTouchTimeout() {
+    if (touchState?.timeout) clearTimeout(touchState.timeout);
+}
+
+function dismissOutsideRoots(e, interactionType) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.dotNetRef) continue;
-
-        const interactionType = normalizeInteractionType(e.pointerType);
-        setPointerInteraction(rootState, interactionType, e);
-
         if (!rootState.isOpen) continue;
         if (isEventInsideSelect(id, rootState, e.target)) continue;
 
         rememberOutsidePointer(rootState, e, interactionType, true);
         rootState.dotNetRef.invokeMethodAsync('OnOutsidePress').catch(() => { });
     }
+}
+
+function handleGlobalPointerDown(e) {
+    const interactionType = normalizeInteractionType(e.pointerType);
+
+    for (const [id, rootState] of state.roots) {
+        if (!rootState.dotNetRef) continue;
+        setPointerInteraction(rootState, interactionType, e);
+    }
+
+    // Source: useDismiss.ts getOutsidePressEvent — `pen` (and an unknown pointer type)
+    // resolve to the `mouse` rule. Only genuine touch input uses the deferred machine.
+    if (e.pointerType === 'touch') return;
+
+    clearTouchTimeout();
+    touchState = null;
+    dismissOutsideRoots(e, interactionType);
+}
+
+function isEventInsideAnyOpenSelect(e) {
+    for (const [id, rootState] of state.roots) {
+        if (rootState.isOpen && isEventInsideSelect(id, rootState, e.target)) return true;
+    }
+    return false;
 }
 
 function handleGlobalTouchStart(e) {
@@ -568,9 +603,87 @@ function handleGlobalTouchStart(e) {
 
         rememberOutsidePointer(rootState, e, 'touch', false);
     }
+
+    if (isEventInsideAnyOpenSelect(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    clearTouchTimeout();
+    touchState = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        dismissOnTouchEnd: false,
+        dismissOnMouseDown: true,
+        timeout: null
+    };
+
+    touchState.timeout = setTimeout(() => {
+        if (touchState) {
+            touchState.dismissOnTouchEnd = false;
+            touchState.dismissOnMouseDown = false;
+            touchState.timeout = null;
+        }
+    }, 1000);
+}
+
+function handleGlobalTouchMove(e) {
+    if (!touchState || isEventInsideAnyOpenSelect(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const deltaX = Math.abs(touch.clientX - touchState.startX);
+    const deltaY = Math.abs(touch.clientY - touchState.startY);
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    if (distance > 5) {
+        touchState.dismissOnTouchEnd = true;
+    }
+
+    if (distance > 10) {
+        dismissOutsideRoots(e, 'touch');
+        clearTouchTimeout();
+        touchState = null;
+    }
+}
+
+function handleGlobalTouchEnd(e) {
+    if (!touchState || isEventInsideAnyOpenSelect(e)) return;
+
+    if (touchState.dismissOnTouchEnd) {
+        dismissOutsideRoots(e, 'touch');
+        touchState.dismissOnMouseDown = false;
+    }
+
+    clearTouchTimeout();
 }
 
 function handleGlobalMouseDown(e) {
+    // Long-press cancellation: the browser-synthesized mousedown after a touch gesture
+    // the machine has vetoed must not dismiss.
+    const touchVetoed = touchState?.dismissOnMouseDown === false;
+    clearTouchTimeout();
+    touchState = null;
+
+    if (touchVetoed) {
+        // The synthesized mouse sequence also moves focus to the outside target, which
+        // would close the select through the trigger focus-out path AND the shared
+        // FloatingFocusManager focus-out path. The vetoed gesture is inert on real touch
+        // hardware, so suppress both close paths for this one synthesized focus move.
+        suppressBlurCloseUntil = Date.now() + 100;
+        for (const rootState of state.roots.values()) {
+            const popupEl = rootState.isOpen ? rootState.popupElement : null;
+            if (!popupEl) continue;
+            popupEl.__blazixBaseUISuppressFocusOutOnce = true;
+            setTimeout(() => {
+                if (popupEl.__blazixBaseUISuppressFocusOutOnce) {
+                    popupEl.__blazixBaseUISuppressFocusOutOnce = false;
+                }
+            }, 0);
+        }
+    }
+
     for (const [id, rootState] of state.roots) {
         if (!rootState.dotNetRef) continue;
 
@@ -585,6 +698,8 @@ function handleGlobalMouseDown(e) {
         }
 
         clearOutsidePointer(rootState);
+
+        if (touchVetoed) continue;
 
         if (!rootState.isOpen) continue;
         if (isEventInsideSelect(id, rootState, e.target)) continue;
@@ -1417,9 +1532,18 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
         };
 
         // Firefox can fire `mouseup` synchronously with `mousedown`; defer the
-        // one-shot listener registration by a tick to match the React source.
+        // one-shot listener registration by a tick to match the React source. A mouseup
+        // processed BEFORE that tick (fast clicks, automation) must be evaluated instead of
+        // silently missed - otherwise the one-shot listener stays armed after the press and
+        // a later unrelated outside mouseup (e.g. the synthesized mouseup of a vetoed touch
+        // long-press) cancels the open long after the gesture completed.
+        const doc = triggerElement.ownerDocument;
+        let pressMouseUp = null;
+        const capturePressMouseUp = (mu) => { pressMouseUp = mu; };
+        doc.addEventListener('mouseup', capturePressMouseUp, { capture: true, once: true });
+
         setTimeout(() => {
-            const doc = triggerElement.ownerDocument;
+            doc.removeEventListener('mouseup', capturePressMouseUp, { capture: true });
             const handler = (mu) => {
                 const currentTrigger = rootState.triggerElement || triggerElement;
                 if (!currentTrigger || !currentTrigger.isConnected) {
@@ -1442,11 +1566,19 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
 
                 notifyCancelOpen();
             };
-            doc.addEventListener('mouseup', handler, { once: true });
+
+            if (pressMouseUp) {
+                handler(pressMouseUp);
+            } else {
+                doc.addEventListener('mouseup', handler, { once: true });
+            }
         }, 0);
     };
 
     const onFocusOut = (e) => {
+        if (Date.now() < suppressBlurCloseUntil) {
+            return;
+        }
         if (rootState.positionerElement && contains(rootState.positionerElement, e.relatedTarget)) {
             return;
         }

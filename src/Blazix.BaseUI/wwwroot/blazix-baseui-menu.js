@@ -46,6 +46,10 @@ function initGlobalListeners() {
 
     document.addEventListener('keydown', handleGlobalKeyDown, { capture: true });
     document.addEventListener('pointerdown', handleGlobalPointerDown);
+    document.addEventListener('mousedown', handleGlobalMouseDown);
+    document.addEventListener('touchstart', handleGlobalTouchStart, { capture: true, passive: true });
+    document.addEventListener('touchmove', handleGlobalTouchMove, { capture: true, passive: true });
+    document.addEventListener('touchend', handleGlobalTouchEnd, { capture: true, passive: true });
     state.globalListenersInitialized = true;
 }
 
@@ -539,45 +543,45 @@ function scheduleOutsidePress(rootId, rootState) {
     }, 0);
 }
 
-function handleGlobalPointerDown(e) {
+function isEventInsideRoot(rootState, target) {
+    const { triggerElement, popupElement } = rootState;
+
+    if (popupElement && popupElement.contains(target)) {
+        return true;
+    }
+
+    if (triggerElement && triggerElement.contains(target)) {
+        return true;
+    }
+
+    // Include ANY trigger registered for this root (multi-trigger / handle),
+    // mirroring React useDismiss excluding every store.context.triggerElements. Without
+    // this, clicking a sibling trigger to switch the menu is treated as an outside press
+    // and dismisses it, racing the switch ("briefly opens then closes").
+    if (rootState.triggerIds && rootState.triggerIds.size > 0) {
+        const triggerHost = target instanceof Element
+            ? target.closest('[aria-haspopup="menu"]')
+            : null;
+        if (triggerHost && rootState.triggerIds.has(triggerHost.id)) {
+            return true;
+        }
+    }
+
+    const allMenuPopups = document.querySelectorAll('[role="menu"]');
+    for (const popup of allMenuPopups) {
+        if (popup.contains(target)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function processOutsidePress(e, pointerType) {
     for (const [id, rootState] of state.roots) {
         if (!rootState.isOpen || !rootState.dotNetRef) continue;
 
-        const { triggerElement, popupElement } = rootState;
-
-        let clickedInsidePopup = false;
-        let clickedOnTrigger = false;
-
-        if (popupElement && popupElement.contains(e.target)) {
-            clickedInsidePopup = true;
-        }
-
-        if (triggerElement && triggerElement.contains(e.target)) {
-            clickedOnTrigger = true;
-        }
-
-        // Exclude clicks on ANY trigger registered for this root (multi-trigger / handle),
-        // mirroring React useDismiss excluding every store.context.triggerElements. Without
-        // this, clicking a sibling trigger to switch the menu is treated as an outside press
-        // and dismisses it, racing the switch ("briefly opens then closes").
-        if (!clickedOnTrigger && rootState.triggerIds && rootState.triggerIds.size > 0) {
-            const triggerHost = e.target instanceof Element
-                ? e.target.closest('[aria-haspopup="menu"]')
-                : null;
-            if (triggerHost && rootState.triggerIds.has(triggerHost.id)) {
-                clickedOnTrigger = true;
-            }
-        }
-
-        const allMenuPopups = document.querySelectorAll('[role="menu"]');
-        for (const popup of allMenuPopups) {
-            if (popup.contains(e.target)) {
-                clickedInsidePopup = true;
-                break;
-            }
-        }
-
-        if (!clickedInsidePopup && !clickedOnTrigger) {
+        if (!isEventInsideRoot(rootState, e.target)) {
             // Context menu grace period: don't dismiss within 500ms of opening
             // to prevent long-press touch from immediately closing the menu
             if (rootState.allowOutsidePressAt && Date.now() < rootState.allowOutsidePressAt) {
@@ -587,13 +591,114 @@ function handleGlobalPointerDown(e) {
             // Touch close prevention: don't dismiss via touch within 300ms of
             // opening via trigger-focus to prevent focus->open->click->close flicker
             if (rootState.allowTouchToCloseAt && Date.now() < rootState.allowTouchToCloseAt
-                && e.pointerType === 'touch') {
+                && pointerType === 'touch') {
                 continue;
             }
 
             scheduleOutsidePress(id, rootState);
         }
     }
+}
+
+function isEventInsideAnyOpenRoot(e) {
+    for (const rootState of state.roots.values()) {
+        if (rootState.isOpen && isEventInsideRoot(rootState, e.target)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Sloppy-touch outside press machine, mirroring blazix-baseui-popover.js (source:
+// useDismiss.ts outsidePressEvent — menus resolve to 'sloppy', so only touch input is
+// deferred to a gesture state machine). A touch outside arms the machine instead of
+// dismissing at press-start: drift > 5px dismisses on touchend, drift > 10px dismisses
+// immediately, a clean tap dismisses via the browser-synthesized mousedown after
+// touchend, and a long press (>= 1000ms) does not dismiss at all.
+let touchState = null;
+let currentPointerType = '';
+
+function clearTouchTimeout() {
+    if (touchState?.timeout) clearTimeout(touchState.timeout);
+}
+
+function handleGlobalPointerDown(e) {
+    currentPointerType = e.pointerType || '';
+
+    // Source: useDismiss.ts getOutsidePressEvent — `pen` (and an unknown pointer type)
+    // resolve to the `mouse` rule. Only genuine touch input uses the deferred machine.
+    if (currentPointerType === 'touch') return;
+
+    clearTouchTimeout();
+    touchState = null;
+    processOutsidePress(e, currentPointerType);
+}
+
+function handleGlobalTouchStart(e) {
+    currentPointerType = 'touch';
+    if (isEventInsideAnyOpenRoot(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    clearTouchTimeout();
+    touchState = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        dismissOnTouchEnd: false,
+        dismissOnMouseDown: true,
+        timeout: null
+    };
+
+    touchState.timeout = setTimeout(() => {
+        if (touchState) {
+            touchState.dismissOnTouchEnd = false;
+            touchState.dismissOnMouseDown = false;
+            touchState.timeout = null;
+        }
+    }, 1000);
+}
+
+function handleGlobalTouchMove(e) {
+    if (!touchState || isEventInsideAnyOpenRoot(e)) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const deltaX = Math.abs(touch.clientX - touchState.startX);
+    const deltaY = Math.abs(touch.clientY - touchState.startY);
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    if (distance > 5) {
+        touchState.dismissOnTouchEnd = true;
+    }
+
+    if (distance > 10) {
+        processOutsidePress(e, 'touch');
+        clearTouchTimeout();
+        touchState = null;
+    }
+}
+
+function handleGlobalTouchEnd(e) {
+    if (!touchState || isEventInsideAnyOpenRoot(e)) return;
+
+    if (touchState.dismissOnTouchEnd) {
+        processOutsidePress(e, 'touch');
+        touchState.dismissOnMouseDown = false;
+    }
+
+    clearTouchTimeout();
+}
+
+function handleGlobalMouseDown(e) {
+    if (currentPointerType !== 'touch') return;
+
+    clearTouchTimeout();
+    const dismissOnMouseDown = touchState?.dismissOnMouseDown !== false;
+    touchState = null;
+    if (!dismissOnMouseDown) return;
+    processOutsidePress(e, 'touch');
 }
 
 // ============================================================================

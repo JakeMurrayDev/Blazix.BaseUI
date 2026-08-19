@@ -17,6 +17,8 @@ public abstract class MenuTestsBase : TestBase
     {
     }
 
+    protected override BrowserNewContextOptions BrowserContextOptions => new() { HasTouch = true };
+
     #region Helper Methods
 
     protected async Task OpenMenuAsync()
@@ -72,6 +74,143 @@ public abstract class MenuTestsBase : TestBase
 
         await trigger.ClickAsync();
         await Assertions.Expect(openState).ToHaveTextAsync("false");
+    }
+
+    #endregion
+
+    #region Touch Outside Press Tests
+
+    // Sloppy-touch semantics (upstream useDismiss.ts 'sloppy' for menus): a touch outside
+    // must not dismiss at press-start. Drift > 5px dismisses on touchend, > 10px immediately,
+    // a clean tap dismisses via the browser-synthesized mousedown, and a long press does not
+    // dismiss at all. Chromium-only (CDP touch + synthetic TouchEvents).
+
+    [Fact]
+    public virtual async Task LongPressOutsideDoesNotDismissMenu()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+        await NavigateAsync(CreateUrl("/tests/menu"));
+        await OpenMenuAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await WaitForDelayAsync(1200);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+    }
+
+    [Fact]
+    public virtual async Task SmallTouchDriftDismissesOnlyViaSynthesizedMouseDown()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+        await NavigateAsync(CreateUrl("/tests/menu"));
+        await OpenMenuAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var outsideButton = GetByTestId("outside-button");
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 3, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 3, y);
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await outsideButton.DispatchEventAsync("mousedown");
+        await WaitForMenuClosedAsync();
+
+        await OpenMenuAsync();
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 7, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 7, y);
+
+        await WaitForMenuClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task ScrollGestureOutsideDismissesAfterTenPixels()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+        await NavigateAsync(CreateUrl("/tests/menu"));
+        await OpenMenuAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var session = await Page.Context.NewCDPSessionAsync(Page);
+
+        await DispatchTouchEventAsync(session, "touchStart", x, y);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // Chromium does not emit a DOM touchmove for the first few pixels of a CDP gesture.
+        // Move far enough past its native touch slop to exercise the >10px branch.
+        await DispatchTouchEventAsync(session, "touchMove", x, y + 30);
+        await WaitForMenuClosedAsync();
+
+        await DispatchTouchEventAsync(session, "touchEnd", x, y + 30);
+    }
+
+    [Fact]
+    public virtual async Task TapOutsideDismissesMenu()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+        await NavigateAsync(CreateUrl("/tests/menu"));
+        await OpenMenuAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
+        await WaitForMenuClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task TouchDriftBoundariesFollowStrictThresholds()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+
+        await NavigateAsync(CreateUrl("/tests/menu"));
+        await OpenMenuAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var outsideButton = GetByTestId("outside-button");
+
+        // Exactly 5px of drift is NOT > 5 (useDismiss.ts strict thresholds): touchend
+        // must not dismiss. (A real tap would still dismiss via the browser-synthesized
+        // mousedown; synthetic TouchEvents produce no synthesis, isolating the touchend path.)
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 5, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 5, y);
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // Exactly 10px is > 5 but NOT > 10: no immediate dismissal on touchmove; the
+        // dismissal lands on touchend.
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 10, y);
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 10, y);
+        await WaitForMenuClosedAsync();
     }
 
     #endregion

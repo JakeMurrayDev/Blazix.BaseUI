@@ -331,7 +331,8 @@ function setupOutsideClickListener(rootState) {
     // Source: useDialogRoot.ts outsidePressEvent — the resolved event type is `intentional` for
     // mouse/pen input (only `touch` is `sloppy`), so a mouse dismissal must wait for a completed
     // click rather than firing on `pointerdown`. The pointer type of the press is recorded here so
-    // the synthesized click of a touch tap is ignored — that interaction is dismissed on `touchend`.
+    // the synthesized click of a touch tap is ignored — that interaction is dismissed by the
+    // sloppy-touch gesture machine below.
     const recordPointerType = (e) => {
         lastPointerType = e.pointerType || '';
     };
@@ -348,18 +349,107 @@ function setupOutsideClickListener(rootState) {
         dismissOutside(e, target);
     };
 
+    // Sloppy-touch outside press machine, mirroring blazix-baseui-popover.js: a touch
+    // outside arms the machine instead of dismissing at bare touchend. Drift > 5px
+    // dismisses on touchend, drift > 10px dismisses immediately, a clean tap dismisses
+    // via the browser-synthesized mousedown after touchend, and a long press (>= 1000ms)
+    // does not dismiss at all.
+    let touchState = null;
+
+    const clearTouchTimeout = () => {
+        if (touchState?.timeout) clearTimeout(touchState.timeout);
+    };
+
+    const eventTarget = (e) => e.composedPath ? e.composedPath()[0] : e.target;
+
+    const handleOutsideTouchStart = (e) => {
+        const target = eventTarget(e);
+        if (!isOutsideDialog(rootState, target)) return;
+
+        const touch = e.touches[0];
+        if (!touch) return;
+
+        clearTouchTimeout();
+        touchState = {
+            startX: touch.clientX,
+            startY: touch.clientY,
+            dismissOnTouchEnd: false,
+            dismissOnMouseDown: true,
+            timeout: null
+        };
+
+        touchState.timeout = setTimeout(() => {
+            if (touchState) {
+                touchState.dismissOnTouchEnd = false;
+                touchState.dismissOnMouseDown = false;
+                touchState.timeout = null;
+            }
+        }, 1000);
+    };
+
+    const handleOutsideTouchMove = (e) => {
+        if (!touchState) return;
+
+        const touch = e.touches[0];
+        if (!touch) return;
+
+        const deltaX = Math.abs(touch.clientX - touchState.startX);
+        const deltaY = Math.abs(touch.clientY - touchState.startY);
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (distance > 5) {
+            touchState.dismissOnTouchEnd = true;
+        }
+
+        if (distance > 10) {
+            if (isTopmostDialog(rootState.rootId)) {
+                dismissOutside(e, eventTarget(e));
+            }
+            clearTouchTimeout();
+            touchState = null;
+        }
+    };
+
     const handleOutsideTouchEnd = (e) => {
+        if (!touchState) return;
         if (e.changedTouches.length !== 1 || e.touches.length !== 0) return;
+
+        if (touchState.dismissOnTouchEnd) {
+            if (isTopmostDialog(rootState.rootId)) {
+                dismissOutside(e, eventTarget(e));
+            }
+            touchState.dismissOnMouseDown = false;
+        }
+
+        clearTouchTimeout();
+    };
+
+    const handleOutsideMouseDown = (e) => {
+        if (lastPointerType !== 'touch') return;
+
+        clearTouchTimeout();
+        const dismissOnMouseDown = touchState?.dismissOnMouseDown !== false;
+        touchState = null;
+        if (!dismissOnMouseDown) {
+            // Long-press veto: headless/desktop Chromium still synthesizes the mouse
+            // sequence after touchend, which focuses the outside target and would close
+            // the dialog through the focus-out path. The whole vetoed gesture is inert
+            // on real touch hardware (no synthesized focus), so suppress that focus-out.
+            suppressNextFocusOut(rootState);
+            return;
+        }
         if (!isTopmostDialog(rootState.rootId)) return;
 
-        const target = e.composedPath ? e.composedPath()[0] : e.target;
-        dismissOutside(e, target);
+        dismissOutside(e, eventTarget(e));
     };
 
     // Use a small delay to avoid catching the click that opened the dialog
     const timeoutId = setTimeout(() => {
         document.addEventListener('pointerdown', recordPointerType, true);
         document.addEventListener('click', handleOutsideClick, true);
+        document.addEventListener('mousedown', handleOutsideMouseDown, true);
+        document.addEventListener('touchstart', handleOutsideTouchStart, { capture: true, passive: true });
+        document.addEventListener('touchmove', handleOutsideTouchMove, { capture: true, passive: true });
         document.addEventListener('touchend', handleOutsideTouchEnd, { capture: true, passive: true });
     }, 0);
 
@@ -367,7 +457,10 @@ function setupOutsideClickListener(rootState) {
         clearTimeout(timeoutId);
         document.removeEventListener('pointerdown', recordPointerType, true);
         document.removeEventListener('click', handleOutsideClick, true);
-        document.removeEventListener('touchend', handleOutsideTouchEnd, true);
+        document.removeEventListener('mousedown', handleOutsideMouseDown, true);
+        document.removeEventListener('touchstart', handleOutsideTouchStart, { capture: true });
+        document.removeEventListener('touchmove', handleOutsideTouchMove, { capture: true });
+        document.removeEventListener('touchend', handleOutsideTouchEnd, { capture: true });
     };
 }
 
