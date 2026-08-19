@@ -432,6 +432,7 @@
         FormContext?.FieldRegistry.Register(fieldId, new FieldRegistration(
             getName: () => EffectiveName,
             getValue: GetRegisteredValue,
+            getElement: () => Element,
             validateAsync: ValidateRegisteredControlAsync,
             getValidityData: GetCombinedValidityData,
             focusAsync: FocusRegisteredControlAsync));
@@ -627,12 +628,14 @@
     private sealed class FieldRegistration(
         Func<string?> getName,
         Func<object?> getValue,
+        Func<ElementReference?> getElement,
         Func<Task> validateAsync,
         Func<FieldValidityData> getValidityData,
         Func<ValueTask> focusAsync) : IFieldRegistration
     {
         public string? Name => getName();
         public Func<object?> GetValue => getValue;
+        public Func<ElementReference?> GetElement => getElement;
         public Func<Task> ValidateAsync => validateAsync;
         public FieldValidityData ValidityData => getValidityData();
         public Func<ValueTask> FocusAsync => focusAsync;

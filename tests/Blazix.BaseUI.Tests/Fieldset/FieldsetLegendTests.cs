@@ -93,4 +93,44 @@ public class FieldsetLegendTests : BunitContext, IFieldsetLegendContract
         fieldset.GetAttribute("aria-labelledby").ShouldBe("custom-legend-id");
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsAriaLabelledByWhenLegendIsReplaced()
+    {
+        var cut = Render<FieldsetLegendSwapHost>();
+        cut.Find("fieldset").GetAttribute("aria-labelledby").ShouldBe("legend-first");
+
+        await cut.InvokeAsync(() => cut.Instance.SwapLegend());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("fieldset").GetAttribute("aria-labelledby").ShouldBe("legend-second"));
+    }
+}
+
+internal sealed class FieldsetLegendSwapHost : ComponentBase
+{
+    private bool useSecondLegend;
+
+    public void SwapLegend()
+    {
+        useSecondLegend = true;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<FieldsetRoot>(0);
+        builder.AddAttribute(1, "ChildContent", (RenderFragment)(inner =>
+        {
+            inner.OpenComponent<FieldsetLegend>(0);
+            inner.SetKey(useSecondLegend ? "second" : "first");
+            inner.AddAttribute(1, "AdditionalAttributes",
+                (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                {
+                    { "id", useSecondLegend ? "legend-second" : "legend-first" }
+                });
+            inner.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
 }

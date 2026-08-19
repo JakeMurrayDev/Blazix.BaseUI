@@ -103,6 +103,9 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        FieldsetContext?.SetLegendId(null);
+        // Only clear when this legend is still the registered one: a replacement legend registers
+        // before this instance is disposed, and clearing unconditionally would drop its id.
+        if (FieldsetContext?.LegendId == resolvedId)
+            FieldsetContext.SetLegendId(null);
     }
 }

@@ -306,7 +306,22 @@ public sealed class FieldValidation : IDisposable
 
     private static bool ShouldContinueRevalidation(FieldValidityState state)
     {
-        return state.Valid != false || IsOnlyValueMissing(state);
+        return state.Valid != false || IsValueMissingWithoutOtherNativeErrors(state);
+    }
+
+    // A stale custom error can coexist with valueMissing during change revalidation, but any other
+    // native error still defers publication until the blur or submit boundary.
+    private static bool IsValueMissingWithoutOtherNativeErrors(FieldValidityState state)
+    {
+        return state.ValueMissing &&
+               !state.BadInput &&
+               !state.PatternMismatch &&
+               !state.RangeOverflow &&
+               !state.RangeUnderflow &&
+               !state.StepMismatch &&
+               !state.TooLong &&
+               !state.TooShort &&
+               !state.TypeMismatch;
     }
 
     private static bool IsOnlyValueMissing(FieldValidityState state)

@@ -358,6 +358,7 @@ public static class JsInteropSetup
             module.Setup<bool>("reportValidity", _ => true).SetResult(true);
             module.SetupVoid("focusElement", _ => true).SetVoidResult();
             module.Setup<bool>("isActiveElement", _ => true).SetResult(false);
+            module.Setup<int>("getFirstInDocumentOrder", _ => true).SetResult(0);
             module.Setup<object?>("getValue", _ => true).SetResult(null);
             module.SetupVoid("setValue", _ => true).SetVoidResult();
             module.Setup<string?>("observeValidity", _ => true).SetResult(null);
