@@ -216,12 +216,13 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (RootContext is null || disabled)
+        if (RootContext is not null && !disabled)
         {
-            return;
+            await RootContext.CommitItemAsync(Value, AutocompleteChangeReason.ItemPress);
         }
 
-        await RootContext.CommitItemAsync(Value, AutocompleteChangeReason.ItemPress);
+        // Upstream merges `elementProps` after the default props, so a consumer's `onClick` still
+        // runs on a disabled item; only the internal commit is suppressed.
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 

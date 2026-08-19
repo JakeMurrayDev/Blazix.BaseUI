@@ -85,7 +85,11 @@ function createRootState(rootId, dotNetRef = null) {
     listElement: null,
     popupElement: null,
     positionerElement: null,
-    inputInsidePopup: false,
+    // Matches the upstream store default: assume the input lives in the popup until an input
+    // rendered outside it registers otherwise. A popup-hosted input does not exist while the
+    // popup is closed, so a `false` default would gate the trigger's cancel-open bookkeeping
+    // off on the very first press.
+    inputInsidePopup: true,
     inputCleanup: null,
     triggerCleanup: null,
     clearCleanup: null,

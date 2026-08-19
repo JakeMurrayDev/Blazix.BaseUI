@@ -73,6 +73,7 @@
     private bool hasValueParameter;
     private bool hasValuesParameter;
     private bool hasHighlightedValue;
+    private bool? pendingQueryClearRestore;
     private TValue? highlightedValue;
     private ComboboxRootActions? previousActionsRef;
     private ComboboxChangeReason openChangeReason = ComboboxChangeReason.None;
@@ -476,6 +477,8 @@
                 transition.HandleTransitionEnd(false, ActionsRef?.Unmount is not null);
                 activeIndex = -1;
                 inlineInputValue = string.Empty;
+                // Closing resets highlight state, so a pending clear must not restore after reopening.
+                pendingQueryClearRestore = null;
             }
 
             state = new ComboboxRootState(CurrentOpen);
@@ -503,6 +506,17 @@
             {
                 _ = ex;
             }
+        }
+
+        if (pendingQueryClearRestore is { } clearedBySelection &&
+            CurrentTypedInputValue.Trim().Length == 0)
+        {
+            // Resolve before `setRootOpen` so JavaScript receives the restored active index in this pass.
+            pendingQueryClearRestore = null;
+            await RestoreHighlightAfterQueryClearAsync(clearedBySelection);
+            SyncContext();
+            typedContext.NotifyStateChanged();
+            await InvokeAsync(StateHasChanged);
         }
 
         if (hasRendered)
@@ -818,6 +832,8 @@
             transition.HandleTransitionEnd(false, ActionsRef?.Unmount is not null);
             activeIndex = -1;
             inlineInputValue = string.Empty;
+            // Closing resets highlight state, so a pending clear must not restore after reopening.
+            pendingQueryClearRestore = null;
             await OnOpenChangeComplete.InvokeAsync(false);
         }
 
@@ -855,6 +871,11 @@
 
         if (reason == ComboboxChangeReason.InputChange)
         {
+            if (value.Trim().Length > 0)
+            {
+                pendingQueryClearRestore = null;
+            }
+
             // Upstream `ComboboxInput.tsx` only resets the selection and closes when the input
             // is emptied from OUTSIDE the popup; an input rendered inside the popup is a search
             // field whose query is independent of the selection.
@@ -874,7 +895,7 @@
 
             if (value.Trim().Length == 0)
             {
-                await RestoreHighlightAfterQueryClearAsync();
+                await RequestHighlightRestoreAfterQueryClearAsync(false);
             }
             else if (AutoHighlight != ComboboxAutoHighlight.False)
             {
@@ -889,7 +910,7 @@
                  value.Length == 0 &&
                  typedContext.InputInsidePopup)
         {
-            await RestoreHighlightAfterQueryClearAsync();
+            await RequestHighlightRestoreAfterQueryClearAsync(true);
         }
 
         SyncContext();
@@ -1041,10 +1062,22 @@
         return -1;
     }
 
-    // Upstream f30013819 (#5232): clearing the query returns the highlight to the selected
-    // item instead of dropping it or jumping to the first item. With nothing selected the
-    // highlight is dropped, except under `AutoHighlight.Always`, which keeps the first item.
-    private async Task RestoreHighlightAfterQueryClearAsync()
+    // Upstream f30013819 (#5232): wait for a controlled clear to commit before restoring the
+    // selected item; a selection clear drops the highlight, `always` selects the first item,
+    // and the remaining no-selection modes preserve the current highlight.
+    private async Task RequestHighlightRestoreAfterQueryClearAsync(bool clearedBySelection)
+    {
+        if (CurrentTypedInputValue.Trim().Length == 0)
+        {
+            pendingQueryClearRestore = null;
+            await RestoreHighlightAfterQueryClearAsync(clearedBySelection);
+            return;
+        }
+
+        pendingQueryClearRestore = clearedBySelection;
+    }
+
+    private async Task RestoreHighlightAfterQueryClearAsync(bool clearedBySelection)
     {
         // A directly rendered (inline) list stays visible while closed; a closed popup list is
         // inert, so its highlight is simply cleared as before.
@@ -1054,11 +1087,20 @@
             return;
         }
 
-        var nextIndex = GetLastSelectedValue() is not null
-            ? FindSelectedVisibleIndex()
-            : AutoHighlight == ComboboxAutoHighlight.Always ? 0 : -1;
+        var hasSelection = GetLastSelectedValue() is not null;
 
-        await HighlightIndexInternalAsync(nextIndex, ComboboxHighlightReason.None);
+        if (hasSelection || clearedBySelection)
+        {
+            // A selection filtered out of the list drops the highlight rather than leaving it on
+            // whichever item now occupies that index.
+            await HighlightIndexInternalAsync(hasSelection ? FindSelectedVisibleIndex() : -1, ComboboxHighlightReason.None);
+        }
+        else if (AutoHighlight == ComboboxAutoHighlight.Always)
+        {
+            await HighlightIndexInternalAsync(0, ComboboxHighlightReason.None);
+        }
+        // Upstream leaves `activeIndex` untouched otherwise: only `always` writes 0, and nothing
+        // writes null in that branch.
 
         // The query is empty, so there is no typed prefix left for inline completion to extend.
         inlineInputValue = string.Empty;

@@ -28,7 +28,8 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         AutocompleteMode mode = AutocompleteMode.List,
         AutocompleteAutoHighlight autoHighlight = AutocompleteAutoHighlight.False,
         EventCallback<AutocompleteValueChangeEventArgs>? onValueChange = null,
-        EventCallback<AutocompleteOpenChangeEventArgs>? onOpenChange = null)
+        EventCallback<AutocompleteOpenChangeEventArgs>? onOpenChange = null,
+        IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -48,12 +49,12 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.AutoHighlight), autoHighlight);
             if (onValueChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnValueChange), onValueChange.Value);
             if (onOpenChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnOpenChange), onOpenChange.Value);
-            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ChildContent), CreateDefaultChildren());
+            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ChildContent), CreateDefaultChildren(itemAdditionalAttributes));
             builder.CloseComponent();
         };
     }
 
-    private static RenderFragment CreateDefaultChildren()
+    private static RenderFragment CreateDefaultChildren(IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -90,7 +91,8 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
                         listBuilder.OpenComponent<AutocompleteItem<string>>(20);
                         listBuilder.AddAttribute(21, nameof(AutocompleteItem<string>.Value), "Banana");
-                        listBuilder.AddAttribute(22, nameof(AutocompleteItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Banana")));
+                        listBuilder.AddAttribute(22, nameof(AutocompleteItem<string>.AdditionalAttributes), itemAdditionalAttributes);
+                        listBuilder.AddAttribute(23, nameof(AutocompleteItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Banana")));
                         listBuilder.CloseComponent();
                     }));
                     popupBuilder.CloseComponent();
@@ -170,6 +172,29 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         await banana.ClickAsync(new MouseEventArgs());
 
         cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public async Task DisabledItem_ShouldStillInvokeConsumerClickHandler()
+    {
+        var consumerClickHandled = false;
+        var valueChangeCount = 0;
+        var valueCallback = EventCallback.Factory.Create<AutocompleteValueChangeEventArgs>(this, _ => valueChangeCount++);
+        var itemAttributes = new Dictionary<string, object>
+        {
+            { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => consumerClickHandled = true) }
+        };
+        var cut = Render(CreateAutocomplete(
+            disabled: true,
+            defaultOpen: true,
+            onValueChange: valueCallback,
+            itemAdditionalAttributes: itemAttributes));
+
+        var banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        consumerClickHandled.ShouldBeTrue();
+        valueChangeCount.ShouldBe(0);
     }
 
     [Fact]

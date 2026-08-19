@@ -283,6 +283,11 @@ public abstract class AutocompleteTestsBase : TestBase
 
         await Page.Mouse.MoveAsync(triggerBox!.X + triggerBox.Width / 2, triggerBox.Y + triggerBox.Height / 2);
         await Page.Mouse.DownAsync();
+
+        // The press must actually open the popup, otherwise the closed state asserted below would
+        // be satisfied by a trigger that never opened at all.
+        await WaitForAutocompleteOpenAsync();
+
         await Page.Mouse.MoveAsync(
             outsideBox!.X + outsideBox.Width / 2,
             outsideBox.Y + outsideBox.Height / 2,

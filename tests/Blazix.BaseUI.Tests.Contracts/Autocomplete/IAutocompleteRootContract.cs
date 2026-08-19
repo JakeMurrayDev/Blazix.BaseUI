@@ -8,6 +8,8 @@ public interface IAutocompleteRootContract
 
     Task DisabledRoot_ShouldDisableItems();
 
+    Task DisabledItem_ShouldStillInvokeConsumerClickHandler();
+
     Task CancelOpen_ShouldCloseThePopupAndReportCancelOpen();
 
     Task Input_ShouldExposeComboboxAttributes();
