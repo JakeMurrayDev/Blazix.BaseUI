@@ -234,7 +234,12 @@ public abstract class ComboboxTestsBase : TestBase
         var trigger = GetByTestId("combobox-trigger");
         await Assertions.Expect(trigger).ToBeDisabledAsync(DisabledTimeout);
         await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-haspopup", "listbox", AttributeTimeout);
-        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-required", "true", AttributeTimeout);
+
+        // Upstream sets aria-required on the trigger only when the input renders inside
+        // the popup (ComboboxTrigger.tsx: 'aria-required': inputInsidePopup ? required ...;
+        // its own test asserts the attribute is absent for an outside input).
+        Assert.Null(await trigger.GetAttributeAsync("aria-required"));
+
         await Assertions.Expect(trigger).ToHaveAttributeAsync("data-disabled", "", AttributeTimeout);
         await Assertions.Expect(trigger).ToHaveAttributeAsync("data-readonly", "", AttributeTimeout);
         await Assertions.Expect(trigger).ToHaveAttributeAsync("data-required", "", AttributeTimeout);
