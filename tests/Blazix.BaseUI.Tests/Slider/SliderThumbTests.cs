@@ -2,10 +2,12 @@ namespace Blazix.BaseUI.Tests.Slider;
 
 public class SliderThumbTests : BunitContext, ISliderThumbContract
 {
+    private readonly BunitJSModuleInterop sliderModule;
+
     public SliderThumbTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupSliderModule(JSInterop);
+        sliderModule = JsInteropSetup.SetupSliderModule(JSInterop);
     }
 
     private RenderFragment CreateSliderWithThumb(
@@ -22,9 +24,12 @@ public class SliderThumbTests : BunitContext, ISliderThumbContract
         RenderFragment<RenderProps<SliderThumbState>>? render = null,
         int thumbCount = 1,
         EventCallback<FocusEventArgs>? onFocus = null,
-        EventCallback<FocusEventArgs>? onBlur = null)
+        EventCallback<FocusEventArgs>? onBlur = null,
+        EventCallback<SliderValueChangeEventArgs<double[]>>? onValuesChange = null,
+        bool wrapInField = false,
+        Func<object?, Task<string[]?>>? validate = null)
     {
-        return builder =>
+        RenderFragment slider = builder =>
         {
             builder.OpenComponent<SliderRoot>(0);
             if (defaultValue.HasValue)
@@ -77,6 +82,25 @@ public class SliderThumbTests : BunitContext, ISliderThumbContract
                 }));
                 innerBuilder.CloseComponent();
             }));
+            if (onValuesChange.HasValue)
+                builder.AddAttribute(9, "OnValuesChange", onValuesChange.Value);
+            builder.CloseComponent();
+        };
+
+        if (!wrapInField)
+            return slider;
+
+        return builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.Field.FieldRoot>(0);
+            builder.AddAttribute(1, "ValidationMode", Blazix.BaseUI.Form.ValidationMode.OnBlur);
+            if (validate is not null)
+                builder.AddAttribute(2, "Validate", validate);
+            builder.AddAttribute(3, "AdditionalAttributes", (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+            {
+                { "data-testid", "field-root" }
+            });
+            builder.AddAttribute(4, "ChildContent", slider);
             builder.CloseComponent();
         };
     }
@@ -394,6 +418,56 @@ public class SliderThumbTests : BunitContext, ISliderThumbContract
         invoked.ShouldBeTrue();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotCommitFieldBlurWhenFocusMovesToAnotherThumb()
+    {
+        // The module registered in the constructor answers `isBlurWithinThumbs` with `false`, and
+        // bUnit resolves the first matching handler, so this case needs its own context to report
+        // that focus landed on a sibling thumb (bUnit cannot move real focus between elements).
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = JsInteropSetup.SetupSliderModule(context.JSInterop, isBlurWithinThumbs: true);
+        var validateCalls = 0;
+        Func<object?, Task<string[]?>> validate = _ =>
+        {
+            validateCalls++;
+            return Task.FromResult<string[]?>(null);
+        };
+        var cut = context.Render(CreateSliderWithThumb(
+            defaultValues: [20, 80],
+            thumbCount: 2,
+            wrapInField: true,
+            validate: validate));
+        cut.Find("[data-testid='slider-thumb-0'] input").Focus();
+
+        cut.Find("[data-testid='slider-thumb-0'] input").Blur();
+
+        cut.WaitForAssertion(() =>
+            module.Invocations.Any(invocation => invocation.Identifier == "isBlurWithinThumbs").ShouldBeTrue());
+        validateCalls.ShouldBe(0);
+        cut.Find("[data-testid='field-root']").HasAttribute("data-touched").ShouldBeFalse();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DoesNotApplyKeyboardChangeWhenValuesContainNaN()
+    {
+        // A NaN among the values makes every distance comparison NaN. Before base-ui #5391 the
+        // `distance < minDistance` form silently passed the minimum-distance guard, so the slider
+        // kept committing changes for a value set that still contained NaN.
+        var changeCount = 0;
+        var cut = Render(CreateSliderWithThumb(
+            defaultValues: [10d, 20d, double.NaN],
+            thumbCount: 3,
+            onValuesChange: EventCallback.Factory.Create<SliderValueChangeEventArgs<double[]>>(this, _ => changeCount++)));
+        var lastThumb = cut.FindComponents<SliderThumb>()[2].Instance;
+
+        await cut.InvokeAsync(() => lastThumb.HandleKeyFromJs("ArrowRight", false));
+
+        changeCount.ShouldBe(0);
     }
 
     [Fact]

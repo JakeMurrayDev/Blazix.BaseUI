@@ -558,6 +558,44 @@
             return;
 
         Context.SetActiveThumbIndex(-1);
+
+        _ = HandleFieldBlurAsync();
+
+        if (OnBlur.HasDelegate)
+        {
+            await OnBlur.InvokeAsync(e);
+        }
+    }
+
+    /// <summary>
+    /// Runs the field-level blur logic unless focus moved to another thumb of the same slider,
+    /// mirroring upstream's <c>thumbRefs.current.some(...)</c> guard so validation does not
+    /// commit mid-interaction (base-ui #5391).
+    /// </summary>
+    private async Task HandleFieldBlurAsync()
+    {
+        if (Context is null)
+            return;
+
+        if (hasRendered && Context.ControlElement.HasValue)
+        {
+            try
+            {
+                var module = await ModuleTask.Value;
+                if (await module.InvokeAsync<bool>("isBlurWithinThumbs", Context.ControlElement.Value))
+                {
+                    return;
+                }
+            }
+            catch (Exception ex) when (
+                ex is JSDisconnectedException or
+                TaskCanceledException or
+                ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect or disposal — safe to ignore.
+            }
+        }
+
         FieldContext?.SetTouched(true);
         FieldContext?.SetFocused(false);
 
@@ -565,11 +603,6 @@
         {
             var value = IsRange ? (object)Context.Values : Context.Values[0];
             _ = FieldContext.Validation.CommitAsync(value);
-        }
-
-        if (OnBlur.HasDelegate)
-        {
-            await OnBlur.InvokeAsync(e);
         }
     }
 

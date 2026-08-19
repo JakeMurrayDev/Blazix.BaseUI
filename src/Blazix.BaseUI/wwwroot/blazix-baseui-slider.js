@@ -1047,6 +1047,31 @@ export function unregisterThumbInput(inputElement) {
     delete inputElement.__sliderThumbState;
 }
 
+/**
+ * Reports whether focus landed on another thumb of the same slider, mirroring upstream's
+ * `thumbRefs.current.some((thumb) => contains(thumb, event.relatedTarget))` guard in
+ * `SliderThumb`'s `onBlur` (base-ui #5391). Blazor's `FocusEventArgs` carries no
+ * `relatedTarget`, so the destination is read from the document's active element once the
+ * blur has settled — the same approach as `isBlurWithinGroup` in blazix-baseui-radio.js.
+ * Thumbs are identified by the `data-index` attribute the thumb element renders, which is
+ * also how upstream marks them.
+ */
+export function isBlurWithinThumbs(controlElement) {
+    if (!controlElement) return false;
+
+    const activeEl = activeElement(getDocument(controlElement));
+    if (!activeEl) return false;
+
+    const thumbs = controlElement.querySelectorAll('[data-index]');
+    for (const thumb of thumbs) {
+        if (contains(thumb, activeEl)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 export function stopDrag(controlElement) {
     const elementState = state.get(controlElement);
     if (!elementState) return;
