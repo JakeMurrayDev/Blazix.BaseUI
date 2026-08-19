@@ -101,6 +101,7 @@ public abstract class PopoverTestsBase : TestBase
     [Fact]
     public virtual async Task LongPressOutsideDoesNotDismissPopover()
     {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
         await NavigateAsync(CreateUrl("/tests/popover"));
         await OpenPopoverAsync();
 
@@ -123,6 +124,7 @@ public abstract class PopoverTestsBase : TestBase
     [Fact]
     public virtual async Task SmallTouchDriftDismissesOnlyViaSynthesizedMouseDown()
     {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
         await NavigateAsync(CreateUrl("/tests/popover"));
         await OpenPopoverAsync();
 
@@ -154,6 +156,7 @@ public abstract class PopoverTestsBase : TestBase
     [Fact]
     public virtual async Task ScrollGestureOutsideDismissesAfterTenPixels()
     {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
         await NavigateAsync(CreateUrl("/tests/popover"));
         await OpenPopoverAsync();
 
@@ -177,6 +180,7 @@ public abstract class PopoverTestsBase : TestBase
     [Fact]
     public virtual async Task TapOutsideDismissesPopover()
     {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
         await NavigateAsync(CreateUrl("/tests/popover"));
         await OpenPopoverAsync();
 
@@ -185,6 +189,40 @@ public abstract class PopoverTestsBase : TestBase
 
         await Page.Touchscreen.TapAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
 
+        await WaitForPopoverClosedAsync();
+    }
+
+    [Fact]
+    public virtual async Task TouchDriftBoundariesFollowStrictThresholds()
+    {
+        Assert.SkipUnless(IsChromiumBrowser, "Touch input relies on CDP and Chromium touch synthesis.");
+
+        await NavigateAsync(CreateUrl("/tests/popover"));
+        await OpenPopoverAsync();
+
+        var box = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(box);
+        var x = box.X + box.Width / 2;
+        var y = box.Y + box.Height / 2;
+        var outsideButton = GetByTestId("outside-button");
+
+        // Exactly 5px of drift is NOT > 5 (useDismiss.ts strict thresholds): touchend
+        // must not dismiss. (A real tap would still dismiss via the browser-synthesized
+        // mousedown; synthetic TouchEvents produce no synthesis, isolating the touchend path.)
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 5, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 5, y);
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        // Exactly 10px is > 5 but NOT > 10: no immediate dismissal on touchmove; the
+        // dismissal lands on touchend.
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchstart", x, y);
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchmove", x + 10, y);
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("true");
+
+        await DispatchSyntheticTouchEventAsync(outsideButton, "touchend", x + 10, y);
         await WaitForPopoverClosedAsync();
     }
 

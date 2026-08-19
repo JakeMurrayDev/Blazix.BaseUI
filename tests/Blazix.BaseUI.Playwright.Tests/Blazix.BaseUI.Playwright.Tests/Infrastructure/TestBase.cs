@@ -326,6 +326,14 @@ public abstract class TestBase : IAsyncLifetime
     }
 
     /// <summary>
+    /// Whether the suite is running on Chromium (the default). Touch tests that use CDP
+    /// sessions or rely on Chromium's touch event synthesis must skip on other engines:
+    /// <c>Assert.SkipUnless(IsChromiumBrowser, ...)</c>.
+    /// </summary>
+    protected static bool IsChromiumBrowser =>
+        (Environment.GetEnvironmentVariable("PLAYWRIGHT_BROWSER")?.ToLowerInvariant() ?? "chromium") == "chromium";
+
+    /// <summary>
     /// Dispatches a real CDP touch event (Chromium only). The browser derives pointer and
     /// synthesized mouse events from it exactly as it would for hardware touch input.
     /// Requires a context created with HasTouch = true.
