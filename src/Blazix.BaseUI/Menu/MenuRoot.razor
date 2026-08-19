@@ -29,6 +29,7 @@
     private bool hasRendered;
     private bool isOpen;
     private int openChangeVersion;
+    private int openParameterSuppressionDepth;
     private readonly TransitionLifecycleManager transition = new();
     private int? activeIndex;
     private ElementReference? triggerElement;
@@ -271,7 +272,12 @@
     {
         var currentOpen = CurrentOpen;
         var previousOpen = state.Open;
-        var parameterOpenChanged = previousOpen != currentOpen;
+        // While SetOpenAsync is mid-flight (state committed, controlled-Open round-trip not yet
+        // processed by the parent), queued renders still carry the stale controlled value.
+        // Treating that as an external change would begin a spurious close/open transition and
+        // reset the keyboard-open highlight intent (ArrowUp highlight-last) via a second
+        // setRootOpen call with highlightLast=false.
+        var parameterOpenChanged = previousOpen != currentOpen && openParameterSuppressionDepth == 0;
         var effectiveDirection = EffectiveDirection;
         var effectiveMenuBarContext = EffectiveMenuBarContext;
         var parentType = ParentType;
@@ -668,34 +674,50 @@
             nextOpen ? activeTriggerId : null,
             nextOpen ? activePayload : null);
 
-        if (hasRendered)
+        // Renders processed while the JS call and the OpenChanged round-trip are pending still
+        // carry the stale controlled Open value; suppress the open-parameter reconciliation in
+        // OnParametersSet until the parent has observed this change. Treating those renders as
+        // external changes churned a close/re-open that reset the keyboard-open highlight intent
+        // (ArrowUp highlight-last) and re-synced JS with a nulled interaction type, wrongly
+        // acquiring the scroll lock on touch-opened menubar menus. A parent that REJECTS the
+        // change still reconciles: its authoritative render flushes after this window closes
+        // (covered by the RejectingControlledParent Playwright test in both render modes).
+        openParameterSuppressionDepth++;
+        try
         {
-            try
+            if (hasRendered)
             {
-                var module = await ModuleTask.Value;
-                var reasonString = reason switch
+                try
                 {
-                    MenuOpenChangeReason.TriggerHover => "trigger-hover",
-                    MenuOpenChangeReason.EscapeKey => "escape-key",
-                    MenuOpenChangeReason.ItemPress => "item-press",
-                    MenuOpenChangeReason.OutsidePress => "outside-press",
-                    MenuOpenChangeReason.ClosePress => "close-press",
-                    _ => null
-                };
-                await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, highlightLast, context.InteractionType);
+                    var module = await ModuleTask.Value;
+                    var reasonString = reason switch
+                    {
+                        MenuOpenChangeReason.TriggerHover => "trigger-hover",
+                        MenuOpenChangeReason.EscapeKey => "escape-key",
+                        MenuOpenChangeReason.ItemPress => "item-press",
+                        MenuOpenChangeReason.OutsidePress => "outside-press",
+                        MenuOpenChangeReason.ClosePress => "close-press",
+                        _ => null
+                    };
+                    await module.InvokeVoidAsync("setRootOpen", rootId, nextOpen, reasonString, highlightLast, context.InteractionType);
 
-                if (nextOpen && ParentType == MenuParentType.Menubar)
+                    if (nextOpen && ParentType == MenuParentType.Menubar)
+                    {
+                        await module.InvokeVoidAsync("closeMenubarSiblingRoots", rootId);
+                    }
+                }
+                catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                 {
-                    await module.InvokeVoidAsync("closeMenubarSiblingRoots", rootId);
+                    _ = ex; // Expected during circuit disconnect - safe to ignore.
                 }
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
-            {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
-            }
-        }
 
-        await OpenChanged.InvokeAsync(nextOpen);
+            await OpenChanged.InvokeAsync(nextOpen);
+        }
+        finally
+        {
+            openParameterSuppressionDepth--;
+        }
 
         if (ParentType == MenuParentType.Menubar)
         {

@@ -163,6 +163,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithRejectOpenChange(bool value)
+    {
+        queryParams["rejectOpenChange"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithOpenOnHover(bool value)
     {
         queryParams["openOnHover"] = value.ToString().ToLowerInvariant();
