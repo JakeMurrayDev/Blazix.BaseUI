@@ -676,7 +676,12 @@
 
         // Renders processed while the JS call and the OpenChanged round-trip are pending still
         // carry the stale controlled Open value; suppress the open-parameter reconciliation in
-        // OnParametersSet until the parent has observed this change.
+        // OnParametersSet until the parent has observed this change. Treating those renders as
+        // external changes churned a close/re-open that reset the keyboard-open highlight intent
+        // (ArrowUp highlight-last) and re-synced JS with a nulled interaction type, wrongly
+        // acquiring the scroll lock on touch-opened menubar menus. A parent that REJECTS the
+        // change still reconciles: its authoritative render flushes after this window closes
+        // (covered by the RejectingControlledParent Playwright test in both render modes).
         openParameterSuppressionDepth++;
         try
         {

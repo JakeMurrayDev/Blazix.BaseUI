@@ -809,6 +809,25 @@ public abstract class MenuTestsBase : TestBase
         await Assertions.Expect(lastItem).ToHaveAttributeAsync("data-highlighted", "");
     }
 
+    [Fact]
+    public virtual async Task RejectingControlledParent_ReconcilesClosedAfterTriggerPress()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu").WithRejectOpenChange(true));
+
+        var trigger = GetByTestId("menu-trigger");
+        await trigger.ClickAsync();
+
+        // The controlled parent refuses to flip its bound Open value. The interactive
+        // open must reconcile back to closed instead of leaving the menu stuck open
+        // while the Open parameter says closed. Guards that the stale-render
+        // suppression in MenuRoot.SetOpenAsync never swallows the parent's
+        // authoritative render (e.g. by becoming sticky).
+        await Assertions.Expect(trigger).ToHaveAttributeAsync("aria-expanded", "false",
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+        await Assertions.Expect(GetByTestId("menu-popup")).Not.ToBeVisibleAsync(
+            new LocatorAssertionsToBeVisibleOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
     #endregion
 
     #region CloseDelay Tests

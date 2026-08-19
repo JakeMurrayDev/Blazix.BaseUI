@@ -150,8 +150,11 @@ public abstract class MenuBarTestsBase : TestBase
         var menu1State = GetByTestId("menu-1-state");
         await Assertions.Expect(menu1State).ToHaveTextAsync("true");
 
+        // Each root's OnOpenChange fires for both halves of the sibling swap, matching
+        // upstream per-root onOpenChange semantics (Menubar.test.tsx asserts last-call
+        // args per root): open menu 2 via click, then close menu 2 + open menu 1.
         var changeCount = GetByTestId("change-count");
-        await Assertions.Expect(changeCount).ToHaveTextAsync("1");
+        await Assertions.Expect(changeCount).ToHaveTextAsync("3");
     }
 
     [Fact]
@@ -462,7 +465,11 @@ public abstract class MenuBarTestsBase : TestBase
 
         await Assertions.Expect(GetByTestId("menu-3-state")).ToHaveTextAsync("true");
         await Assertions.Expect(GetByTestId("menu-1-state")).ToHaveTextAsync("false");
-        await Assertions.Expect(trigger3).ToBeFocusedAsync();
+
+        // A mouse-opened menubar menu focuses its popup (upstream MenuPopup passes
+        // initialFocus for non-submenu parents and the unhighlighted items are not
+        // tabbable), so the refused wrap leaves focus on the popup - not the trigger.
+        await Assertions.Expect(popup3).ToBeFocusedAsync();
     }
 
     [Fact]
