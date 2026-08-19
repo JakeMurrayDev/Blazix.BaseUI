@@ -212,6 +212,26 @@ public abstract class ComboboxTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task EscapeBubblesWhenListEmptyAndPopupHidden()
+    {
+        // Upstream AriaCombobox.tsx allowPropagation() + ComboboxRoot.test.tsx
+        // 'bubbles Escape key when list is empty and popup hidden with CSS': a data-driven
+        // list with zero filtered items and no Empty part keeps its default and bubbles the
+        // Escape so an enclosing popup can also close. The outer Blazor handler only sees
+        // the event when the JS capture handler skips stopPropagation.
+        await NavigateAsync(CreateUrl("/tests/combobox").WithEmptyEscapeScenario(true));
+
+        var input = GetByTestId("empty-combobox-input");
+        await input.ClickAsync();
+        await Assertions.Expect(GetByTestId("empty-open-state")).ToHaveTextAsync("true", TextTimeout);
+
+        await Page.Keyboard.PressAsync("Escape");
+
+        await Assertions.Expect(GetByTestId("empty-open-state")).ToHaveTextAsync("false", TextTimeout);
+        await Assertions.Expect(GetByTestId("outer-escape-count")).ToHaveTextAsync("1", TextTimeout);
+    }
+
+    [Fact]
     public virtual async Task DisabledReadonlyRequiredAttributesAreExposed()
     {
         await NavigateAsync(CreateUrl("/tests/combobox")

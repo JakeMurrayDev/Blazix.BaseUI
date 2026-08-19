@@ -169,6 +169,12 @@ public sealed class TestPageUrlBuilder
         return this;
     }
 
+    public TestPageUrlBuilder WithEmptyEscapeScenario(bool value)
+    {
+        queryParams["emptyEscapeScenario"] = value.ToString().ToLowerInvariant();
+        return this;
+    }
+
     public TestPageUrlBuilder WithOpenOnHover(bool value)
     {
         queryParams["openOnHover"] = value.ToString().ToLowerInvariant();

@@ -72,6 +72,21 @@ internal interface IComboboxRootContext
     void UnregisterItem(IComboboxItemRegistration item);
     int GetItemIndex(IComboboxItemRegistration item);
     int GetVisibleItemCount();
+
+    /// <summary>
+    /// Gets whether a <c>ComboboxEmpty</c> part is currently rendered for this root.
+    /// </summary>
+    bool HasEmptyPart { get; }
+
+    /// <summary>
+    /// Registers a rendered <c>ComboboxEmpty</c> part.
+    /// </summary>
+    void RegisterEmptyPart();
+
+    /// <summary>
+    /// Unregisters a disposed <c>ComboboxEmpty</c> part.
+    /// </summary>
+    void UnregisterEmptyPart();
     void SetInputElement(ElementReference? element);
     void SetTriggerElement(ElementReference? element);
     void SetListElement(ElementReference? element);
@@ -162,6 +177,17 @@ internal sealed class ComboboxRootContext<TValue> : IComboboxRootContext, IDispo
     public Func<ValueTask> FocusInputAsyncFunc { get; set; } = () => ValueTask.CompletedTask;
 
     public bool ListEmpty => GetVisibleItemCount() == 0;
+
+    private int emptyPartCount;
+
+    /// <inheritdoc />
+    public bool HasEmptyPart => emptyPartCount > 0;
+
+    /// <inheritdoc />
+    public void RegisterEmptyPart() => emptyPartCount++;
+
+    /// <inheritdoc />
+    public void UnregisterEmptyPart() => emptyPartCount = Math.Max(0, emptyPartCount - 1);
 
     public string GetInputValue() => GetInputValueFunc();
 

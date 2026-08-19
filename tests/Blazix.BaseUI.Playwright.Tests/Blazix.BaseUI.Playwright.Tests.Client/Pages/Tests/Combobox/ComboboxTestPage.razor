@@ -5,6 +5,29 @@
 <PageTitle>Combobox Test Page (WASM)</PageTitle>
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    @if (EmptyEscapeScenario)
+    {
+        <div @onkeydown="HandleOuterKeyDown">
+            <ComboboxRoot TValue="string"
+                          Items="emptyItems"
+                          DefaultOpen="true"
+                          @bind-Open="emptyEscapeOpen">
+                <ComboboxInput data-testid="empty-combobox-input" placeholder="Search" />
+                <ComboboxPositioner data-testid="empty-combobox-positioner" style="display:none">
+                    <ComboboxPopup data-testid="empty-combobox-popup">
+                        <ComboboxList data-testid="empty-combobox-list">
+                            <ComboboxCollection TValue="string" Context="entry">
+                                <ComboboxItem TValue="string" Value="@entry.Item" Index="@entry.Index">@entry.Item</ComboboxItem>
+                            </ComboboxCollection>
+                        </ComboboxList>
+                    </ComboboxPopup>
+                </ComboboxPositioner>
+            </ComboboxRoot>
+        </div>
+        <div>Outer Escapes: <span data-testid="outer-escape-count">@outerEscapeCount</span></div>
+        <div>Empty Open: <span data-testid="empty-open-state">@emptyEscapeOpen.ToString().ToLowerInvariant()</span></div>
+    }
+
     <form data-testid="combobox-form" @onsubmit="HandleSubmit" @onsubmit:preventDefault="true">
         <ComboboxRoot TValue="string"
                       Items="fruits"
@@ -87,6 +110,21 @@
 
 @code {
     private readonly IReadOnlyList<string> fruits = ["Apple", "Apricot", "Banana", "Cherry"];
+
+    [SupplyParameterFromQuery(Name = "emptyEscapeScenario")]
+    public bool EmptyEscapeScenario { get; set; }
+
+    private readonly IReadOnlyList<string> emptyItems = [];
+    private bool emptyEscapeOpen;
+    private int outerEscapeCount;
+
+    private void HandleOuterKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            outerEscapeCount++;
+        }
+    }
 
     [SupplyParameterFromQuery(Name = "defaultOpen")]
     public bool DefaultOpen { get; set; }
