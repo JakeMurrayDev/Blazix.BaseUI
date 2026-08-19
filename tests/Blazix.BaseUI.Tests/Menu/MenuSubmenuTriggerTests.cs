@@ -2,10 +2,12 @@ namespace Blazix.BaseUI.Tests.Menu;
 
 public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
 {
+    private readonly BunitJSModuleInterop menuModule;
+
     public MenuSubmenuTriggerTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
-        JsInteropSetup.SetupMenuModule(JSInterop);
+        menuModule = JsInteropSetup.SetupMenuModule(JSInterop);
     }
 
     private RenderFragment CreateSubmenuTriggerInRoot(
@@ -152,6 +154,39 @@ public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
         submenuTrigger.GetAttribute("aria-expanded")!.ShouldBe("true");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task OmitsAriaExpandedForVoiceOverWhenOpenedByKeyboard()
+    {
+        menuModule.Setup<bool>("isVoiceOverPlatform", _ => true).SetResult(true);
+        var cut = Render(CreateSubmenuTriggerInRoot(submenuDefaultOpen: false));
+
+        var submenuRoot = cut.FindComponents<MenuRoot>().Last();
+        await cut.InvokeAsync(() => submenuRoot.Instance.OnHoverOpen(true));
+
+        cut.WaitForAssertion(() =>
+        {
+            var submenuTrigger = cut.Find("[role='menuitem'][aria-haspopup='menu']");
+            submenuTrigger.HasAttribute("aria-expanded").ShouldBeFalse();
+            submenuTrigger.GetAttribute("aria-haspopup").ShouldBe("menu");
+        });
+    }
+
+    [Fact]
+    public async Task KeepsAriaExpandedForVoiceOverWhenOpenedByPointer()
+    {
+        menuModule.Setup<bool>("isVoiceOverPlatform", _ => true).SetResult(true);
+        var cut = Render(CreateSubmenuTriggerInRoot(submenuDefaultOpen: false));
+
+        var submenuRoot = cut.FindComponents<MenuRoot>().Last();
+        await cut.InvokeAsync(() => submenuRoot.Instance.OnHoverOpen(false));
+
+        cut.WaitForAssertion(() =>
+        {
+            var submenuTrigger = cut.Find("[role='menuitem'][aria-haspopup='menu']");
+            submenuTrigger.GetAttribute("aria-expanded").ShouldBe("true");
+        });
     }
 
     [Fact]

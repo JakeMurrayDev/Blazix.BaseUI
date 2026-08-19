@@ -482,10 +482,10 @@
     }
 
     /// <summary>
-    /// Invoked from JavaScript when the trigger is hovered to open the menu.
+    /// Invoked from JavaScript when the trigger opens the menu, including whether it was opened by keyboard.
     /// </summary>
     [JSInvokable]
-    public Task OnHoverOpen()
+    public Task OnHoverOpen(bool viaKeyboard = false)
     {
         var menuBarContext = EffectiveMenuBarContext;
         if (menuBarContext is not null && !menuBarContext.GetHasSubmenuOpen())
@@ -498,7 +498,7 @@
             try
             {
                 await Task.Yield();
-                await SetOpenAsync(true, MenuOpenChangeReason.TriggerHover);
+                await SetOpenAsync(true, MenuOpenChangeReason.TriggerHover, interactionType: viaKeyboard ? "keyboard" : null);
             }
             catch (Exception ex)
             {
