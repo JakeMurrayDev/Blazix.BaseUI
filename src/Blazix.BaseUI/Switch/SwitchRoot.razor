@@ -486,6 +486,7 @@
 
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocus);
         attrs["onblur"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleBlur);
+        attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleRootClickAsync);
 
         AddAttributeUnlessOverridden(attrs, "data-checked", state.Checked);
         AddAttributeUnlessOverridden(attrs, "data-unchecked", !state.Checked);
@@ -536,6 +537,20 @@
         {
             _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
+    }
+
+    private Task HandleRootClickAsync(MouseEventArgs e)
+    {
+        // Upstream useButton getButtonProps: while disabled, the consumer's onClick
+        // must not run (the JS module handles preventDefault). This internal handler
+        // wins over a consumer @onclick in AdditionalAttributes and forwards to it
+        // only when the switch is enabled.
+        if (ResolvedDisabled)
+        {
+            return Task.CompletedTask;
+        }
+
+        return EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
     }
 
     private Task HandleFocus(FocusEventArgs e)
