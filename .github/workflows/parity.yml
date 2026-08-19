@@ -1,0 +1,88 @@
+# Task 18 freshness canary plus offline provenance validation only.
+# The Task 18 required baseline-mode PR job that executes all 29 milestone fixtures in Blazor
+# Server and WebAssembly is deliberately not activated yet. The committed pixel baselines are
+# macOS-only (chromium-macos-arm64), while the specification requires Linux-compatible pixel
+# baselines for the required job, and the milestone-1 comparator findings are not yet disposed.
+# See docs/audits/parity-limitations.md.
+name: Parity Freshness
+
+on:
+  pull_request:
+    paths:
+      - 'tests/Blazix.BaseUI.Parity.Tests/**'
+      - 'scripts/parity-freshness-canary.mjs'
+      - 'scripts/tests/parity-freshness-canary-tests.sh'
+      - '.github/workflows/parity.yml'
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provenance:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test freshness canary
+        run: bash scripts/tests/parity-freshness-canary-tests.sh
+      - name: Validate offline provenance and waivers
+        run: node scripts/parity-freshness-canary.mjs --offline
+
+  canary:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check freshness
+        id: freshness
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/parity-freshness-canary.mjs --output canary.json
+      - name: Read canary result
+        id: result
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const result = JSON.parse(fs.readFileSync('canary.json', 'utf8'));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `status=${result.status}\n`);
+          fs.writeFileSync('title.txt', result.issueTitle);
+          fs.writeFileSync('body.md', `${result.issueBody}\n[View workflow run](${process.env.RUN_URL})\n`);
+          NODE
+      - name: Create or update freshness issue
+        if: steps.result.outputs.status != 'fresh'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="$(cat title.txt)"
+          gh issue list --state open --search "$title in:title" --json number,title > open-issues.json
+          number="$(node -e '
+            const fs = require("node:fs");
+            const title = process.argv[1];
+            const issues = JSON.parse(fs.readFileSync("open-issues.json", "utf8"));
+            process.stdout.write(String(issues.find(issue => issue.title === title)?.number ?? ""));
+          ' "$title")"
+          if [[ -n "$number" ]]; then
+            gh issue edit "$number" --body-file body.md
+          else
+            gh issue create --title "$title" --body-file body.md
+          fi
+      - name: Fail on stale or invalid parity metadata
+        if: steps.result.outputs.status != 'fresh'
+        run: exit 1
