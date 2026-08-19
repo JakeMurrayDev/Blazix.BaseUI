@@ -125,6 +125,14 @@
     public bool CloseOnFocusOut { get; set; } = true;
 
     /// <summary>
+    /// Whether to skip the focus-out close while an outside press is in flight so the
+    /// component's outside-press dismissal can report the correct close reason on the
+    /// completed click. Defaults to <see langword="false"/>.
+    /// </summary>
+    [Parameter]
+    public bool DeferFocusOutDuringOutsidePress { get; set; }
+
+    /// <summary>
     /// The interaction type that opened the popup (e.g. "click", "touch", "keyboard").
     /// </summary>
     [Parameter]
@@ -381,6 +389,7 @@
                 restoreFocus = RestoreFocus,
                 restoreFocusMode = RestoreFocusMode,
                 closeOnFocusOut = CloseOnFocusOut,
+                deferFocusOutDuringOutsidePress = DeferFocusOutDuringOutsidePress,
                 interactionType = InteractionType ?? string.Empty,
                 dotNetRef = dotNetRef,
                 treeId = NodeContext?.TreeId ?? ExternalTree?.TreeId,
