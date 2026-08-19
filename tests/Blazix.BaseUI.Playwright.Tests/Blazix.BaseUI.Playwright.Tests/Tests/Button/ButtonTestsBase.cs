@@ -164,18 +164,19 @@ public abstract class ButtonTestsBase : TestBase
 
         await WaitForButtonJsAsync();
 
-        // The JS handler calls preventDefault() on click when disabled.
-        // Blazor's event delegation still fires @onclick, so we verify the
-        // JS-level prevention by checking defaultPrevented on the native event.
+        // The JS handler calls preventDefault() and stopImmediatePropagation() on click while
+        // disabled, so a listener added after it never runs - dispatchEvent's return value is
+        // the only way to observe defaultPrevented synchronously without hanging.
         var defaultPrevented = await Page.EvaluateAsync<bool>(@"() => {
-            return new Promise(resolve => {
-                const el = document.querySelector('[data-testid=""button-under-test""]');
-                el.addEventListener('click', e => resolve(e.defaultPrevented), { once: true });
-                el.click();
-            });
+            const el = document.querySelector('[data-testid=""button-under-test""]');
+            return !el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         }");
 
         Assert.True(defaultPrevented);
+
+        // stopImmediatePropagation also keeps Blazor's root-delegated @onclick from firing.
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetClickCount()).ToHaveTextAsync("0");
     }
 
     [Fact]
@@ -223,18 +224,19 @@ public abstract class ButtonTestsBase : TestBase
 
         await WaitForButtonJsAsync();
 
-        // The JS handler calls preventDefault() on click when disabled.
-        // Blazor's event delegation still fires @onclick, so we verify the
-        // JS-level prevention by checking defaultPrevented on the native event.
+        // The JS handler calls preventDefault() and stopImmediatePropagation() on click while
+        // disabled, so a listener added after it never runs - dispatchEvent's return value is
+        // the only way to observe defaultPrevented synchronously without hanging.
         var defaultPrevented = await Page.EvaluateAsync<bool>(@"() => {
-            return new Promise(resolve => {
-                const el = document.querySelector('[data-testid=""button-under-test""]');
-                el.addEventListener('click', e => resolve(e.defaultPrevented), { once: true });
-                el.click();
-            });
+            const el = document.querySelector('[data-testid=""button-under-test""]');
+            return !el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         }");
 
         Assert.True(defaultPrevented);
+
+        // stopImmediatePropagation also keeps Blazor's root-delegated @onclick from firing.
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetClickCount()).ToHaveTextAsync("0");
     }
 
     [Fact]
@@ -297,15 +299,17 @@ public abstract class ButtonTestsBase : TestBase
 
         await WaitForButtonJsAsync();
 
+        // Same dispatchEvent technique as the non-native variants: the module's
+        // stopImmediatePropagation while disabled makes a listener-based probe hang forever.
         var defaultPrevented = await Page.EvaluateAsync<bool>(@"() => {
-            return new Promise(resolve => {
-                const el = document.querySelector('[data-testid=""button-under-test""]');
-                el.addEventListener('click', e => resolve(e.defaultPrevented), { once: true });
-                el.click();
-            });
+            const el = document.querySelector('[data-testid=""button-under-test""]');
+            return !el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         }");
 
         Assert.True(defaultPrevented);
+
+        await WaitForDelayAsync(100);
+        await Assertions.Expect(GetClickCount()).ToHaveTextAsync("0");
     }
 
     #endregion
