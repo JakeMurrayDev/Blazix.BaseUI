@@ -22,6 +22,8 @@ public interface ISelectItemContract
     // Root disabled inheritance
     Task Item_ShouldInheritRootDisabledState();
 
+    Task RootDisabled_ShouldNotHighlightOnHover();
+
     // React parity additions
     Task ShouldNotEmitDataLabel();
     Task ShouldEmitDataBlazixBaseUiLabelWhenLabelSet();

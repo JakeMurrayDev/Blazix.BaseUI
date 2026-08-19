@@ -462,6 +462,14 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
+        // `useButton` wraps every merged click handler — the item's own and the
+        // consumer's — and returns before calling them when the button is disabled,
+        // so a disabled item runs neither and leaves `allowMouseSelection` untouched.
+        if (EffectiveDisabled)
+        {
+            return;
+        }
+
         // Consumer handlers run before the Base UI behavior, matching mergeProps.
         await EventUtilities.InvokeOnClickAsync(AdditionalAttributes, e);
 
@@ -488,7 +496,7 @@
         var isInvalidMouseClick = isMouseClick && !isVirtualMouseClick && !allowMouseSelection;
         allowMouseSelection = false;
 
-        if (EffectiveDisabled || TypedRootContext is null || RootContext is null)
+        if (TypedRootContext is null || RootContext is null)
         {
             return;
         }
@@ -600,7 +608,12 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!Disabled
+        // Hover highlighting comes from `listNavigation`, which React enables with
+        // `!readOnly && !disabled`, so a disabled root never highlights on hover.
+        // Item-level `disabled` is checked too, which is a deliberate deviation:
+        // React's `disabledIndices` is empty, so hovering an individual disabled
+        // item does highlight it there.
+        if (!EffectiveDisabled
             && (RootContext?.HighlightItemOnHover ?? true)
             && !(RootContext?.KeyboardActive ?? false)
             && (RootContext?.SelectedIndex ?? -1) < 0
@@ -615,7 +628,7 @@
 
     private async Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!Disabled
+        if (!EffectiveDisabled
             && (RootContext?.HighlightItemOnHover ?? true)
             && !(RootContext?.KeyboardActive ?? false)
             && itemIndex >= 0
