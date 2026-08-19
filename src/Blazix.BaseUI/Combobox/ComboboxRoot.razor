@@ -855,7 +855,10 @@
 
         if (reason == ComboboxChangeReason.InputChange)
         {
-            if (!Multiple && value.Length == 0)
+            // Upstream `ComboboxInput.tsx` only resets the selection and closes when the input
+            // is emptied from OUTSIDE the popup; an input rendered inside the popup is a search
+            // field whose query is independent of the selection.
+            if (!Multiple && value.Length == 0 && !typedContext.InputInsidePopup)
             {
                 await SetSelectedValueInternalAsync(default, ComboboxChangeReason.InputClear);
             }
@@ -864,12 +867,16 @@
             {
                 await SetOpenInternalAsync(true, ComboboxChangeReason.InputChange);
             }
-            else if (value.Length == 0 && !OpenOnInputClick)
+            else if (value.Length == 0 && !typedContext.InputInsidePopup && !OpenOnInputClick)
             {
                 await SetOpenInternalAsync(false, ComboboxChangeReason.InputClear);
             }
 
-            if (AutoHighlight != ComboboxAutoHighlight.False && value.Trim().Length > 0)
+            if (value.Trim().Length == 0)
+            {
+                await RestoreHighlightAfterQueryClearAsync();
+            }
+            else if (AutoHighlight != ComboboxAutoHighlight.False)
             {
                 await HighlightIndexInternalAsync(0, ComboboxHighlightReason.Keyboard);
             }
@@ -877,6 +884,12 @@
             {
                 await HighlightIndexInternalAsync(-1, ComboboxHighlightReason.Keyboard);
             }
+        }
+        else if (reason == ComboboxChangeReason.InputClear &&
+                 value.Length == 0 &&
+                 typedContext.InputInsidePopup)
+        {
+            await RestoreHighlightAfterQueryClearAsync();
         }
 
         SyncContext();
@@ -988,6 +1001,67 @@
         }
 
         return IsItemEqualToValue?.Invoke(left, right) ?? EqualityComparer<TValue>.Default.Equals(left, right);
+    }
+
+    // Upstream f30013819 (#5232) `findSelectionIndex`: the last selected value in multiple
+    // mode, the selected value otherwise.
+    private TValue? GetLastSelectedValue()
+    {
+        if (!Multiple)
+        {
+            return CurrentSelectedValue;
+        }
+
+        var values = GetCurrentSelectedValues();
+        return values.Count == 0 ? default : values[^1];
+    }
+
+    // Position of the selected value in the currently visible (filtered) list, or -1 when
+    // nothing is selected or the selection has been filtered out. A selection that is no
+    // longer in the list drops the highlight rather than leaving it on whichever item now
+    // occupies that index.
+    private int FindSelectedVisibleIndex()
+    {
+        var target = GetLastSelectedValue();
+        if (target is null)
+        {
+            return -1;
+        }
+
+        var count = typedContext.GetVisibleItemCount();
+        for (var index = 0; index < count; index++)
+        {
+            if (typedContext.GetValueAtVisibleIndex(index).Value is TValue candidate &&
+                AreHighlightedValuesEqual(candidate, target))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    // Upstream f30013819 (#5232): clearing the query returns the highlight to the selected
+    // item instead of dropping it or jumping to the first item. With nothing selected the
+    // highlight is dropped, except under `AutoHighlight.Always`, which keeps the first item.
+    private async Task RestoreHighlightAfterQueryClearAsync()
+    {
+        // A directly rendered (inline) list stays visible while closed; a closed popup list is
+        // inert, so its highlight is simply cleared as before.
+        if (!CurrentOpen && !Inline)
+        {
+            await HighlightIndexInternalAsync(-1, ComboboxHighlightReason.Keyboard);
+            return;
+        }
+
+        var nextIndex = GetLastSelectedValue() is not null
+            ? FindSelectedVisibleIndex()
+            : AutoHighlight == ComboboxAutoHighlight.Always ? 0 : -1;
+
+        await HighlightIndexInternalAsync(nextIndex, ComboboxHighlightReason.None);
+
+        // The query is empty, so there is no typed prefix left for inline completion to extend.
+        inlineInputValue = string.Empty;
     }
 
     private void TrackHighlightedValue(int index, bool hasValue, TValue? value)
@@ -1204,7 +1278,9 @@
             }
 
             await SetSelectedValuesInternalAsync(nextValues, reason);
-            if (typedContext.InputInsidePopup)
+            // Upstream `handleSelection` bails out unless the user was filtering, so toggling an
+            // item with an empty query leaves the highlight where the user put it.
+            if (typedContext.InputInsidePopup && CurrentTypedInputValue.Trim().Length > 0)
             {
                 await SetInputValueInternalAsync(string.Empty, ComboboxChangeReason.InputClear);
             }
