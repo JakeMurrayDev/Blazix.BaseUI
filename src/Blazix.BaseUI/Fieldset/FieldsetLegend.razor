@@ -65,7 +65,7 @@
     protected override void OnInitialized()
     {
         resolvedId = ResolvedId;
-        FieldsetContext?.SetLegendId(resolvedId);
+        FieldsetContext?.SetLegendId(this, resolvedId);
         BuildComponentAttributes();
     }
 
@@ -76,7 +76,7 @@
         if (newId != resolvedId)
         {
             resolvedId = newId;
-            FieldsetContext?.SetLegendId(resolvedId);
+            FieldsetContext?.SetLegendId(this, resolvedId);
         }
 
         disabled = FieldsetContext?.Disabled ?? false;
@@ -103,9 +103,9 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        // Only clear when this legend is still the registered one: a replacement legend registers
-        // before this instance is disposed, and clearing unconditionally would drop its id.
-        if (FieldsetContext?.LegendId == resolvedId)
-            FieldsetContext.SetLegendId(null);
+        // A replacement legend registers before this instance is disposed, so the root ignores the
+        // clear unless this instance is still the registered owner. Ownership is tracked by
+        // instance rather than by id so a replacement reusing the same explicit id also survives.
+        FieldsetContext?.SetLegendId(this, null);
     }
 }

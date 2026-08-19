@@ -105,11 +105,29 @@ public class FieldsetLegendTests : BunitContext, IFieldsetLegendContract
         cut.WaitForAssertion(() =>
             cut.Find("fieldset").GetAttribute("aria-labelledby").ShouldBe("legend-second"));
     }
+
+    [Fact]
+    public async Task KeepsAriaLabelledByWhenReplacementLegendReusesTheSameId()
+    {
+        var cut = Render<FieldsetLegendSwapHost>(ps => ps.Add(p => p.ReuseId, true));
+        cut.Find("fieldset").GetAttribute("aria-labelledby").ShouldBe("legend-first");
+
+        await cut.InvokeAsync(() => cut.Instance.SwapLegend());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("fieldset").GetAttribute("aria-labelledby").ShouldBe("legend-first"));
+    }
 }
 
 internal sealed class FieldsetLegendSwapHost : ComponentBase
 {
     private bool useSecondLegend;
+
+    /// <summary>
+    /// Gets or sets whether the replacement legend reuses the first legend's explicit id.
+    /// </summary>
+    [Parameter]
+    public bool ReuseId { get; set; }
 
     public void SwapLegend()
     {
@@ -127,7 +145,7 @@ internal sealed class FieldsetLegendSwapHost : ComponentBase
             inner.AddAttribute(1, "AdditionalAttributes",
                 (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
                 {
-                    { "id", useSecondLegend ? "legend-second" : "legend-first" }
+                    { "id", useSecondLegend && !ReuseId ? "legend-second" : "legend-first" }
                 });
             inner.CloseComponent();
         }));

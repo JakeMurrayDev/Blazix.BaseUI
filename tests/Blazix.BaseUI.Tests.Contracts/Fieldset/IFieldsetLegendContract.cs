@@ -7,4 +7,5 @@ public interface IFieldsetLegendContract
     Task SetsAriaLabelledByOnFieldsetAutomatically();
     Task SetsAriaLabelledByWithCustomId();
     Task KeepsAriaLabelledByWhenLegendIsReplaced();
+    Task KeepsAriaLabelledByWhenReplacementLegendReusesTheSameId();
 }
