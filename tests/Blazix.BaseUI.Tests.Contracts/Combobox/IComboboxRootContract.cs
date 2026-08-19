@@ -2,6 +2,14 @@ namespace Blazix.BaseUI.Tests.Contracts.Combobox;
 
 public interface IComboboxRootContract
 {
+    Task InputPress_ShouldReportInputPressOpenReason();
+
+    Task InlineList_ShouldExposeExpandedAriaOnInput();
+
+    Task DisabledRoot_ShouldDisableItems();
+
+    Task QueryClear_ShouldRestoreHighlightToSelectedItem();
+
     Task Input_ShouldExposeComboboxAttributesFromSelectedValue();
 
     Task ItemPress_ShouldSelectSingleValueAndSerializeHiddenInput();
