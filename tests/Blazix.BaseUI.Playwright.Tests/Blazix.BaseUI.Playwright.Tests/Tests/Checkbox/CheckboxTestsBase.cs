@@ -100,6 +100,29 @@ public abstract class CheckboxTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that a disabled non-native checkbox exposes aria-disabled without firing
+    /// user click callbacks (upstream useButton suppresses consumer onClick while disabled).
+    /// </summary>
+    [Fact]
+    public virtual async Task DisabledCheckbox_HasAriaDisabledAndDoesNotInvokeClickCallback()
+    {
+        await NavigateAsync(CreateUrl("/tests/checkbox")
+            .WithDisabled(true));
+
+        var checkbox = GetCheckbox();
+        var clickCount = GetByTestId("click-count");
+
+        await Assertions.Expect(checkbox).ToHaveAttributeAsync("aria-disabled", "true");
+        Assert.Null(await checkbox.GetAttributeAsync("disabled"));
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+
+        await checkbox.ClickAsync(new LocatorClickOptions { Force = true });
+        await WaitForDelayAsync(100);
+
+        await Assertions.Expect(clickCount).ToHaveTextAsync("0");
+    }
+
+    /// <summary>
     /// Tests that clicking a readonly checkbox does not change state.
     /// </summary>
     [Fact]
