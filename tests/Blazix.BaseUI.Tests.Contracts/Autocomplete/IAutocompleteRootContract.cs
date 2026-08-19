@@ -12,6 +12,8 @@ public interface IAutocompleteRootContract
 
     Task CancelOpen_ShouldCloseThePopupAndReportCancelOpen();
 
+    Task CancelOpen_ShouldDiscardPendingOpenAwaitingOnOpenChange();
+
     Task Input_ShouldExposeComboboxAttributes();
 
     Task ListMode_ShouldFilterItemsAndExposeEmptyState();

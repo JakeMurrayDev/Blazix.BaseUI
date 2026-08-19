@@ -29,6 +29,7 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         AutocompleteAutoHighlight autoHighlight = AutocompleteAutoHighlight.False,
         EventCallback<AutocompleteValueChangeEventArgs>? onValueChange = null,
         EventCallback<AutocompleteOpenChangeEventArgs>? onOpenChange = null,
+        EventCallback<bool>? openChanged = null,
         IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
@@ -49,6 +50,7 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.AutoHighlight), autoHighlight);
             if (onValueChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnValueChange), onValueChange.Value);
             if (onOpenChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnOpenChange), onOpenChange.Value);
+            if (openChanged.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OpenChanged), openChanged.Value);
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ChildContent), CreateDefaultChildren(itemAdditionalAttributes));
             builder.CloseComponent();
         };
@@ -213,6 +215,28 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         received.ShouldNotBeEmpty();
         received[^1].Open.ShouldBeFalse();
         received[^1].Reason.ShouldBe(AutocompleteChangeReason.CancelOpen);
+    }
+
+    [Fact]
+    public async Task CancelOpen_ShouldDiscardPendingOpenAwaitingOnOpenChange()
+    {
+        var gate = new TaskCompletionSource();
+        var openStates = new List<bool>();
+        var onOpenChange = EventCallback.Factory.Create<AutocompleteOpenChangeEventArgs>(this, _ => gate.Task);
+        var openChanged = EventCallback.Factory.Create<bool>(this, value => openStates.Add(value));
+        var cut = Render(CreateAutocomplete(onOpenChange: onOpenChange, openChanged: openChanged));
+        var root = cut.FindComponent<AutocompleteRoot<string>>().Instance;
+
+        // The popup is still closed while the open sits in OnOpenChange, so the cancel early-returns
+        // from SetOpenInternalAsync - but only after bumping the version that discards that open.
+        var pendingOpen = cut.Find("button").MouseDownAsync(new MouseEventArgs());
+        await cut.InvokeAsync(() => root.OnCancelOpen());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        openStates.ShouldBeEmpty();
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
     }
 
     [Fact]
