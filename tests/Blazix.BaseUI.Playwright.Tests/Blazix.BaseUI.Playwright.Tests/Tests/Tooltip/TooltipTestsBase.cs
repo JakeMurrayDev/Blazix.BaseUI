@@ -58,23 +58,6 @@ public abstract class TooltipTestsBase : TestBase
         });
     }
 
-    protected async Task MovePointerWithinTriggerAsync(ILocator trigger, int stepCount)
-    {
-        var box = await trigger.BoundingBoxAsync();
-        Assert.NotNull(box);
-
-        var centerX = box.X + box.Width / 2;
-        var centerY = box.Y + box.Height / 2;
-        var offsets = new[] { -12, 0, 12, 0 };
-
-        await Page.Mouse.MoveAsync(centerX + offsets[0], centerY);
-        for (var index = 1; index <= stepCount; index++)
-        {
-            await Page.Mouse.MoveAsync(centerX + offsets[index % offsets.Length], centerY);
-            await WaitForDelayAsync(60);
-        }
-    }
-
     protected async Task MovePointerToOuterTriggerPaddingAsync()
     {
         var box = await GetByTestId("outer-trigger").BoundingBoxAsync();
