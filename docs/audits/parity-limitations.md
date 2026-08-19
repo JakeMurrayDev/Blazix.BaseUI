@@ -63,7 +63,8 @@ What that means concretely:
    silent: it compares the declared pin and the baseline provenance against upstream's tracked
    revision daily and files a single deduplicated issue when they diverge.
 
-Baselines are also **platform-exact**: chromium `143.0.7499.4`, macos, arm64. There is no Linux
+Baselines are also **platform-exact**. The recorded `platform` block reads `chromium`
+`143.0.7499.4`, `macos`, `arm64` — those are the literal metadata values, not prose. There is no Linux
 platform set, so the pixel dimension has no Linux-compatible baseline and the required CI job the
 spec describes cannot yet be activated (§7).
 
@@ -165,8 +166,10 @@ sloppy touch for Select/Menu/non-modal Dialog (#197), the combobox empty-list Es
 and the four pre-existing master test failures (#191, #192, #194, #195, with #193/#196 for the
 disabled-callback siblings).
 
-These fixes ship with deviations that are deliberate and reviewed, and they are limitations of the
-port as it stands:
+These fixes ship with nine deviations that are deliberate and reviewed, and they are limitations of
+the port as it stands. A tenth bullet follows them: it is not a deviation but the pre-existing
+gap #190 recorded without adopting, dispositioned as B-189.19 in
+[`parity-milestone1-dispositions.md`](parity-milestone1-dispositions.md).
 
 - Escape's `preventDefault`/`stopPropagation` are unconditional — cancellation is not knowable
   synchronously across the async .NET boundary, where upstream skips them for a canceled change.
@@ -186,8 +189,9 @@ port as it stands:
 - NavigationMenu's viewport un-inert in the after-outside guard branch is JS-synchronous against an
   async .NET state sync (upstream uses `flushSync`); a mid-window re-render could transiently restore
   `inert` in the inline/no-positioner configuration.
-- NavigationMenu's viewport always renders both focus guards; upstream renders none when closed
-  inline, so a closed inline menu exposes two dead tab stops.
+- *(not a deviation — tracked blocker B-189.19)* NavigationMenu's viewport always renders both focus
+  guards; upstream renders none when closed inline, so a closed inline menu exposes two dead tab
+  stops.
 
 Two further shipped deviations from earlier waves: `restMs` keys on `isOpen` because the port's JS
 state has no `mounted` equivalent, so the full delay still applies during an exit transition (#189);
@@ -205,7 +209,8 @@ What the evidence does support, stated in full:
 > At upstream Base UI SHA `bdcb685fadcca9d18b18f013c052795a53b6aa33`, the parity harness executed
 > 29/29 declared Milestone 1 fixtures — 26 components, 87 steps, `light` theme only, pixel threshold
 > 0.001, zero `actionOnly` actions — against both Blazor Server and Blazor WebAssembly through the
-> production capture, comparison, and reporting pipeline, on chromium 143.0.7499.4 / macos / arm64.
+> production capture, comparison, and reporting pipeline, on the recorded platform set
+> `chromium` 143.0.7499.4 / `macos` / `arm64`.
 > All 58 candidate legs completed, with zero `ActionCompletionUnmet`, `FixtureError`,
 > `SelectorUnresolved`, or `SelectorNonActionable` findings and zero settle timeouts, and the
 > deliberately broken canary produced its known findings in both render modes. This establishes that

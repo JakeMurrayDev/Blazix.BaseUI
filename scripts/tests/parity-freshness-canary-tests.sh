@@ -15,13 +15,14 @@ output="$fixture/output.json"
 write_fixture() {
     local set_name="${1:-chromium-linux-x64}"
     local platform_pin="${2:-$pin}"
+    local generated_at="${3:-2026-01-01T00:00:00.000Z}"
 
     rm -rf "$fixture/baselines"
     mkdir -p "$fixture/baselines/$set_name"
     printf '{"schemaVersion":3,"captureSchemaVersion":3,"declaredRepositoryPin":"%s"}\n' \
         "$pin" > "$fixture/baselines/metadata.json"
     printf '%s\n' \
-        "{\"schemaVersion\":3,\"captureSchemaVersion\":3,\"upstreamSha\":\"$platform_pin\",\"platform\":{\"browser\":\"chromium\",\"browserVersion\":\"1\",\"os\":\"linux\",\"architecture\":\"x64\"},\"generatedAtUtc\":\"2026-01-01T00:00:00.000Z\",\"fixtureManifestHash\":\"fixture\",\"aliasManifestHash\":\"alias\",\"stylesheetHash\":\"style\",\"fixtures\":[]}" \
+        "{\"schemaVersion\":3,\"captureSchemaVersion\":3,\"upstreamSha\":\"$platform_pin\",\"platform\":{\"browser\":\"chromium\",\"browserVersion\":\"1\",\"os\":\"linux\",\"architecture\":\"x64\"},\"generatedAtUtc\":\"$generated_at\",\"fixtureManifestHash\":\"fixture\",\"aliasManifestHash\":\"alias\",\"stylesheetHash\":\"style\",\"fixtures\":[]}" \
         > "$fixture/baselines/$set_name/metadata.json"
     printf '[]\n' > "$fixture/waivers.json"
 }
@@ -114,6 +115,15 @@ expect_failure --observed-sha "$pin"
 assert_json "
     if (result.status !== 'invalid') throw new Error('expected invalid provenance');
     if (!result.issues.some(issue => issue.code === 'provenance')) throw new Error('missing provenance issue');
+"
+
+write_fixture "chromium-linux-x64" "$pin" "2026-03-01T00:00:00.000Z"
+expect_failure --observed-sha "$pin"
+assert_json "
+    if (result.status !== 'invalid') throw new Error('expected a future generatedAtUtc to be invalid');
+    if (!result.issues.some(issue => issue.code === 'provenance' && issue.message.includes('later than the check time'))) throw new Error('missing future-timestamp provenance issue');
+    if (result.platformSets[0].ageDays !== null) throw new Error('expected a future generatedAtUtc to report a null age');
+    if (result.oldestBaselineAgeDays !== null) throw new Error('expected a future generatedAtUtc to report a null oldest age');
 "
 
 write_fixture "wrong-platform-name"

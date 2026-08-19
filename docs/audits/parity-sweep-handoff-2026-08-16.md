@@ -1,5 +1,14 @@
 # Blazix.BaseUI parity sweep — handoff (2026-08-16)
 
+> **Historical snapshot — not a current work queue.** This is the handoff as written on 2026-08-16,
+> preserved unedited below so the method and the reasoning behind it stay readable. Its "what to do
+> next" list has since been worked: PR #190 retired the entire five-item Playwright cluster in §1,
+> and #197, #198, and #199 closed #190's own follow-ups. For the current state of every finding —
+> including the deviations those PRs shipped with — read
+> [`parity-milestone1-dispositions.md`](parity-milestone1-dispositions.md) and
+> [`parity-limitations.md`](parity-limitations.md), which supersede the "What to do next" and
+> "Known deviations" sections below.
+
 Paste this into a fresh session to continue the upstream-parity effort.
 
 ## Context

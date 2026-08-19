@@ -173,6 +173,8 @@ function validateProvenance(directory, nowValue, resultIssues) {
         const generatedTime = generatedAtUtc === null ? Number.NaN : Date.parse(generatedAtUtc);
         if (!Number.isFinite(generatedTime))
             addIssue(resultIssues, "provenance", `Platform set '${setName}' generatedAtUtc must parse as a date.`);
+        else if (generatedTime > nowValue.getTime())
+            addIssue(resultIssues, "provenance", `Platform set '${setName}' generatedAtUtc is later than the check time; baselines cannot be captured in the future.`);
 
         const platform = isObject(metadata.platform) ? metadata.platform : {};
         const browser = readPlatformString(platform, "browser", setName, resultIssues);
@@ -185,7 +187,7 @@ function validateProvenance(directory, nowValue, resultIssues) {
             set: setName,
             upstreamSha,
             generatedAtUtc,
-            ageDays: Number.isFinite(generatedTime)
+            ageDays: Number.isFinite(generatedTime) && generatedTime <= nowValue.getTime()
                 ? Math.floor((nowValue.getTime() - generatedTime) / 86_400_000)
                 : null
         });

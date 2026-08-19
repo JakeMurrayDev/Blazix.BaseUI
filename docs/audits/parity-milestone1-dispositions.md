@@ -40,8 +40,8 @@ an explicitly tracked blocker.
 ## A. Harness findings from the 29-fixture run
 
 **Evidence:** PR [#178](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/178), one unfiltered live
-run at upstream pin `bdcb685fadcca9d18b18f013c052795a53b6aa33`, capture schema 3, chromium
-143.0.7499.4 on macos/arm64, 7m19s wall clock.
+run at upstream pin `bdcb685fadcca9d18b18f013c052795a53b6aa33`, capture schema 3, on the recorded
+platform set `chromium` 143.0.7499.4 / `macos` / `arm64`, 7m19s wall clock.
 
 ### A.1 Execution findings — none outstanding; one comparator count unreported
 
@@ -74,9 +74,9 @@ two runner-owned kinds (`ActionCompletionUnmet` and `FixtureError`) are reported
 
 ### A.3 Comparator differences — one explicitly tracked blocker
 
-The run reported **4356 findings, 4149 of them blocking**, with 0 waivers defined and 0 applied. PR
-#178 landed them deliberately undisposed and made no parity claim: it established that all 29 fixtures
-*execute and compare cleanly*, not that the compared output matches.
+The run reported **4356 findings, 4149 of them blocking**, with 0 waivers defined and 0 applied.
+PR #178 landed them deliberately undisposed and made no parity claim: it established that all 29
+fixtures *execute and compare cleanly*, not that the compared output matches.
 
 That population has **not** been reduced to per-finding dispositions, and it cannot be from the
 evidence that exists: no run report is committed, so the individual six-field identities were never
@@ -291,12 +291,18 @@ in both the `.js` and the regenerated `.min.js`.
 | B-190.4 | Sloppy-touch outside press: >10 px dismisses mid-gesture, >5 px arms dismissal at touchend, >1 s long press never dismisses, a clean tap dismisses via the synthesized mousedown. | #190 (`03eb25b9`, `9940c7b9`, `966dbd8d`) |
 | B-190.5 | NavigationMenu closes when focus leaves it; Safari no longer lands focus on an invisible guard. | #190 (`bd6e7f11`, `a6bf7f77`) |
 
-#190's own recorded deviations (Escape `preventDefault` unconditional; same-phase capture siblings
-cannot suppress each other; `touchState` retained until the synthesized mousedown; one global touch
-machine so a second open root's gesture dismissal is lost; Chromium-only touch test primitives;
-Select's escape pick is last-in-Map; NavigationMenu's null `relatedTarget` exemption; the viewport
-un-inert/`flushSync` window) are **deviations — recorded, deliberate** and are reproduced in
-[`parity-limitations.md`](parity-limitations.md) rather than re-listed here.
+PR #190's own recorded deviations are **deviations — recorded, deliberate**, and are reproduced in
+[`parity-limitations.md`](parity-limitations.md) §5 rather than given rows here. There are nine:
+Escape `preventDefault` unconditional; same-phase capture siblings cannot suppress each other;
+Select's escape pick is last-in-Map; Safari's compositionend-before-keydown IME hold is not
+replicated in the shared guard; `touchState` retained until the synthesized mousedown; one global
+touch machine, so a second open root's gesture dismissal is lost; Chromium-only touch test
+primitives; NavigationMenu's null `relatedTarget` exemption; and the viewport
+un-inert/`flushSync` window.
+
+`parity-limitations.md` §5 carries a tenth bullet — the viewport always rendering both focus guards.
+That one is not a #190 deviation: it is the pre-existing gap #190 recorded but did not adopt, and it
+is dispositioned here as B-189.19, a tracked blocker.
 
 ### B.11 #190's follow-up list — closed
 
@@ -318,11 +324,11 @@ These five dispositions attach to real upstream commits and so are restated in t
 
 | ID | Upstream | Verdict | Symptom | Evidence | Verified against |
 | --- | --- | --- | --- | --- | --- |
-| B-181.10 | `9798cd1e8` #5194 ("[select][combobox] Remove dead code and deduplicate handlers") | `(a)` | no user-observable symptom — the same attributes, ARIA, handler set and ordering are emitted before and after; the commit consolidates duplicated React prop objects into `combobox/utils/parts.ts` and deletes unreachable branches | 29 upstream files, all under `packages/react/src/{select,combobox,autocomplete}/`, **no test file changed** (304 additions / 472 deletions), and the port builds each part's attribute dictionary once in its own `.razor`, so there is no duplicated handler registration to consolidate | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-181.10 | `9798cd1e8` #5194 (`[select][combobox] Remove dead code and deduplicate handlers`) | `(a)` | no user-observable symptom — the same attributes, ARIA, handler set and ordering are emitted before and after; the commit consolidates duplicated React prop objects into `combobox/utils/parts.ts` and deletes unreachable branches | 29 upstream files, all under `packages/react/src/{select,combobox,autocomplete}/`, **no test file changed** (304 additions / 472 deletions), and the port builds each part's attribute dictionary once in its own `.razor`, so there is no duplicated handler registration to consolidate | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
 | B-181.11 | `def0eade0` #5195 ("[autocomplete] Respect locale when filtering") | `(b) — escalated (METHODOLOGY tier 3: adds public API surface)` | with a caller-supplied locale, filtering must compare using that locale's collation instead of the ambient one, so locale-sensitive matches (accents, casing rules) differ | the port filters with `StringComparison.CurrentCultureIgnoreCase` at `src/Blazix.BaseUI/Combobox/ComboboxRootContext.cs:546` and `:557`, which is the runtime-locale analogue but is not caller-selectable; porting upstream's behavior means adding a public `Locale` parameter, which is the maintainer's call | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
 | B-182.4 | `2437d817e` #5156 ("[composite] Fix nested list reorder detection") | `(d:moot)` | after a nested list's items are reordered in the DOM, arrow navigation follows the stale order captured when the list was registered | exact local mechanism inspected: `getMenuItems` in `src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js:408-417` runs `popupElement.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]')` on every call, and every navigation site calls it fresh (`:104`, `:160`, `:508`, `:1310`, `:1402`, `:1895`); no item array is cached, so there is no stale registration for a `MutationObserver` to repair | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
 | B-182.5 | (current-state parity) `findRootOwnerId` early return in `MenuTrigger.tsx:145-147` | `(c) — deferred with spec (METHODOLOGY tier 2)`, correcting the earlier "declined" | after a hover-open, releasing the mouse over a node that belongs to the same menu root but sits outside both the trigger and the positioner — a portalled submenu popup, for instance — cancels the open, where upstream keeps it open | upstream walks up from the mouseup target with `findRootOwnerId` (`packages/react/src/menu/utils/findRootOwnerId.ts`) and returns early when the nearest `data-rootownerid` equals the root's id. The port's `armHoverOpenSlipOutCancel` (`src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js:898-934`) checks only `contains(trigger, target)`, `contains(positionerElement, target)` and `isMouseWithinBounds`, and has no `data-rootownerid` walk — yet `src/Blazix.BaseUI/Menu/MenuPopup.razor:216` does emit `data-rootownerid`, and `src/Blazix.BaseUI/wwwroot/blazix-baseui-context-menu.js:347-353` already implements the same walk. The symptom is therefore reachable, not moot; METHODOLOGY forbids default-skip, so this is a recorded debt with the mechanism written down, not a decline. | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
-| B-185.16 | `99018b2c7` #5003 ("[tabs][slider] Exclude the prehydration script from client bundles") | `(d:moot)` | the published client JavaScript bundle carried the server-only prehydration script string, so browsers downloaded (and the bundler kept alive) code that only ever runs during server rendering | exact local mechanism inspected: the port has no client JS bundle that could carry it. `src/Blazix.BaseUI/Tabs/TabsIndicator.razor:21` emits the prehydration script inline in the component's own rendered markup from the `PrehydrationScript` constant at `:26`, and `src/Blazix.BaseUI/Slider/` contains no prehydration script at all (grep for "Prehydration" across `src/` matches only `TabsIndicator.razor`). There is no separate bundle from which to exclude it. | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
+| B-185.16 | `99018b2c7` #5003 (`[tabs][slider] Exclude the prehydration script from client bundles`) | `(d:moot)` | the published client JavaScript bundle carried the server-only prehydration script string, so browsers downloaded (and the bundler kept alive) code that only ever runs during server rendering | exact local mechanism inspected: the port has no client JS bundle that could carry it. `src/Blazix.BaseUI/Tabs/TabsIndicator.razor:21` emits the prehydration script inline in the component's own rendered markup from the `PrehydrationScript` constant at `:26`, and `src/Blazix.BaseUI/Slider/` contains no prehydration script at all (grep for "Prehydration" across `src/` matches only `TabsIndicator.razor`). There is no separate bundle from which to exclude it. | local HEAD `90c20c55` + upstream pin `1a2ca3c9f`, 2026-08-20 |
 
 ## Summary
 
@@ -335,8 +341,9 @@ These five dispositions attach to real upstream commits and so are restated in t
 
 The B count is the 118 unique IDs in the §B ledger tables, not an estimate. The §B.12 methodology
 table restates five existing IDs, so `grep -cE '^\| B-[0-9.]+ \|'` counts 123 rendered rows.
-The eight further deviations #190 recorded about its own fixes are listed in
-[`parity-limitations.md`](parity-limitations.md) instead of being given rows here.
+The nine further deviations #190 recorded about its own fixes are listed in
+[`parity-limitations.md`](parity-limitations.md) §5 instead of being given rows here; §5's tenth
+bullet is B-189.19, which does have a row.
 
 Nothing is waived. Nothing is silently accepted. The three items the design spec calls
 milestone-completion criteria 4 and 5 — "every finding has a disposition" and "no unwaived Error
