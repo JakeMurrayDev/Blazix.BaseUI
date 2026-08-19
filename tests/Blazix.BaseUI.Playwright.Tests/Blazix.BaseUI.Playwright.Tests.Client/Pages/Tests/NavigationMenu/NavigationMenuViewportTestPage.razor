@@ -1,0 +1,64 @@
+@page "/tests/navigation-menu-viewport/wasm"
+@using Blazix.BaseUI.NavigationMenu
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Navigation Menu Viewport Test Page (WASM)</PageTitle>
+
+<div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
+    <NavigationMenuRoot
+        @bind-Value="currentValue"
+        Delay="@Delay"
+        CloseDelay="@CloseDelay"
+        OnValueChange="HandleValueChange">
+        @* Horizontal layout with a gap keeps the popup (anchored below the active
+           trigger) from covering the sibling trigger, so hover can reach both. *@
+        <NavigationMenuList style="display: flex; gap: 60px; list-style: none; margin: 0; padding: 0;">
+            <NavigationMenuItem Value="item1">
+                <NavigationMenuTrigger data-testid="nav-trigger-1">Item 1</NavigationMenuTrigger>
+                <NavigationMenuContent data-testid="nav-content-1">
+                    <NavigationMenuLink Href="/link1a" data-testid="nav-link-1a">Link 1A</NavigationMenuLink>
+                    <NavigationMenuLink Href="/link1b" data-testid="nav-link-1b">Link 1B</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+            <NavigationMenuItem Value="item2">
+                <NavigationMenuTrigger data-testid="nav-trigger-2">Item 2</NavigationMenuTrigger>
+                <NavigationMenuContent data-testid="nav-content-2">
+                    <NavigationMenuLink Href="/link2a" data-testid="nav-link-2a">Link 2A</NavigationMenuLink>
+                    <NavigationMenuLink Href="/link2b" data-testid="nav-link-2b">Link 2B</NavigationMenuLink>
+                </NavigationMenuContent>
+            </NavigationMenuItem>
+        </NavigationMenuList>
+
+        <NavigationMenuPortal>
+            <NavigationMenuPositioner>
+                <NavigationMenuPopup>
+                    <NavigationMenuViewport data-testid="nav-viewport" />
+                </NavigationMenuPopup>
+            </NavigationMenuPositioner>
+        </NavigationMenuPortal>
+    </NavigationMenuRoot>
+
+    <div data-testid="state-display" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <div>Active Value: <span data-testid="active-value">@(currentValue ?? "none")</span></div>
+        <div>Change Count: <span data-testid="change-count">@changeCount</span></div>
+        <div>Last Changed Value: <span data-testid="last-changed-value">@(lastChangedValue ?? "none")</span></div>
+    </div>
+</div>
+
+@code {
+    private string? currentValue;
+    private int changeCount;
+    private string? lastChangedValue;
+
+    [SupplyParameterFromQuery(Name = "delay")]
+    public int Delay { get; set; } = 50;
+
+    [SupplyParameterFromQuery(Name = "closeDelay")]
+    public int CloseDelay { get; set; } = 50;
+
+    private void HandleValueChange(NavigationMenuValueChangeEventArgs args)
+    {
+        changeCount++;
+        lastChangedValue = args.Value;
+    }
+}
