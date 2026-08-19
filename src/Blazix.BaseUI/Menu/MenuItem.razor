@@ -22,6 +22,8 @@
     private string ResolvedId => AttributeUtilities.GetIdOrDefault(
         AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
 
+    private bool ResolvedDisabled => Disabled || (RootContext?.Disabled ?? false);
+
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
@@ -98,7 +100,7 @@
     protected override void OnParametersSet()
     {
         hasMouseMoveAttribute = AttributeUtilities.HasAttribute(AdditionalAttributes, "onmousemove");
-        state = new MenuItemState(Disabled, highlighted);
+        state = new MenuItemState(ResolvedDisabled, highlighted);
         BuildComponentAttributes();
     }
 
@@ -108,11 +110,11 @@
 
         if (NativeButton)
         {
-            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, ResolvedDisabled);
         }
         else
         {
-            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, ResolvedDisabled);
         }
 
         attrs["role"] = "menuitem";
@@ -122,7 +124,7 @@
         // kept-mounted closed menu's stale-highlighted item from keeping tabindex=0 (#4931).
         attrs["tabindex"] = ((RootContext?.GetOpen() ?? false) && highlighted) ? 0 : -1;
 
-        if (Disabled)
+        if (ResolvedDisabled)
         {
             attrs["aria-disabled"] = "true";
             attrs["data-disabled"] = true;
@@ -145,7 +147,7 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (Disabled)
+        if (ResolvedDisabled)
         {
             return;
         }
@@ -160,7 +162,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!Disabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
+        if (!ResolvedDisabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };
@@ -186,7 +188,7 @@
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!Disabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
+        if (!ResolvedDisabled && !highlighted && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };

@@ -30,6 +30,8 @@
 
     private bool IsChecked => IsControlled ? Checked!.Value : internalChecked;
 
+    private bool ResolvedDisabled => Disabled || (RootContext?.Disabled ?? false);
+
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
 
@@ -148,18 +150,18 @@
             {
                 Checked = IsChecked,
                 Highlighted = highlighted,
-                Disabled = Disabled
+                Disabled = ResolvedDisabled
             };
         }
         else
         {
             itemContext.Checked = IsChecked;
             itemContext.Highlighted = highlighted;
-            itemContext.Disabled = Disabled;
+            itemContext.Disabled = ResolvedDisabled;
         }
 
         state = new MenuCheckboxItemState(
-            Disabled: Disabled,
+            Disabled: ResolvedDisabled,
             Highlighted: highlighted,
             Checked: IsChecked);
 
@@ -172,11 +174,11 @@
 
         if (NativeButton)
         {
-            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, Disabled);
+            AccessibilityUtilities.ApplyNativeButtonAttributes(attrs, ResolvedDisabled);
         }
         else
         {
-            AccessibilityUtilities.ApplyButtonAttributes(attrs, Disabled);
+            AccessibilityUtilities.ApplyButtonAttributes(attrs, ResolvedDisabled);
         }
 
         attrs["role"] = "menuitemcheckbox";
@@ -186,7 +188,7 @@
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
 
-        if (Disabled)
+        if (ResolvedDisabled)
         {
             attrs["aria-disabled"] = "true";
         }
@@ -199,7 +201,7 @@
 
         attrs["data-checked"] = IsChecked;
         attrs["data-unchecked"] = !IsChecked;
-        attrs["data-disabled"] = Disabled;
+        attrs["data-disabled"] = ResolvedDisabled;
         attrs["data-highlighted"] = highlighted;
 
         if (!string.IsNullOrEmpty(Label))
@@ -212,7 +214,7 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (Disabled)
+        if (ResolvedDisabled)
         {
             return;
         }
@@ -252,7 +254,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!Disabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
+        if (!ResolvedDisabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             itemContext.Highlighted = true;
@@ -280,7 +282,7 @@
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!Disabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
+        if (!ResolvedDisabled && !highlighted && itemContext is not null && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             itemContext.Highlighted = true;

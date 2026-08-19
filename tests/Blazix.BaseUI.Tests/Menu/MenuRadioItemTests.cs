@@ -10,6 +10,7 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
 
     private RenderFragment CreateRadioItemInRoot(
         bool defaultOpen = true,
+        bool rootDisabled = false,
         string? defaultValue = null,
         bool groupDisabled = false,
         bool itemDisabled = false,
@@ -21,7 +22,9 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
         {
             builder.OpenComponent<MenuRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
+            if (rootDisabled)
+                builder.AddAttribute(2, "Disabled", true);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<MenuTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
@@ -206,6 +209,18 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
         var items = cut.FindAll("[role='menuitemradio']");
         items[0].HasAttribute("data-disabled").ShouldBeTrue();
         items[0].GetAttribute("aria-disabled")!.ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task IsDisabledWhenRootIsDisabled()
+    {
+        var cut = Render(CreateRadioItemInRoot(rootDisabled: true));
+
+        var item = cut.Find("[role='menuitemradio']");
+        item.HasAttribute("data-disabled").ShouldBeTrue();
+        item.GetAttribute("aria-disabled")!.ShouldBe("true");
 
         return Task.CompletedTask;
     }
