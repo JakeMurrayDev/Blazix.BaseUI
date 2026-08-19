@@ -26,6 +26,7 @@ public abstract class NavigationMenuTestsBase : TestBase
         await WaitForDelayAsync((int)(200 * TimeoutMultiplier));
     }
 
+
     protected async Task WaitForActiveValueAsync(string expectedValue)
     {
         var activeValue = GetByTestId("active-value");
@@ -74,7 +75,43 @@ public abstract class NavigationMenuTestsBase : TestBase
     {
         return Page.EvaluateAsync<string?>("() => document.activeElement?.getAttribute('data-testid')");
     }
+    #endregion
 
+    #region Hover Rest Tests
+
+    // Upstream NavigationMenuTrigger.tsx: `restMs: mounted && positionerElement ? 0 : delay`
+    // - the initial hover open is REST-only: a pointer sweeping continuously across the
+    // trigger never opens; the pointer must come to rest for the delay.
+
+    [Fact]
+    public virtual async Task ContinuousPointerMovementDoesNotOpenMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu").WithDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("nav-trigger-1"), 25);
+
+        await Assertions.Expect(GetByTestId("active-value")).ToHaveTextAsync("none");
+    }
+
+    [Fact]
+    public virtual async Task PointerRestOpensMenuAfterRestDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/navigation-menu").WithDelay(600));
+        await WaitForDelayAsync(500);
+
+        // 12 steps x 60ms of movement outlast the 600ms delay, so an implementation
+        // that arms one timer on entry without restarting it on mousemove opens DURING
+        // the movement and fails the closed assertion below.
+        await MovePointerWithinTriggerAsync(GetByTestId("nav-trigger-1"), 12);
+        var activeValue = GetByTestId("active-value");
+        await Assertions.Expect(activeValue).ToHaveTextAsync("none");
+
+        await Assertions.Expect(activeValue).ToHaveTextAsync("item1", new LocatorAssertionsToHaveTextOptions
+        {
+            Timeout = 1500 * TimeoutMultiplier
+        });
+    }
     #endregion
 
     #region Trigger Click Tests

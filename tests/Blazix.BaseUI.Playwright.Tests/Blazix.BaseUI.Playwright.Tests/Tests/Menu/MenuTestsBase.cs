@@ -78,6 +78,45 @@ public abstract class MenuTestsBase : TestBase
 
     #endregion
 
+    #region Hover Rest Tests
+
+    // Upstream MenuTrigger.tsx: standalone menu roots are REST-only
+    // (restMs = delay, no enter delay) - a pointer sweeping continuously across the
+    // trigger never opens; the pointer must come to rest for the delay.
+
+    [Fact]
+    public virtual async Task ContinuousPointerMovementDoesNotOpenHoverMenu()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(600));
+        await WaitForDelayAsync(500);
+
+        await MovePointerWithinTriggerAsync(GetByTestId("menu-trigger"), 25);
+
+        await Assertions.Expect(GetByTestId("open-state")).ToHaveTextAsync("false");
+    }
+
+    [Fact]
+    public virtual async Task PointerRestOpensHoverMenuAfterRestDelay()
+    {
+        await NavigateAsync(CreateUrl("/tests/menu")
+            .WithOpenOnHover(true)
+            .WithOpenDelay(600));
+        await WaitForDelayAsync(500);
+
+        // 12 steps x 60ms of movement outlast the 600ms delay, so an implementation
+        // that arms one timer on entry without restarting it on mousemove opens DURING
+        // the movement and fails the closed assertion below.
+        await MovePointerWithinTriggerAsync(GetByTestId("menu-trigger"), 12);
+        var openState = GetByTestId("open-state");
+        await Assertions.Expect(openState).ToHaveTextAsync("false");
+
+        await WaitForTextContentAsync(openState, "true", 1500);
+    }
+
+    #endregion
+
     #region Touch Outside Press Tests
 
     // Sloppy-touch semantics (upstream useDismiss.ts 'sloppy' for menus): a touch outside

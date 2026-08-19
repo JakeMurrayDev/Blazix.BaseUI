@@ -378,6 +378,29 @@ function addHoverListeners(rootState, itemValue, element) {
     const onPointerDown = (event) => {
         rootState.pointerType = event.pointerType || '';
     };
+    const openFromHover = () => {
+        const prev = rootState.activeTriggerElement;
+        if (prev && prev !== element) {
+            rootState.prevTriggerElement = prev;
+            rootState.activationDirection = computeRectDirection(prev, element, rootState.orientation);
+        } else {
+            rootState.prevTriggerElement = null;
+            rootState.activationDirection = 'none';
+        }
+        rootState.value = itemValue;
+        rootState.activeTriggerElement = element;
+        rootState.openedByHover = true;
+        rootState.stickIfOpenUntil = Date.now() + 500;
+        rootState.pendingOpen = true;
+        revealPositioningSurface(rootState);
+        syncContentVisibility(rootState);
+        syncCurrentContentElement(rootState);
+        syncPopupAutoSize(rootState);
+        rootState.dotNetRef
+            .invokeMethodAsync('OnHoverOpen', itemValue, rootState.activationDirection)
+            .catch(() => { });
+    };
+
     const onEnter = () => {
         if (rootState.pointerType === 'touch' || isTriggerDisabled(element)) {
             return;
@@ -387,32 +410,37 @@ function addHoverListeners(rootState, itemValue, element) {
         rootState.closeTimer = null;
         clearSafePolygon(rootState);
 
-        // Upstream `restMs: mounted && positionerElement ? 0 : delay` - the open delay only
-        // applies to the initial open; retargeting an already-open menu is instant.
-        const effectiveDelay = rootState.isOpen && rootState.positionerElement ? 0 : rootState.delay;
+        // Upstream `restMs: mounted && positionerElement ? 0 : delay` - retargeting an
+        // already-open menu is instant (kept keyed on isOpen rather than mounted, the
+        // recorded deviation), while the initial open is REST-based: entry alone never
+        // starts the timer; onMouseMove below arms and restarts it until the pointer
+        // comes to rest for the delay.
+        if ((rootState.isOpen && rootState.positionerElement) || !rootState.delay) {
+            rootState.openTimer = setTimeout(openFromHover, 0);
+        }
+    };
 
+    const onMouseMove = (event) => {
+        if (rootState.pointerType === 'touch' || isTriggerDisabled(element)) {
+            return;
+        }
+
+        // Rest-only applies to the initial open; an open menu retargets via onEnter.
+        if ((rootState.isOpen && rootState.positionerElement) || !rootState.delay) {
+            return;
+        }
+
+        // Tremor guard (shared hover parity): sub-pixel jitter while the rest timer is
+        // pending must not restart it.
+        if (rootState.openTimer && event.movementX ** 2 + event.movementY ** 2 < 2) {
+            return;
+        }
+
+        clearTimeout(rootState.openTimer);
         rootState.openTimer = setTimeout(() => {
-            const prev = rootState.activeTriggerElement;
-            if (prev && prev !== element) {
-                rootState.prevTriggerElement = prev;
-                rootState.activationDirection = computeRectDirection(prev, element, rootState.orientation);
-            } else {
-                rootState.prevTriggerElement = null;
-                rootState.activationDirection = 'none';
-            }
-            rootState.value = itemValue;
-            rootState.activeTriggerElement = element;
-            rootState.openedByHover = true;
-            rootState.stickIfOpenUntil = Date.now() + 500;
-            rootState.pendingOpen = true;
-            revealPositioningSurface(rootState);
-            syncContentVisibility(rootState);
-            syncCurrentContentElement(rootState);
-            syncPopupAutoSize(rootState);
-            rootState.dotNetRef
-                .invokeMethodAsync('OnHoverOpen', itemValue, rootState.activationDirection)
-                .catch(() => { });
-        }, effectiveDelay);
+            rootState.openTimer = null;
+            openFromHover();
+        }, rootState.delay);
     };
 
     const onLeave = (event) => {
@@ -469,12 +497,14 @@ function addHoverListeners(rootState, itemValue, element) {
     element._navMenuPointerDown = onPointerDown;
     element._navMenuEnter = onEnter;
     element._navMenuLeave = onLeave;
+    element._navMenuMouseMove = onMouseMove;
     element._navMenuClickCapture = onClickCapture;
     element._navMenuKeyDown = onKeyDown;
     element.addEventListener('pointerenter', onPointerEnter);
     element.addEventListener('pointerdown', onPointerDown);
     element.addEventListener('mouseenter', onEnter);
     element.addEventListener('mouseleave', onLeave);
+    element.addEventListener('mousemove', onMouseMove);
     element.addEventListener('click', onClickCapture, true);
     element.addEventListener('keydown', onKeyDown);
 }
@@ -588,6 +618,10 @@ function removeHoverListeners(rootState, itemValue, element) {
     if (element._navMenuEnter) {
         element.removeEventListener('mouseenter', element._navMenuEnter);
         delete element._navMenuEnter;
+    }
+    if (element._navMenuMouseMove) {
+        element.removeEventListener('mousemove', element._navMenuMouseMove);
+        delete element._navMenuMouseMove;
     }
     if (element._navMenuLeave) {
         element.removeEventListener('mouseleave', element._navMenuLeave);

@@ -116,7 +116,10 @@ public abstract class TooltipTestsBase : TestBase
         await NavigateAsync(CreateUrl("/tests/tooltip").WithDelay(600));
         await WaitForDelayAsync(500);
 
-        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 5);
+        // 12 steps x 60ms of movement outlast the 600ms delay, so an implementation
+        // that arms one timer on entry without restarting it on mousemove opens DURING
+        // the movement and fails the closed assertion below.
+        await MovePointerWithinTriggerAsync(GetByTestId("tooltip-trigger"), 12);
         var openState = GetByTestId("open-state");
         await Assertions.Expect(openState).ToHaveTextAsync("false");
 

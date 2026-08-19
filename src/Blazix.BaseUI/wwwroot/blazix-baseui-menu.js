@@ -975,16 +975,28 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
     // allowMouseEnter starts false - hover opens instantly until deliberate mouse movement
     const configuredOpenDelay = openDelay || 0;
     const configuredCloseDelay = closeDelay || 0;
+
+    // Upstream MenuTrigger.tsx: standalone menu roots are REST-only —
+    // `restMs: parent.type === undefined ? delay : undefined` — the pointer must come
+    // to rest on the trigger for the delay; a continuous sweep never opens. Submenu,
+    // menubar, and context-menu triggers keep plain enter delays
+    // (MenuSubmenuTrigger.tsx arms both and the enter timer wins).
+    const isStandaloneRoot = !rootState.isNested && !rootState.menubarElement && rootState.parentType == null;
+    const effectiveOpenDelay = isStandaloneRoot ? 0 : configuredOpenDelay;
+    const effectiveRestMs = isStandaloneRoot ? configuredOpenDelay : 0;
+
     rootState.allowMouseEnter = false;
-    rootState.openDelay = configuredOpenDelay;
+    rootState.openDelay = effectiveOpenDelay;
     rootState.closeDelay = configuredCloseDelay;
+    rootState.restMs = effectiveRestMs;
 
     rootState.hoverInteraction = createHoverInteraction({
         interactionId: `menu-hover-${rootId}`,
         triggerElement: rootState.triggerElement,
         floatingElement: rootState.popupElement,
-        openDelay: configuredOpenDelay,
+        openDelay: effectiveOpenDelay,
         closeDelay: configuredCloseDelay,
+        ...(isStandaloneRoot ? { restMs: effectiveRestMs } : {}),
         mouseOnly: true,
         useSafePolygon: true,
         safePolygonOptions: { blockPointerEvents: true },
@@ -1024,7 +1036,7 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
     function onAllowMouseEnter() {
         if (!rootState.allowMouseEnter) {
             rootState.allowMouseEnter = true;
-            rootState.hoverInteraction?.setDelays(configuredOpenDelay, configuredCloseDelay);
+            rootState.hoverInteraction?.setDelays(effectiveOpenDelay, configuredCloseDelay, effectiveRestMs);
         }
     }
     rootState.triggerElement.addEventListener('mousemove', onAllowMouseEnter);
@@ -1171,7 +1183,7 @@ export async function setRootOpen(rootId, isOpen, reason, highlightLast, interac
         rootState.hoverInteraction.setOpen(isOpen);
         if (!isOpen) {
             rootState.allowMouseEnter = false;
-            rootState.hoverInteraction.setDelays(rootState.openDelay ?? 0, rootState.closeDelay ?? 0);
+            rootState.hoverInteraction.setDelays(rootState.openDelay ?? 0, rootState.closeDelay ?? 0, rootState.restMs ?? 0);
         }
     }
 
