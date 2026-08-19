@@ -3076,6 +3076,13 @@ function createFocusOutHandler(mgr, interactionCtx) {
         queueMicrotask(() => {
             // Suppress during pointer interactions
             if (interactionCtx?.isPointerDown) return;
+            // Opt-in (dialogs): an outside press is in flight (pointerdown seen, click not
+            // yet resolved). The dismissal decision belongs to the component's outside-press
+            // machinery, which reports the correct close reason on the completed click;
+            // closing here as focus-out would win the race and misreport the reason.
+            if (mgr.deferFocusOutDuringOutsidePress && interactionCtx?.pointerDownOutside) {
+                return;
+            }
             if (mgr.floatingElement?.__blazixBaseUISuppressFocusOutOnce) {
                 return;
             }
@@ -3216,6 +3223,7 @@ export function createFloatingFocusManager(options) {
         restoreFocus = false,
         restoreFocusMode = null,
         closeOnFocusOut = true,
+        deferFocusOutDuringOutsidePress = false,
         interactionType = '',
         dotNetRef = null,
         onClose: onCloseOption = null,
@@ -3480,7 +3488,8 @@ export function createFloatingFocusManager(options) {
     if (!modal && closeOnFocusOut) {
         const handleFocusOut = createFocusOutHandler(
             { floatingElement, triggerElement, insideElements, onClose, treeId, nodeId,
-              restoreFocus, restoreFocusMode, get tabbableIndex() { return tabbableIndex; } },
+              restoreFocus, restoreFocusMode, deferFocusOutDuringOutsidePress,
+              get tabbableIndex() { return tabbableIndex; } },
             interactionState
         );
         floatingElement.addEventListener('focusout', handleFocusOut);
@@ -3566,6 +3575,7 @@ export function createFloatingFocusManager(options) {
         triggerElement,
         modal,
         closeOnFocusOut,
+        deferFocusOutDuringOutsidePress,
         returnFocus,
         returnFocusElement,
         previouslyFocusedElement,

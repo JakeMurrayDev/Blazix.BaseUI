@@ -20,6 +20,7 @@
                           InitialFocus="@ComputeInitialFocus()"
                           ReturnFocus="@ComputeReturnFocus()"
                           CloseOnFocusOut="@(Context is not null && !Context.DisablePointerDismissal)"
+                          DeferFocusOutDuringOutsidePress="true"
                           RestoreFocusMode="popup"
                           InteractionType="@(Context?.InteractionType)">
         @ChildContent

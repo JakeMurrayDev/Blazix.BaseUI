@@ -272,6 +272,11 @@ function focusPopup(rootState, popupElement) {
         returnFocus: returnFocusTarget,
         interactionType: effectiveInteractionType || '',
         closeOnFocusOut: !rootState.disablePointerDismissal,
+        // The dialog's outside-press dismissal waits for the completed click
+        // ('intentional', per useDialogRoot outsidePressEvent); without deferral the
+        // focusout microtask fires between pointerdown and click and closes with the
+        // FocusOut reason before OnOutsidePress can claim the dismissal.
+        deferFocusOutDuringOutsidePress: true,
         insideElements,
         onClose: rootState.modal === 'false' ? () => {
             if (rootState.isOpen && rootState.dotNetRef) {
