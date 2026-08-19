@@ -17,6 +17,7 @@
                @ref="renderElementReference" />
 
 @code {
+    private bool disabled;
     private bool highlighted;
     private bool visible = true;
     private int itemIndex = -1;
@@ -159,10 +160,11 @@
 
     private void RefreshFromRoot()
     {
+        disabled = Disabled || RootContext?.Disabled == true;
         visible = RootContext?.IsItemVisible(this) ?? true;
         itemIndex = RootContext?.GetItemIndex(this) ?? -1;
         highlighted = RootContext?.IsItemHighlighted(this) ?? false;
-        state = new AutocompleteItemState(Disabled, highlighted);
+        state = new AutocompleteItemState(disabled, highlighted);
         BuildComponentAttributes();
     }
 
@@ -189,7 +191,7 @@
             attrs["data-highlighted"] = true;
         }
 
-        if (Disabled)
+        if (disabled)
         {
             attrs["aria-disabled"] = "true";
             attrs["data-disabled"] = true;
@@ -214,7 +216,7 @@
 
     private async Task HandleClickAsync(MouseEventArgs e)
     {
-        if (RootContext is null || Disabled)
+        if (RootContext is null || disabled)
         {
             return;
         }
@@ -225,7 +227,7 @@
 
     private async Task HandlePointerEnterAsync(PointerEventArgs e)
     {
-        if (RootContext is not null && !Disabled && RootContext.HighlightItemOnHover)
+        if (RootContext is not null && !disabled && RootContext.HighlightItemOnHover)
         {
             RootContext.KeyboardActive = false;
             await RootContext.HighlightIndexAsync(itemIndex, AutocompleteHighlightReason.Pointer);
