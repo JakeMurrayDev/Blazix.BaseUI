@@ -1,0 +1,78 @@
+name: Release
+
+# Tag-driven publish. Pushing a `v*` tag packs and pushes to nuget.org.
+# workflow_dispatch packs and uploads the artifacts WITHOUT publishing, so a release
+# can be rehearsed safely — NuGet publishes are immutable and cannot be undone.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  release:
+    name: Pack and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # SourceLink embeds commit information; a shallow clone loses it.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # scripts/validate-js-assets.mjs runs on every library build and falls back to
+      # `npx --yes terser@...` when the vendored terser is absent (it is gitignored).
+      # If npm is ever unreachable here, pass /p:SkipBlazixSourceValidation=true — but
+      # note that skips the check that minified JS matches its source.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Blazix.BaseUI/Blazix.BaseUI.csproj | head -n1)"
+          echo "tag=$tag_version project=$pkg_version"
+          if [[ "$tag_version" != "$pkg_version" ]]; then
+            echo "::error::Tag v$tag_version does not match <Version>$pkg_version</Version> in Blazix.BaseUI.csproj."
+            exit 1
+          fi
+
+      - name: Pack
+        run: >
+          dotnet pack src/Blazix.BaseUI/Blazix.BaseUI.csproj
+          --configuration Release
+          --output ./artifacts
+          /p:ContinuousIntegrationBuild=true
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: Publish to nuget.org
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [[ -z "$NUGET_API_KEY" ]]; then
+            echo "::error::NUGET_API_KEY secret is not configured for this repository."
+            exit 1
+          fi
+          dotnet nuget push "artifacts/*.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

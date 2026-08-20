@@ -1,0 +1,72 @@
+name: CI
+
+# Deliberately unfiltered by path: the bUnit and analyzer suites must run on every pull request.
+# lint.yml restricts itself to src/**, which would skip test-only changes.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-release:
+    name: Build (Release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # scripts/validate-js-assets.mjs runs on every library build and falls back to
+      # `npx --yes terser@...` when the vendored terser is absent (it is gitignored).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
+          restore-keys: ${{ runner.os }}-nuget-
+      - name: Build solution in Release
+        run: dotnet build Blazix.BaseUI.slnx --configuration Release
+      - name: Verify the package can be produced
+        run: dotnet pack src/Blazix.BaseUI/Blazix.BaseUI.csproj --configuration Release --no-build --output ./artifacts
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*
+          if-no-files-found: error
+
+  test:
+    name: Test (bUnit + analyzers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
+          restore-keys: ${{ runner.os }}-nuget-
+      - name: Run bUnit suite
+        run: dotnet test tests/Blazix.BaseUI.Tests/Blazix.BaseUI.Tests.csproj --configuration Debug
+      - name: Run analyzer suite
+        run: dotnet test tests/Blazix.BaseUI.Analyzers.Tests/Blazix.BaseUI.Analyzers.Tests.csproj --configuration Debug
