@@ -10,6 +10,7 @@ public class MenuItemTests : BunitContext, IMenuItemContract
 
     private RenderFragment CreateMenuItemInRoot(
         bool defaultOpen = true,
+        bool rootDisabled = false,
         bool itemDisabled = false,
         bool closeOnClick = true,
         RenderFragment<RenderProps<MenuItemState>>? render = null,
@@ -20,7 +21,9 @@ public class MenuItemTests : BunitContext, IMenuItemContract
         {
             builder.OpenComponent<MenuRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
+            if (rootDisabled)
+                builder.AddAttribute(2, "Disabled", true);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<MenuTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
@@ -242,6 +245,32 @@ public class MenuItemTests : BunitContext, IMenuItemContract
 
         var item = cut.Find("[role='menuitem']");
         item.GetAttribute("aria-disabled")!.ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task IsDisabledWhenRootIsDisabled()
+    {
+        var clicked = false;
+
+        var cut = Render(CreateMenuItemInRoot(
+            rootDisabled: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => clicked = true) }
+            }
+        ));
+
+        var item = cut.Find("[role='menuitem']");
+        item.HasAttribute("data-disabled").ShouldBeTrue();
+        item.GetAttribute("aria-disabled")!.ShouldBe("true");
+
+        item.Click();
+        clicked.ShouldBeFalse();
+
+        item.MouseEnter();
+        item.HasAttribute("data-highlighted").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

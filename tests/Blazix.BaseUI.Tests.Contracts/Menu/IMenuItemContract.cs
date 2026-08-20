@@ -14,6 +14,7 @@ public interface IMenuItemContract
     Task HasTabindexMinusOneByDefault();
     Task HasDataDisabledWhenDisabled();
     Task HasAriaDisabledWhenDisabled();
+    Task IsDisabledWhenRootIsDisabled();
     Task HasDataHighlightedOnMouseEnter();
     Task SetsLabelAsDataAttribute();
 

@@ -21,6 +21,7 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private bool hasRendered;
     private bool hoverInitialized;
+    private bool mayUseVoiceOver;
     private string? hoverRootId;
     private int itemIndex = -1;
     private string? defaultId;
@@ -37,6 +38,15 @@
 
     private string ResolvedId => AttributeUtilities.GetIdOrDefault(
         AdditionalAttributes, () => Id ?? (defaultId ??= Guid.NewGuid().ToIdString()));
+
+    // React: lastOpenChangeReason === REASONS.listNavigation || openMethod === 'keyboard'.
+    // Arrow keys open the submenu through list navigation; Enter/Space report a keyboard
+    // interaction type on the open.
+    private bool OpenedByKeyboard =>
+        RootContext?.MenuOpenChangeReason == MenuOpenChangeReason.ListNavigation ||
+        RootContext?.InteractionType == "keyboard";
+
+    private bool ShouldOmitExpanded => state.Open && OpenedByKeyboard && mayUseVoiceOver;
 
     [CascadingParameter]
     private MenuRootContext? RootContext { get; set; }
@@ -162,6 +172,7 @@
         if (firstRender)
         {
             hasRendered = true;
+            _ = DetectVoiceOverPlatformAsync();
         }
 
         var currentElement = Element;
@@ -228,7 +239,15 @@
         attrs["role"] = "menuitem";
         attrs["id"] = triggerId;
         attrs["aria-haspopup"] = "menu";
-        attrs["aria-expanded"] = state.Open ? "true" : "false";
+        // Opening a submenu changes the trigger's expanded state while the trigger still holds
+        // focus, and VoiceOver announces that state change instead of the submenu item focus moves
+        // to a moment later, so the first item is never announced. Dropping the state while a
+        // keyboard-opened submenu is open avoids the announcement without claiming the submenu is
+        // collapsed; `aria-haspopup` still conveys that the item opens a submenu (#5342).
+        if (!ShouldOmitExpanded)
+        {
+            attrs["aria-expanded"] = state.Open ? "true" : "false";
+        }
 
         var popupId = RootContext?.PopupId;
         if (state.Open && !string.IsNullOrEmpty(popupId))
@@ -344,6 +363,25 @@
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
             _ = ex;
+        }
+    }
+
+    private async Task DetectVoiceOverPlatformAsync()
+    {
+        try
+        {
+            var module = await ModuleTask.Value;
+            var value = await module.InvokeAsync<bool>("isVoiceOverPlatform");
+            if (value != mayUseVoiceOver)
+            {
+                mayUseVoiceOver = value;
+                BuildComponentAttributes();
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
         }
     }
 

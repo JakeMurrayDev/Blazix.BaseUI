@@ -7,6 +7,8 @@ public interface IMenuSubmenuTriggerContract
     Task HasAriaHaspopupMenu();
     Task HasAriaExpandedFalseWhenClosed();
     Task HasAriaExpandedTrueWhenOpen();
+    Task OmitsAriaExpandedForVoiceOverWhenOpenedByKeyboard();
+    Task KeepsAriaExpandedForVoiceOverWhenOpenedByPointer();
     Task HasDataPopupOpenWhenOpen();
     Task DoesNotHaveDataPopupOpenWhenClosed();
     Task HasDataDisabledWhenDisabled();

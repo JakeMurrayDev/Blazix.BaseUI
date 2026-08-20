@@ -10,6 +10,7 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
 
     private RenderFragment CreateCheckboxItemInRoot(
         bool defaultOpen = true,
+        bool rootDisabled = false,
         bool? itemChecked = null,
         bool defaultChecked = false,
         bool itemDisabled = false,
@@ -27,7 +28,9 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
         {
             builder.OpenComponent<MenuRoot>(0);
             builder.AddAttribute(1, "DefaultOpen", defaultOpen);
-            builder.AddAttribute(2, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
+            if (rootDisabled)
+                builder.AddAttribute(2, "Disabled", true);
+            builder.AddAttribute(3, "ChildContent", (RenderFragment<MenuRootPayloadContext>)(_ => innerBuilder =>
             {
                 innerBuilder.OpenComponent<MenuTrigger>(0);
                 innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Trigger")));
@@ -358,6 +361,25 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
 
         var item = cut.Find("[role='menuitemcheckbox']");
         item.HasAttribute("data-disabled").ShouldBeTrue();
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task IsDisabledWhenRootIsDisabled()
+    {
+        var cut = Render(CreateCheckboxItemInRoot(rootDisabled: true, defaultChecked: false));
+
+        var item = cut.Find("[role='menuitemcheckbox']");
+        item.HasAttribute("data-disabled").ShouldBeTrue();
+        item.GetAttribute("aria-disabled")!.ShouldBe("true");
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.Click();
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.MouseEnter();
+        item.HasAttribute("data-highlighted").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

@@ -23,6 +23,15 @@ const TYPEAHEAD_TIMEOUT = 500;
 const BOUNDARY_OFFSET = 5;
 const STATE_KEY = Symbol.for('Blazix.BaseUI.Menu.State');
 const MENUBAR_STATE_KEY = Symbol.for('Blazix.BaseUI.MenuBar.State');
+// Upstream gates the VoiceOver workaround on `platform.screenReader.voiceOver`, which is a
+// pure Apple-OS check: VoiceOver is the system screen reader on macOS/iOS/iPadOS and whether
+// it is actually running cannot be detected (base-ui #5342).
+const IS_APPLE_PLATFORM = (() => {
+    if (typeof navigator === 'undefined') return false;
+    const platform = (navigator.platform ?? '').toLowerCase();
+    const isIos = /^i(os$|p)/.test(platform) || (platform === 'macintel' && (navigator.maxTouchPoints || 0) > 1);
+    return isIos || platform.startsWith('mac');
+})();
 
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
@@ -807,7 +816,7 @@ function invokeMenuMethodAsync(dotNetRef, methodName) {
 function openChildSubmenu(triggerElement) {
     const childRoot = findChildRootForTrigger(triggerElement);
     if (childRoot?.dotNetRef) {
-        childRoot.dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+        childRoot.dotNetRef.invokeMethodAsync('OnHoverOpen', true).catch(() => { });
     } else {
         triggerElement.click();
     }
@@ -1014,7 +1023,7 @@ export async function initializeHoverInteraction(rootId, triggerElement, openDel
             }
             if (dotNetRef && !rootState.isOpen) {
                 armHoverOpenSlipOutCancel(rootState, dotNetRef);
-                const openTask = dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+                const openTask = dotNetRef.invokeMethodAsync('OnHoverOpen', false).catch(() => { });
                 if (rootState.parentType === 'menubar') {
                     openTask.then(() => closeSiblingMenubarRoots(rootState));
                 }
@@ -1071,7 +1080,7 @@ export function initializeMenubarTrigger(interactionId, triggerElement, dotNetRe
         }
 
         lastOpenAt = now;
-        dotNetRef.invokeMethodAsync('OnHoverOpen').catch(() => { });
+        dotNetRef.invokeMethodAsync('OnHoverOpen', false).catch(() => { });
     };
     triggerElement.addEventListener('pointerenter', onPointerEnter);
     triggerElement.addEventListener('pointerover', onPointerEnter);
@@ -1890,6 +1899,10 @@ function cleanupMenuAutoResize(rootState) {
 // ============================================================================
 // Item Index Query
 // ============================================================================
+
+export function isVoiceOverPlatform() {
+    return IS_APPLE_PLATFORM;
+}
 
 export function getItemIndex(rootId, element) {
     const root = state.roots.get(rootId);

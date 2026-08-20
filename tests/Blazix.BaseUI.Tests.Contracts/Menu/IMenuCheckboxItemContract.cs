@@ -15,6 +15,7 @@ public interface IMenuCheckboxItemContract
     Task HasAriaCheckedFalseWhenUnchecked();
     Task HasAriaCheckedTrueWhenChecked();
     Task HasAriaDisabledWhenDisabled();
+    Task IsDisabledWhenRootIsDisabled();
 
     // Data attributes
     Task HasDataCheckedWhenChecked();
