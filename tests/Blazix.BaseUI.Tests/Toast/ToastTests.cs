@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Toast;
+using Blazix.BaseUI.Tests.Contracts.Toast;
 using Blazix.BaseUI.Tests.Infrastructure;
 using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Components;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Components.Web;
 
 namespace Blazix.BaseUI.Tests.Toast;
 
-public class ToastTests : BunitContext
+public class ToastTests : BunitContext, IToastContract
 {
     public ToastTests()
     {
@@ -702,13 +703,131 @@ public class ToastTests : BunitContext
         portal.Instance.TargetElement.ShouldBe(container);
     }
 
+    [Fact]
+    public async Task RepeatedPauseAndResumeDoesNotExtendToastTimeout()
+    {
+        var store = new ToastStore(1500, 3);
+        try
+        {
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            store.AddToast(new ToastManagerAddOptions
+            {
+                Id = "timer",
+                Description = "Timer",
+                Timeout = 1500,
+                OnClose = () => closed.TrySetResult()
+            });
+
+            // Two 500 ms slices, each ended by a pause/resume cycle: the toast must have
+            // ~500 ms left, not the full delay minus only the last slice.
+            await Task.Delay(500);
+            store.PauseTimers();
+            store.ResumeTimers();
+
+            await Task.Delay(500);
+            store.PauseTimers();
+            store.ResumeTimers();
+
+            var completed = await Task.WhenAny(closed.Task, Task.Delay(750));
+            ReferenceEquals(completed, closed.Task).ShouldBeTrue();
+        }
+        finally
+        {
+            store.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task ReAddingAClosingToastClearsRetainedSwipeState()
+    {
+        var manager = new ToastManager();
+
+        // The re-add runs from a rendered event handler, the way an application adds a
+        // toast: the two store writes it performs (remove the ending toast, add the new
+        // one) then land in a single render, so the keyed root instance is retained.
+        var cut = RenderProvider(manager, headerContent: builder =>
+        {
+            builder.OpenElement(0, "button");
+            builder.AddAttribute(1, "data-testid", "re-add");
+            builder.AddAttribute(2, "onclick", EventCallback.Factory.Create<MouseEventArgs>(
+                this,
+                () => manager.Add(new ToastManagerAddOptions
+                {
+                    Id = "recycled",
+                    Description = "Recycled toast",
+                    Timeout = 0
+                })));
+            builder.CloseElement();
+        });
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "recycled",
+            Description = "Recycled toast",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() => cut.Find("[data-toast-id='recycled']").ShouldNotBeNull());
+
+        var rootComponent = cut.FindComponent<ToastRoot>();
+        await rootComponent.Instance.OnSwipeEnded(true, "right");
+
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='recycled']");
+            root.HasAttribute("data-ending-style").ShouldBeTrue();
+            root.GetAttribute("data-swipe-direction").ShouldBe("right");
+        });
+
+        cut.Find("[data-testid='re-add']").Click();
+
+        // The Playwright regression covers the JS-side reset of the swipe custom
+        // properties and forced height re-measurement because bUnit does not run the module.
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='recycled']");
+            root.HasAttribute("data-ending-style").ShouldBeFalse();
+            root.HasAttribute("data-swipe-direction").ShouldBeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task ShiftTabInsideViewportKeepsTimersPaused()
+    {
+        var manager = new ToastManager();
+        var cut = RenderProvider(manager);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "keyboard",
+            Description = "Keyboard toast",
+            Timeout = 500
+        });
+
+        cut.WaitForAssertion(() => cut.Find("[data-toast-id='keyboard']").ShouldNotBeNull());
+
+        var viewport = cut.FindComponent<ToastViewport>();
+        await viewport.Instance.OnViewportFocus(true);
+        cut.Find("[data-testid='toast-viewport']").KeyDown(new KeyboardEventArgs
+        {
+            Key = "Tab",
+            ShiftKey = true
+        });
+
+        // Before the fix Shift+Tab resumed the timers while focus was still inside
+        // the viewport, so the 500 ms toast dismissed itself under the keyboard user.
+        await Task.Delay(800);
+        cut.Find("[data-toast-id='keyboard']").HasAttribute("data-ending-style").ShouldBeFalse();
+    }
+
     private IRenderedComponent<ToastProvider> RenderProvider(
         ToastManager manager,
         int limit = 3,
         bool renderPositioner = false,
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null,
         Func<bool>? shouldRenderLabelParts = null,
-        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null)
+        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
+        RenderFragment? headerContent = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -716,6 +835,11 @@ public class ToastTests : BunitContext
             .Add(p => p.ToastManager, manager)
             .Add(p => p.ChildContent, context => builder =>
             {
+                if (headerContent is not null)
+                {
+                    builder.AddContent(100, headerContent);
+                }
+
                 builder.OpenComponent<ToastViewport>(0);
                 builder.AddAttribute(1, "AdditionalAttributes", new Dictionary<string, object>
                 {

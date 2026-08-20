@@ -334,6 +334,22 @@ export function updateRoot(rootId, element, ending, swipeEnabled, swipeDirection
     }
 }
 
+export function resetRootLifecycle(rootId) {
+    const entry = state.roots.get(rootId);
+    if (!entry) {
+        return;
+    }
+
+    entry.initialTransform = { x: 0, y: 0, scale: 1 };
+    entry.dragOffset = { x: 0, y: 0 };
+    entry.element.style.transition = '';
+    entry.element.style.transform = '';
+    entry.element.style.setProperty('--toast-swipe-movement-x', '0px');
+    entry.element.style.setProperty('--toast-swipe-movement-y', '0px');
+    entry.lastMeasuredHeight = null;
+    measureRoot(entry);
+}
+
 export function disposeRoot(rootId) {
     const entry = state.roots.get(rootId);
     if (!entry) {

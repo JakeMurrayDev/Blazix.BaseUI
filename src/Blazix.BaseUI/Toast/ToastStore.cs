@@ -458,7 +458,8 @@ internal sealed class ToastStore : IDisposable
                 timer.CancellationTokenSource = null;
 
                 var elapsed = (int)Math.Max(0, (DateTimeOffset.UtcNow - timer.StartedAt).TotalMilliseconds);
-                timer.Remaining = Math.Max(0, timer.Delay - elapsed);
+                // Subtract each elapsed slice from the remainder so repeated pause/resume cycles do not add time.
+                timer.Remaining = Math.Max(0, timer.Remaining - elapsed);
             }
         }
     }

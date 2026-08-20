@@ -347,11 +347,7 @@
 
     private Task HandleKeyDownAsync(KeyboardEventArgs e)
     {
-        if (e.Key == "Tab" && e.ShiftKey)
-        {
-            Store?.ResumeTimers();
-        }
-
+        // OnViewportBlur resumes timers; doing so here could dismiss toasts while keyboard focus remains in the viewport.
         return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 

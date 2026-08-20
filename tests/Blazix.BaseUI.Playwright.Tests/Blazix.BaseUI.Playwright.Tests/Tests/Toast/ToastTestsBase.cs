@@ -172,6 +172,45 @@ public abstract class ToastTestsBase : TestBase
         await Assertions.Expect(toast).ToBeHiddenAsync();
     }
 
+    // A toast re-added while its previous instance is still animating out reuses
+    // the same root; without the reset it stays offset and is never re-measured.
+    [Fact]
+    public virtual async Task ReAddingAToastMidExitClearsSwipeOffsetAndRemeasuresHeight()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+
+        await GetByTestId("add-recycled").ClickAsync();
+
+        var toast = GetByTestId("toast-recycled");
+        await Assertions.Expect(toast).ToBeVisibleAsync();
+
+        var box = await toast.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var startX = box.X + 20;
+        var startY = box.Y + 20;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        try
+        {
+            await Page.Mouse.MoveAsync(startX + 96, startY, new MouseMoveOptions { Steps = 8 });
+        }
+        finally
+        {
+            await Page.Mouse.UpAsync();
+        }
+
+        await Page.WaitForFunctionAsync(
+            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); const movement = element?.style.getPropertyValue('--toast-swipe-movement-x'); return element?.hasAttribute('data-ending-style') === true && element?.getAttribute('data-swipe-direction') === 'right' && movement && movement !== '0px'; }",
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        await GetByTestId("add-recycled").ClickAsync();
+
+        await Page.WaitForFunctionAsync(
+            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); const style = element?.style; return element && !element.hasAttribute('data-ending-style') && !element.hasAttribute('data-swipe-direction') && style.getPropertyValue('--toast-swipe-movement-x') === '0px' && parseFloat(style.getPropertyValue('--toast-height') || '0') > 0; }",
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
     [Fact]
     public virtual async Task CanonicalSwipeIgnoreTargetDoesNotStartOrDismissSwipe()
     {
