@@ -216,11 +216,18 @@ public class MenuRadioItemTests : BunitContext, IMenuRadioItemContract
     [Fact]
     public Task IsDisabledWhenRootIsDisabled()
     {
-        var cut = Render(CreateRadioItemInRoot(rootDisabled: true));
+        var cut = Render(CreateRadioItemInRoot(rootDisabled: true, defaultValue: "option2"));
 
         var item = cut.Find("[role='menuitemradio']");
         item.HasAttribute("data-disabled").ShouldBeTrue();
         item.GetAttribute("aria-disabled")!.ShouldBe("true");
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.Click();
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.MouseEnter();
+        item.HasAttribute("data-highlighted").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

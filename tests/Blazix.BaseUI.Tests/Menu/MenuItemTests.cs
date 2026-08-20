@@ -252,11 +252,25 @@ public class MenuItemTests : BunitContext, IMenuItemContract
     [Fact]
     public Task IsDisabledWhenRootIsDisabled()
     {
-        var cut = Render(CreateMenuItemInRoot(rootDisabled: true));
+        var clicked = false;
+
+        var cut = Render(CreateMenuItemInRoot(
+            rootDisabled: true,
+            additionalAttributes: new Dictionary<string, object>
+            {
+                { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => clicked = true) }
+            }
+        ));
 
         var item = cut.Find("[role='menuitem']");
         item.HasAttribute("data-disabled").ShouldBeTrue();
         item.GetAttribute("aria-disabled")!.ShouldBe("true");
+
+        item.Click();
+        clicked.ShouldBeFalse();
+
+        item.MouseEnter();
+        item.HasAttribute("data-highlighted").ShouldBeFalse();
 
         return Task.CompletedTask;
     }

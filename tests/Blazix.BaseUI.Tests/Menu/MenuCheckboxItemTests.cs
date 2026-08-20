@@ -368,11 +368,18 @@ public class MenuCheckboxItemTests : BunitContext, IMenuCheckboxItemContract
     [Fact]
     public Task IsDisabledWhenRootIsDisabled()
     {
-        var cut = Render(CreateCheckboxItemInRoot(rootDisabled: true));
+        var cut = Render(CreateCheckboxItemInRoot(rootDisabled: true, defaultChecked: false));
 
         var item = cut.Find("[role='menuitemcheckbox']");
         item.HasAttribute("data-disabled").ShouldBeTrue();
         item.GetAttribute("aria-disabled")!.ShouldBe("true");
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.Click();
+        item.GetAttribute("aria-checked")!.ShouldBe("false");
+
+        item.MouseEnter();
+        item.HasAttribute("data-highlighted").ShouldBeFalse();
 
         return Task.CompletedTask;
     }
