@@ -9,7 +9,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the
 ## [0.1.0-preview.1] — Unreleased
 
 First packaged release. Blazix.BaseUI has been developed in-repo up to this point; this is the
-first version published to NuGet.
+first version intended for publication to NuGet. Replace `Unreleased` with the release date once
+the `v0.1.0-preview.1` tag has published successfully.
 
 ### Added
 
