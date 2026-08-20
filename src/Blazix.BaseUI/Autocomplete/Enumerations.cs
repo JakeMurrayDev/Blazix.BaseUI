@@ -39,6 +39,7 @@ public enum AutocompleteAutoHighlight
 public enum AutocompleteChangeReason
 {
     TriggerPress,
+    InputPress,
     OutsidePress,
     ItemPress,
     ClosePress,
@@ -48,6 +49,7 @@ public enum AutocompleteChangeReason
     InputChange,
     InputClear,
     ClearPress,
+    CancelOpen,
     None
 }
 

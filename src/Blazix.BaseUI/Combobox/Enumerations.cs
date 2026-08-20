@@ -39,6 +39,7 @@ public enum ComboboxAutoHighlight
 public enum ComboboxChangeReason
 {
     TriggerPress,
+    InputPress,
     OutsidePress,
     ItemPress,
     ChipRemovePress,

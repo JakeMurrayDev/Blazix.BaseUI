@@ -19,6 +19,8 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         string? defaultValue = null,
         string? value = null,
         bool defaultOpen = false,
+        bool inline = false,
+        bool openOnInputClick = false,
         bool disabled = false,
         bool readOnly = false,
         bool required = false,
@@ -26,7 +28,9 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
         AutocompleteMode mode = AutocompleteMode.List,
         AutocompleteAutoHighlight autoHighlight = AutocompleteAutoHighlight.False,
         EventCallback<AutocompleteValueChangeEventArgs>? onValueChange = null,
-        EventCallback<AutocompleteOpenChangeEventArgs>? onOpenChange = null)
+        EventCallback<AutocompleteOpenChangeEventArgs>? onOpenChange = null,
+        EventCallback<bool>? openChanged = null,
+        IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -36,6 +40,8 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
             if (defaultValue is not null) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.DefaultValue), defaultValue);
             if (value is not null) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.Value), value);
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.DefaultOpen), defaultOpen);
+            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.Inline), inline);
+            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OpenOnInputClick), openOnInputClick);
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.Disabled), disabled);
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ReadOnly), readOnly);
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.Required), required);
@@ -44,12 +50,13 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
             builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.AutoHighlight), autoHighlight);
             if (onValueChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnValueChange), onValueChange.Value);
             if (onOpenChange.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OnOpenChange), onOpenChange.Value);
-            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ChildContent), CreateDefaultChildren());
+            if (openChanged.HasValue) builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.OpenChanged), openChanged.Value);
+            builder.AddAttribute(i++, nameof(AutocompleteRoot<string>.ChildContent), CreateDefaultChildren(itemAdditionalAttributes));
             builder.CloseComponent();
         };
     }
 
-    private static RenderFragment CreateDefaultChildren()
+    private static RenderFragment CreateDefaultChildren(IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -86,7 +93,8 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
                         listBuilder.OpenComponent<AutocompleteItem<string>>(20);
                         listBuilder.AddAttribute(21, nameof(AutocompleteItem<string>.Value), "Banana");
-                        listBuilder.AddAttribute(22, nameof(AutocompleteItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Banana")));
+                        listBuilder.AddAttribute(22, nameof(AutocompleteItem<string>.AdditionalAttributes), itemAdditionalAttributes);
+                        listBuilder.AddAttribute(23, nameof(AutocompleteItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Banana")));
                         listBuilder.CloseComponent();
                     }));
                     popupBuilder.CloseComponent();
@@ -122,6 +130,113 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
             }));
             builder.CloseComponent();
         };
+    }
+
+    [Fact]
+    public async Task InputPress_ShouldReportInputPressOpenReason()
+    {
+        AutocompleteOpenChangeEventArgs? received = null;
+        var callback = EventCallback.Factory.Create<AutocompleteOpenChangeEventArgs>(this, args => received = args);
+        var cut = Render(CreateAutocomplete(openOnInputClick: true, onOpenChange: callback));
+
+        await cut.Find("input[role='combobox']").MouseDownAsync(new MouseEventArgs());
+
+        received.ShouldNotBeNull();
+        received.Open.ShouldBeTrue();
+        received.Reason.ShouldBe(AutocompleteChangeReason.InputPress);
+    }
+
+    [Fact]
+    public Task InlineList_ShouldExposeExpandedAriaOnInput()
+    {
+        var cut = Render(CreateAutocomplete(inline: true, defaultOpen: false));
+
+        var input = cut.Find("input[role='combobox']");
+        var list = cut.Find("[role='listbox']");
+        input.GetAttribute("aria-expanded").ShouldBe("true");
+        input.GetAttribute("aria-haspopup").ShouldBe("listbox");
+        input.GetAttribute("aria-controls").ShouldBe(list.Id);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DisabledRoot_ShouldDisableItems()
+    {
+        var cut = Render(CreateAutocomplete(disabled: true, defaultOpen: true));
+
+        var options = cut.FindAll("[role='option']");
+        options.Count.ShouldBe(Fruits.Count);
+        options.ShouldAllBe(option => option.HasAttribute("data-disabled"));
+        options.ShouldAllBe(option => option.GetAttribute("aria-disabled") == "true");
+
+        var banana = options.Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe(string.Empty);
+    }
+
+    [Fact]
+    public async Task DisabledItem_ShouldStillInvokeConsumerClickHandler()
+    {
+        var consumerClickHandled = false;
+        var valueChangeCount = 0;
+        var valueCallback = EventCallback.Factory.Create<AutocompleteValueChangeEventArgs>(this, _ => valueChangeCount++);
+        var itemAttributes = new Dictionary<string, object>
+        {
+            { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => consumerClickHandled = true) }
+        };
+        var cut = Render(CreateAutocomplete(
+            disabled: true,
+            defaultOpen: true,
+            onValueChange: valueCallback,
+            itemAdditionalAttributes: itemAttributes));
+
+        var banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        consumerClickHandled.ShouldBeTrue();
+        valueChangeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CancelOpen_ShouldCloseThePopupAndReportCancelOpen()
+    {
+        var received = new List<AutocompleteOpenChangeEventArgs>();
+        var callback = EventCallback.Factory.Create<AutocompleteOpenChangeEventArgs>(this, args => received.Add(args));
+        var cut = Render(CreateAutocomplete(onOpenChange: callback));
+
+        await cut.Find("button").MouseDownAsync(new MouseEventArgs());
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
+
+        await cut.InvokeAsync(() => cut.FindComponent<AutocompleteRoot<string>>().Instance.OnCancelOpen());
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+        received.ShouldNotBeEmpty();
+        received[^1].Open.ShouldBeFalse();
+        received[^1].Reason.ShouldBe(AutocompleteChangeReason.CancelOpen);
+    }
+
+    [Fact]
+    public async Task CancelOpen_ShouldDiscardPendingOpenAwaitingOnOpenChange()
+    {
+        var gate = new TaskCompletionSource();
+        var openStates = new List<bool>();
+        var onOpenChange = EventCallback.Factory.Create<AutocompleteOpenChangeEventArgs>(this, _ => gate.Task);
+        var openChanged = EventCallback.Factory.Create<bool>(this, value => openStates.Add(value));
+        var cut = Render(CreateAutocomplete(onOpenChange: onOpenChange, openChanged: openChanged));
+        var root = cut.FindComponent<AutocompleteRoot<string>>().Instance;
+
+        // The popup is still closed while the open sits in OnOpenChange, so the cancel early-returns
+        // from SetOpenInternalAsync - but only after bumping the version that discards that open.
+        var pendingOpen = cut.Find("button").MouseDownAsync(new MouseEventArgs());
+        await cut.InvokeAsync(() => root.OnCancelOpen());
+
+        gate.SetResult();
+        await pendingOpen;
+
+        openStates.ShouldBeEmpty();
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
     }
 
     [Fact]
