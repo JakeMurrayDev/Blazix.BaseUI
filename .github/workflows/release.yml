@@ -98,8 +98,22 @@ jobs:
 
       - name: Publish to nuget.org
         if: startsWith(github.ref, 'refs/tags/v')
-        run: >
-          dotnet nuget push "artifacts/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
+        working-directory: artifacts
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Push explicit file names rather than handing dotnet a wildcard. A glob has
+          # open defects: it can silently skip the adjacent .snupkg (NuGet/Home#11871)
+          # and stop after the first package (NuGet/Home#9867). Running from the
+          # artifacts directory also keeps the symbol package next to the working
+          # directory, since symbol discovery is relative to it. Bash's *.nupkg does not
+          # match .snupkg, so the symbol package is never pushed as a primary package --
+          # dotnet uploads it automatically alongside its .nupkg.
+          for pkg in *.nupkg; do
+            echo "Pushing $pkg"
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
