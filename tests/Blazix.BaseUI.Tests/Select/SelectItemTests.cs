@@ -12,6 +12,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
     private RenderFragment CreateSelectWithItems(
         string? defaultValue = null,
         bool defaultOpen = false,
+        bool rootDisabled = false,
         bool disabledItem = false,
         bool useNativeButton = false,
         string? firstItemLabel = null,
@@ -24,6 +25,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
             var i = 1;
             if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
+            if (rootDisabled) builder.AddAttribute(i++, "Disabled", true);
             builder.AddAttribute(i++, "HighlightItemOnHover", highlightItemOnHover);
             builder.AddAttribute(i++, "ChildContent", (RenderFragment)(innerBuilder =>
             {
@@ -209,6 +211,57 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         trigger.GetAttribute("aria-expanded").ShouldBe("true");
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task Item_ShouldInheritRootDisabledState()
+    {
+        var clickCalled = false;
+
+        var cut = Render(CreateSelectWithItems(
+            defaultOpen: true,
+            rootDisabled: true,
+            firstItemAdditionalAttributes: new Dictionary<string, object>
+            {
+                ["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, _ => clickCalled = true)
+            }));
+
+        var items = cut.FindAll("[role='option']");
+        items.ShouldAllBe(item => item.HasAttribute("data-disabled"));
+        items.ShouldAllBe(item => item.GetAttribute("aria-disabled") == "true");
+
+        items[0].Click();
+
+        // `useButton` returns before invoking the merged click handlers when disabled,
+        // so the consumer's handler must not run either.
+        clickCalled.ShouldBeFalse();
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-selected").ShouldBeFalse();
+
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("true");
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task RootDisabled_ShouldNotHighlightOnHover()
+    {
+        // React enables `listNavigation` with `!readOnly && !disabled`, so a disabled
+        // root never moves the highlight under the pointer.
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, rootDisabled: true));
+
+        var items = cut.FindAll("[role='option']");
+        await items[0].TriggerEventAsync("onmouseenter", new MouseEventArgs());
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-highlighted").ShouldBeFalse();
+
+        await items[0].TriggerEventAsync("onmousemove", new MouseEventArgs());
+
+        items = cut.FindAll("[role='option']");
+        items[0].HasAttribute("data-highlighted").ShouldBeFalse();
     }
 
     // --- React parity additions ---
