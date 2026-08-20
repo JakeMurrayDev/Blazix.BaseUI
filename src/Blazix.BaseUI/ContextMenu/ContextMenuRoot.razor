@@ -11,24 +11,14 @@
                   HighlightItemOnHover="HighlightItemOnHover"
                   Disabled="Disabled"
                   CloseParentOnEsc="CloseParentOnEsc"
-                  Handle="Handle"
-                  TriggerId="@TriggerId"
-                  DefaultTriggerId="@DefaultTriggerId"
                   ActionsRef="ActionsRef"
                   OpenChanged="OpenChanged"
                   OnOpenChange="OnOpenChange"
                   OnOpenChangeComplete="OnOpenChangeComplete">
-            <ChildContent Context="payloadContext">
+            <ChildContent Context="_">
                 <div @ref="virtualAnchorElement"
                      style="position:fixed;pointer-events:none;width:0;height:0;top:0;left:0;visibility:hidden" />
-                @if (PayloadChildContent is not null)
-                {
-                    @PayloadChildContent(payloadContext)
-                }
-                else
-                {
-                    @ChildContent
-                }
+                @ChildContent
             </ChildContent>
         </MenuRoot>
     </CascadingValue>
@@ -90,25 +80,6 @@
     public bool CloseParentOnEsc { get; set; }
 
     /// <summary>
-    /// Gets or sets the ID of the trigger element that the menu should be associated with.
-    /// Used for detached trigger patterns where multiple triggers share one menu.
-    /// </summary>
-    [Parameter]
-    public string? TriggerId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the default trigger ID when using uncontrolled trigger selection.
-    /// </summary>
-    [Parameter]
-    public string? DefaultTriggerId { get; set; }
-
-    /// <summary>
-    /// Gets or sets a handle to connect this root with detached trigger components.
-    /// </summary>
-    [Parameter]
-    public IMenuHandle? Handle { get; set; }
-
-    /// <summary>
     /// Gets or sets a reference to imperative actions for controlling the menu programmatically.
     /// </summary>
     [Parameter]
@@ -137,12 +108,6 @@
     /// </summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
-
-    /// <summary>
-    /// Defines the child components of this instance with access to the payload context.
-    /// </summary>
-    [Parameter]
-    public RenderFragment<MenuRootPayloadContext>? PayloadChildContent { get; set; }
 
     /// <inheritdoc />
     protected override void OnInitialized()
