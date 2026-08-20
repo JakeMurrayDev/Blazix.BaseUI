@@ -22,6 +22,17 @@ public interface ISliderThumbContract
     Task HasPositioningStyle();
     Task InvokesOnFocus();
     Task InvokesOnBlur();
+
+    /// <summary>
+    /// Verifies that field blur is not committed when focus moves to another slider thumb.
+    /// </summary>
+    Task DoesNotCommitFieldBlurWhenFocusMovesToAnotherThumb();
+
+    /// <summary>
+    /// Verifies that keyboard changes are rejected when slider values contain <see cref="double.NaN"/>.
+    /// </summary>
+    Task DoesNotApplyKeyboardChangeWhenValuesContainNaN();
+
     Task HasAriaValueTextForRangeSlider();
 
     // Non-integer value handling

@@ -88,7 +88,9 @@ internal static class SliderUtilities
         for (var i = 0; i < values.Length - 1; i++)
         {
             var distance = Math.Abs(values[i + 1] - values[i]);
-            if (distance < minDistance)
+            // Negated `>=` rather than `<` so a NaN distance fails the guard instead of
+            // silently passing it (upstream base-ui #5391).
+            if (!(distance >= minDistance))
                 return false;
         }
 

@@ -159,12 +159,12 @@ public static class JsInteropSetup
     private const string SliderModule = "./_content/Blazix.BaseUI/blazix-baseui-slider.js";
     private const string SliderMinModule = "./_content/Blazix.BaseUI/blazix-baseui-slider.min.js";
 
-    public static void SetupSliderModule(BunitJSInterop jsInterop)
+    public static BunitJSModuleInterop SetupSliderModule(BunitJSInterop jsInterop, bool isBlurWithinThumbs = false)
     {
         SetupSliderModulePath(SliderModule);
-        SetupSliderModulePath(SliderMinModule);
+        return SetupSliderModulePath(SliderMinModule);
 
-        void SetupSliderModulePath(string path)
+        BunitJSModuleInterop SetupSliderModulePath(string path)
         {
             var module = jsInterop.SetupModule(path);
             module.SetupVoid("initialize", _ => true).SetVoidResult();
@@ -182,6 +182,8 @@ public static class JsInteropSetup
             module.SetupVoid("unobserveInsetResize", _ => true).SetVoidResult();
             module.SetupVoid("registerThumbInput", _ => true).SetVoidResult();
             module.SetupVoid("unregisterThumbInput", _ => true).SetVoidResult();
+            module.Setup<bool>("isBlurWithinThumbs", _ => true).SetResult(isBlurWithinThumbs);
+            return module;
         }
     }
 
