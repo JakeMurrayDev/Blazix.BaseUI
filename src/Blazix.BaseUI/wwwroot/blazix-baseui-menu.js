@@ -1608,7 +1608,7 @@ export async function setPopupElement(rootId, element, insideToolbar) {
 // Positioning (delegated to shared floating module)
 // ============================================================================
 
-export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasViewport, shiftCrossAxis) {
+export async function initializePositioner(positionerElement, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, disableAnchorTracking, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, dotNetRef, hasViewport, shiftCrossAxis, shiftLayoutViewport) {
     let onPositionUpdated = null;
     if (dotNetRef) {
         onPositionUpdated = (effectiveSide, effectiveAlign, anchorHidden, arrowUncentered) => {
@@ -1634,7 +1634,8 @@ export async function initializePositioner(positionerElement, triggerElement, si
         onPositionUpdated,
         dotNetRef: dotNetRef || null,
         hasViewport: hasViewport || false,
-        shiftCrossAxis: shiftCrossAxis || false
+        shiftCrossAxis: shiftCrossAxis || false,
+        shiftLayoutViewport: shiftLayoutViewport || false
     });
 
     if (positionerId) {
@@ -1644,7 +1645,7 @@ export async function initializePositioner(positionerElement, triggerElement, si
     return positionerId;
 }
 
-export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, shiftCrossAxis) {
+export async function updatePosition(positionerId, triggerElement, side, align, sideOffset, alignOffset, collisionPadding, collisionBoundary, arrowPadding, arrowElement, sticky, positionMethod, collisionAvoidanceSide, collisionAvoidanceAlign, collisionAvoidanceFallback, shiftCrossAxis, shiftLayoutViewport) {
     await floatingUpdatePositioner(positionerId, {
         triggerElement,
         side,
@@ -1658,7 +1659,8 @@ export async function updatePosition(positionerId, triggerElement, side, align, 
         sticky: sticky || false,
         positionMethod: positionMethod || 'absolute',
         collisionAvoidance: normalizeCollisionAvoidance({ side: collisionAvoidanceSide, align: collisionAvoidanceAlign, fallbackAxisSide: collisionAvoidanceFallback }),
-        shiftCrossAxis: shiftCrossAxis || false
+        shiftCrossAxis: shiftCrossAxis || false,
+        shiftLayoutViewport: shiftLayoutViewport || false
     });
 }
 
@@ -1824,25 +1826,25 @@ function getCssDimensions(el) {
 
 function applyAnchoringStyles(el, side, direction) {
     if (!el) return;
-    const isRtl = direction === 'rtl';
-    if (side === 'top') {
-        el.style.position = 'absolute';
-        el.style.bottom = '0';
-        el.style.top = 'auto';
-    } else if (side === 'bottom') {
+    // Upstream #5370: physical-left anchoring applies in both text directions.
+    const isPhysicalTop = side === 'top';
+    const isPhysicalLeft = side === 'left'
+        || side === (direction === 'rtl' ? 'inline-end' : 'inline-start');
+
+    if (!isPhysicalTop && !isPhysicalLeft) {
         el.style.position = '';
-        el.style.bottom = '';
         el.style.top = '';
-    }
-    if ((side === 'left' && !isRtl) || (side === 'right' && isRtl)) {
-        el.style.position = 'absolute';
-        el.style.right = '0';
-        el.style.left = 'auto';
-    } else if ((side === 'right' && !isRtl) || (side === 'left' && isRtl)) {
-        el.style.position = '';
-        el.style.right = '';
+        el.style.bottom = '';
         el.style.left = '';
+        el.style.right = '';
+        return;
     }
+
+    el.style.position = 'absolute';
+    el.style[isPhysicalTop ? 'bottom' : 'top'] = '0';
+    el.style[isPhysicalTop ? 'top' : 'bottom'] = '';
+    el.style[isPhysicalLeft ? 'right' : 'left'] = '0';
+    el.style[isPhysicalLeft ? 'left' : 'right'] = '';
 }
 
 function setupMenuAutoResize(rootState) {
