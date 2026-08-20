@@ -3,6 +3,16 @@ name: Release
 # Tag-driven publish. Pushing a `v*` tag packs and pushes to nuget.org.
 # workflow_dispatch packs and uploads the artifacts WITHOUT publishing, so a release
 # can be rehearsed safely — NuGet publishes are immutable and cannot be undone.
+#
+# Publishing uses NuGet trusted publishing (OIDC), not a long-lived API key. The
+# workflow exchanges a short-lived GitHub OIDC token for a temporary nuget.org key.
+# This requires a trusted publishing policy on nuget.org:
+#   Account menu -> Trusted Publishing -> new policy
+#     Repository Owner: JakeMurrayDev
+#     Repository:       Blazix.BaseUI
+#     Workflow File:    release.yml     (file name only, no .github/workflows/ prefix)
+#     Environment:      (leave empty)
+# Renaming this file breaks the policy — update it on nuget.org if you do.
 on:
   push:
     tags: ['v*']
@@ -18,6 +28,9 @@ jobs:
   release:
     name: Pack and publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # issue the OIDC token that nuget.org exchanges for a temporary key
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,16 +76,28 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
-      - name: Publish to nuget.org
+      - name: Check the nuget.org user name is configured
         if: startsWith(github.ref, 'refs/tags/v')
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_USER: ${{ secrets.NUGET_USER }}
         run: |
-          if [[ -z "$NUGET_API_KEY" ]]; then
-            echo "::error::NUGET_API_KEY secret is not configured for this repository."
+          if [[ -z "$NUGET_USER" ]]; then
+            echo "::error::NUGET_USER secret is not set. It is the nuget.org profile name (not an email address, and not an API key) used for the trusted publishing token exchange."
             exit 1
           fi
-          dotnet nuget push "artifacts/*.nupkg" \
-            --api-key "$NUGET_API_KEY" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+
+      # Temporary keys are valid for one hour, so log in immediately before pushing.
+      - name: NuGet login (OIDC to short-lived API key)
+        id: login
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to nuget.org
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
