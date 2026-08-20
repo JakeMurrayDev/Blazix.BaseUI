@@ -366,8 +366,12 @@
 
         FormContext?.ClearErrors(ResolvedName);
 
+        // Upstream normalizes a null initial value to the control's empty value before comparing
+        // (`inputValue !== (validityData.initialValue ?? '')`).
         var initialValue = FieldContext?.ValidityData.InitialValue;
-        var isDirty = !EqualityComparer<TValue>.Default.Equals(currentInputValue, (TValue?)initialValue);
+        var isDirty = initialValue is null
+            ? !IsEmpty(currentInputValue)
+            : !EqualityComparer<TValue>.Default.Equals(currentInputValue, (TValue?)initialValue);
         FieldContext?.SetDirty(isDirty);
         FieldContext?.SetFilled(!IsEmpty(currentInputValue));
 

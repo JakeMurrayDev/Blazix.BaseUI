@@ -8,4 +8,5 @@ public interface IFormContract
     Task NoValidateCanBeDisabled();
     Task MarksControlInvalidWhenErrorsProvided();
     Task DoesNotMarkControlInvalidWhenNoErrors();
+    Task IncludesCheckboxGroupValueRegisteredThroughContext();
 }

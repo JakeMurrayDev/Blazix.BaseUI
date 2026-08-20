@@ -285,4 +285,29 @@ public abstract class FormTestsBase : TestBase
             await Assertions.Expect(fieldErrorEmail).Not.ToBeVisibleAsync();
         });
     }
+
+    // F15: focuses the first invalid field in document order after a keyed reorder
+    [Fact]
+    public virtual async Task FocusesFirstInvalidFieldInDocumentOrder()
+    {
+        await RunTestAsync(async () =>
+        {
+            var url = CreateUrl("/tests/form")
+                .WithTestScenario("focus-invalid-document-order")
+                .Build();
+            await NavigateAsync(url);
+
+            var reorderButton = GetByTestId("reorder-fields");
+            await reorderButton.ClickAsync();
+            await WaitForDelayAsync(200);
+
+            var submitButton = GetByTestId("submit-button");
+            await submitButton.ClickAsync();
+            await WaitForDelayAsync(300);
+
+            // Registration order is still a, b; the DOM order is now b, a.
+            var firstInDom = GetByTestId("field-control-b");
+            await Assertions.Expect(firstInDom).ToBeFocusedAsync();
+        });
+    }
 }

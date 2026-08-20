@@ -1,4 +1,5 @@
 using Blazix.BaseUI.Field;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace Blazix.BaseUI.Form;
@@ -13,6 +14,9 @@ internal interface IFieldRegistration
 
     /// <summary>Gets a function that returns the current value of the field.</summary>
     Func<object?> GetValue { get; }
+
+    /// <summary>Gets a function that returns the element that represents the field, if rendered.</summary>
+    Func<ElementReference?> GetElement { get; }
 
     /// <summary>Gets a function that validates the field.</summary>
     Func<Task> ValidateAsync { get; }

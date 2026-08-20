@@ -17,6 +17,9 @@
         case "focus-invalid-on-submit":
             @RenderFocusInvalidOnSubmit()
             break;
+        case "focus-invalid-document-order":
+            @RenderFocusInvalidDocumentOrder()
+            break;
         case "errors-removed-on-change":
             @RenderErrorsRemovedOnChange()
             break;
@@ -84,6 +87,21 @@
         <button type="submit" data-testid="submit-button">Submit</button>
     </Form>;
 
+    private RenderFragment RenderFocusInvalidDocumentOrder() => @<div>
+        <button type="button" data-testid="reorder-fields" @onclick="ReorderFields">Reorder</button>
+        <Form Model="model" ValidationMode="ValidationMode.OnSubmit"
+              OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit">
+            @foreach (var fieldName in orderedFieldNames)
+            {
+                <FieldRoot @key="fieldName" Name="@fieldName" Validate="ValidateRequired"
+                           data-testid="@($"field-root-{fieldName}")">
+                    <FieldControl TValue="string" data-testid="@($"field-control-{fieldName}")" />
+                </FieldRoot>
+            }
+            <button type="submit" data-testid="submit-button">Submit</button>
+        </Form>
+    </div>;
+
     private RenderFragment RenderErrorsRemovedOnChange() => @<Form Model="model" ValidationMode="ValidationMode.OnSubmit"
           Errors="@formErrors"
           OnValidSubmit="HandleValidSubmit" OnInvalidSubmit="HandleInvalidSubmit">
@@ -139,6 +157,7 @@
     public string Scenario { get; set; } = "submit-with-errors";
 
     private TestFormModel model = new();
+    private List<string> orderedFieldNames = ["a", "b"];
     private int submitCount;
     private int validSubmitCount;
     private int invalidSubmitCount;
@@ -147,6 +166,8 @@
     private bool showOptionalField = true;
     private Dictionary<string, string[]>? formErrors;
     private FormActions? formActions;
+
+    private void ReorderFields() => orderedFieldNames = ["b", "a"];
 
     private Task<string[]?> ValidateRequired(object? value)
     {
