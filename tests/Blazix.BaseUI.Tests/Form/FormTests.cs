@@ -15,6 +15,7 @@ public class FormTests : BunitContext, IFormContract
     public FormTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        JsInteropSetup.SetupCheckboxModule(JSInterop);
         JsInteropSetup.SetupFieldModule(JSInterop);
         JsInteropSetup.SetupLabelModule(JSInterop);
         Services.AddSingleton<ILoggerFactory, NullLoggerFactory>();
@@ -154,6 +155,72 @@ public class FormTests : BunitContext, IFormContract
         control.HasAttribute("aria-invalid").ShouldBeFalse();
 
         return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task IncludesCheckboxGroupValueRegisteredThroughContext()
+    {
+        FormSubmitEventArgs? submittedArgs = null;
+        var defaultValue = new[] { "apple" };
+        var model = new TestModel();
+        var labelableContext = new Blazix.BaseUI.Utilities.LabelableProvider.LabelableContext(
+            ControlId: null,
+            SetControlId: _ => { },
+            LabelId: null,
+            SetLabelId: _ => { },
+            MessageIds: [],
+            UpdateMessageIds: (_, _) => { });
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<Blazix.BaseUI.Form.Form>(0);
+            builder.AddAttribute(1, "Model", model);
+            builder.AddAttribute(2, "OnFormSubmit",
+                EventCallback.Factory.Create<FormSubmitEventArgs>(this, args => submittedArgs = args));
+            builder.AddAttribute(3, "ChildContent",
+                (RenderFragment<Microsoft.AspNetCore.Components.Forms.EditContext>)(_ =>
+                    (RenderFragment)(innerBuilder =>
+                    {
+                        innerBuilder.OpenComponent<FieldRoot>(0);
+                        innerBuilder.AddAttribute(1, "Name", "fruits");
+                        innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
+                        {
+                            fieldBuilder.OpenComponent<Blazix.BaseUI.CheckboxGroup.CheckboxGroup>(0);
+                            fieldBuilder.AddAttribute(1, "DefaultValue", defaultValue);
+                            fieldBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(groupBuilder =>
+                            {
+                                groupBuilder.OpenComponent<CascadingValue<Blazix.BaseUI.Utilities.LabelableProvider.LabelableContext>>(0);
+                                groupBuilder.AddAttribute(1, "Value", labelableContext);
+                                groupBuilder.AddAttribute(2, "IsFixed", true);
+                                groupBuilder.AddAttribute(3, "ChildContent", (RenderFragment)(contextBuilder =>
+                                {
+                                    contextBuilder.OpenComponent<Blazix.BaseUI.Checkbox.CheckboxRoot>(0);
+                                    contextBuilder.AddAttribute(1, "Value", "apple");
+                                    contextBuilder.CloseComponent();
+
+                                    contextBuilder.OpenComponent<Blazix.BaseUI.Checkbox.CheckboxRoot>(10);
+                                    contextBuilder.AddAttribute(11, "Value", "banana");
+                                    contextBuilder.CloseComponent();
+                                }));
+                                groupBuilder.CloseComponent();
+                            }));
+                            fieldBuilder.CloseComponent();
+                        }));
+                        innerBuilder.CloseComponent();
+
+                        innerBuilder.OpenElement(10, "button");
+                        innerBuilder.AddAttribute(11, "type", "submit");
+                        innerBuilder.AddContent(12, "Submit");
+                        innerBuilder.CloseElement();
+                    })));
+            builder.CloseComponent();
+        });
+
+        await cut.Find("form").SubmitAsync();
+
+        submittedArgs.ShouldNotBeNull();
+        submittedArgs.Values.ShouldContainKey("fruits");
+        submittedArgs.Values["fruits"].ShouldBeOfType<string[]>().ShouldBe(["apple"]);
     }
 
     [Fact]

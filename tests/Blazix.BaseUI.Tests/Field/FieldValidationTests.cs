@@ -146,6 +146,88 @@ public class FieldValidationTests
         data.Errors.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task CommitAsyncPublishesValueMissingWhenCustomErrorIsStale()
+    {
+        var data = CreateValidityData(
+            state: new FieldValidityState(CustomError: true, Valid: false),
+            errors: ["custom error"],
+            error: "custom error",
+            value: "invalid");
+        var validateCalls = 0;
+
+        var validation = new FieldValidation(
+            () => data,
+            next => data = next,
+            (_, _) =>
+            {
+                validateCalls++;
+                return Task.FromResult<string[]?>(["custom error"]);
+            },
+            getInvalid: null,
+            getMarkedDirty: () => true,
+            getShouldValidateOnChange: () => false,
+            getFormValues: () => EmptyFormValues,
+            debounceTime: 0,
+            requestStateChange: () => { });
+
+        await validation.CommitAsync(
+            "",
+            revalidateOnly: true,
+            nativeValidity: new FieldNativeValiditySnapshot(
+                new FieldValidityState(CustomError: true, ValueMissing: true, Valid: false),
+                "custom error"));
+
+        data.Value.ShouldBe("");
+        data.State.ValueMissing.ShouldBeTrue();
+        data.State.CustomError.ShouldBeTrue();
+        data.State.Valid.ShouldBe(false);
+        data.Errors.ShouldBe(["custom error"]);
+        validateCalls.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task CommitAsyncDefersValueMissingWhenAnotherNativeErrorExists()
+    {
+        var data = CreateValidityData(
+            state: new FieldValidityState(CustomError: true, Valid: false),
+            errors: ["custom error"],
+            error: "custom error",
+            value: "invalid");
+        var validateCalls = 0;
+
+        var validation = new FieldValidation(
+            () => data,
+            next => data = next,
+            (_, _) =>
+            {
+                validateCalls++;
+                return Task.FromResult<string[]?>(["custom error"]);
+            },
+            getInvalid: null,
+            getMarkedDirty: () => true,
+            getShouldValidateOnChange: () => false,
+            getFormValues: () => EmptyFormValues,
+            debounceTime: 0,
+            requestStateChange: () => { });
+
+        await validation.CommitAsync(
+            "",
+            revalidateOnly: true,
+            nativeValidity: new FieldNativeValiditySnapshot(
+                new FieldValidityState(
+                    BadInput: true,
+                    CustomError: true,
+                    ValueMissing: true,
+                    Valid: false),
+                "custom error"));
+
+        data.Value.ShouldBe("invalid");
+        data.State.ValueMissing.ShouldBeFalse();
+        data.Errors.ShouldBe(["custom error"]);
+        validateCalls.ShouldBe(0);
+    }
+
     private static FieldValidityData CreateValidityData(
         FieldValidityState? state = null,
         string[]? errors = null,

@@ -21,6 +21,8 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         string? defaultInputValue = null,
         bool multiple = false,
         bool defaultOpen = false,
+        bool inline = false,
+        ComboboxAutoHighlight autoHighlight = ComboboxAutoHighlight.False,
         bool disabled = false,
         bool readOnly = false,
         bool required = false,
@@ -29,7 +31,8 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         EventCallback<ComboboxInputValueChangeEventArgs>? onInputValueChange = null,
         bool? open = null,
         EventCallback<ComboboxOpenChangeEventArgs>? onOpenChange = null,
-        EventCallback<bool>? openChanged = null)
+        EventCallback<bool>? openChanged = null,
+        IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -41,6 +44,8 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
             if (defaultInputValue is not null) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.DefaultInputValue), defaultInputValue);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Multiple), multiple);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.DefaultOpen), defaultOpen);
+            builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Inline), inline);
+            builder.AddAttribute(i++, nameof(ComboboxRoot<string>.AutoHighlight), autoHighlight);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Disabled), disabled);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.ReadOnly), readOnly);
             builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Required), required);
@@ -50,12 +55,14 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
             if (open.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.Open), open.Value);
             if (onOpenChange.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OnOpenChange), onOpenChange.Value);
             if (openChanged.HasValue) builder.AddAttribute(i++, nameof(ComboboxRoot<string>.OpenChanged), openChanged.Value);
-            builder.AddAttribute(i++, nameof(ComboboxRoot<string>.ChildContent), CreateDefaultChildren(multiple));
+            builder.AddAttribute(i++, nameof(ComboboxRoot<string>.ChildContent), CreateDefaultChildren(multiple, itemAdditionalAttributes));
             builder.CloseComponent();
         };
     }
 
-    private static RenderFragment CreateDefaultChildren(bool multiple = false)
+    private static RenderFragment CreateDefaultChildren(
+        bool multiple = false,
+        IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return builder =>
         {
@@ -101,7 +108,7 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
                 positionerBuilder.AddAttribute(1, nameof(ComboboxPopup.ChildContent), (RenderFragment)(popupBuilder =>
                 {
                     popupBuilder.OpenComponent<ComboboxList>(0);
-                    popupBuilder.AddAttribute(1, nameof(ComboboxList.ChildContent), CreateListItems());
+                    popupBuilder.AddAttribute(1, nameof(ComboboxList.ChildContent), CreateListItems(itemAdditionalAttributes));
                     popupBuilder.CloseComponent();
                 }));
                 positionerBuilder.CloseComponent();
@@ -110,7 +117,7 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         };
     }
 
-    private static RenderFragment CreateListItems()
+    private static RenderFragment CreateListItems(IReadOnlyDictionary<string, object>? itemAdditionalAttributes = null)
     {
         return listBuilder =>
         {
@@ -120,7 +127,8 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
                 listBuilder.OpenComponent<ComboboxItem<string>>(index * 10);
                 listBuilder.AddAttribute(index * 10 + 1, nameof(ComboboxItem<string>.Value), fruit);
                 listBuilder.AddAttribute(index * 10 + 2, nameof(ComboboxItem<string>.Index), index);
-                listBuilder.AddAttribute(index * 10 + 3, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(itemBuilder =>
+                listBuilder.AddAttribute(index * 10 + 3, nameof(ComboboxItem<string>.AdditionalAttributes), itemAdditionalAttributes);
+                listBuilder.AddAttribute(index * 10 + 4, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(itemBuilder =>
                 {
                     itemBuilder.OpenComponent<ComboboxItemIndicator>(0);
                     itemBuilder.AddAttribute(1, nameof(ComboboxItemIndicator.ChildContent), (RenderFragment)(b => b.AddContent(0, "Selected")));
@@ -130,6 +138,214 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
                 listBuilder.CloseComponent();
             }
         };
+    }
+
+    private static RenderFragment CreatePopupInputCombobox(
+        string? defaultValue,
+        bool multiple = false,
+        string? inputValue = null,
+        EventCallback<string>? inputValueChanged = null,
+        EventCallback<ComboboxInputValueChangeEventArgs>? onInputValueChange = null)
+    {
+        return builder =>
+        {
+            builder.OpenComponent<ComboboxRoot<string>>(0);
+            builder.AddAttribute(1, nameof(ComboboxRoot<string>.Items), Fruits);
+            if (defaultValue is not null)
+            {
+                builder.AddAttribute(2, nameof(ComboboxRoot<string>.DefaultValue), defaultValue);
+            }
+
+            builder.AddAttribute(3, nameof(ComboboxRoot<string>.Multiple), multiple);
+            if (inputValueChanged.HasValue)
+            {
+                builder.AddAttribute(4, nameof(ComboboxRoot<string>.InputValue), inputValue);
+                builder.AddAttribute(5, nameof(ComboboxRoot<string>.InputValueChanged), inputValueChanged.Value);
+            }
+            if (onInputValueChange.HasValue)
+            {
+                builder.AddAttribute(6, nameof(ComboboxRoot<string>.OnInputValueChange), onInputValueChange.Value);
+            }
+
+            builder.AddAttribute(7, nameof(ComboboxRoot<string>.DefaultOpen), true);
+            builder.AddAttribute(8, nameof(ComboboxRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<ComboboxTrigger>(0);
+                childBuilder.AddAttribute(1, nameof(ComboboxTrigger.ChildContent), (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                childBuilder.CloseComponent();
+
+                childBuilder.OpenComponent<ComboboxPositioner>(10);
+                childBuilder.AddAttribute(11, nameof(ComboboxPositioner.ChildContent), (RenderFragment)(positionerBuilder =>
+                {
+                    positionerBuilder.OpenComponent<ComboboxPopup>(0);
+                    positionerBuilder.AddAttribute(1, nameof(ComboboxPopup.ChildContent), (RenderFragment)(popupBuilder =>
+                    {
+                        popupBuilder.OpenComponent<ComboboxInput>(0);
+                        popupBuilder.CloseComponent();
+
+                        popupBuilder.OpenComponent<ComboboxList>(10);
+                        popupBuilder.AddAttribute(11, nameof(ComboboxList.ChildContent), (RenderFragment)(listBuilder =>
+                        {
+                            listBuilder.OpenComponent<ComboboxItem<string>>(0);
+                            listBuilder.AddAttribute(1, nameof(ComboboxItem<string>.Value), "Apple");
+                            listBuilder.AddAttribute(2, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Apple")));
+                            listBuilder.CloseComponent();
+
+                            listBuilder.OpenComponent<ComboboxItem<string>>(10);
+                            listBuilder.AddAttribute(11, nameof(ComboboxItem<string>.Value), "Apricot");
+                            listBuilder.AddAttribute(12, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Apricot")));
+                            listBuilder.CloseComponent();
+
+                            listBuilder.OpenComponent<ComboboxItem<string>>(20);
+                            listBuilder.AddAttribute(21, nameof(ComboboxItem<string>.Value), "Banana");
+                            listBuilder.AddAttribute(22, nameof(ComboboxItem<string>.ChildContent), (RenderFragment)(b => b.AddContent(0, "Banana")));
+                            listBuilder.CloseComponent();
+                        }));
+                        popupBuilder.CloseComponent();
+                    }));
+                    positionerBuilder.CloseComponent();
+                }));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        };
+    }
+
+    [Fact]
+    public async Task InputPress_ShouldReportInputPressOpenReason()
+    {
+        ComboboxOpenChangeEventArgs? received = null;
+        var callback = EventCallback.Factory.Create<ComboboxOpenChangeEventArgs>(this, args => received = args);
+        var cut = Render(CreateCombobox(onOpenChange: callback));
+
+        await cut.Find("input[role='combobox']").MouseDownAsync(new MouseEventArgs());
+
+        received.ShouldNotBeNull();
+        received.Open.ShouldBeTrue();
+        received.Reason.ShouldBe(ComboboxChangeReason.InputPress);
+    }
+
+    [Fact]
+    public Task InlineList_ShouldExposeExpandedAriaOnInput()
+    {
+        var cut = Render(CreateCombobox(inline: true, defaultOpen: false));
+
+        var input = cut.Find("input[role='combobox']");
+        var list = cut.Find("[role='listbox']");
+        input.GetAttribute("aria-expanded").ShouldBe("true");
+        input.GetAttribute("aria-haspopup").ShouldBe("listbox");
+        input.GetAttribute("aria-controls").ShouldBe(list.Id);
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task DisabledRoot_ShouldDisableItems()
+    {
+        ComboboxValueChangeEventArgs<string>? received = null;
+        var callback = EventCallback.Factory.Create<ComboboxValueChangeEventArgs<string>>(this, args => received = args);
+        var cut = Render(CreateCombobox(disabled: true, defaultOpen: true, onValueChange: callback));
+
+        var options = cut.FindAll("[role='option']");
+        options.Count.ShouldBe(Fruits.Count);
+        options.ShouldAllBe(option => option.HasAttribute("data-disabled"));
+        options.ShouldAllBe(option => option.GetAttribute("aria-disabled") == "true");
+
+        var banana = options.Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe(string.Empty);
+        received.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task DisabledItem_ShouldStillInvokeConsumerClickHandler()
+    {
+        var consumerClickHandled = false;
+        var valueChangeCount = 0;
+        var valueCallback = EventCallback.Factory.Create<ComboboxValueChangeEventArgs<string>>(this, _ => valueChangeCount++);
+        var itemAttributes = new Dictionary<string, object>
+        {
+            { "onclick", EventCallback.Factory.Create<MouseEventArgs>(this, _ => consumerClickHandled = true) }
+        };
+        var cut = Render(CreateCombobox(
+            disabled: true,
+            defaultOpen: true,
+            onValueChange: valueCallback,
+            itemAdditionalAttributes: itemAttributes));
+
+        var banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        consumerClickHandled.ShouldBeTrue();
+        valueChangeCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task QueryClear_ShouldRestoreHighlightToSelectedItem()
+    {
+        var selectedCut = Render(CreatePopupInputCombobox("Banana"));
+        var input = selectedCut.Find("input[role='combobox']");
+
+        await input.InputAsync(new ChangeEventArgs { Value = "Ap" });
+
+        var filteredOptions = selectedCut.FindAll("[role='option']");
+        filteredOptions.Count.ShouldBe(2);
+        filteredOptions.ShouldNotContain(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+
+        await selectedCut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "" });
+
+        var restoredOptions = selectedCut.FindAll("[role='option']");
+        var banana = restoredOptions.Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        banana.HasAttribute("data-highlighted").ShouldBeTrue();
+        selectedCut.Find("input[role='combobox']").GetAttribute("aria-activedescendant").ShouldBe(banana.Id);
+
+        var emptyCut = Render(CreatePopupInputCombobox(null));
+        await emptyCut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "Ap" });
+        await emptyCut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "" });
+
+        emptyCut.Find("input[role='combobox']").HasAttribute("aria-activedescendant").ShouldBeFalse();
+        emptyCut.FindAll("[role='option']").ShouldAllBe(option => !option.HasAttribute("data-highlighted"));
+    }
+
+    [Fact]
+    public async Task QueryClear_ShouldRestoreHighlightWithControlledInputValue()
+    {
+        var inputValue = string.Empty;
+        var inputValueChanged = EventCallback.Factory.Create<string>(this, value => inputValue = value);
+        var cut = Render(CreatePopupInputCombobox(
+            defaultValue: null,
+            inputValue: inputValue,
+            inputValueChanged: inputValueChanged));
+        var root = cut.FindComponent<ComboboxRoot<string>>();
+
+        var banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        await cut.Find("button").MouseDownAsync(new MouseEventArgs());
+        banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        banana.GetAttribute("aria-selected").ShouldBe("true");
+
+        await cut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "Ap" });
+        inputValue.ShouldBe("Ap");
+        root.Render(parameters => parameters
+            .Add(component => component.InputValue, inputValue)
+            .Add(component => component.InputValueChanged, inputValueChanged));
+
+        var filteredOptions = cut.FindAll("[role='option']");
+        filteredOptions.Count.ShouldBe(2);
+        filteredOptions.ShouldNotContain(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+
+        await cut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "" });
+        inputValue.ShouldBe(string.Empty);
+        root.Render(parameters => parameters
+            .Add(component => component.InputValue, inputValue)
+            .Add(component => component.InputValueChanged, inputValueChanged));
+
+        var restoredOptions = cut.FindAll("[role='option']");
+        banana = restoredOptions.Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        banana.HasAttribute("data-highlighted").ShouldBeTrue();
+        cut.Find("input[role='combobox']").GetAttribute("aria-activedescendant").ShouldBe(banana.Id);
     }
 
     [Fact]
@@ -200,6 +416,30 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         received.Value.ShouldBeNull();
         received.Values.ShouldBe(["Apple", "Banana"]);
         received.Reason.ShouldBe(ComboboxChangeReason.ItemPress);
+    }
+
+    [Fact]
+    public async Task MultipleToggle_ShouldNotClearInputWhenQueryIsEmpty()
+    {
+        var inputChangeReasons = new List<ComboboxChangeReason>();
+        var callback = EventCallback.Factory.Create<ComboboxInputValueChangeEventArgs>(this, args => inputChangeReasons.Add(args.Reason));
+        var cut = Render(CreatePopupInputCombobox(
+            defaultValue: null,
+            multiple: true,
+            onInputValueChange: callback));
+
+        var apple = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Apple", StringComparison.Ordinal));
+        await apple.ClickAsync(new MouseEventArgs());
+
+        cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe(string.Empty);
+        inputChangeReasons.ShouldNotContain(ComboboxChangeReason.InputClear);
+
+        await cut.Find("input[role='combobox']").InputAsync(new ChangeEventArgs { Value = "Ba" });
+        var banana = cut.FindAll("[role='option']").Single(option => option.TextContent.Contains("Banana", StringComparison.Ordinal));
+        await banana.ClickAsync(new MouseEventArgs());
+
+        cut.Find("input[role='combobox']").GetAttribute("value").ShouldBe(string.Empty);
+        inputChangeReasons.Count(reason => reason == ComboboxChangeReason.InputClear).ShouldBe(1);
     }
 
     [Fact]

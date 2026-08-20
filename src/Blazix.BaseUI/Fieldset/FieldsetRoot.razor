@@ -14,6 +14,7 @@
 
 @code {
     private string? legendId;
+    private object? legendOwner;
     private FieldsetRootState state = new(Disabled: false);
     private FieldsetRootContext context = null!;
     private RenderElement<FieldsetRootState>? renderElementReference;
@@ -101,8 +102,20 @@
         componentAttributes = attrs;
     }
 
-    private void SetLegendId(string? id)
+    private void SetLegendId(object owner, string? id)
     {
+        if (id is null)
+        {
+            // A replacement legend registers before the previous instance is disposed, so a stale
+            // instance must not clear the current registration - even when both share an explicit id.
+            if (!ReferenceEquals(legendOwner, owner)) return;
+            legendOwner = null;
+        }
+        else
+        {
+            legendOwner = owner;
+        }
+
         if (legendId == id) return;
         legendId = id;
         context.LegendId = id;

@@ -55,7 +55,8 @@ export function initializeRoot(rootElement, rootId, dotNetRef, direction, overfl
         scrollingX: false,
         scrollingY: false,
         touchModality: false,
-        thumbDragging: false,
+        activePointerId: null,
+        savedSnapType: null,
         startY: 0,
         startX: 0,
         startScrollTop: 0,
@@ -412,12 +413,6 @@ export function registerThumb(rootId, thumbElement, orientation) {
     };
 
     const onPointerUp = (event) => {
-        if (normalizedOrientation === 'vertical') {
-            setScrolling(root, 'y', false);
-        } else {
-            setScrolling(root, 'x', false);
-        }
-
         handlePointerUp(root, event);
     };
 
@@ -780,12 +775,38 @@ function handleScrollPosition(root, scrollPosition) {
     }
 }
 
+// CSS scroll snap forces every programmatic scroll to land on a snap
+// point, making thumb dragging jump between snap points. Native
+// scrollbars suppress snapping while dragging, so disable it until the
+// pointer is released; restoring the value re-snaps the viewport. The
+// save is guarded so a second pointer during an active drag can't
+// clobber the saved value with `none`.
+function disableViewportSnap(root) {
+    const viewportEl = root.viewportElement;
+    if (viewportEl && root.savedSnapType === null) {
+        root.savedSnapType = viewportEl.style.scrollSnapType;
+        viewportEl.style.scrollSnapType = 'none';
+    }
+}
+
 function handlePointerDown(root, orientation, event) {
     if (event.button !== 0) {
         return;
     }
 
-    root.thumbDragging = true;
+    if (root.activePointerId !== null) {
+        const activeThumb =
+            root.currentOrientation === 'vertical' ? root.thumbYElement : root.thumbXElement;
+        // A live drag holds capture for the active pointer — ignore other pointers.
+        // No capture means the release went missing entirely (silent capture drop
+        // with an id that never reappears, e.g. a lost touch contact), so let the
+        // new pointer take over the latch instead of leaving dragging dead.
+        if (activeThumb?.hasPointerCapture?.(root.activePointerId)) {
+            return;
+        }
+    }
+
+    root.activePointerId = event.pointerId;
     root.startY = event.clientY;
     root.startX = event.clientX;
     root.currentOrientation = orientation;
@@ -793,6 +814,7 @@ function handlePointerDown(root, orientation, event) {
     if (root.viewportElement) {
         root.startScrollTop = root.viewportElement.scrollTop;
         root.startScrollLeft = root.viewportElement.scrollLeft;
+        disableViewportSnap(root);
     }
 
     const thumb = orientation === 'vertical' ? root.thumbYElement : root.thumbXElement;
@@ -806,7 +828,17 @@ function handlePointerDown(root, orientation, event) {
 }
 
 function handlePointerMove(root, event) {
-    if (!root.thumbDragging) {
+    if (event.pointerId !== root.activePointerId) {
+        return;
+    }
+
+    // The release can go missing entirely (e.g. the browser drops pointer
+    // capture while the scrollbar is hidden mid-drag), leaving the drag
+    // latched so a buttonless hover over the thumb scrolls the viewport.
+    // Treat a move without the primary button held (`buttons` bit 1 unset)
+    // as the missed release.
+    if (event.buttons % 2 === 0) {
+        handlePointerUp(root, event);
         return;
     }
 
@@ -865,10 +897,27 @@ function handlePointerMove(root, event) {
 }
 
 function handlePointerUp(root, event) {
-    root.thumbDragging = false;
+    if (event.pointerId !== root.activePointerId) {
+        return;
+    }
+
+    root.activePointerId = null;
+    // Clear the drag's scrolling state immediately rather than waiting for the
+    // `SCROLL_TIMEOUT` timer armed by the last drag move, so every release path
+    // (real, `pointercancel`, or the missed-release fallback) behaves the same.
+    setScrolling(root, root.currentOrientation === 'vertical' ? 'y' : 'x', false);
+
+    if (root.savedSnapType !== null) {
+        if (root.viewportElement) {
+            root.viewportElement.style.scrollSnapType = root.savedSnapType;
+        }
+        root.savedSnapType = null;
+    }
 
     const thumb = root.currentOrientation === 'vertical' ? root.thumbYElement : root.thumbXElement;
-    if (thumb?.releasePointerCapture && event.pointerId != null) {
+    // `pointercancel` releases capture implicitly, so guard against releasing a
+    // capture we no longer hold (which would throw).
+    if (thumb?.hasPointerCapture?.(event.pointerId)) {
         try {
             thumb.releasePointerCapture(event.pointerId);
         } catch {
@@ -910,6 +959,12 @@ function handleScrollbarPointerDown(root, orientation, event) {
             return;
         }
 
+        // Disable snapping before the jump-to-click assignment, or the
+        // assigned position quantizes to the nearest snap point and the thumb
+        // stays offset from the pointer for the whole drag. `handlePointerDown`
+        // below re-runs this as a guarded no-op for the thumb-drag path.
+        disableViewportSnap(root);
+
         viewportEl.scrollTop = scrollRatioY * (viewportEl.scrollHeight - viewportEl.clientHeight);
     }
 
@@ -929,17 +984,15 @@ function handleScrollbarPointerDown(root, orientation, event) {
 
         const scrollRange = viewportEl.scrollWidth - viewportEl.clientWidth;
 
-        let newScrollLeft;
-        if (root.direction === 'rtl') {
-            newScrollLeft = (1 - scrollRatioX) * scrollRange;
-            if (viewportEl.scrollLeft <= 0) {
-                newScrollLeft = -newScrollLeft;
-            }
-        } else {
-            newScrollLeft = scrollRatioX * scrollRange;
-        }
+        // Disable snapping before the jump-to-click assignment, or the
+        // assigned position quantizes to the nearest snap point and the thumb
+        // stays offset from the pointer for the whole drag. `handlePointerDown`
+        // below re-runs this as a guarded no-op for the thumb-drag path.
+        disableViewportSnap(root);
 
-        viewportEl.scrollLeft = newScrollLeft;
+        viewportEl.scrollLeft = root.direction === 'rtl'
+            ? -(1 - scrollRatioX) * scrollRange
+            : scrollRatioX * scrollRange;
     }
 
     handleScrollPosition(root, { x: viewportEl.scrollLeft, y: viewportEl.scrollTop });

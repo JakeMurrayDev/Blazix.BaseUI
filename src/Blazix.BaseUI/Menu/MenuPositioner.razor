@@ -29,6 +29,7 @@
     private int effectiveArrowPadding;
     private PositionMethod effectivePositionMethod;
     private bool shiftCrossAxis;
+    private bool shiftLayoutViewport;
     private bool computedAnchorHidden;
     private bool computedArrowUncentered;
     private DotNetObjectReference<MenuPositioner>? positionerDotNetRef;
@@ -199,12 +200,15 @@
         effectiveArrowPadding = ArrowPadding;
         effectivePositionMethod = PositionMethod;
         shiftCrossAxis = false;
+        shiftLayoutViewport = false;
 
         if (isContextMenu)
         {
             effectivePositionMethod = ContextMenuContext is not null ? PositionMethod.Fixed : PositionMethod;
             effectiveArrowPadding = 0;
             shiftCrossAxis = CollisionAvoidance?.Side != CollisionAvoidanceSideMode.Flip;
+            // Pin shift to the layout viewport so pinch-zoom does not shift the menu.
+            shiftLayoutViewport = true;
 
             // Context-menu offset adjustments when side is unspecified and align isn't center
             if (Side is null && resolvedAlign != Blazix.BaseUI.Align.Center)
@@ -434,7 +438,8 @@
                 caSide, caAlign, caFallback,
                 positionerDotNetRef,
                 hasViewport,
-                shiftCrossAxis));
+                shiftCrossAxis,
+                shiftLayoutViewport));
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
@@ -476,7 +481,8 @@
                 Sticky,
                 effectivePositionMethod == PositionMethod.Fixed ? "fixed" : "absolute",
                 caSide, caAlign, caFallback,
-                shiftCrossAxis);
+                shiftCrossAxis,
+                shiftLayoutViewport);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {

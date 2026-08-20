@@ -88,20 +88,18 @@
         attrs["id"] = RootContext?.PopupId ?? string.Empty;
         attrs["tabindex"] = "-1";
 
-        // Side-dependent positioning for origin-side alignment (top or left)
+        // Upstream #5370: physical-left anchoring applies in both text directions.
         var isRtl = string.Equals(RootContext?.Direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var isOriginSide = state.Side == Side.Top;
         var isPhysicalLeft = state.Side == Side.Left;
         if (isRtl)
         {
-            isOriginSide = isOriginSide || state.Side == Side.InlineEnd;
             isPhysicalLeft = isPhysicalLeft || state.Side == Side.InlineEnd;
         }
         else
         {
-            isOriginSide = isOriginSide || state.Side == Side.InlineStart;
             isPhysicalLeft = isPhysicalLeft || state.Side == Side.InlineStart;
         }
+        var isOriginSide = state.Side == Side.Top || isPhysicalLeft;
 
         if (isOriginSide)
         {

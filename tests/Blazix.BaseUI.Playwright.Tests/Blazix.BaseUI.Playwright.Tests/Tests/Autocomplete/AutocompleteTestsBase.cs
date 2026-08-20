@@ -271,6 +271,33 @@ public abstract class AutocompleteTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task TriggerPressReleasedOutsideCancelsTheOpen()
+    {
+        await NavigateAsync(CreateUrl("/tests/autocomplete")
+            .WithAutocompleteInputInsidePopup(true));
+
+        var triggerBox = await GetByTestId("autocomplete-trigger").BoundingBoxAsync();
+        var outsideBox = await GetByTestId("outside-button").BoundingBoxAsync();
+        Assert.NotNull(triggerBox);
+        Assert.NotNull(outsideBox);
+
+        await Page.Mouse.MoveAsync(triggerBox!.X + triggerBox.Width / 2, triggerBox.Y + triggerBox.Height / 2);
+        await Page.Mouse.DownAsync();
+
+        // The press must actually open the popup, otherwise the closed state asserted below would
+        // be satisfied by a trigger that never opened at all.
+        await WaitForAutocompleteOpenAsync();
+
+        await Page.Mouse.MoveAsync(
+            outsideBox!.X + outsideBox.Width / 2,
+            outsideBox.Y + outsideBox.Height / 2,
+            new MouseMoveOptions { Steps = 6 });
+        await Page.Mouse.UpAsync();
+
+        await WaitForAutocompleteClosedAsync();
+    }
+
+    [Fact]
     public virtual async Task PopupPointerDownKeepsInputRenderedInsidePopupFocused()
     {
         await NavigateAsync(CreateUrl("/tests/autocomplete")

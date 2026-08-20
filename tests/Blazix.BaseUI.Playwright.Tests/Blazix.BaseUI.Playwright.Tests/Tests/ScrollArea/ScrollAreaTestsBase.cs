@@ -214,6 +214,7 @@ public abstract class ScrollAreaTestsBase : TestBase
         });
         await VerticalThumb.DispatchEventAsync("pointermove", new
         {
+            buttons = 1,
             clientX = metrics.ClientX,
             clientY = metrics.ClientY + 40,
             pointerId = 1
@@ -227,6 +228,264 @@ public abstract class ScrollAreaTestsBase : TestBase
 
         var scrollTopAfterDrag = await GetScrollTopAsync();
         Assert.Equal(initialScrollTop, scrollTopAfterDrag);
+    }
+
+    [Fact]
+    public virtual async Task ThumbDrag_MissedRelease_EndsDragInsteadOfHoverScrolling()
+    {
+        await NavigateAsync(CreateUrl("/tests/scroll-area"));
+        await WaitForMeasuredOverflowAsync();
+
+        var box = await VerticalThumb.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var clientX = box!.X + box.Width / 2;
+        var clientY = box.Y + box.Height / 2;
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+        await VerticalThumb.DispatchEventAsync("pointermove", new
+        {
+            buttons = 1,
+            clientX,
+            clientY = clientY + 40,
+            pointerId = 1
+        });
+
+        await WaitForScrollTopGreaterThanAsync(0);
+        var scrollTopAfterFirstMove = await GetScrollTopAsync();
+
+        await VerticalThumb.DispatchEventAsync("pointermove", new
+        {
+            buttons = 0,
+            clientX,
+            clientY = clientY + 60,
+            pointerId = 2
+        });
+
+        Assert.Equal(scrollTopAfterFirstMove, await GetScrollTopAsync());
+
+        await VerticalThumb.DispatchEventAsync("pointermove", new
+        {
+            buttons = 1,
+            clientX,
+            clientY = clientY + 60,
+            pointerId = 1
+        });
+
+        await WaitForScrollTopGreaterThanAsync(scrollTopAfterFirstMove);
+        var scrollTopBeforeMissedRelease = await GetScrollTopAsync();
+
+        await VerticalThumb.DispatchEventAsync("pointermove", new
+        {
+            buttons = 0,
+            clientX,
+            clientY = clientY + 80,
+            pointerId = 1
+        });
+
+        Assert.Equal(scrollTopBeforeMissedRelease, await GetScrollTopAsync());
+        await Assertions.Expect(VerticalScrollbar).Not.ToHaveAttributeAsync("data-scrolling", "");
+
+        await VerticalThumb.DispatchEventAsync("pointermove", new
+        {
+            buttons = 0,
+            clientX,
+            clientY = clientY + 120,
+            pointerId = 1
+        });
+
+        Assert.Equal(scrollTopBeforeMissedRelease, await GetScrollTopAsync());
+    }
+
+    [Fact]
+    public virtual async Task ThumbDrag_SuspendsScrollSnapWhileDragging()
+    {
+        await NavigateAsync(CreateUrl("/tests/scroll-area"));
+        await WaitForMeasuredOverflowAsync();
+
+        await Viewport.EvaluateAsync("el => { el.style.scrollSnapType = 'y mandatory'; }");
+
+        var box = await VerticalThumb.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var clientX = box!.X + box.Width / 2;
+        var clientY = box.Y + box.Height / 2;
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("y mandatory", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointercancel", new
+        {
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("y mandatory", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+    }
+
+    [Fact]
+    public virtual async Task ThumbDrag_SecondPointer_CannotClobberSavedSnapState()
+    {
+        await NavigateAsync(CreateUrl("/tests/scroll-area"));
+        await WaitForMeasuredOverflowAsync();
+
+        await Viewport.EvaluateAsync("el => { el.style.scrollSnapType = 'y mandatory'; }");
+        await VerticalThumb.EvaluateAsync(
+            """
+            el => {
+                let capturedId = null;
+                Object.defineProperties(el, {
+                    setPointerCapture: { configurable: true, value: (id) => { capturedId = id; } },
+                    hasPointerCapture: { configurable: true, value: (id) => id === capturedId },
+                    releasePointerCapture: { configurable: true, value: (id) => { if (id === capturedId) { capturedId = null; } } }
+                });
+            }
+            """);
+
+        var box = await VerticalThumb.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var clientX = box!.X + box.Width / 2;
+        var clientY = box.Y + box.Height / 2;
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 2
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 2
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("y mandatory", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+    }
+
+    [Fact]
+    public virtual async Task TrackPress_DisablesSnapForJumpToClickAndRestoresOnRelease()
+    {
+        await NavigateAsync(CreateUrl("/tests/scroll-area"));
+        await WaitForMeasuredOverflowAsync();
+
+        await Viewport.EvaluateAsync("el => { el.style.scrollSnapType = 'y mandatory'; }");
+        var initialScrollTop = await GetScrollTopAsync();
+
+        var box = await VerticalScrollbar.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var clientX = box!.X + box.Width / 2;
+        var clientY = box.Y + box.Height * 0.85;
+
+        await VerticalScrollbar.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        await WaitForScrollTopGreaterThanAsync(initialScrollTop);
+        Assert.True(await GetScrollTopAsync() > initialScrollTop);
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalScrollbar.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        Assert.Equal("y mandatory", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+    }
+
+    [Fact]
+    public virtual async Task RtlTrackPress_AssignsNegativeScrollLeft()
+    {
+        await NavigateAsync(CreateUrl("/tests/scroll-area").WithScrollAreaDirection("rtl"));
+        await WaitForMeasuredOverflowAsync();
+
+        var box = await HorizontalScrollbar.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        var clientX = box!.X + box.Width * 0.15;
+        var clientY = box.Y + box.Height / 2;
+
+        await HorizontalScrollbar.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 1
+        });
+
+        var scrollLeft = await Viewport.EvaluateAsync<double>("el => el.scrollLeft");
+        Assert.True(scrollLeft < -1);
+
+        await HorizontalScrollbar.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 1
+        });
     }
 
     [Fact]

@@ -7,9 +7,6 @@
               HighlightItemOnHover="HighlightItemOnHover"
               Orientation="Orientation"
               Direction="Direction"
-              Handle="Handle"
-              TriggerId="@TriggerId"
-              DefaultTriggerId="@DefaultTriggerId"
               ActionsRef="ActionsRef"
               OpenChanged="OpenChanged"
               OnOpenChange="OnOpenChange"
@@ -76,25 +73,6 @@
     /// </summary>
     [Parameter]
     public Direction Direction { get; set; } = Direction.Undefined;
-
-    /// <summary>
-    /// Gets or sets a handle to connect this root with detached trigger components.
-    /// </summary>
-    [Parameter]
-    public IMenuHandle? Handle { get; set; }
-
-    /// <summary>
-    /// Gets or sets the ID of the trigger element that the menu should be associated with.
-    /// Used for detached trigger patterns.
-    /// </summary>
-    [Parameter]
-    public string? TriggerId { get; set; }
-
-    /// <summary>
-    /// Gets or sets the default trigger ID when using uncontrolled trigger selection.
-    /// </summary>
-    [Parameter]
-    public string? DefaultTriggerId { get; set; }
 
     /// <summary>
     /// Gets or sets a reference to imperative actions for controlling the menu programmatically.

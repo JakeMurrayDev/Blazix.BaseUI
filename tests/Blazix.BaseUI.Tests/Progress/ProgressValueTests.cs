@@ -223,6 +223,37 @@ public class ProgressValueTests : BunitContext, IProgressValueContract
         return Task.CompletedTask;
     }
 
+    [Fact]
+    public Task RendersNothingForNonFiniteValueWhenNoChildContent()
+    {
+        var cut = Render(CreateProgressWithValue(value: double.NaN));
+        var valueEl = cut.Find("[data-testid='value']");
+        valueEl.TextContent.ShouldBeEmpty();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ChildContentReceivesIndeterminateForNonFiniteValue()
+    {
+        string? capturedFormatted = null;
+        double? capturedValue = null;
+
+        var cut = Render(CreateProgressWithValue(
+            value: double.NaN,
+            childContent: (formatted, val) =>
+            {
+                capturedFormatted = formatted;
+                capturedValue = val;
+                return b => b.AddContent(0, formatted);
+            }
+        ));
+
+        capturedFormatted.ShouldBe("indeterminate");
+        capturedValue.ShouldNotBeNull();
+        double.IsNaN(capturedValue!.Value).ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
     // Data attributes
 
     [Fact]

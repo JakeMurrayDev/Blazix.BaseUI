@@ -1,5 +1,10 @@
 @using System.Diagnostics
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+
+@implements IAsyncDisposable
+
+@inject IJSRuntime JSRuntime
 
 <CascadingValue Value="editContext">
     <CascadingValue Value="formContext" IsFixed="true">
@@ -22,8 +27,11 @@
 </CascadingValue>
 
 @code {
+    private const string JsModulePath = "./_content/Blazix.BaseUI/blazix-baseui-field.min.js";
+
     private readonly FieldRegistry fieldRegistry = new();
 
+    private Lazy<Task<IJSObjectReference>> moduleTask = null!;
     private EditContext? editContext;
     private bool hasSetEditContextExplicitly;
     private bool submitAttempted;
@@ -154,6 +162,9 @@
     /// <inheritdoc />
     protected override void OnInitialized()
     {
+        moduleTask = new Lazy<Task<IJSObjectReference>>(() =>
+            JSRuntime.InvokeAsync<IJSObjectReference>("import", JsModulePath).AsTask());
+
         EnsureEditContext();
 
         formContext = new FormContext(
@@ -200,7 +211,27 @@
         if (errorsChanged && focusAfterSubmitErrors)
         {
             focusAfterSubmitErrors = false;
-            _ = InvokeAsync(FocusFirstInvalidFieldAsync);
+            _ = InvokeAsync(() => FocusFirstInvalidFieldAsync());
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (moduleTask.IsValueCreated)
+        {
+            try
+            {
+                var module = await moduleTask.Value;
+                await module.DisposeAsync();
+            }
+            catch (Exception ex) when (
+                ex is JSDisconnectedException or
+                TaskCanceledException or
+                ObjectDisposedException)
+            {
+                _ = ex; // Expected during circuit disconnect - safe to ignore.
+            }
         }
     }
 
@@ -274,11 +305,11 @@
 
         var isValid = editContext.Validate();
 
-        var firstInvalidField = GetFirstInvalidField();
-        if (firstInvalidField is not null)
+        var invalidFields = GetInvalidFields();
+        if (invalidFields.Count > 0)
         {
             isValid = false;
-            await firstInvalidField.FocusAsync();
+            await FocusFirstInvalidFieldAsync(invalidFields);
         }
 
         if (!isValid)
@@ -318,12 +349,12 @@
         }
     }
 
-    private IFieldRegistration? GetFirstInvalidField()
+    private List<IFieldRegistration> GetInvalidFields()
     {
-        return fieldRegistry.Fields.Values.FirstOrDefault(field =>
+        return fieldRegistry.Fields.Values.Where(field =>
             field.ValidityData.State.Valid == false ||
             FormContextHasError(field) ||
-            EditContextHasError(field));
+            EditContextHasError(field)).ToList();
     }
 
     private bool FormContextHasError(IFieldRegistration field) =>
@@ -337,10 +368,56 @@
         return editContext.GetValidationMessages(editContext.Field(field.Name)).Any();
     }
 
-    private async Task FocusFirstInvalidFieldAsync()
+    private async Task FocusFirstInvalidFieldAsync(List<IFieldRegistration>? invalidFields = null)
     {
-        var firstInvalidField = GetFirstInvalidField();
+        invalidFields ??= GetInvalidFields();
+        var firstInvalidField = await ResolveFirstInvalidFieldAsync(invalidFields);
         if (firstInvalidField is not null)
             await firstInvalidField.FocusAsync();
+    }
+
+    // Registration order can diverge from DOM order (fields reordered by @key keep their
+    // registration slot, portaled fields move in the DOM), so pick the first invalid field by
+    // document position. Fields in disconnected trees keep registration order.
+    private async Task<IFieldRegistration?> ResolveFirstInvalidFieldAsync(List<IFieldRegistration> invalidFields)
+    {
+        if (invalidFields.Count < 2)
+            return invalidFields.Count == 0 ? null : invalidFields[0];
+
+        var candidates = new List<IFieldRegistration>(invalidFields.Count);
+        var elements = new List<ElementReference>(invalidFields.Count);
+
+        foreach (var field in invalidFields)
+        {
+            var element = field.GetElement();
+            if (element.HasValue)
+            {
+                candidates.Add(field);
+                elements.Add(element.Value);
+            }
+        }
+
+        if (candidates.Count == 0)
+            return invalidFields[0];
+
+        if (candidates.Count == 1)
+            return candidates[0];
+
+        try
+        {
+            var module = await moduleTask.Value;
+            var index = await module.InvokeAsync<int>("getFirstInDocumentOrder", elements);
+            if (index >= 0 && index < candidates.Count)
+                return candidates[index];
+        }
+        catch (Exception ex) when (
+            ex is JSDisconnectedException or
+            TaskCanceledException or
+            ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect - safe to ignore.
+        }
+
+        return candidates[0];
     }
 }

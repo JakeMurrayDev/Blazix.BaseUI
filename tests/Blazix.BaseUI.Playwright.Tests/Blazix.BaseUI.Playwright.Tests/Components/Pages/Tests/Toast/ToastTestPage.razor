@@ -20,6 +20,16 @@
         border: 1px solid #999;
         background: white;
     }
+
+    .toast-lingering[data-ending-style] {
+        animation: toast-lingering-exit 2s linear forwards;
+    }
+
+    @@keyframes toast-lingering-exit {
+        to {
+            opacity: 0.99;
+        }
+    }
 </style>
 
 <div data-testid="test-container" data-interactive="@RendererInfo.IsInteractive.ToString().ToLowerInvariant()">
@@ -32,6 +42,7 @@
     <button type="button" data-testid="add-keyboard-action" @onclick="AddKeyboardActionToast">Add Keyboard Action</button>
     <button type="button" data-testid="add-keyboard-close" @onclick="AddKeyboardCloseToast">Add Keyboard Close</button>
     <button type="button" data-testid="add-ignore" @onclick="AddIgnoreToast">Add Ignore Target</button>
+    <button type="button" data-testid="add-recycled" @onclick="AddRecycledToast">Add Recycled</button>
     <button type="button" data-testid="close-all" @onclick="() => manager.Close()">Close All</button>
     <button type="button" data-testid="limit-zero" @onclick="() => limit = 0">Limit Zero</button>
     <button type="button" data-testid="limit-two" @onclick="() => limit = 2">Limit Two</button>
@@ -40,7 +51,7 @@
         <ToastViewport class="toast-viewport" data-testid="toast-viewport">
             @foreach (var item in toast.Toasts)
             {
-                <ToastRoot @key="item.Id" Toast="item" class="toast-root" data-testid="@($"toast-{item.Id}")">
+                <ToastRoot @key="item.Id" Toast="item" class="@(item.Id == "recycled" ? "toast-root toast-lingering" : "toast-root")" data-testid="@($"toast-{item.Id}")">
                     <ToastContent data-testid="@($"toast-content-{item.Id}")">
                         <ToastTitle Id="@($"title-{item.Id}")" />
                         <ToastDescription Id="@($"description-{item.Id}")" />
@@ -202,6 +213,17 @@
             Description = "Ignore target",
             Timeout = 0,
             OnCloseCallback = EventCallback.Factory.Create(this, () => closedCount++)
+        });
+    }
+
+    private void AddRecycledToast()
+    {
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "recycled",
+            Title = "Recycled",
+            Description = "Recycled toast",
+            Timeout = 0
         });
     }
 

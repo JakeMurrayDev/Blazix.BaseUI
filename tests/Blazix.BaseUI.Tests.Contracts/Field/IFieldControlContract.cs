@@ -4,4 +4,5 @@ public interface IFieldControlContract
 {
     Task RendersAsInputByDefault();
     Task RendersWithCustomRender();
+    Task ClearsDirtyWhenNullInitialValueReturnsToEmpty();
 }

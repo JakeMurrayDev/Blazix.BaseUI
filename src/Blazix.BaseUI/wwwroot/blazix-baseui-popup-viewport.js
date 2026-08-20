@@ -28,6 +28,22 @@ function setPopupCssSize(el, size) {
     }
 }
 
+// Upstream #5401: canceled animations must wait for any replacement animations.
+function releasePopupSizeWhenAnimationsFinish(popupElement, animationList) {
+    Promise.all(animationList.map(animation => animation.finished)).then(
+        () => setPopupCssSize(popupElement, 'auto'),
+        () => {
+            const currentAnimations = popupElement.getAnimations?.() || [];
+            if (currentAnimations.some(animation => animation.pending || animation.playState !== 'finished')) {
+                releasePopupSizeWhenAnimationsFinish(popupElement, currentAnimations);
+                return;
+            }
+
+            setPopupCssSize(popupElement, 'auto');
+        }
+    );
+}
+
 function setPositionerCssSize(el, size) {
     if (!el) return;
     if (size === 'max-content') {
@@ -54,7 +70,6 @@ function getCssDimensions(el) {
 
 function applyAnchoringStyles(el, side, direction) {
     if (!el) return () => {};
-    const isRtl = direction === 'rtl';
     const originals = {
         position: el.style.position,
         top: el.style.top,
@@ -63,17 +78,14 @@ function applyAnchoringStyles(el, side, direction) {
         right: el.style.right
     };
 
-    if (side === 'top') {
+    // Upstream #5370: physical-left anchoring applies in both text directions.
+    const isPhysicalTop = side === 'top';
+    const isPhysicalLeft = side === 'left'
+        || side === (direction === 'rtl' ? 'inline-end' : 'inline-start');
+    if (isPhysicalTop || isPhysicalLeft) {
         el.style.position = 'absolute';
-        el.style.bottom = '0';
-        el.style.top = 'auto';
-    }
-
-    const isPhysicalLeft = (side === 'left' && !isRtl) || (side === 'right' && isRtl);
-    if (isPhysicalLeft) {
-        el.style.position = 'absolute';
-        el.style.right = '0';
-        el.style.left = 'auto';
+        el.style[isPhysicalTop ? 'bottom' : 'top'] = '0';
+        el.style[isPhysicalLeft ? 'right' : 'left'] = '0';
     }
 
     return () => {
@@ -168,9 +180,7 @@ function remeasureAutoResize(entry) {
 
         const animations = popupElement.getAnimations?.() || [];
         if (animations.length > 0) {
-            Promise.all(animations.map(a => a.finished.catch(() => {}))).then(() => {
-                setPopupCssSize(popupElement, 'auto');
-            });
+            releasePopupSizeWhenAnimationsFinish(popupElement, animations);
         } else {
             setPopupCssSize(popupElement, 'auto');
         }

@@ -478,9 +478,6 @@ Groups all parts of a nested menu.
 | `HighlightItemOnHover` | `bool` | `true` | Whether pointer movement highlights items. |
 | `Orientation` | `MenuOrientation` | `Vertical` | Visual orientation of the submenu. |
 | `Direction` | `Direction` | `Undefined` | Text direction for logical positioning. |
-| `Handle` | `IMenuHandle?` | `null` | Handle for detached trigger patterns. |
-| `TriggerId` | `string?` | `null` | Associated trigger id. |
-| `DefaultTriggerId` | `string?` | `null` | Initial associated trigger id. |
 | `ActionsRef` | `MenuRootActions?` | `null` | Imperative submenu actions. |
 | `OpenChanged` | `EventCallback<bool>` | — | Supports two-way binding. |
 | `OnOpenChange` | `EventCallback<MenuOpenChangeEventArgs>` | — | Fires when the submenu opens or closes. |

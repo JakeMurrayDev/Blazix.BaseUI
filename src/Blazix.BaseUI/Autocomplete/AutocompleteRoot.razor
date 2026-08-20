@@ -62,6 +62,7 @@
     private AutocompleteRootActions? previousActionsRef;
     private AutocompleteChangeReason openChangeReason = AutocompleteChangeReason.None;
     private string? autoHighlightSignature;
+    private int openChangeVersion;
 
     private Task<IJSObjectReference> ModuleTask => (moduleTask ??= new Lazy<Task<IJSObjectReference>>(() =>
         JSRuntime.InvokeAsync<IJSObjectReference>("import", ModulePath).AsTask())).Value;
@@ -482,6 +483,15 @@
     }
 
     [JSInvokable]
+    public Task OnCancelOpen()
+    {
+        // SetOpenInternalAsync bumps the version before its early return, so a CancelOpen arriving
+        // while the popup is still closed (an open pending in its OnOpenChange callback) invalidates
+        // that pending open just as it does when the popup is already open.
+        return SetOpenInternalAsync(false, AutocompleteChangeReason.CancelOpen);
+    }
+
+    [JSInvokable]
     public Task OnEscapeKey()
     {
         return SetOpenInternalAsync(false, AutocompleteChangeReason.EscapeKey);
@@ -653,6 +663,12 @@
 
     private async Task SetOpenInternalAsync(bool open, AutocompleteChangeReason reason)
     {
+        // Capture a version before awaiting OnOpenChange. Any subsequent SetOpenInternalAsync call
+        // (including a redundant one that early-returns below) bumps the counter, which
+        // invalidates a request still suspended in its OnOpenChange callback. This prevents a
+        // close arriving during an in-flight open from being dropped and the stale open committing.
+        var version = ++openChangeVersion;
+
         if (CurrentOpen == open)
         {
             return;
@@ -660,7 +676,7 @@
 
         var args = new AutocompleteOpenChangeEventArgs(open, reason);
         await OnOpenChange.InvokeAsync(args);
-        if (args.IsCanceled)
+        if (args.IsCanceled || version != openChangeVersion)
         {
             return;
         }

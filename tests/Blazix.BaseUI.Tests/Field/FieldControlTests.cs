@@ -27,7 +27,8 @@ public class FieldControlTests : BunitContext, IFieldControlContract
         return builder =>
         {
             builder.OpenComponent<FieldRoot>(0);
-            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            builder.AddAttribute(1, "data-testid", "field-root");
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(fieldBuilder =>
             {
                 fieldBuilder.OpenComponent<FieldControl<string>>(0);
                 fieldBuilder.AddAttribute(1, "data-testid", "field-control");
@@ -64,6 +65,27 @@ public class FieldControlTests : BunitContext, IFieldControlContract
         var textarea = cut.Find("textarea");
         textarea.ShouldNotBeNull();
         textarea.HasAttribute("id").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ClearsDirtyWhenNullInitialValueReturnsToEmpty()
+    {
+        var cut = Render(CreateFieldControl());
+
+        var root = cut.Find("[data-testid='field-root']");
+        var control = cut.Find("[data-testid='field-control']");
+
+        root.HasAttribute("data-dirty").ShouldBeFalse();
+
+        control.Input("x");
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='field-root']").HasAttribute("data-dirty").ShouldBeTrue());
+
+        cut.Find("[data-testid='field-control']").Input("");
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='field-root']").HasAttribute("data-dirty").ShouldBeFalse());
+
         return Task.CompletedTask;
     }
 

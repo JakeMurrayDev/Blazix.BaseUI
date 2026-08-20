@@ -222,15 +222,15 @@
             ["aria-autocomplete"] = ToComboboxAttribute(RootContext?.Mode ?? ComboboxMode.List)
         };
 
-        if (RootContext?.Inline != true)
-        {
-            attrs["aria-expanded"] = open ? "true" : "false";
-            attrs["aria-haspopup"] = RootContext?.Grid == true ? "grid" : "listbox";
+        // An inline list isn't gated on `open`: it renders for as long as it's in the tree, so the
+        // combobox is permanently expanded even while the internal open state is `false`.
+        var expanded = open || RootContext?.Inline == true;
+        attrs["aria-expanded"] = expanded ? "true" : "false";
+        attrs["aria-haspopup"] = RootContext?.Grid == true ? "grid" : "listbox";
 
-            if (open && RootContext?.ListId is not null)
-            {
-                attrs["aria-controls"] = RootContext.ListId;
-            }
+        if (expanded && RootContext?.ListId is not null)
+        {
+            attrs["aria-controls"] = RootContext.ListId;
         }
 
         if (RootContext?.ActiveIndex >= 0 && RootContext.ListId is not null)
@@ -327,7 +327,7 @@
             return;
         }
 
-        await RootContext.SetOpenAsync(true, ComboboxChangeReason.InputChange);
+        await RootContext.SetOpenAsync(true, ComboboxChangeReason.InputPress);
         await EventUtilities.InvokeOnMouseDownAsync(AdditionalAttributes, e);
     }
 

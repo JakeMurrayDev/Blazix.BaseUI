@@ -150,3 +150,33 @@ export function dispose(element) {
         }
     }
 }
+
+export function getFirstInDocumentOrder(elements) {
+    if (!Array.isArray(elements)) {
+        return -1;
+    }
+
+    let firstIndex = -1;
+    let first = null;
+
+    for (let i = 0; i < elements.length; i += 1) {
+        const element = elements[i];
+        if (!element || typeof element.compareDocumentPosition !== 'function') {
+            continue;
+        }
+
+        if (first === null || comesBeforeInSameTree(element, first)) {
+            first = element;
+            firstIndex = i;
+        }
+    }
+
+    return firstIndex;
+}
+
+function comesBeforeInSameTree(element, reference) {
+    const position = element.compareDocumentPosition(reference);
+
+    return (position & Node.DOCUMENT_POSITION_DISCONNECTED) === 0 &&
+        (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
