@@ -56,6 +56,26 @@ public abstract class ToastTestsBase : TestBase
     }
 
     [Fact]
+    public virtual async Task ShiftTabFromViewportRestoresFocusToPreviousElement()
+    {
+        await NavigateAsync(CreateUrl("/tests/toast"));
+
+        await GetByTestId("add-low").ClickAsync();
+        await Assertions.Expect(GetByTestId("toast-low")).ToBeVisibleAsync();
+
+        await GetByTestId("before-toast").FocusAsync();
+        await Page.Keyboard.PressAsync("F6");
+        await Assertions.Expect(GetByTestId("toast-viewport")).ToBeFocusedAsync();
+
+        // A focusable toast is present, so this exercises the Shift+Tab branch rather than
+        // the forward-Tab fallback: focus must leave the viewport for the element that was
+        // focused before F6, and the toast must stay on screen.
+        await Page.Keyboard.PressAsync("Shift+Tab");
+        await Assertions.Expect(GetByTestId("before-toast")).ToBeFocusedAsync();
+        await Assertions.Expect(GetByTestId("toast-low")).ToBeVisibleAsync();
+    }
+
+    [Fact]
     public virtual async Task CloseButtonClosesAndRemovesToast()
     {
         await NavigateAsync(CreateUrl("/tests/toast"));
