@@ -87,7 +87,10 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         NumberFormatOptions? format = null,
         string? formatString = null,
         string? locale = null,
-        IFormatProvider? formatProvider = null)
+        IFormatProvider? formatProvider = null,
+        double min = 0,
+        double max = 100,
+        Func<string?, double?, string>? getAriaValueText = null)
     {
         return builder =>
         {
@@ -117,6 +120,10 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
                     });
                 innerBuilder.CloseComponent();
             }));
+            builder.AddAttribute(8, "Min", min);
+            builder.AddAttribute(9, "Max", max);
+            if (getAriaValueText is not null)
+                builder.AddAttribute(10, "GetAriaValueText", getAriaValueText);
             builder.CloseComponent();
         };
     }
@@ -297,6 +304,16 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
     }
 
     [Fact]
+    public Task SetsIndeterminateAriaValueTextForNonFiniteValue()
+    {
+        var cut = Render(CreateProgressRoot(value: double.NaN));
+        var progressbar = cut.Find("[role='progressbar']");
+        progressbar.GetAttribute("aria-valuetext").ShouldBe("indeterminate progress");
+        progressbar.HasAttribute("data-indeterminate").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
     public Task AllowsAriaAttributesToOverrideDefaults()
     {
         var cut = Render(CreateProgressRoot(
@@ -406,6 +423,77 @@ public class ProgressRootTests : BunitContext, IProgressRootContract
         var valueElement = cut.Find("[data-testid='value']");
         var expected = 70.51.ToString("F2", germanCulture);
         valueElement.TextContent.ShouldBe(expected);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FormatsClampedValueWhenValueOutsideRange()
+    {
+        // Mirrors upstream ProgressRoot.test.tsx (#5389): value 50 clamps to 40, value 10 clamps to 20
+        // for min=20/max=40; the formatted text and aria-valuetext use the clamped value while the
+        // GetAriaValueText callback still receives the raw value.
+        var cases = new (double Value, double Expected)[] { (50, 40), (10, 20) };
+
+        foreach (var (value, expectedValue) in cases)
+        {
+            string? capturedFormatted = null;
+            double? capturedRaw = null;
+
+            var cut = Render(CreateProgressWithValue(
+                value: value,
+                min: 20,
+                max: 40,
+                formatString: "F1",
+                getAriaValueText: (formatted, raw) =>
+                {
+                    capturedFormatted = formatted;
+                    capturedRaw = raw;
+                    return $"{formatted} (raw: {raw})";
+                }));
+
+            var expected = expectedValue.ToString("F1", CultureInfo.CurrentCulture);
+            var progressbar = cut.Find("[role='progressbar']");
+            var valueElement = cut.Find("[data-testid='value']");
+
+            valueElement.TextContent.ShouldBe(expected);
+            capturedFormatted.ShouldBe(expected);
+            capturedRaw.ShouldBe(value);
+            progressbar.GetAttribute("aria-valuetext").ShouldBe($"{expected} (raw: {value})");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ReportsClampedAriaValueNowWhenValueOutsideRange()
+    {
+        // Upstream ProgressRoot.tsx sets `aria-valuenow: clampedValue`, asserted by the #5389 test.
+        var cut = Render(CreateProgressRoot(value: 50, min: 20, max: 40));
+        cut.Find("[role='progressbar']").GetAttribute("aria-valuenow").ShouldBe("40");
+
+        var below = Render(CreateProgressRoot(value: 10, min: 20, max: 40));
+        below.Find("[role='progressbar']").GetAttribute("aria-valuenow").ShouldBe("20");
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task ReportsCompleteWhenValueExceedsMax()
+    {
+        // Upstream derives status from the clamped value (`clampedValue === max`), so a value past
+        // max reports complete rather than progressing.
+        var cut = Render(CreateProgressRoot(value: 45, min: 0, max: 40));
+        cut.Find("[role='progressbar']").HasAttribute("data-complete").ShouldBeTrue();
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task FormatsPercentageRelativeToCustomRange()
+    {
+        // Without an explicit format the text is the value's position within the range, keeping it in
+        // sync with the indicator fill: 30 within 20..40 is 50%, not 30%.
+        var cut = Render(CreateProgressWithValue(value: 30, min: 20, max: 40));
+        cut.Find("[data-testid='value']").TextContent
+            .ShouldBe(0.5.ToString("P0", CultureInfo.CurrentCulture));
         return Task.CompletedTask;
     }
 

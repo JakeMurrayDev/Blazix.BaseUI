@@ -20,18 +20,23 @@ public interface IProgressRootContract
     Task UpdatesAriaValueNowWhenValueChanges();
     Task DoesNotSetAriaValueNowWhenIndeterminate();
     Task SetsIndeterminateAriaValueText();
+    Task SetsIndeterminateAriaValueTextForNonFiniteValue();
     Task AllowsAriaAttributesToOverrideDefaults();
     Task RendersNvdaPresentationSpan();
 
     // Data attributes
     Task HasDataProgressingWhenInProgress();
     Task HasDataCompleteWhenComplete();
+    Task ReportsCompleteWhenValueExceedsMax();
     Task HasDataIndeterminateWhenNull();
 
     // Formatting
     Task FormatsValueWithCustomFormat();
     Task FormatsValueWithFormatProvider();
     Task FormatsValueWithNumberFormatOptionsAndLocale();
+    Task FormatsClampedValueWhenValueOutsideRange();
+    Task ReportsClampedAriaValueNowWhenValueOutsideRange();
+    Task FormatsPercentageRelativeToCustomRange();
     Task GetAriaValueTextCallbackOverridesDefault();
 
     // Context cascading

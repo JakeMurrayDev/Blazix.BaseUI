@@ -78,8 +78,11 @@
 
     private RenderFragment GetResolvedContent()
     {
-        var formattedValueArg = !Context!.Value.HasValue ? "indeterminate" : Context.FormattedValue;
-        var formattedValueDisplay = !Context.Value.HasValue ? null : Context.FormattedValue;
+        // Follow status rather than re-deriving it: a non-finite value is also indeterminate,
+        // and has no formatted text to show.
+        var indeterminate = Context!.State.Status == ProgressStatus.Indeterminate;
+        var formattedValueArg = indeterminate ? "indeterminate" : Context.FormattedValue;
+        var formattedValueDisplay = indeterminate ? null : Context.FormattedValue;
 
         if (ChildContent is not null)
         {
