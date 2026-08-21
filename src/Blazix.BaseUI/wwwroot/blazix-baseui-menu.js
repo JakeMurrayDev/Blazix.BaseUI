@@ -32,6 +32,12 @@ const IS_APPLE_PLATFORM = (() => {
     const isIos = /^i(os$|p)/.test(platform) || (platform === 'macintel' && (navigator.maxTouchPoints || 0) > 1);
     return isIos || platform.startsWith('mac');
 })();
+// Upstream's `isVirtualPointerEvent` only recognizes the Android TalkBack press shape when the
+// platform reports Android (base-ui #5384); `platform.os.android` maps to a user-agent check here.
+const IS_ANDROID_PLATFORM = (() => {
+    if (typeof navigator === 'undefined') return false;
+    return /\bAndroid\b/i.test(navigator.userAgent);
+})();
 
 if (!window[STATE_KEY]) {
     window[STATE_KEY] = {
@@ -1902,6 +1908,10 @@ function cleanupMenuAutoResize(rootState) {
 
 export function isVoiceOverPlatform() {
     return IS_APPLE_PLATFORM;
+}
+
+export function isAndroidPlatform() {
+    return IS_ANDROID_PLATFORM;
 }
 
 export function getItemIndex(rootId, element) {

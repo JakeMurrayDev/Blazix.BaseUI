@@ -22,6 +22,7 @@
     private bool hasRendered;
     private bool hoverInitialized;
     private bool mayUseVoiceOver;
+    private bool mayUseAndroidScreenReader;
     private string? hoverRootId;
     private int itemIndex = -1;
     private string? defaultId;
@@ -172,7 +173,7 @@
         if (firstRender)
         {
             hasRendered = true;
-            _ = DetectVoiceOverPlatformAsync();
+            _ = DetectScreenReaderPlatformsAsync();
         }
 
         var currentElement = Element;
@@ -366,15 +367,17 @@
         }
     }
 
-    private async Task DetectVoiceOverPlatformAsync()
+    private async Task DetectScreenReaderPlatformsAsync()
     {
         try
         {
             var module = await ModuleTask.Value;
-            var value = await module.InvokeAsync<bool>("isVoiceOverPlatform");
-            if (value != mayUseVoiceOver)
+            var voiceOver = await module.InvokeAsync<bool>("isVoiceOverPlatform");
+            mayUseAndroidScreenReader = await module.InvokeAsync<bool>("isAndroidPlatform");
+
+            if (voiceOver != mayUseVoiceOver)
             {
-                mayUseVoiceOver = value;
+                mayUseVoiceOver = voiceOver;
                 BuildComponentAttributes();
                 StateHasChanged();
             }
@@ -385,9 +388,25 @@
         }
     }
 
+    // React's `useClick` classifies a mouse-like press that `isVirtualPointerEvent` recognizes as
+    // `'virtual'`, so `ignoreMouse: openOnHover` no longer drops it: a screen reader press produces
+    // no pointer movement, so hover can never open the submenu for it (#5384).
+    private bool IsVirtualMouseLikePress(PointerEventArgs e)
+    {
+        if (e.PointerType is not ("mouse" or "pen"))
+        {
+            return false;
+        }
+
+        return mayUseAndroidScreenReader
+            // TalkBack in Chrome activates elements with a zero-pressure 1x1 synthetic mouse press.
+            ? e.Width == 1 && e.Height == 1 && e.Pressure == 0 && e.Detail == 0 && e.PointerType == "mouse"
+            : e.Width == 0 && e.Height == 0;
+    }
+
     private async Task HandlePointerDownAsync(PointerEventArgs e)
     {
-        if (!OpenOnHover && !state.Disabled && RootContext is not null)
+        if ((!OpenOnHover || IsVirtualMouseLikePress(e)) && !state.Disabled && RootContext is not null)
         {
             var nextOpen = !RootContext.GetOpen();
             await RootContext.SetOpenAsync(nextOpen, MenuOpenChangeReason.TriggerPress, null);
