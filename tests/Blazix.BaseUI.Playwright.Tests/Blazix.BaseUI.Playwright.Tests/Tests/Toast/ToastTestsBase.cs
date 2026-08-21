@@ -172,8 +172,12 @@ public abstract class ToastTestsBase : TestBase
         await Assertions.Expect(toast).ToBeHiddenAsync();
     }
 
-    // A toast re-added while its previous instance is still animating out reuses
-    // the same root; without the reset it stays offset and is never re-measured.
+    // A toast re-added while its previous instance is still animating out reuses the same
+    // root. The JS caches each root's last measured height and only reports a change, so a
+    // recycled root measures the same height as before and reports nothing — leaving
+    // `--toast-height` unset and the toast stranded on `data-starting-style`, its entry
+    // animation never completing. `resetRootLifecycle` clears that cache (along with the
+    // retained drag offset and inline transform) so the new lifecycle measures afresh.
     [Fact]
     public virtual async Task ReAddingAToastMidExitClearsSwipeOffsetAndRemeasuresHeight()
     {
@@ -194,20 +198,37 @@ public abstract class ToastTestsBase : TestBase
         try
         {
             await Page.Mouse.MoveAsync(startX + 96, startY, new MouseMoveOptions { Steps = 8 });
+
+            // Confirm the drag really offsets the root before the release dismisses it, so
+            // the exit below is genuinely a swiped root's exit and not a bare close.
+            await Page.WaitForFunctionAsync(
+                "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); return element?.hasAttribute('data-swiping') === true && element.getAttribute('data-swipe-direction') === 'right' && element.style.getPropertyValue('--toast-swipe-movement-x') !== '0px'; }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
         }
         finally
         {
             await Page.Mouse.UpAsync();
         }
 
+        // Mid-exit. Blazor re-authors the whole inline `style` attribute on the ending
+        // render, so the swipe movement vars are already back to `0px` by this point and
+        // the height var is gone; the stale state that survives into the next lifecycle is
+        // the JS-side height cache, which is invisible from the DOM. The lingering exit
+        // animation on this toast holds the window open for the re-add below.
         await Page.WaitForFunctionAsync(
-            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); const movement = element?.style.getPropertyValue('--toast-swipe-movement-x'); return element?.hasAttribute('data-ending-style') === true && element?.getAttribute('data-swipe-direction') === 'right' && movement && movement !== '0px'; }",
+            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); return element?.hasAttribute('data-ending-style') === true && element.getAttribute('data-swipe-direction') === 'right' && !element.style.getPropertyValue('--toast-height'); }",
+            null,
             new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
 
         await GetByTestId("add-recycled").ClickAsync();
 
+        // The recycled root must re-enter a clean lifecycle: exit state and swipe direction
+        // dropped, no residual offset, a freshly measured height, and — the symptom that
+        // fails without the reset — `data-starting-style` actually clearing again.
         await Page.WaitForFunctionAsync(
-            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); const style = element?.style; return element && !element.hasAttribute('data-ending-style') && !element.hasAttribute('data-swipe-direction') && style.getPropertyValue('--toast-swipe-movement-x') === '0px' && parseFloat(style.getPropertyValue('--toast-height') || '0') > 0; }",
+            "() => { const element = document.querySelector('[data-testid=\"toast-recycled\"]'); const style = element?.style; return element && !element.hasAttribute('data-ending-style') && !element.hasAttribute('data-starting-style') && !element.hasAttribute('data-swipe-direction') && style.getPropertyValue('--toast-swipe-movement-x') === '0px' && parseFloat(style.getPropertyValue('--toast-height') || '0') > 0; }",
+            null,
             new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
     }
 
