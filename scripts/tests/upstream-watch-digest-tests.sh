@@ -43,6 +43,9 @@ commit "[docs] Rewrite the menu page" "docs/src/app/menu/page.mdx"
 commit "[combobox] Fix accented filtering" "packages/react/src/combobox/utils/café.ts"
 commit "[tabs] Fix a pathname holding a newline" "packages/react/src/tabs/we
 ird.ts"
+# A record separator inside a pathname split one commit into two records under the old in-band
+# delimiter, inflating the commit count and inventing a commit id out of the pathname remainder.
+commit "[select] Fix a pathname holding a record separator" "packages/react/src/select/sep"$'\036'"arator.ts"
 # A two-segment path: the bucket is the top-level directory, not the file.
 commit "Bump docs dependencies" "docs/package.json"
 commit "Bump the lockfile" "pnpm-lock.yaml"
@@ -69,9 +72,15 @@ $assertion" "$output"
 # The watch only reports: a non-empty delta must never be signalled as a failure.
 digest
 assert_json "
-    if (result.commitCount !== 10) throw new Error('expected 10 new commits, got ' + result.commitCount);
+    if (result.commitCount !== 11) throw new Error('expected 11 new commits, got ' + result.commitCount);
     if (bucket('combobox')?.commitCount !== 1) throw new Error('a non-ASCII path must bucket by directory, not by a quote character');
     if (bucket('tabs')?.commitCount !== 1) throw new Error('a pathname holding a newline must bucket by directory');
+    if (bucket('select')?.commitCount !== 1) throw new Error('a pathname holding a record separator must bucket by directory');
+    for (const entry of result.buckets) {
+        for (const item of entry.commits) {
+            if (!/^[0-9a-f]{40}$/.test(item.sha)) throw new Error('a pathname was parsed as a commit id: ' + JSON.stringify(item.sha));
+        }
+    }
     if (result.buckets.some(entry => entry.bucket.startsWith('\"'))) throw new Error('a bucket name was built from a quoted path');
     if (result.buckets.some(entry => entry.bucket.includes('\n'))) throw new Error('a newline leaked into a bucket name');
     if (result.issueBody.length > 60000) throw new Error('rendered body exceeded the issue body limit');

@@ -52,7 +52,7 @@ if (!ShaPattern.test(pin))
 if (!existsSync(upstream))
     fail(`Upstream clone does not exist at ${upstream}.`);
 
-const head = git(["rev-parse", upstreamRef]);
+const head = git(["rev-parse", upstreamRef]).trim();
 if (!ShaPattern.test(head))
     fail(`'${upstreamRef}' did not resolve to a commit SHA in ${upstream}.`);
 // A pin that is not an ancestor of the ref means the clone lacks the pin or upstream rewrote
@@ -150,7 +150,7 @@ function readPinRecord(path) {
 }
 
 function git(args) {
-    return execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
+    return execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 }
 
 function isAncestor(ancestor, descendant) {
@@ -162,25 +162,44 @@ function isAncestor(ancestor, descendant) {
     }
 }
 
-// Without -z, git C-quotes any pathname holding a non-ASCII or control character, so it arrives
-// wrapped in double quotes and buckets under the quote instead of its directory. -z emits raw
-// NUL-terminated pathnames instead, which also keeps significant leading or trailing whitespace.
-// That frees NUL as a field terminator, so %x1e (record separator) delimits commits and %x1f
-// (unit separator) delimits the sha from the subject.
+// Read in two passes rather than one delimited stream. A single --name-only stream needs an in-band
+// record delimiter, and every candidate is legal in a pathname: a double quote, a newline and \x1e
+// each corrupted records when tested against a fixture repository. So the metadata comes from a
+// stream holding no pathnames at all, and those known shas are then the boundaries in the name
+// stream. -z keeps git from C-quoting pathnames and preserves significant whitespace in them.
 function readCommits(range) {
-    const output = git(["log", "-z", "--name-only", "--format=%x1e%H%x1f%s", range]);
-    return output
-        .split("\x1e")
-        .slice(1)
+    const commits = git(["log", "-z", "--format=%H%x1f%s", range])
+        .split("\0")
+        .filter(record => record.length > 0)
         .map(record => {
-            const [header, ...rest] = record.split("\0");
-            const [sha, title] = header.split("\x1f");
-            // git separates the formatted header from the name list with a single newline, which
-            // lands on the front of the first pathname field.
-            if (rest.length > 0 && rest[0].startsWith("\n"))
-                rest[0] = rest[0].slice(1);
-            return { sha, title, paths: rest.filter(path => path.length > 0) };
+            const separator = record.indexOf("\x1f");
+            return { sha: record.slice(0, separator), title: record.slice(separator + 1), paths: [] };
         });
+    for (const commit of commits) {
+        if (!ShaPattern.test(commit.sha))
+            fail(`git log returned an unexpected commit id: ${JSON.stringify(commit.sha)}.`);
+    }
+
+    const fields = git(["log", "-z", "--name-only", "--format=%H", range]).split("\0");
+    let index = -1;
+    for (const field of fields) {
+        if (index + 1 < commits.length && field === commits[index + 1].sha) {
+            index += 1;
+            continue;
+        }
+        if (index < 0)
+            continue;
+        // git separates each commit's header from its name list with a single newline, which lands
+        // on the front of that commit's first pathname field.
+        const path = field.startsWith("\n") ? field.slice(1) : field;
+        if (path.length > 0)
+            commits[index].paths.push(path);
+    }
+    // Both streams walk the same range, so anything else means they disagreed about its commits.
+    if (index !== commits.length - 1)
+        fail(`Read ${commits.length} commits but matched ${index + 1} in the name stream for ${range}.`);
+
+    return commits;
 }
 
 function bucketFor(path) {
