@@ -24,4 +24,6 @@ public interface IProgressLabelContract
 
     // Context
     Task ThrowsWhenRenderedWithoutRoot();
+
+    Task KeepsAriaLabelledByWhenLabelIsReplaced();
 }

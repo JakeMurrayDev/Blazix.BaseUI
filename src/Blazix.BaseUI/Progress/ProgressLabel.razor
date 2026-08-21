@@ -15,7 +15,7 @@
 @code {
     private string? defaultId;
     private string? registeredLabelId;
-    private Action<string?>? registeredSetLabelIdAction;
+    private Action<object, string?>? registeredSetLabelIdAction;
     private RenderElement<ProgressRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
 
@@ -76,12 +76,11 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        if (registeredSetLabelIdAction is not null)
-        {
-            registeredSetLabelIdAction(null);
-            registeredLabelId = null;
-            registeredSetLabelIdAction = null;
-        }
+        // A replacement label registers before this instance is disposed, so the root ignores the
+        // clear unless this instance is still the registered owner.
+        registeredSetLabelIdAction?.Invoke(this, null);
+        registeredLabelId = null;
+        registeredSetLabelIdAction = null;
     }
 
     private void BuildComponentAttributes()
@@ -107,12 +106,12 @@
 
         if (registeredSetLabelIdAction is not null && registeredSetLabelIdAction != setLabelIdAction)
         {
-            registeredSetLabelIdAction(null);
+            registeredSetLabelIdAction(this, null);
         }
 
         registeredLabelId = id;
         registeredSetLabelIdAction = setLabelIdAction;
-        setLabelIdAction(id);
+        setLabelIdAction(this, id);
     }
 
     private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
