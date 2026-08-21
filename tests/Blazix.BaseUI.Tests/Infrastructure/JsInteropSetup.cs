@@ -799,6 +799,8 @@ public static class JsInteropSetup
             module.SetupVoid("initializeTrigger", _ => true).SetVoidResult();
             module.SetupVoid("disposeTrigger", _ => true).SetVoidResult();
             module.Setup<string>("getLastInteractionType", _ => true).SetResult("none");
+            module.Setup<string>("consumeCloseInteractionType", _ => true).SetResult("none");
+            module.Setup<string>("captureCloseInteractionType", _ => true).SetResult("none");
             module.Setup<string>("applyScrollLock", _ => true).SetResult("scroll-lock-token");
             module.SetupVoid("releaseScrollLock", _ => true).SetVoidResult();
             module.SetupVoid("initializePopup", _ => true).SetVoidResult();

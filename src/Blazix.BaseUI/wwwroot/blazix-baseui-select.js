@@ -1612,6 +1612,22 @@ export function getLastInteractionType(rootId) {
     return rootState?.lastInteractionType || 'none';
 }
 
+/**
+ * Returns the interaction type that closed the popup and clears it, so the next open session
+ * resolves its own modality instead of inheriting this one (base-ui #5388). Clearing on read rather
+ * than on open is deliberate: `setRootOpen` sees several closed-to-open transitions per
+ * user-visible open while the .NET open state settles, so its rising edge is not a session
+ * boundary.
+ */
+export function consumeCloseInteractionType(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return 'none';
+
+    const closeInteractionType = rootState.lastInteractionType || 'none';
+    rootState.lastInteractionType = 'none';
+    return closeInteractionType;
+}
+
 export function disposeTrigger(rootId) {
     const rootState = state.roots.get(rootId);
     if (!rootState) return;

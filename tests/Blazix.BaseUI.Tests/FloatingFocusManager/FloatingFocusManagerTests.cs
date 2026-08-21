@@ -879,7 +879,7 @@ public class FloatingFocusManagerTests : BunitContext, IFloatingFocusManagerCont
         var module = JSInterop.SetupModule(FloatingModule);
         module.Setup<string>("createFloatingFocusManager", _ => true).SetResult("fm-1");
         module.SetupVoid("disposeFloatingFocusManager", _ => true).SetVoidResult();
-        module.Setup<string>("getLastInteractionType", _ => true).SetResult("keyboard");
+        module.Setup<string>("captureCloseInteractionType", _ => true).SetResult("keyboard");
 
         string? receivedType = null;
         Func<string?, bool> callback = type =>
