@@ -239,8 +239,8 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await VerticalThumb.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var clientX = box!.X + box.Width / 2;
-        var clientY = box.Y + box.Height / 2;
+        var clientX = PointAcross(box!, 0.5);
+        var clientY = PointDown(box, 0.5);
 
         await VerticalThumb.DispatchEventAsync("pointerdown", new
         {
@@ -314,8 +314,8 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await VerticalThumb.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var clientX = box!.X + box.Width / 2;
-        var clientY = box.Y + box.Height / 2;
+        var clientX = PointAcross(box!, 0.5);
+        var clientY = PointDown(box, 0.5);
 
         await VerticalThumb.DispatchEventAsync("pointerdown", new
         {
@@ -367,6 +367,7 @@ public abstract class ScrollAreaTestsBase : TestBase
             """
             el => {
                 let capturedId = null;
+                el.dropPointerCapture = () => { capturedId = null; };
                 Object.defineProperties(el, {
                     setPointerCapture: { configurable: true, value: (id) => { capturedId = id; } },
                     hasPointerCapture: { configurable: true, value: (id) => id === capturedId },
@@ -378,8 +379,8 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await VerticalThumb.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var clientX = box!.X + box.Width / 2;
-        var clientY = box.Y + box.Height / 2;
+        var clientX = PointAcross(box!, 0.5);
+        var clientY = PointDown(box, 0.5);
 
         await VerticalThumb.DispatchEventAsync("pointerdown", new
         {
@@ -391,6 +392,7 @@ public abstract class ScrollAreaTestsBase : TestBase
 
         Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
 
+        // While the first pointer still holds capture, a second pointer is ignored outright.
         await VerticalThumb.DispatchEventAsync("pointerdown", new
         {
             button = 0,
@@ -410,11 +412,38 @@ public abstract class ScrollAreaTestsBase : TestBase
 
         Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
 
+        // Drop capture silently, the way a browser can mid-drag. The second pointer now
+        // takes over the latch and re-enters the snap-disable path with a drag already in
+        // flight, which is the only way to reach the saved-state guard: without it the
+        // takeover would save the live 'none' and the release would strand the viewport
+        // unsnapped.
+        await VerticalThumb.EvaluateAsync("el => el.dropPointerCapture()");
+
+        await VerticalThumb.DispatchEventAsync("pointerdown", new
+        {
+            button = 0,
+            clientX,
+            clientY,
+            pointerId = 2
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        // The superseded pointer's release must not restore anything.
         await VerticalThumb.DispatchEventAsync("pointerup", new
         {
             clientX,
             clientY,
             pointerId = 1
+        });
+
+        Assert.Equal("none", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
+
+        await VerticalThumb.DispatchEventAsync("pointerup", new
+        {
+            clientX,
+            clientY,
+            pointerId = 2
         });
 
         Assert.Equal("y mandatory", await Viewport.EvaluateAsync<string>("el => el.style.scrollSnapType"));
@@ -432,8 +461,8 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await VerticalScrollbar.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var clientX = box!.X + box.Width / 2;
-        var clientY = box.Y + box.Height * 0.85;
+        var clientX = PointAcross(box!, 0.5);
+        var clientY = PointDown(box, 0.85);
 
         await VerticalScrollbar.DispatchEventAsync("pointerdown", new
         {
@@ -466,8 +495,35 @@ public abstract class ScrollAreaTestsBase : TestBase
         var box = await HorizontalScrollbar.BoundingBoxAsync();
         Assert.NotNull(box);
 
-        var clientX = box!.X + box.Width * 0.15;
-        var clientY = box.Y + box.Height / 2;
+        var scrollRange = await Viewport.EvaluateAsync<double>("el => el.scrollWidth - el.clientWidth");
+        Assert.True(scrollRange > 0);
+
+        // In RTL, `scrollLeft` runs from `-scrollRange` (content end) up to 0 (content
+        // start), and the track is mirrored: pressing the left of the track jumps to the
+        // end, pressing the right jumps back to the start. Asserting only that a single
+        // press produces a negative value cannot distinguish the RTL mapping from the LTR
+        // one, because a press left of the thumb's half-width yields a negative ratio and
+        // so goes negative under either formula.
+        var atTrackEnd = await PressRtlTrackAsync(box!, 0.15);
+        Assert.True(
+            atTrackEnd <= -scrollRange * 0.9,
+            $"Pressing the end of an RTL track should scroll to about {-scrollRange}, but scrollLeft was {atTrackEnd}.");
+
+        var atTrackMiddle = await PressRtlTrackAsync(box, 0.5);
+        Assert.True(
+            Math.Abs(atTrackMiddle - (-scrollRange / 2)) <= scrollRange * 0.2,
+            $"Pressing the middle of an RTL track should scroll to about {-scrollRange / 2}, but scrollLeft was {atTrackMiddle}.");
+
+        var atTrackStart = await PressRtlTrackAsync(box, 0.85);
+        Assert.True(
+            atTrackStart >= -scrollRange * 0.1,
+            $"Pressing the start of an RTL track should scroll to about 0, but scrollLeft was {atTrackStart}.");
+    }
+
+    private async Task<double> PressRtlTrackAsync(LocatorBoundingBoxResult box, double trackFraction)
+    {
+        var clientX = PointAcross(box, trackFraction);
+        var clientY = PointDown(box, 0.5);
 
         await HorizontalScrollbar.DispatchEventAsync("pointerdown", new
         {
@@ -478,7 +534,6 @@ public abstract class ScrollAreaTestsBase : TestBase
         });
 
         var scrollLeft = await Viewport.EvaluateAsync<double>("el => el.scrollLeft");
-        Assert.True(scrollLeft < -1);
 
         await HorizontalScrollbar.DispatchEventAsync("pointerup", new
         {
@@ -486,6 +541,8 @@ public abstract class ScrollAreaTestsBase : TestBase
             clientY,
             pointerId = 1
         });
+
+        return scrollLeft;
     }
 
     [Fact]
@@ -590,6 +647,17 @@ public abstract class ScrollAreaTestsBase : TestBase
         await Assertions.Expect(VerticalThumb).ToBeVisibleAsync();
         await Assertions.Expect(HorizontalThumb).ToBeVisibleAsync();
     }
+
+    // Coordinates dispatched into the browser must be `double`. Playwright's argument
+    // serializer has no case for `float`: it walks one as a property-less object, so the
+    // value arrives as `{}` and `new PointerEvent(...)` rejects it as non-finite. Every
+    // `BoundingBox` member is a `float`, so arithmetic over them stays `float` unless a
+    // `double` is involved — which is why these return `double` rather than inferring.
+    private static double PointAcross(LocatorBoundingBoxResult box, double fraction) =>
+        box.X + box.Width * fraction;
+
+    private static double PointDown(LocatorBoundingBoxResult box, double fraction) =>
+        box.Y + box.Height * fraction;
 
     private async Task<double> GetScrollTopAsync()
     {
