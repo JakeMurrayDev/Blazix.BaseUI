@@ -1,6 +1,6 @@
 # Parity harness limitations
 
-**Date:** 2026-08-19
+**Date:** 2026-08-19 (§1, §2 and §6 updated 2026-08-21 for the #213 re-baseline)
 
 **Deliverable:** Task 17 of
 [`2026-07-27-parity-harness-pipeline.md`](../superpowers/plans/2026-07-27-parity-harness-pipeline.md).
@@ -32,41 +32,56 @@ count in the manifest is **26**; use 26.
 The denominator is fixed at 29 and never shrinks for filters, failures, missing legs, exclusions, or
 completion failures. A `PARITY_FIXTURES` run is diagnostic and cannot contribute to it.
 
-The corpus is 29 of the 114 upstream Tailwind demos counted at the pin. It validates the method and
-the named evidence — never repository-wide or component-wide parity. Expansion to the remainder is
-owned by [#176](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/176), whose first action is to
-recount upstream demos at the then-pinned SHA.
+The corpus is 29 of the **116** upstream Tailwind demos counted at the current pin `1a2ca3c9f…`;
+it was 114 at the superseded `bdcb685f…` pin, so the denominator moves when the pin does. It
+validates the method and the named evidence — never repository-wide or component-wide parity.
+Expansion to the remainder, and the recount that fixes the exact denominator, are owned by
+[#176](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/176).
 
-## 2. Two different upstream SHAs are in play
+## 2. The baseline pin, and what still lags it
 
-This is the single most important qualifier on any parity statement made from this harness today.
+The two-pin gap this section used to describe is closed. **The committed baselines were recaptured at
+`1a2ca3c9f8a39bd8c0dda939a7a23b72da226124` on 2026-08-21** (PR for
+[#213](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/213)), which is the same pin every
+cycle-1 audit and every #180-#200 fix was authored against.
 
 | Fact | Value | Source |
 | --- | --- | --- |
-| Upstream SHA the committed React baselines were captured at | `bdcb685fadcca9d18b18f013c052795a53b6aa33` (2026-07-18, `@base-ui/monorepo` 1.6.0) | `baselines/metadata.json` `declaredRepositoryPin`; `baselines/chromium-macos-arm64/metadata.json` `upstreamSha` |
-| When they were captured | `2026-08-10T17:46:33Z` | `baselines/chromium-macos-arm64/metadata.json` `generatedAtUtc` |
-| Upstream SHA the cycle-1 audits and sweeps run against | `1a2ca3c9f8a39bd8c0dda939a7a23b72da226124` (upstream `origin/master`, 2026-08-03) | issue [#157](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/157) |
-| Distance between them | 91 upstream commits, ~30 framework-neutral bug fixes identified as portable | issue #157 / the delta inventory resolving #145 |
+| Upstream SHA the committed React baselines are captured at | `1a2ca3c9f8a39bd8c0dda939a7a23b72da226124` (2026-08-03) | `baselines/metadata.json` `declaredRepositoryPin`; `baselines/chromium-macos-arm64/metadata.json` `upstreamSha` |
+| When they were captured | `2026-08-21T05:15:00Z` | `baselines/chromium-macos-arm64/metadata.json` `generatedAtUtc` |
+| Upstream SHA the cycle-1 audits and sweeps run against | the same `1a2ca3c9f…` | issue [#157](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/157) |
+| Previous baseline pin, superseded | `bdcb685fadcca9d18b18f013c052795a53b6aa33` (2026-07-18, `@base-ui/monorepo` 1.6.0) | git history of `baselines/metadata.json` |
 
-What that means concretely:
+The pin is declared by hand in `baselines/metadata.json` and the baseline writer refuses to capture
+against anything else (`BaselineStore.ValidateLiveProvenance`). Bumping the pin is therefore an
+explicit reviewed edit, never a side effect of whichever revision `.base-ui` happens to sit at.
 
-1. Every parity comparison the harness has performed describes the Blazor port **against Base UI as
-   of 2026-07-18**. No harness output describes the port against `1a2ca3c9f`.
-2. Every fix in the cycle-1 sweeps (#180–#200) was authored **against `1a2ca3c9f`**. A behavior that
-   is now correct at the newer pin can register as a *difference* against the older baseline, and a
-   behavior that matches the older baseline can be stale relative to the newer pin. Baseline
-   agreement and upstream correctness are not the same claim right now.
-3. Until the baselines are regenerated at the audit pin
-   (`cd tests/Blazix.BaseUI.Parity.Tests/react-fixtures && pnpm parity:baseline`), no statement of
-   the form "parity against Base UI `1a2ca3c9f`" is supported by harness evidence.
-4. The scheduled canary in `.github/workflows/parity.yml` exists to keep this drift loud rather than
-   silent: it compares the declared pin and the baseline provenance against upstream's tracked
-   revision daily and files a single deduplicated issue when they diverge.
+Three things still lag that pin, and every one of them bounds what may be claimed:
+
+1. **No harness run at the new pin has been recorded.** The only committed run evidence — #178's
+   4356 findings, 4149 blocking — was produced against `bdcb685f…` and describes the port as it was
+   before the cycle-1 sweeps. It does not transfer. A full serial re-run is A-3.1 prerequisite (c),
+   still outstanding.
+2. **The Blazor fixture ports are still frozen at `bdcb685f…` class surfaces.** Five contract tests
+   fail on exactly this — `CalibrationFixtureContractTests.FrozenRazorPortsCarryTheExactUpstreamTailwindClassMultisets`,
+   `Task16BatchAFixtureContractTests.PreservesEveryUpstreamTailwindClassMultiset`,
+   `Task16FloatingMenuFixtureContractTests.PreservesTheExactUpstreamTailwindClassDefinitions`,
+   `Task16HighRiskFixtureContractTests.PinsExactEffectiveTailwindClassMultisetsFromPinnedReactSources`,
+   and `Task16NavigationMenuHeroFixtureContractTests.PreservesTheExactUpstreamTailwindClassSurface`.
+   Until the ports are re-diffed against the pinned React sources, a class-level difference reported
+   by the comparator cannot be attributed to the components rather than to a stale port.
+3. **Upstream has moved past the pin again.** The scheduled canary compares the declared pin against
+   `mui/base-ui` `master`, so it reports `drift` whenever the repository is deliberately pinned
+   behind head — as it is by design between sync cycles. After this refresh that alarm means "time to
+   consider cycle 2", not "the baselines are stale relative to this repository's own source". Read the
+   canary body for which of the two it is: the recorded pin now matches the pin the port is written
+   against, and only the observed revision differs.
 
 Baselines are also **platform-exact**. The recorded `platform` block reads `chromium`
-`143.0.7499.4`, `macos`, `arm64` — those are the literal metadata values, not prose. There is no Linux
-platform set, so the pixel dimension has no Linux-compatible baseline and the required CI job the
-spec describes cannot yet be activated (§7).
+`143.0.7499.4`, `macos`, `arm64` — those are the literal metadata values, not prose. The browser
+version is unchanged across the re-baseline, so pixel movement in the refreshed set is attributable
+to upstream rather than to a browser bump. There is no Linux platform set, so the pixel dimension has
+no Linux-compatible baseline and the required CI job the spec describes cannot yet be activated (§7).
 
 ## 3. What the harness structurally cannot observe
 
@@ -218,6 +233,10 @@ What the evidence does support, stated in full:
 > output matches: the run reported 4356 findings (4149 blocking), no waivers are defined, and those
 > differences have not been individually dispositioned. It is not evidence of repository-wide or
 > component-wide parity, and it says nothing about upstream `1a2ca3c9f`.
+
+That statement is now **historical**: the baselines it was produced against were superseded on
+2026-08-21 (§2). It remains the only recorded run evidence, and it still describes `bdcb685f…`.
+No re-run at the current pin has been recorded, so nothing stronger may be claimed yet.
 
 ## 7. CI coverage, and what is deliberately not automated
 

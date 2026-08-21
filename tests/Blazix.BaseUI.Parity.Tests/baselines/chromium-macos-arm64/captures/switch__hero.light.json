@@ -2,7 +2,7 @@
   "captureSchemaVersion": 3,
   "fixture": "switch/hero",
   "leg": 0,
-  "baseUiSha": "bdcb685fadcca9d18b18f013c052795a53b6aa33",
+  "baseUiSha": "1a2ca3c9f8a39bd8c0dda939a7a23b72da226124",
   "sourceHash": "BA3520CFFA6A02752796507F3CEC173704CB02A40CFFDA7AECD15E588AB8BC5F",
   "theme": "light",
   "steps": [
@@ -549,10 +549,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -593,10 +593,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -637,10 +637,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -681,10 +681,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -725,10 +725,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1335,10 +1335,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1379,10 +1379,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1423,10 +1423,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1467,10 +1467,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1511,10 +1511,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1564,7 +1564,7 @@
       "focus": "root \u003E label \u003E span[role=switch]",
       "timeline": [
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E span[role=switch] \u003E span",
           "attr": "data-checked",
@@ -1572,7 +1572,7 @@
           "to": null
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E span[role=switch] \u003E span",
           "attr": "data-unchecked",
@@ -1580,7 +1580,7 @@
           "to": ""
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E span[role=switch]",
           "attr": "data-checked",
@@ -1588,7 +1588,7 @@
           "to": null
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E span[role=switch]",
           "attr": "data-unchecked",
@@ -1596,7 +1596,7 @@
           "to": ""
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E span[role=switch]",
           "attr": "aria-checked",
@@ -1604,7 +1604,7 @@
           "to": "false"
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "name",
@@ -1612,7 +1612,7 @@
           "to": null
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "type",
@@ -1620,7 +1620,7 @@
           "to": "checkbox"
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "name",
@@ -1628,7 +1628,7 @@
           "to": null
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "name",
@@ -1636,7 +1636,7 @@
           "to": null
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "type",
@@ -1644,7 +1644,7 @@
           "to": "checkbox"
         },
         {
-          "t": 12,
+          "t": 18,
           "kind": "attribute",
           "path": "root \u003E label \u003E input",
           "attr": "name",
@@ -1676,7 +1676,7 @@
           "to": null
         },
         {
-          "t": 167,
+          "t": 175,
           "kind": "transitionend",
           "path": "root \u003E label \u003E span[role=switch] \u003E span",
           "attr": "background-color",
@@ -1684,7 +1684,7 @@
           "to": null
         },
         {
-          "t": 167,
+          "t": 175,
           "kind": "transitionend",
           "path": "root \u003E label \u003E span[role=switch] \u003E span",
           "attr": "translate",
@@ -1692,7 +1692,7 @@
           "to": null
         },
         {
-          "t": 167,
+          "t": 175,
           "kind": "transitionend",
           "path": "root \u003E label \u003E span[role=switch]",
           "attr": "background-color",

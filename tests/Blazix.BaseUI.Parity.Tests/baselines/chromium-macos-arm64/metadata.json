@@ -1,17 +1,17 @@
 {
   "schemaVersion": 3,
   "captureSchemaVersion": 3,
-  "upstreamSha": "bdcb685fadcca9d18b18f013c052795a53b6aa33",
+  "upstreamSha": "1a2ca3c9f8a39bd8c0dda939a7a23b72da226124",
   "platform": {
     "browser": "chromium",
     "browserVersion": "143.0.7499.4",
     "os": "macos",
     "architecture": "arm64"
   },
-  "generatedAtUtc": "2026-08-10T17:46:33.385+00:00",
+  "generatedAtUtc": "2026-08-21T05:15:00.172+00:00",
   "fixtureManifestHash": "43CB863DECDB35CADE9893C737226289AA2A22CBDC0A851612387A7868BC19A8",
   "aliasManifestHash": "AE8A9607EB047F7520FF9A0DFD2725FDBB4C6A3101CD4AE3FB62298FB8B42C46",
-  "stylesheetHash": "96456BF65B5AA5A9503304D70154C14E5880939D0675556AC02AC3BB0D45728D",
+  "stylesheetHash": "7685B80B9AD7B63831167561A09507938A2A8BE0DDDC6F0E558035DB902834DF",
   "fixtures": [
     {
       "fixture": "switch/hero",
@@ -27,7 +27,7 @@
       "artifacts": [
         {
           "path": "captures/switch__hero.light.json",
-          "sha256": "5616100B594BF9EF47F333CD3A81BC6AA930EDE3FBAA7876B1ADD3B639B3783B"
+          "sha256": "AEAEEBB75088F3552BF475A0D284303E22CB8F33E6850984F6B350F485C9695B"
         },
         {
           "path": "screenshots/switch__hero.light.React.initial.00.png",
@@ -74,7 +74,7 @@
       "artifacts": [
         {
           "path": "captures/collapsible__hero.light.json",
-          "sha256": "2096299E00825501D79D27D4CC7D59A8C0B335FBDD4EE88FCC00741B10C0CFDF"
+          "sha256": "B0566C00C6B2395F1B83A19CD9E800F812EAD275C5B752CDD81216964A987DC2"
         },
         {
           "path": "screenshots/collapsible__hero.light.React.close.00.png",
@@ -133,7 +133,7 @@
     {
       "fixture": "popover/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/popover/demos/hero/tailwind/index.tsx",
-      "sourceHash": "DC650C4125BD8C323D43EF096C879FD7FE7E5813C89F51AB87011CF4693EAAD2",
+      "sourceHash": "65694D2B74DDF09FA2648A5DC93977C309AD94257ED8A7D227D3A86437D9297E",
       "contractHash": "C760571C3644EB257AF35F4817C6689869EFB1A9D3DB1E7DF59EE5E93F4973CE",
       "theme": "light",
       "steps": [
@@ -145,7 +145,7 @@
       "artifacts": [
         {
           "path": "captures/popover__hero.light.json",
-          "sha256": "620B61AC00CD8A5F897B2E2811EA8B2BC297795B55A776631C2E780247FD12C2"
+          "sha256": "BCEDABEF4D69C95130C7808506AFB7211880DE3299A792543A7772D61607A925"
         },
         {
           "path": "screenshots/popover__hero.light.React.close.00.png",
@@ -248,7 +248,7 @@
     {
       "fixture": "select/grouped",
       "sourcePath": "docs/src/app/(docs)/react/components/select/demos/grouped/tailwind/index.tsx",
-      "sourceHash": "70AD520F90B58355062ECC165F4E4949CD1127FBE756BA97CAC3055CC2644A01",
+      "sourceHash": "F80F8AA9D426CEE2873E5315FF2068BF4397FB33C272227FB483CA7D918E2E2A",
       "contractHash": "076EC761CC897A477DD0FA1FFE86BE0A93EB6860FA6FB9C04DFE05692B12ECAA",
       "theme": "light",
       "steps": [
@@ -262,7 +262,7 @@
       "artifacts": [
         {
           "path": "captures/select__grouped.light.json",
-          "sha256": "D4721319DEA76996ACC875FC887E3D83186172B882ED2BC11E3BC1F3955C1202"
+          "sha256": "183930373CDF0F4FC9B8B6A7D0910F74FDA450A64E9112699CE50593CE733FCD"
         },
         {
           "path": "screenshots/select__grouped.light.React.arrow-down.00.png",
@@ -354,7 +354,7 @@
       "artifacts": [
         {
           "path": "captures/field__hero.light.json",
-          "sha256": "302F790D1BB661B105EE3E79693FE8F20B00D595251453C74C103E983974F50A"
+          "sha256": "181D42E91C46F7B435204738A7792C271692EC428740507CA53E250220BEA456"
         },
         {
           "path": "screenshots/field__hero.light.React.blur.00.png",
@@ -387,7 +387,7 @@
       "artifacts": [
         {
           "path": "captures/avatar__hero.light.json",
-          "sha256": "386094522ED85D8DA55B70F65E34DDBA41D3E9937CA939B777334697C13F7F42"
+          "sha256": "13E2E28C66DAEAB72842F4E701D29297070A01C03D9D77C27DEC046764789B13"
         },
         {
           "path": "screenshots/avatar__hero.light.React.initial.00.png",
@@ -408,7 +408,7 @@
       "artifacts": [
         {
           "path": "captures/separator__hero.light.json",
-          "sha256": "568C63794E89C5394B0DB54B10018C4C30B9506918875F733B4F71713BFE6A67"
+          "sha256": "1E86240D52DBD373F4234CCAD3A8FB749C338EE0CC110DFD86AB7869E8906790"
         },
         {
           "path": "screenshots/separator__hero.light.React.initial.00.png",
@@ -429,7 +429,7 @@
       "artifacts": [
         {
           "path": "captures/progress__hero.light.json",
-          "sha256": "C37C28C4916ADC7A971808D8BD0DBC47D35CABF31F07AFE5237F5EBE0889299D"
+          "sha256": "69F1740B6F80AE88A15198C4DD5A578BB40ED2D3B66DAE3BD9BC7887CE0C70C7"
         },
         {
           "path": "screenshots/progress__hero.light.React.initial.00.png",
@@ -450,7 +450,7 @@
       "artifacts": [
         {
           "path": "captures/meter__hero.light.json",
-          "sha256": "9E736039721174715BA337B017B7F822E91B1F2748A26BCE1326B1898D4A44B0"
+          "sha256": "4DA61BAFDCDD01497089483C7100AD3FCD9787A409C26FA28D5E26F1790E5332"
         },
         {
           "path": "screenshots/meter__hero.light.React.initial.00.png",
@@ -474,7 +474,7 @@
       "artifacts": [
         {
           "path": "captures/accordion__multiple.light.json",
-          "sha256": "1138EA7F3927B47B65BFA8C30B2FD733E913DDCFEED739A6ACA2BF931BF74565"
+          "sha256": "7A2B135A0A5D68A283B2AF51EE36F017F3A11AC4AC9CDD93B6A3832F23276183"
         },
         {
           "path": "screenshots/accordion__multiple.light.React.close-first.00.png",
@@ -569,7 +569,7 @@
       "artifacts": [
         {
           "path": "captures/dialog__hero.light.json",
-          "sha256": "A5D79D62CC13E0627F2665370D3AE8AA531DC62D3C80B7ED221D487514231E0E"
+          "sha256": "693D117DF002AA27B6A2AB583A85B90738FF8B2CC1465DAD2A1B9B1D0C7F55FF"
         },
         {
           "path": "screenshots/dialog__hero.light.React.close.00.png",
@@ -684,7 +684,7 @@
       "artifacts": [
         {
           "path": "captures/drawer__hero.light.json",
-          "sha256": "8E12B3C3565A22333D30D8061E44E5059ACDFFAE71E53DF7C5353B80E05CF55D"
+          "sha256": "956694954BA6253C24B9EB56F641D02DC98C090128050A6D5A8609C06076601C"
         },
         {
           "path": "screenshots/drawer__hero.light.React.close.00.png",
@@ -787,7 +787,7 @@
     {
       "fixture": "toast/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/toast/demos/hero/tailwind/index.tsx",
-      "sourceHash": "32CA22CE17287AF5465F1143FB32A2C34DC9251AA31C7175BD2C81B800CA7392",
+      "sourceHash": "4BB593FE6C5AB44B6E25E5CD42860B4D8F39CFB8CFEDB45B481C71CEE1CADC33",
       "contractHash": "235A2162F8E98E748D52CAA38E8BC70AD88C26F8847DB51B188494B561E2DD97",
       "theme": "light",
       "steps": [
@@ -799,7 +799,7 @@
       "artifacts": [
         {
           "path": "captures/toast__hero.light.json",
-          "sha256": "4376334774589D6543468F2C1B2CC5012AC4B00E7C1FE78CCC24514E1220CDF1"
+          "sha256": "F25420713F2EB811BC8584C657C79ED5863C3399DA9041B0B1980482A92ADACC"
         },
         {
           "path": "screenshots/toast__hero.light.React.create-toast.00.png",
@@ -910,7 +910,7 @@
       "artifacts": [
         {
           "path": "captures/tooltip__hero.light.json",
-          "sha256": "01F6B2AE73633493DCBF5509B7E22B805A27E791A3080D9866C900080DCF3F83"
+          "sha256": "5A940E38B182FF4F5AE17FF8959A8A774D105EE1A95ED737F664017BD80774BC"
         },
         {
           "path": "screenshots/tooltip__hero.light.React.dismiss-tooltip.00.png",
@@ -985,7 +985,7 @@
       "artifacts": [
         {
           "path": "captures/preview-card__hero.light.json",
-          "sha256": "2A2E19248A71BC8FCBE76926B20D8B6D4534C99A5425721CF490021E3F44119D"
+          "sha256": "C094AD6933EEEACC8B0C58A43AD9DFAA0A0483A745A925D0D086274F3FBE29AF"
         },
         {
           "path": "screenshots/preview-card__hero.light.React.dismiss-preview.00.png",
@@ -1088,7 +1088,7 @@
     {
       "fixture": "menu/arrow",
       "sourcePath": "docs/src/app/(docs)/react/components/menu/demos/arrow/tailwind/index.tsx",
-      "sourceHash": "DD95B34300AB2F95134B3A6036740C33F0275DEC70F3296CAAA461E2359EE87C",
+      "sourceHash": "5C8D1DFBE17DC18DAD3EDD2A0CF906EB617149677A2ABA53108CAC7B4C9EDC68",
       "contractHash": "9670E1E564158746827C07EF5D0D4AC45672B061710AA31F484F3636A1BF9755",
       "theme": "light",
       "steps": [
@@ -1101,7 +1101,7 @@
       "artifacts": [
         {
           "path": "captures/menu__arrow.light.json",
-          "sha256": "6B28CF2DA6F4A67AEE3FD70B3A52CD1515656307BCCAF00C94D1A4D03F2E295C"
+          "sha256": "6E6315F2CA0606840FA5C56BBFE39A36AB157537B5EFA81F63FC5DE562A01347"
         },
         {
           "path": "screenshots/menu__arrow.light.React.arrow-down.00.png",
@@ -1212,7 +1212,7 @@
     {
       "fixture": "select/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/select/demos/hero/tailwind/index.tsx",
-      "sourceHash": "B7C83261FE057D9A16BD420E71000A1E583E6F60C4525AF66A65427F8E328111",
+      "sourceHash": "CC94A647BE12A308774FCF8B770EF1B486C625048D28B40BF95316E3ACB7BCF4",
       "contractHash": "7E614F389719A3DA2B1595847CD26000FD8FD9396B7D53D373698CEF708B6371",
       "theme": "light",
       "steps": [
@@ -1224,7 +1224,7 @@
       "artifacts": [
         {
           "path": "captures/select__hero.light.json",
-          "sha256": "3EEB9C263F97FA4A41426EBA85A762025920BB6BF2308E84FE49AED1E23C7D1E"
+          "sha256": "F7D79A55EFCE1E7E9F813123292FD5A69A36068873DED2BF9082AB61EFE367E0"
         },
         {
           "path": "screenshots/select__hero.light.React.initial.00.png",
@@ -1287,7 +1287,7 @@
     {
       "fixture": "menu/checkbox-items",
       "sourcePath": "docs/src/app/(docs)/react/components/menu/demos/checkbox-items/tailwind/index.tsx",
-      "sourceHash": "A9B58ED11A825E5B981F031FC0C38FDCA25AC6C7ED64D86177DAFDE7CCEF6473",
+      "sourceHash": "53E11903A7D046AF1978FE2C5206F6E940FFAEB79AE6D723257CCF7E125BB3CF",
       "contractHash": "BE5EA1F0F78B9798D8B4DD5AA36863BFA8F13CABB12E582514BCF7ACFABBF92E",
       "theme": "light",
       "steps": [
@@ -1300,7 +1300,7 @@
       "artifacts": [
         {
           "path": "captures/menu__checkbox-items.light.json",
-          "sha256": "C63033093A85D2C4F068306B06B8A4FEBC7F35520874F40203333B64400A61C9"
+          "sha256": "61E489A4479AEDCC257CBB9487DA1D15A6A317C61E54B04B686DA03962352554"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.00.png",
@@ -1312,7 +1312,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame000.01.png",
-          "sha256": "55C0ACECACB5D75C4644A8B72AE8E1332D119877A0BDDDAD5959BFC51F52E646"
+          "sha256": "931A269BD6E0CF3FE7AE143CD0F3B6FA746B26BA1687A9AE92478669EC20A2B0"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame025.00.png",
@@ -1320,7 +1320,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame025.01.png",
-          "sha256": "E094347970796C74291A654A8744BE8998E35A81B4BCA0F82F327C007B31092A"
+          "sha256": "8D9F776AF308AD7590F373219B8D1FE21FCE576C9DA9ADA582C349803446E1E1"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame050.00.png",
@@ -1328,7 +1328,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame050.01.png",
-          "sha256": "67BE7EBE6987D3FC8795081644050994DAB9EC4FF258E3EACDE8AC8FD739986C"
+          "sha256": "8D34C15669ABADBD3AD92E1890D119FAF302C32D701833B1208A2119D628C39C"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame075.00.png",
@@ -1336,7 +1336,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame075.01.png",
-          "sha256": "2C9797B475B68B66FE68D49AF5CA568A9CD6D437A707F976D08E4B6E09E97D6C"
+          "sha256": "59DF0D56AC5D3F17E782ACDE95A2793CB435F52C84F2015CF3570E7A1932633E"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.close.frame100.00.png",
@@ -1356,7 +1356,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.01.png",
-          "sha256": "A39A9D6D2034C6FA000FF309B68111929298D1AB559DD0CA44E63D94921391AC"
+          "sha256": "3D0EA6179C880180A6767FFEE1CE1D09F824333F29B686FA5DE3FD37EDCB54A4"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame000.00.png",
@@ -1372,7 +1372,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame025.01.png",
-          "sha256": "877640F436B5FED2A2F0DCB6DA10C6B18683C90FC26EA7CDD45763CD26FA4739"
+          "sha256": "C4C9D819DCE699233FF17E9189EC299B0210680C3100490EFD1E39B40FAE5B91"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame050.00.png",
@@ -1380,7 +1380,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame050.01.png",
-          "sha256": "FFB9023CE94F24ED507DD973B1E0997B4C866A59D74267ABB23CAA9CA1058340"
+          "sha256": "03DA9C535667BE6A9D30435DC656BC612DBFF5C0363E84B06D112A9067572CEC"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame075.00.png",
@@ -1388,7 +1388,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame075.01.png",
-          "sha256": "B97CADB4281F03E78ED949A908DE1E785533232CCE72CAFBFDEDEC8777C2135C"
+          "sha256": "AB57A70EF9074635AD2B14E041B66210DEE4F0E71CCA08A564A6576B728F3C36"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame100.00.png",
@@ -1396,7 +1396,7 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.open.frame100.01.png",
-          "sha256": "A39A9D6D2034C6FA000FF309B68111929298D1AB559DD0CA44E63D94921391AC"
+          "sha256": "3D0EA6179C880180A6767FFEE1CE1D09F824333F29B686FA5DE3FD37EDCB54A4"
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.toggle-minimap.00.png",
@@ -1404,14 +1404,14 @@
         },
         {
           "path": "screenshots/menu__checkbox-items.light.React.toggle-minimap.01.png",
-          "sha256": "2E1683062A2FA9BD310BA81C739CC8163A7D316D29AF8C56F4D027BD615BF4FC"
+          "sha256": "8B255EACFC8CE32BEC166DAE19D9881294C746F7351F0A8D254C668C2E34B9E0"
         }
       ]
     },
     {
       "fixture": "menubar/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/menubar/demos/hero/tailwind/index.tsx",
-      "sourceHash": "45DA452D4B69059B0E797B8D559B3B448C9E5FD0E342CDDA8791F57F1CFC6A24",
+      "sourceHash": "2BAE14A95D169A1F7C58CF0431C87CA6C1E6AA314ADA6DDFE2CACEFADC4A9A4C",
       "contractHash": "3CA5FF973CAB02460527F86750BF006E19D447C7C74E9844AF07E1D121942229",
       "theme": "light",
       "steps": [
@@ -1424,7 +1424,7 @@
       "artifacts": [
         {
           "path": "captures/menubar__hero.light.json",
-          "sha256": "A49BB386B39CD3719D71F0CB64A9B3468821BFE5BD0481F17956CBDA49DBC494"
+          "sha256": "7C0DB7C703D543CC201082349F8B5B89CEA4ABEAE973A08DA0755F089A92F0BD"
         },
         {
           "path": "screenshots/menubar__hero.light.React.close.00.png",
@@ -1508,7 +1508,7 @@
       "artifacts": [
         {
           "path": "captures/tabs__hero.light.json",
-          "sha256": "030A64EE0D254C7A6A301A7B547C646A56F5366A40088EF669B79FD3503F2D08"
+          "sha256": "107533855391FB69157E5E06C5416194F093B536D0F67FBEA2BA1691B227CE81"
         },
         {
           "path": "screenshots/tabs__hero.light.React.activate-account.00.png",
@@ -1571,7 +1571,7 @@
     {
       "fixture": "toolbar/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/toolbar/demos/hero/tailwind/index.tsx",
-      "sourceHash": "0C66FD2505C48E6CFE3C33A7B1669B4D1848859838CA885DF27B5E86E14828F2",
+      "sourceHash": "7D7A2E668EF708E4E913B67C8A45A81A95F189CD8AC4F4576C8D4320D287B3C5",
       "contractHash": "14DEF7648B59DEC4AA9421E149F8800ACA121B9F52A497372044F7C4833687D1",
       "theme": "light",
       "steps": [
@@ -1586,7 +1586,7 @@
       "artifacts": [
         {
           "path": "captures/toolbar__hero.light.json",
-          "sha256": "7F5B3CDCC1C9A889BFDA789F22B15B91850A2E0FDCD6FC4939A7512DBABCC381"
+          "sha256": "2799D004E706374D59BEDAF976478F2CC2C156E618343C3FC5D0C2F0539474D1"
         },
         {
           "path": "screenshots/toolbar__hero.light.React.focus-align-right.00.png",
@@ -1712,7 +1712,7 @@
       "artifacts": [
         {
           "path": "captures/form__hero.light.json",
-          "sha256": "C83E7920AA02BB38CA858D8FB3030C6A09C126C447D31D721AF8D1723B8599E2"
+          "sha256": "A605F10C60FBD3313CD27DEF168E6028035905A9603304E960B9B0EEB98135C7"
         },
         {
           "path": "screenshots/form__hero.light.React.initial.00.png",
@@ -1739,7 +1739,7 @@
       "artifacts": [
         {
           "path": "captures/number-field__hero.light.json",
-          "sha256": "011EBE4913498380F37E0A73B9A0D03F714CD39E136BF335390D3EA71996DD6D"
+          "sha256": "AA9D7221492032B1287FF9BDF4FB3CD2D93722742D2D4282461046C2FBE6F18E"
         },
         {
           "path": "screenshots/number-field__hero.light.React.decrement.00.png",
@@ -1769,7 +1769,7 @@
       "artifacts": [
         {
           "path": "captures/checkbox__hero.light.json",
-          "sha256": "C3B13594C38EB27E8073B11192497F8E9B73F125A8408990630A415BFD4AB624"
+          "sha256": "CE7D21E73BBA2B466931DCDF1542B1CC1CA653D7211CD0D9617A35038A333887"
         },
         {
           "path": "screenshots/checkbox__hero.light.React.initial.00.png",
@@ -1795,7 +1795,7 @@
       "artifacts": [
         {
           "path": "captures/otp-field__hero.light.json",
-          "sha256": "3CB9EE276DD33B03F3962E988C37082E5E67E445FADD72CFC42E05CA36FA5C65"
+          "sha256": "961A7A6BA8E3D215C1312F3539409DC3E97B202D6C6E7BB8F32F539E126A4F42"
         },
         {
           "path": "screenshots/otp-field__hero.light.React.complete-code.00.png",
@@ -1810,7 +1810,7 @@
     {
       "fixture": "popover/detached-triggers-simple",
       "sourcePath": "docs/src/app/(docs)/react/components/popover/demos/detached-triggers-simple/tailwind/index.tsx",
-      "sourceHash": "343CFE15D98CCC0411E9FA68ACA1CBCFBCEB71067AB0D3BDD73E3BDE11E6B763",
+      "sourceHash": "A0F58872E6F0DA74710FF150EBDBDE7454DE0377819513FF651560221779C437",
       "contractHash": "DEF48E2654BA8ECF7C39466D5886999B1E44D7B91B2071DB12C6AD4FAE7DDF26",
       "theme": "light",
       "steps": [
@@ -1822,7 +1822,7 @@
       "artifacts": [
         {
           "path": "captures/popover__detached-triggers-simple.light.json",
-          "sha256": "0923B229C631E98B98C77B8C87ABBD18AAA2911631C041D6BF28611206B68261"
+          "sha256": "8E2C5DD886B613C798D414E2F507C28A03664E362C98052437E827389936D1F1"
         },
         {
           "path": "screenshots/popover__detached-triggers-simple.light.React.close.00.png",
@@ -1925,7 +1925,7 @@
     {
       "fixture": "navigation-menu/hero",
       "sourcePath": "docs/src/app/(docs)/react/components/navigation-menu/demos/hero/tailwind/index.tsx",
-      "sourceHash": "15A8A7C46E18871B18EEAABC21AA41DCE4627F31D88653F35650FA2648582ECE",
+      "sourceHash": "1390582183620B2AF0D186627E47348E380A4747813EE02F8482BC4191825898",
       "contractHash": "178649BD774742DBE25953FBF8D4DC4D5A231082FE6CC4E15C0DD308AFCA38A5",
       "theme": "light",
       "steps": [
@@ -1938,7 +1938,7 @@
       "artifacts": [
         {
           "path": "captures/navigation-menu__hero.light.json",
-          "sha256": "38A97CF3321A2E4240471896210E0CE6D21EFB3C85FEACD7AAEAD137AE39C29F"
+          "sha256": "E25A7D63A6B7A354346B4512203545AB739C31FF03D1DCC38C0659C9DA35C466"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.00.png",
@@ -1950,7 +1950,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame000.01.png",
-          "sha256": "E9B71210E5595BA5D2440AFE49BADE71E3544B30C6BBAE3BB8882BCFD75277E9"
+          "sha256": "970D9871A3FDF6439E5D8E6943023BCCD87973587F0745C1032F9025135B3AC9"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame025.00.png",
@@ -1958,7 +1958,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame025.01.png",
-          "sha256": "5EF2248675D2475A7A8652FAEEA1277C986B94E860F6913C22AA29FF7D502A38"
+          "sha256": "82F9938ADD2CE2563925E1DDECAFE03E59C838F832264D4FE9368C3E4F9E63CD"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame050.00.png",
@@ -1966,7 +1966,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame050.01.png",
-          "sha256": "BCA77DD5C78393F9D3EA3D08457CB0170580107DF73E3B4BA2888D5044ACB6A0"
+          "sha256": "B2111F96C02C080A91FAAC0F465145B8EC6E6EC4DE786F517936133E71F19613"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame075.00.png",
@@ -1974,7 +1974,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame075.01.png",
-          "sha256": "E9C563E3149CACBEF7099A2C2FAE63AB4D1E7443002E3A28CA9ECC022C8254E4"
+          "sha256": "3A9DC58E63E748A7ECD3AAF42125533236C7C946742F57791E345A66DD6DF844"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.close.frame100.00.png",
@@ -1994,7 +1994,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.01.png",
-          "sha256": "E6BAA3927247BB9C2F827F0875B543324817AD5F2F988FBA44F5CF65F05DC45D"
+          "sha256": "9107F78161686D25C617F44C3BD48A31EF48FBD4BCB2BAD2FE45AC80620A99AA"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame000.00.png",
@@ -2010,7 +2010,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame025.01.png",
-          "sha256": "20616379A15CD93E778E55AD39C02F8461616565E1B4B00B31E8BFFA9576BD28"
+          "sha256": "A979352E345B1826D06402E1A75C74CF4E57180B147661368E68A1F988E333E7"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame050.00.png",
@@ -2018,7 +2018,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame050.01.png",
-          "sha256": "204202E5DDD8A9F378EAC6E4B31C5B1E3229908960BD73C977A2F11668FCE2B9"
+          "sha256": "72F8DA0D8B3DAA10D5307572AC29D409F6AE93681171AB0CB90C19836EC40E6F"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame075.00.png",
@@ -2026,7 +2026,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame075.01.png",
-          "sha256": "A8CB890918536C5B46F50BF661BE0AACF8BCEB6B08C71EEA0094C4E5D8A7A30B"
+          "sha256": "CAEDC00FE67AC44D5D47B9C56EA22875E3C36D415C77F6F302B3DDC5DE6478B6"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame100.00.png",
@@ -2034,7 +2034,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.open-overview.frame100.01.png",
-          "sha256": "7A75173F105FB8AA2C605C2FFC77350420163B28B2618E2C13B69B527C746D01"
+          "sha256": "0619AFBA98DD47B9BB4E98567EE0DFC5C30EE98CBC37CF2BD1001567E6B480F4"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.00.png",
@@ -2042,7 +2042,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.01.png",
-          "sha256": "2F6B54679472CD90930FFBB1E9E1E250AADE05E47F83505A766123308673A614"
+          "sha256": "B9F6A471AD104595587F48FBBAE1D54B204DF1E58555A7BA6B5B1D90271FB811"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame000.00.png",
@@ -2050,7 +2050,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame000.01.png",
-          "sha256": "33350FA6544A0D905D807A5322FB577955854A9FF8C1C3AA7CF8FEE2065B3AA2"
+          "sha256": "1FA7018A5A388DB996D456B58CA29196F793785E4EAEEB12A03AFE3E9F8D37F6"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame025.00.png",
@@ -2058,7 +2058,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame025.01.png",
-          "sha256": "60B93CE098DE63FB7060BB26FA02115B21B276C5A2C156F1403065ACD8AE5BBB"
+          "sha256": "A9FFF8E33DC2447830C476AC6F17DC325B3C052D59838AC5DF50F52117FA849D"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame050.00.png",
@@ -2066,7 +2066,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame050.01.png",
-          "sha256": "CB805E525B28FF72CB69B96A2AD3B743E1C259C7CE3FB7E6D37D89C68D5F0653"
+          "sha256": "588A04DA086039E6FE89C49853982BA925BF85519CC25DE7A939037CF7EC2731"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame075.00.png",
@@ -2074,7 +2074,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame075.01.png",
-          "sha256": "39F11BA6A0C84ACAD85FBECB40EF44FC3514591938C1924C343127D737966B5A"
+          "sha256": "715605CABD8DC9D687A651D9B1CCFF9B19174B416B448BD527BEFB15455BADDD"
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame100.00.png",
@@ -2082,7 +2082,7 @@
         },
         {
           "path": "screenshots/navigation-menu__hero.light.React.switch-handbook.frame100.01.png",
-          "sha256": "1D17F14CD5868141370C046C789BF9B4B793CA84C1133984B4EC691972D62C02"
+          "sha256": "D7D515C1D6B3D79465E974063FA57A33B91702089645176186D3AC19FD524E3A"
         }
       ]
     },
@@ -2100,7 +2100,7 @@
       "artifacts": [
         {
           "path": "captures/scroll-area__hero.light.json",
-          "sha256": "57978C6ACB3AF5F1772BBC3A2DCC9BD3DA74E9AAEAE9F675CD6310DFCA76901D"
+          "sha256": "6478381308868F37B642C81936DD54071BB4F410A6B732E2AAB997CDE253B7E7"
         },
         {
           "path": "screenshots/scroll-area__hero.light.React.focus-viewport.00.png",
@@ -2128,7 +2128,7 @@
       "artifacts": [
         {
           "path": "captures/combobox__hero.light.json",
-          "sha256": "67263C11DBEF03E24BEEEABE0F2D11921B3B67A1A1E8DD8BC0B926F50BA5546E"
+          "sha256": "F6284A2700D5CBEA96D11A07FAC9235B53E4A4AA7863F7D7E5FF0C3B70F080C1"
         },
         {
           "path": "screenshots/combobox__hero.light.React.filter-banana.00.png",

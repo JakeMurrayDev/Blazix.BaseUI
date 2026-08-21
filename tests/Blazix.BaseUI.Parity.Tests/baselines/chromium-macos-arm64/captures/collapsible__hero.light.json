@@ -2,7 +2,7 @@
   "captureSchemaVersion": 3,
   "fixture": "collapsible/hero",
   "leg": 0,
-  "baseUiSha": "bdcb685fadcca9d18b18f013c052795a53b6aa33",
+  "baseUiSha": "1a2ca3c9f8a39bd8c0dda939a7a23b72da226124",
   "sourceHash": "50F4BC170BFA94037D0810C0B1EEBC2192323EA110E0B27383F00B80ED433257",
   "theme": "light",
   "steps": [
@@ -558,10 +558,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -602,10 +602,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -646,10 +646,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -690,10 +690,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -734,10 +734,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1829,10 +1829,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1873,10 +1873,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1917,10 +1917,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -1961,10 +1961,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2005,10 +2005,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2051,10 +2051,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2097,10 +2097,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2143,10 +2143,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2189,10 +2189,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2235,10 +2235,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -2318,7 +2318,7 @@
       "focus": "root \u003E div \u003E button",
       "timeline": [
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "data-panel-open",
@@ -2326,7 +2326,7 @@
           "to": ""
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "data-starting-style",
@@ -2334,7 +2334,7 @@
           "to": ""
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "aria-controls",
@@ -2342,7 +2342,7 @@
           "to": "base-ui-_r_0_"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "aria-expanded",
@@ -2350,7 +2350,7 @@
           "to": "true"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "added",
           "path": "root \u003E div \u003E div",
           "attr": null,
@@ -2358,7 +2358,7 @@
           "to": "div"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div",
           "attr": "data-closed",
@@ -2366,7 +2366,7 @@
           "to": null
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div",
           "attr": "data-open",
@@ -2374,7 +2374,7 @@
           "to": ""
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div",
           "attr": "data-starting-style",
@@ -2382,7 +2382,7 @@
           "to": ""
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2390,7 +2390,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2398,7 +2398,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2406,7 +2406,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2414,7 +2414,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2422,7 +2422,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 15,
+          "t": 19,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2430,7 +2430,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px; place-content: initial !important; place-items: initial !important;"
         },
         {
-          "t": 39,
+          "t": 42,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2438,7 +2438,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;"
         },
         {
-          "t": 39,
+          "t": 42,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2446,7 +2446,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;"
         },
         {
-          "t": 39,
+          "t": 42,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2454,7 +2454,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;"
         },
         {
-          "t": 39,
+          "t": 42,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2462,7 +2462,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;"
         },
         {
-          "t": 39,
+          "t": 43,
           "kind": "transitionstart",
           "path": "root \u003E div \u003E button \u003E svg",
           "attr": "rotate",
@@ -2470,7 +2470,7 @@
           "to": null
         },
         {
-          "t": 40,
+          "t": 43,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "data-starting-style",
@@ -2478,7 +2478,7 @@
           "to": null
         },
         {
-          "t": 40,
+          "t": 43,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "data-starting-style",
@@ -2486,7 +2486,7 @@
           "to": null
         },
         {
-          "t": 40,
+          "t": 43,
           "kind": "attribute",
           "path": "root \u003E div",
           "attr": "data-starting-style",
@@ -2494,7 +2494,7 @@
           "to": null
         },
         {
-          "t": 52,
+          "t": 57,
           "kind": "transitionstart",
           "path": "root \u003E div \u003E div",
           "attr": "height",
@@ -2502,7 +2502,7 @@
           "to": null
         },
         {
-          "t": 135,
+          "t": 140,
           "kind": "transitionend",
           "path": "root \u003E div \u003E button \u003E svg",
           "attr": "rotate",
@@ -2510,7 +2510,7 @@
           "to": null
         },
         {
-          "t": 193,
+          "t": 199,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2518,7 +2518,7 @@
           "to": "--collapsible-panel-height: auto; --collapsible-panel-width: auto;"
         },
         {
-          "t": 193,
+          "t": 199,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -2526,7 +2526,7 @@
           "to": "--collapsible-panel-height: auto; --collapsible-panel-width: auto;"
         },
         {
-          "t": 194,
+          "t": 199,
           "kind": "transitionend",
           "path": "root \u003E div \u003E div",
           "attr": "height",
@@ -3143,10 +3143,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -3187,10 +3187,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -3231,10 +3231,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -3275,10 +3275,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -3319,10 +3319,10 @@
           "--color-red-600": "oklch(57.7% 0.245 27.325)",
           "--text-sm--line-height": "calc(1.25 / 0.875)",
           "--color-neutral-950": "oklch(14.5% 0 0)",
-          "--text-xs": "0.75rem",
+          "--color-black": "#000",
           "--default-font-family": "ui-sans-serif, system-ui, sans-serif, \u0022Apple Color Emoji\u0022,\n      \u0022Segoe UI Emoji\u0022, \u0022Segoe UI Symbol\u0022, \u0022Noto Color Emoji\u0022",
           "--text-xs--line-height": "calc(1 / 0.75)",
-          "--color-black": "#000",
+          "--text-xs": "0.75rem",
           "--color-neutral-700": "oklch(37.1% 0 0)",
           "--font-weight-normal": "400",
           "--color-neutral-400": "oklch(70.8% 0 0)",
@@ -3436,7 +3436,7 @@
           "to": "--collapsible-panel-height: 92px; --collapsible-panel-width: 192px;"
         },
         {
-          "t": 15,
+          "t": 14,
           "kind": "attribute",
           "path": "root \u003E div \u003E div",
           "attr": "style",
@@ -3468,7 +3468,7 @@
           "to": ""
         },
         {
-          "t": 29,
+          "t": 28,
           "kind": "transitionstart",
           "path": "root \u003E div \u003E button \u003E svg",
           "attr": "rotate",
@@ -3476,7 +3476,7 @@
           "to": null
         },
         {
-          "t": 37,
+          "t": 36,
           "kind": "transitionstart",
           "path": "root \u003E div \u003E div",
           "attr": "height",
@@ -3484,7 +3484,7 @@
           "to": null
         },
         {
-          "t": 129,
+          "t": 120,
           "kind": "transitionend",
           "path": "root \u003E div \u003E button \u003E svg",
           "attr": "rotate",
@@ -3492,7 +3492,7 @@
           "to": null
         },
         {
-          "t": 188,
+          "t": 179,
           "kind": "attribute",
           "path": "root \u003E div \u003E button",
           "attr": "data-ending-style",
@@ -3500,7 +3500,7 @@
           "to": null
         },
         {
-          "t": 188,
+          "t": 179,
           "kind": "removed",
           "path": "",
           "attr": null,
@@ -3508,7 +3508,7 @@
           "to": null
         },
         {
-          "t": 188,
+          "t": 179,
           "kind": "attribute",
           "path": "root \u003E div",
           "attr": "data-ending-style",

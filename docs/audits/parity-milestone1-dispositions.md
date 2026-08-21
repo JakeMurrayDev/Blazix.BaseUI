@@ -85,9 +85,36 @@ prerequisites.
 
 | ID | Blocker | Prerequisites before the population can be dispositioned |
 | --- | --- | --- |
-| A-3.1 | 4149 blocking comparator findings from the pin-`bdcb685` run remain undisposed. The `ParityStaticShard*`/`ParityTiming` theories assert `verdict.Blocking == false`, so on the last recorded evidence the suite does not pass; no run since #178 has been recorded either way. | (a) the component fixes PR #178 names as prerequisites for its own green state — Menu, OtpField, NavigationMenu, `select.js`, `collapsible.js` — of which the Menu and NavigationMenu work landed in #182/#189/#192 and the `select.js` work landed in #181 (`d72685d9`), while the OtpField and `collapsible.js` items have **not** landed on master; (b) a re-baseline, because the committed baselines are at `bdcb685` and cycle-1 work runs at pin `1a2ca3c9f`; (c) a full serial re-run (the parity project must not run concurrently with other Playwright work on this machine); (d) a committed run report so identities and per-kind counts become citable, explicitly including the un-waivable `CorrespondenceUncertain`. |
+| A-3.1 | 4149 blocking comparator findings from the pin-`bdcb685` run remain undisposed. The `ParityStaticShard*`/`ParityTiming` theories assert `verdict.Blocking == false`, so on the last recorded evidence the suite does not pass; no run since #178 has been recorded either way. | (a) the component fixes PR #178 names as prerequisites for its own green state — Menu, OtpField, NavigationMenu, `select.js`, `collapsible.js` — of which the Menu and NavigationMenu work landed in #182/#189/#192 and the `select.js` work landed in #181 (`d72685d9`), while the OtpField and `collapsible.js` items have **not** landed on master; (b) ~~a re-baseline, because the committed baselines are at `bdcb685` and cycle-1 work runs at pin `1a2ca3c9f`~~ — **met 2026-08-21**, see the update below; (c) a full serial re-run (the parity project must not run concurrently with other Playwright work on this machine); (d) a committed run report so identities and per-kind counts become citable, explicitly including the un-waivable `CorrespondenceUncertain`. |
 | A-3.2 | Server-leg finding counts are not reproducible (A-2.3), so a re-run's per-fixture numbers cannot be compared against #178's until the settle protocol gains a transition-start gate. | Settle-protocol change, then a repeat run to demonstrate stability. |
 | A-3.3 | Pixel baselines exist only for `chromium-macos-arm64`. The design spec requires Linux-captured or explicitly per-OS pixel baselines before the required CI job may block. | Generate a Linux platform set, or scope the required job's pixel dimension explicitly. |
+
+### Update — 2026-08-21: A-3.1 prerequisite (b) is met
+
+Recorded here rather than edited away, per `docs/audits/METHODOLOGY.md` G4.
+
+The committed baselines were recaptured at `1a2ca3c9f8a39bd8c0dda939a7a23b72da226124`
+(`baselines/metadata.json` `declaredRepositoryPin`, `baselines/chromium-macos-arm64/metadata.json`
+`generatedAtUtc` `2026-08-21T05:15:00.172+00:00`, browser `chromium` `143.0.7499.4` unchanged), on
+the same pin cycle-1 work runs at. Prerequisite (b) is closed; **(a), (c) and (d) remain open**, so
+A-3.1 itself stays an unresolved blocker.
+
+Two observations from the write-baseline run, which executes both candidate legs per fixture:
+
+- **26 of 29 fixtures still report 2 blocking legs; 3 report 0** (`separator/hero`, `progress/hero`,
+  `meter/hero`). The blocker is live, not merely historical. The 4149 figure is *not* re-measured by
+  this — a write-baseline run produces no committed report — so the population size at the new pin
+  remains unknown until prerequisite (c) runs.
+- **Five fixture-contract tests fail because the Blazor ports are still frozen at `bdcb685` Tailwind
+  class surfaces.** They failed identically before this refresh. Re-diffing the ports against the
+  pinned React sources is now the narrowest remaining source of class-level ambiguity, and is not
+  covered by any of (a)-(d); it is tracked in `parity-limitations.md` §2.
+
+One test changed failure mode rather than passing:
+`LiveIntegrationTests.SelectGroupedPreservesSourceOwnedAlignedAndForceMountedStateInBothModes`
+previously failed fast on the stale-pin guard and now runs the full comparison, reporting a real
+difference — `data-base-ui-inert` is absent from `root` in the candidate DOM where the React leg
+carries it. That is a genuine finding the stale pin was hiding.
 
 Consequence: the milestone-1 bounded claim in the design spec (criterion 5, "no unwaived Error
 remains") is **not** satisfied and must not be published. The #176 start gate is a narrower
