@@ -14,6 +14,7 @@
 @code {
     private static readonly SelectGroupState CachedState = new();
 
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? labelId;
     private SelectGroupContext? groupContext;
     private RenderElement<SelectGroupState>? renderElementReference;
@@ -68,8 +69,10 @@
         BuildComponentAttributes();
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
+
         if (labelId != id)
         {
             labelId = id;

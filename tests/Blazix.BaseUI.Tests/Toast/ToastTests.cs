@@ -827,7 +827,8 @@ public class ToastTests : BunitContext, IToastContract
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null,
         Func<bool>? shouldRenderLabelParts = null,
         RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
-        RenderFragment? headerContent = null)
+        RenderFragment? headerContent = null,
+        Func<string>? labelPartKey = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -872,7 +873,8 @@ public class ToastTests : BunitContext, IToastContract
                                 closeAdditionalAttributes,
                                 includeArrow: false,
                                 shouldRenderLabelParts,
-                                titleRender);
+                                titleRender,
+                                labelPartKey);
                         }
                     }
                 }));
@@ -886,7 +888,8 @@ public class ToastTests : BunitContext, IToastContract
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes,
         bool includeArrow,
         Func<bool>? shouldRenderLabelParts = null,
-        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null)
+        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
+        Func<string>? labelPartKey = null)
     {
         var sequence = 0;
 
@@ -910,6 +913,10 @@ public class ToastTests : BunitContext, IToastContract
                 if (shouldRenderLabelParts?.Invoke() ?? true)
                 {
                     contentBuilder.OpenComponent<ToastTitle>(0);
+                    if (labelPartKey is not null)
+                    {
+                        contentBuilder.SetKey($"title-{labelPartKey()}");
+                    }
                     contentBuilder.AddAttribute(1, "Id", $"title-{toast.Id}");
                     if (titleRender is not null)
                     {
@@ -918,6 +925,10 @@ public class ToastTests : BunitContext, IToastContract
                     contentBuilder.CloseComponent();
 
                     contentBuilder.OpenComponent<ToastDescription>(10);
+                    if (labelPartKey is not null)
+                    {
+                        contentBuilder.SetKey($"description-{labelPartKey()}");
+                    }
                     contentBuilder.AddAttribute(11, "Id", $"description-{toast.Id}");
                     contentBuilder.CloseComponent();
                 }
@@ -949,5 +960,41 @@ public class ToastTests : BunitContext, IToastContract
             rootBuilder.CloseComponent();
         }));
         builder.CloseComponent();
+    }
+
+    [Fact]
+    public Task TitleAndDescriptionRegistrationsSurviveAReplacement()
+    {
+        var manager = new ToastManager();
+        var partKey = "first";
+        var cut = RenderProvider(manager, labelPartKey: () => partKey);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "swapped-parts",
+            Title = "Swapped title",
+            Description = "Swapped description",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='swapped-parts']");
+            root.GetAttribute("aria-labelledby").ShouldBe("title-swapped-parts");
+            root.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
+        });
+
+        // The replacement parts reuse the same ids, so an id-equality guard would not reject the
+        // outgoing instances' clears.
+        partKey = "second";
+        cut.Render();
+
+        // The parts re-register on every parameter set, so a stale clear is self-healing here; this
+        // locks in the invariant the ownership guard makes unconditional.
+        var swappedRoot = cut.Find("[data-toast-id='swapped-parts']");
+        swappedRoot.GetAttribute("aria-labelledby").ShouldBe("title-swapped-parts");
+        swappedRoot.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
+
+        return Task.CompletedTask;
     }
 }

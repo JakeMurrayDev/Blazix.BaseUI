@@ -17,6 +17,7 @@
 
 @code {
     private TValue? internalValue;
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? labelId;
     private MenuRadioGroupContext<TValue> groupContext = null!;
     private MenuGroupContext? menuGroupContext;
@@ -123,8 +124,10 @@
         BuildComponentAttributes();
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
+
         if (labelId != id)
         {
             labelId = id;

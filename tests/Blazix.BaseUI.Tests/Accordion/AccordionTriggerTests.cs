@@ -289,4 +289,49 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsPanelAriaLabelledByWhenTriggerIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<AccordionRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", new[] { "item" });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<AccordionItem<string>>(0);
+                innerBuilder.AddAttribute(1, "Value", "item");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.SetKey(swapped ? "second" : "first");
+                        headerBuilder.AddAttribute(1, "AdditionalAttributes",
+                            (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { ["id"] = "accordion-trigger" });
+                        headerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(tb => tb.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(2);
+                    itemBuilder.AddAttribute(3, "KeepMounted", true);
+                    itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(pb => pb.AddContent(0, "Panel Content")));
+                    itemBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='region']").GetAttribute("aria-labelledby").ShouldBe("accordion-trigger"));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        // The trigger re-registers on every parameter set, so a stale clear is self-healing here;
+        // this locks in the invariant the ownership guard makes unconditional.
+        cut.Find("[role='region']").GetAttribute("aria-labelledby").ShouldBe("accordion-trigger");
+    }
 }

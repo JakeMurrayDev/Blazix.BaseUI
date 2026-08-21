@@ -216,4 +216,34 @@ public class SliderLabelTests : BunitContext, ISliderLabelContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsRootAriaLabelledByWhenLabelIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<SliderRoot>(0);
+            builder.AddAttribute(1, "DefaultValue", 50.0);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
+            {
+                inner.OpenComponent<SliderLabel>(0);
+                inner.SetKey(swapped ? "second" : "first");
+                inner.CloseComponent();
+
+                inner.OpenComponent<SliderControl>(10);
+                inner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        // The label id is derived from the root id, so the replacement registers the same value the
+        // outgoing instance is about to clear.
+        var labelId = cut.Find("[role='group']").GetAttribute("aria-labelledby");
+        labelId.ShouldNotBeNullOrEmpty();
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe(labelId));
+    }
 }

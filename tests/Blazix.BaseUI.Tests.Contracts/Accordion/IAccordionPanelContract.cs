@@ -27,4 +27,6 @@ public interface IAccordionPanelContract
     Task HasIdleTransitionStateWhenInitiallyOpen();
     Task UpdatesTransitionStyleAttributesFromJsCallback();
     Task KeepsPanelAndTriggerIdsSynchronizedWhenPanelRendersBeforeTrigger();
+
+    Task DropsTriggerAriaControlsWhenPanelIsRemoved();
 }

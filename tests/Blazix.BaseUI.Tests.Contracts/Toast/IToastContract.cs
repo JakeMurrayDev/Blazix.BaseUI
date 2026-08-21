@@ -7,4 +7,6 @@ public interface IToastContract
     Task ReAddingAClosingToastClearsRetainedSwipeState();
 
     Task ShiftTabInsideViewportKeepsTimersPaused();
+
+    Task TitleAndDescriptionRegistrationsSurviveAReplacement();
 }

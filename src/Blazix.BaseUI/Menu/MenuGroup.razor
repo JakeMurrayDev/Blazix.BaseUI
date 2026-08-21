@@ -14,6 +14,7 @@
 @code {
     private static readonly MenuGroupState CachedState = new();
 
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? labelId;
     private MenuGroupContext? groupContext;
     private RenderElement<MenuGroupState>? renderElementReference;
@@ -68,8 +69,10 @@
         BuildComponentAttributes();
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
+
         if (labelId != id)
         {
             labelId = id;

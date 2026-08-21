@@ -205,6 +205,12 @@ internal interface ISelectRootContext
     string? LabelId { get; set; }
 
     /// <summary>
+    /// Tracks which <c>SelectLabel</c> instance currently owns <see cref="LabelId"/>, so a label
+    /// replaced in place cannot have its registration cleared by the outgoing instance.
+    /// </summary>
+    RegisteredIdOwner LabelIdOwner { get; }
+
+    /// <summary>
     /// Raises the <see cref="StateChanged"/> event so descendants (e.g., the trigger)
     /// re-render after context properties like <see cref="LabelId"/> change.
     /// </summary>

@@ -16,4 +16,6 @@ public interface ICollapsiblePanelContract
     Task HasDataClosedWhenClosed();
     Task ReceivesCorrectState();
     Task RequiresContext();
+
+    Task DropsTriggerAriaControlsWhenPanelIsRemoved();
 }

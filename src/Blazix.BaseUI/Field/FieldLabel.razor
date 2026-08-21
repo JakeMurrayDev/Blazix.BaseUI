@@ -93,7 +93,7 @@
     protected override void OnInitialized()
     {
         labelId = ResolvedId;
-        LabelableContext?.SetLabelId(labelId);
+        LabelableContext?.SetLabelId(this, labelId);
         FieldContext?.Subscribe(this);
 
         state = State;
@@ -107,7 +107,7 @@
         if (newId != labelId)
         {
             labelId = newId;
-            LabelableContext?.SetLabelId(labelId);
+            LabelableContext?.SetLabelId(this, labelId);
         }
 
         state = State;
@@ -162,7 +162,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        LabelableContext?.SetLabelId(null);
+        LabelableContext?.SetLabelId(this, null);
         FieldContext?.Unsubscribe(this);
 
         if (moduleTask.IsValueCreated)

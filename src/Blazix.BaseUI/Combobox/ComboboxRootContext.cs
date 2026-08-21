@@ -24,6 +24,7 @@ internal interface IComboboxRootContext
     string? ListId { get; set; }
     string? PopupId { get; set; }
     string? LabelId { get; set; }
+    RegisteredIdOwner LabelIdOwner { get; }
     string? Name { get; }
     string? Form { get; }
     bool Disabled { get; }
@@ -117,6 +118,9 @@ internal sealed class ComboboxRootContext<TValue> : IComboboxRootContext, IDispo
     public string? ListId { get; set; }
     public string? PopupId { get; set; }
     public string? LabelId { get; set; }
+
+    public RegisteredIdOwner LabelIdOwner { get; } = new();
+
     public string? Name { get; set; }
     public string? Form { get; set; }
     public bool Disabled { get; set; }

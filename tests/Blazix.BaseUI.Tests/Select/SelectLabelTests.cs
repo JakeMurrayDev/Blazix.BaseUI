@@ -235,4 +235,40 @@ public class SelectLabelTests : BunitContext, ISelectLabelContract
         // the SetupLabelModule mock, which accepts any arguments without error.
         label.GetAttribute("id").ShouldBe("fruit-select-label");
     }
+
+    [Fact]
+    public async Task KeepsTriggerAriaLabelledByWhenLabelIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<SelectRoot<string>>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(inner =>
+            {
+                inner.OpenComponent<SelectLabel>(0);
+                inner.SetKey(swapped ? "second" : "first");
+                inner.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Fruit")));
+                inner.CloseComponent();
+
+                inner.OpenComponent<SelectTrigger>(10);
+                inner.AddAttribute(11, "ChildContent", (RenderFragment)(b =>
+                {
+                    b.OpenComponent<SelectValue<string>>(0);
+                    b.AddAttribute(1, "Placeholder", "Select...");
+                    b.CloseComponent();
+                }));
+                inner.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        // The label id is derived from the root id, so the replacement registers the same value the
+        // outgoing instance is about to clear.
+        var labelId = cut.Find("button").GetAttribute("aria-labelledby");
+        labelId.ShouldNotBeNullOrEmpty();
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-labelledby").ShouldBe(labelId));
+    }
 }

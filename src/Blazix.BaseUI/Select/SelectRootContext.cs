@@ -178,6 +178,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public string? LabelId { get; set; }
 
     /// <inheritdoc />
+    public RegisteredIdOwner LabelIdOwner { get; } = new();
+
+    /// <inheritdoc />
     public Func<Task> ClearHighlightsAsync { get; init; } = null!;
 
     /// <inheritdoc />

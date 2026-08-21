@@ -18,4 +18,6 @@ public interface IMenuGroupLabelContract
 
     // Element reference
     Task ExposesElementReference();
+
+    Task KeepsGroupAriaLabelledByWhenSupersededLabelUnmounts();
 }

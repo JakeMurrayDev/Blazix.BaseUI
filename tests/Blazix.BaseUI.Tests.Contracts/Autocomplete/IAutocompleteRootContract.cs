@@ -23,4 +23,6 @@ public interface IAutocompleteRootContract
     Task BothMode_ShouldUseTypedQueryForFilteringAndInlineHighlightForDisplay();
 
     Task Trigger_ShouldExposePopupStateDisabledReadonlyRequiredAndListEmptyAttributes();
+
+    Task GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts();
 }

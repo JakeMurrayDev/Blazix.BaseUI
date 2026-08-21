@@ -917,4 +917,37 @@ namespace Blazix.BaseUI.Tests.Autocomplete;
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, removeFirst => builder =>
+        {
+            builder.OpenComponent<AutocompleteGroup>(0);
+            builder.AddAttribute(1, nameof(AutocompleteGroup.ChildContent), (RenderFragment)(groupBuilder =>
+            {
+                if (!removeFirst)
+                {
+                    groupBuilder.OpenComponent<AutocompleteGroupLabel>(0);
+                    groupBuilder.SetKey("first");
+                    groupBuilder.AddAttribute(1, nameof(AutocompleteGroupLabel.Id), "label-a");
+                    groupBuilder.CloseComponent();
+                }
+
+                groupBuilder.OpenComponent<AutocompleteGroupLabel>(10);
+                groupBuilder.SetKey("second");
+                groupBuilder.AddAttribute(11, nameof(AutocompleteGroupLabel.Id), "label-b");
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+    }
 }

@@ -33,4 +33,7 @@ public interface IComboboxRootContract
     Task GroupedFiltering_ShouldStopAfterGlobalLimit();
 
     Task HiddenInputChange_ShouldBeIgnoredWhenReadOnly();
+
+    Task Label_ShouldKeepTriggerAssociationWhenLabelIsReplaced();
+    Task GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts();
 }

@@ -11,4 +11,6 @@ public interface ISelectLabelContract
     Task RegistersLabelIdInLabelableContextWhenInsideFieldRoot();
     Task EmitsFieldValidityDataAttributes();
     Task FocusesTriggerWhenClicked();
+
+    Task KeepsTriggerAriaLabelledByWhenLabelIsReplaced();
 }

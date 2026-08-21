@@ -75,7 +75,7 @@
         if (hasRegisteredId && currentId != lastRegisteredId)
         {
             lastRegisteredId = currentId;
-            GroupContext?.SetLabelId(currentId);
+            GroupContext?.SetLabelId(this, currentId);
         }
 
         BuildComponentAttributes();
@@ -87,7 +87,7 @@
         if (firstRender && !hasRegisteredId)
         {
             lastRegisteredId = ResolvedId;
-            GroupContext?.SetLabelId(lastRegisteredId);
+            GroupContext?.SetLabelId(this, lastRegisteredId);
             hasRegisteredId = true;
         }
     }
@@ -95,10 +95,10 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        if (hasRegisteredId)
-        {
-            GroupContext?.SetLabelId(null);
-        }
+        // `hasRegisteredId` only says this instance registered at some point, not that it is
+        // still the owner. Blazor initializes a replacement label before disposing this one, so the
+        // group ignores the clear unless this instance still owns the registration.
+        GroupContext?.SetLabelId(this, null);
     }
 
     private void BuildComponentAttributes()

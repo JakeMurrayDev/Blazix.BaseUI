@@ -18,9 +18,9 @@ internal sealed class ToastRootContext
 
     public bool Expanded { get; set; }
 
-    public Action<string?> SetTitleId { get; set; } = _ => { };
+    public Action<object, string?> SetTitleId { get; set; } = (_, _) => { };
 
-    public Action<string?> SetDescriptionId { get; set; } = _ => { };
+    public Action<object, string?> SetDescriptionId { get; set; } = (_, _) => { };
 
     public Action<bool, ToastSwipeDirection?> SetSwipeState { get; set; } = (_, _) => { };
 

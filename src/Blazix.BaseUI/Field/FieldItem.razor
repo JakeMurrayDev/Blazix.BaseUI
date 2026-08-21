@@ -21,6 +21,7 @@
 
 @code {
     private string? controlId;
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? labelId;
     private List<string> messageIds = [];
     private bool labelableNotifyPending;
@@ -162,8 +163,9 @@
         ScheduleLabelableStateHasChanged();
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
         if (labelId == id) return;
         labelId = id;
         ScheduleLabelableStateHasChanged();

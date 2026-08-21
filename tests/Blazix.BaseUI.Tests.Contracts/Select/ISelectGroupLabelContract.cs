@@ -23,4 +23,6 @@ public interface ISelectGroupLabelContract
 
     // Cleanup
     Task CleansUpLabelIdOnDispose();
+
+    Task KeepsGroupAriaLabelledByWhenSupersededLabelUnmounts();
 }

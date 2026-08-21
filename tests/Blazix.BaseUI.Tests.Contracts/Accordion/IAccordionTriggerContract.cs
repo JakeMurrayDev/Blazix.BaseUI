@@ -18,4 +18,6 @@ public interface IAccordionTriggerContract
     Task HasRoleButtonWhenNotNativeButton();
     Task TogglesOnClick();
     Task DisabledTriggerIgnoresClick();
+
+    Task KeepsPanelAriaLabelledByWhenTriggerIsReplaced();
 }

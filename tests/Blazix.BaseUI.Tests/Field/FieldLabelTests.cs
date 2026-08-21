@@ -114,4 +114,34 @@ public class FieldLabelTests : BunitContext, IFieldLabelContract
         field.ShouldNotBeNull();
         field.SetValue(instance, value);
     }
+
+    [Fact]
+    public async Task KeepsControlAriaLabelledByWhenLabelIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<FieldRoot>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(fieldBuilder =>
+            {
+                fieldBuilder.OpenComponent<FieldLabel>(0);
+                fieldBuilder.SetKey(swapped ? "second" : "first");
+                fieldBuilder.AddAttribute(1, "id", "field-label");
+                fieldBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Field Label")));
+                fieldBuilder.CloseComponent();
+
+                fieldBuilder.OpenComponent<FieldControl<string>>(10);
+                fieldBuilder.AddAttribute(11, "data-testid", "field-control");
+                fieldBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='field-control']").GetAttribute("aria-labelledby").ShouldBe("field-label"));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[data-testid='field-control']").GetAttribute("aria-labelledby").ShouldBe("field-label"));
+    }
 }

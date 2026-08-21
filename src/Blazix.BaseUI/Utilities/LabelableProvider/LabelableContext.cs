@@ -4,7 +4,7 @@ public sealed record LabelableContext(
     string? ControlId,
     Action<string?> SetControlId,
     string? LabelId,
-    Action<string?> SetLabelId,
+    Action<object, string?> SetLabelId,
     List<string> MessageIds,
     Action<string, bool> UpdateMessageIds)
 {
