@@ -27,6 +27,7 @@ const NoFilesBucket = "(no files)";
 // that (435 commits measured at ~66k). So the body is rendered at the largest title budget that
 // fits, degrading rather than failing to post. Every elision is stated with the compare link, and
 // the JSON output always carries every commit regardless of what the body could show.
+// 60k, not GitHub's 65,536: the workflow appends a run link after this script writes the body.
 const IssueBodyLimit = 60_000;
 const TitleBudgets = [40, 20, 10, 5, 0];
 // Buckets outside packages/react/src/ are reported for completeness, not for sweeping, so they
@@ -86,6 +87,13 @@ for (const budget of TitleBudgets) {
     if (result.issueBody.length <= IssueBodyLimit)
         break;
 }
+// Backstop. The smallest budget renders headings and counts only, which no realistic bucket count
+// pushes past the limit — but a hard cap beats a rejected post, so truncate and say so.
+if (result.issueBody.length > IssueBodyLimit) {
+    const notice = `\n\n_Digest truncated to fit the issue body limit; see the [full compare](${result.compareUrl})._\n`;
+    result.issueBody = `${result.issueBody.slice(0, IssueBodyLimit - notice.length)}${notice}`;
+    result.truncated = true;
+}
 const json = `${JSON.stringify(result, null, 2)}\n`;
 
 if (options.output)
@@ -141,11 +149,8 @@ function readPinRecord(path) {
     return record;
 }
 
-// core.quotePath=false keeps a non-ASCII path from arriving as an escaped, double-quoted string,
-// which would bucket it under a leading quote character.
 function git(args) {
-    const argv = ["-C", upstream, "-c", "core.quotePath=false", ...args];
-    return execFileSync("git", argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
+    return execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
 function isAncestor(ancestor, descendant) {
@@ -157,21 +162,24 @@ function isAncestor(ancestor, descendant) {
     }
 }
 
-// %x00 separates commit records and %x1f separates fields, so neither a subject containing a
-// newline nor a path containing spaces can be misread as a record boundary.
+// Without -z, git C-quotes any pathname holding a non-ASCII or control character, so it arrives
+// wrapped in double quotes and buckets under the quote instead of its directory. -z emits raw
+// NUL-terminated pathnames instead, which also keeps significant leading or trailing whitespace.
+// That frees NUL as a field terminator, so %x1e (record separator) delimits commits and %x1f
+// (unit separator) delimits the sha from the subject.
 function readCommits(range) {
-    const output = git(["log", "--name-only", "--format=%x00%H%x1f%s", range]);
+    const output = git(["log", "-z", "--name-only", "--format=%x1e%H%x1f%s", range]);
     return output
-        .split("\0")
+        .split("\x1e")
         .slice(1)
         .map(record => {
-            const [header, ...pathLines] = record.split("\n");
+            const [header, ...rest] = record.split("\0");
             const [sha, title] = header.split("\x1f");
-            return {
-                sha,
-                title,
-                paths: pathLines.map(line => line.trim()).filter(line => line.length > 0)
-            };
+            // git separates the formatted header from the name list with a single newline, which
+            // lands on the front of the first pathname field.
+            if (rest.length > 0 && rest[0].startsWith("\n"))
+                rest[0] = rest[0].slice(1);
+            return { sha, title, paths: rest.filter(path => path.length > 0) };
         });
 }
 

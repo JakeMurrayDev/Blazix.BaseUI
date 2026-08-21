@@ -31,6 +31,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, and gh authenticates from GH_TOKEN, so the digest job's
+          # issues: write token has no reason to sit in the local git config.
+          persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -41,11 +45,21 @@ jobs:
   digest:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    # The issue lookup and the create are separate commands, so a cron run overlapping a manual
+    # dispatch could have both find nothing and both post. Queue instead of cancelling: a run that
+    # is already mid-post should finish.
+    concurrency:
+      group: upstream-watch-digest
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Nothing here pushes, and gh authenticates from GH_TOKEN, so the digest job's
+          # issues: write token has no reason to sit in the local git config.
+          persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -75,10 +89,14 @@ jobs:
         run: |
           title="$(cat title.txt)"
           # One digest issue per month. A manual re-run inside the same month refreshes that issue
-          # instead of posting a second one; the next month's title claims its own. Listing the
-          # label rather than searching the title avoids GitHub search tokenising the em dash; the
-          # helper (shared with the parity canary) then matches the title exactly.
-          gh issue list --state all --label upstream-sync --limit 200 --json number,title > issues.json
+          # instead of posting a second one; the next month's title claims its own. The helper is
+          # shared with the parity canary and matches the title exactly.
+          # --limit paginates internally. The label is shared with cycle epics and sweep tickets,
+          # and the list comes back newest-first, so this only truncates if 1000 upstream-sync
+          # issues were opened after this month's digest. Listing the label rather than searching
+          # the title is deliberate: search indexing lags issue creation, and a lookup that misses
+          # a just-created issue posts a duplicate.
+          gh issue list --state all --label upstream-sync --limit 1000 --json number,title > issues.json
           number="$(node scripts/parity-canary-issue-number.mjs issues.json "$title")"
           if [[ -n "$number" ]]; then
             gh issue edit "$number" --body-file body.md
