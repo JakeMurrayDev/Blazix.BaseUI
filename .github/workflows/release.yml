@@ -2,7 +2,10 @@ name: Release
 
 # Tag-driven publish. Pushing a `v*` tag packs and pushes to nuget.org.
 # workflow_dispatch packs and uploads the artifacts WITHOUT publishing, so a release
-# can be rehearsed safely — NuGet publishes are immutable and cannot be undone.
+# can be rehearsed safely — NuGet publishes are immutable and cannot be undone. The
+# publish steps require github.event_name == 'push', not just a v* ref, because a manual
+# dispatch can also target a v* tag (gh workflow run --ref v1.2.3) and would otherwise
+# satisfy a ref-only check.
 #
 # Publishing uses NuGet trusted publishing (OIDC), not a long-lived API key. The
 # workflow exchanges a short-lived GitHub OIDC token for a temporary nuget.org key.
@@ -77,7 +80,7 @@ jobs:
           if-no-files-found: error
 
       - name: Check the nuget.org user name is configured
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           NUGET_USER: ${{ secrets.NUGET_USER }}
         run: |
@@ -89,7 +92,7 @@ jobs:
       # Temporary keys are valid for one hour, so log in immediately before pushing.
       - name: NuGet login (OIDC to short-lived API key)
         id: login
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         # Pinned to a commit SHA, not the mutable v1 tag: this step mints a live nuget.org
         # publishing key, so a repointed tag would run unreviewed code with that access.
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
@@ -97,7 +100,7 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Publish to nuget.org
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         working-directory: artifacts
         env:
           NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
