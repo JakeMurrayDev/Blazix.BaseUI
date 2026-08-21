@@ -38,7 +38,7 @@ the `v0.1.0-preview.1` tag has published successfully.
 
 - **Breaking:** `LabelableContext.SetLabelId` now takes the registering component instance
   alongside the id (`Action<object, string?>` instead of `Action<string?>`)
-  ([#225](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/225)).
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 
   Blazor initializes a replacement component before disposing the outgoing one, so a label that
   cleared its registration on dispose could drop its replacement's registration and leave the
@@ -72,17 +72,17 @@ Cycle-1 upstream parity sweep — behavioral gaps against upstream Base UI, by c
 - **All components with registered ids** — replacing a label, a toast title or description, an
   accordion trigger, or a collapsible panel no longer drops the accessible name or leaves
   `aria-controls` pointing at a removed element
-  ([#225](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/225)).
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 - **Menu** — a submenu trigger now opens on an Android TalkBack press instead of waiting for hover
   that a screen reader never produces
-  ([#225](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/225)).
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 - **Select / Combobox / Autocomplete / Menu** — in Safari, scrolling a list under a stationary
   pointer no longer drags the highlight onto whichever item slides under the cursor; a read-only
   Select no longer highlights on hover
-  ([#225](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/225)).
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 - **Shared floating layer / Select** — a popup no longer returns focus with a visible focus ring
   left over from a previous open session
-  ([#225](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/225)).
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 
 ### Known issues
 
