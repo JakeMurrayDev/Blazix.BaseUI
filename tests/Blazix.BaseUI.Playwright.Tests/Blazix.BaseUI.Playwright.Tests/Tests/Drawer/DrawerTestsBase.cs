@@ -292,6 +292,73 @@ public abstract class DrawerTestsBase : TestBase
     }
 
     [Fact]
+    public async Task PinnedPointerMoveKeepsSnapPointDragStyles()
+    {
+        await NavigateAsync(CreateUrl("/tests/drawer")
+            .WithDefaultOpen(true)
+            .WithSnapPoints(true));
+        await WaitForDrawerOpenAsync();
+
+        var popup = GetByTestId("drawer-popup");
+
+        // `data-starting-style` clears before the open transition finishes, so the popup is still
+        // sliding when it is measured. Wait for the snap-point machinery to be wired up and for the
+        // popup box to hold still, otherwise the drag starts at coordinates the popup has left.
+        await Page.WaitForFunctionAsync(
+            """
+            () => {
+                const el = document.querySelector('[data-testid="drawer-popup"]');
+                if (el == null) {
+                    return false;
+                }
+                const offset = Number.parseFloat(
+                    getComputedStyle(el).getPropertyValue('--drawer-snap-point-offset'));
+                if (!Number.isFinite(offset)) {
+                    return false;
+                }
+                const top = Math.round(el.getBoundingClientRect().top);
+                if (window.__drawerSettleTop === top) {
+                    window.__drawerSettleFrames = (window.__drawerSettleFrames || 0) + 1;
+                } else {
+                    window.__drawerSettleTop = top;
+                    window.__drawerSettleFrames = 0;
+                }
+                return window.__drawerSettleFrames >= 3;
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = 5000 * TimeoutMultiplier });
+
+        var titleBox = await GetByTestId("drawer-title").BoundingBoxAsync();
+        Assert.NotNull(titleBox);
+
+        var startX = titleBox!.X + titleBox.Width / 2;
+        var startY = titleBox.Y + titleBox.Height / 2;
+        await Page.Mouse.MoveAsync(startX, startY);
+        await Page.Mouse.DownAsync();
+        await Page.Mouse.MoveAsync(startX, startY - 200, new MouseMoveOptions { Steps = 10 });
+
+        // The drag must be live before the pinned move means anything. Gate on the movement
+        // variable rather than `data-swiping`, which only lands after a .NET round trip.
+        var movementBefore = await popup.EvaluateAsync<string>(
+            "element => element.style.getPropertyValue('--drawer-swipe-movement-y')");
+        Assert.EndsWith("px", movementBefore);
+
+        // A move that leaves the drag offset unchanged must not reinstate the raw frozen
+        // transform: the snap-point correction runs from the progress callback, which dedupes
+        // unchanged deltas away and so cannot undo it.
+        await Page.Mouse.MoveAsync(startX, startY - 200);
+
+        var transform = await popup.EvaluateAsync<string>("element => element.style.transform");
+        var movementAfter = await popup.EvaluateAsync<string>(
+            "element => element.style.getPropertyValue('--drawer-swipe-movement-y')");
+        await Page.Mouse.UpAsync();
+
+        Assert.Equal(string.Empty, transform);
+        Assert.Equal(movementBefore, movementAfter);
+    }
+
+    [Fact]
     public async Task SwipeAreaCanRegrabDuringDismissTransition()
     {
         await NavigateAsync(CreateUrl("/tests/drawer").WithDefaultOpen(true));

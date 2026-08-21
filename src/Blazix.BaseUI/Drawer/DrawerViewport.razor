@@ -361,7 +361,8 @@
                 DrawerContext.SnapToSequentialPoints,
                 DrawerContext.SnapPoints?.Select(static point => point.ToString()).ToArray(),
                 DrawerContext.ActiveSnapPoint?.ToString(),
-                Context.Nested);
+                Context.Nested,
+                Context.Modal == DialogModalMode.True);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
         {
