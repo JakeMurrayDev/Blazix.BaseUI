@@ -141,8 +141,11 @@ function readPinRecord(path) {
     return record;
 }
 
+// core.quotePath=false keeps a non-ASCII path from arriving as an escaped, double-quoted string,
+// which would bucket it under a leading quote character.
 function git(args) {
-    return execFileSync("git", ["-C", upstream, ...args], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
+    const argv = ["-C", upstream, "-c", "core.quotePath=false", ...args];
+    return execFileSync("git", argv, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).trim();
 }
 
 function isAncestor(ancestor, descendant) {

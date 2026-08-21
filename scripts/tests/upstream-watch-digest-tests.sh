@@ -38,6 +38,8 @@ commit "[menu] Fix submenu hover" "packages/react/src/menu/submenu/SubmenuTrigge
 commit "[menu][popups] Share the dismissal listener" \
     "packages/react/src/menu/MenuPopup.tsx" "packages/react/src/utils/popups/dismiss.ts"
 commit "[docs] Rewrite the menu page" "docs/src/app/menu/page.mdx"
+# git quotes non-ASCII paths unless core.quotePath is off, which would bucket the leading quote.
+commit "[combobox] Fix accented filtering" "packages/react/src/combobox/utils/café.ts"
 # A two-segment path: the bucket is the top-level directory, not the file.
 commit "Bump docs dependencies" "docs/package.json"
 commit "Bump the lockfile" "pnpm-lock.yaml"
@@ -64,7 +66,9 @@ $assertion" "$output"
 # The watch only reports: a non-empty delta must never be signalled as a failure.
 digest
 assert_json "
-    if (result.commitCount !== 8) throw new Error('expected 8 new commits, got ' + result.commitCount);
+    if (result.commitCount !== 9) throw new Error('expected 9 new commits, got ' + result.commitCount);
+    if (bucket('combobox')?.commitCount !== 1) throw new Error('a non-ASCII path must bucket by directory, not by a quote character');
+    if (result.buckets.some(entry => entry.bucket.startsWith('\"'))) throw new Error('a bucket name was built from a quoted path');
     if (result.buckets[0].bucket !== 'shared') throw new Error('shared bucket must sort first');
     if (result.buckets[0].kind !== 'shared') throw new Error('shared bucket must be kind shared');
 "
