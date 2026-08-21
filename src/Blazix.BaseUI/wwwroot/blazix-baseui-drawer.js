@@ -37,12 +37,23 @@ const MIN_SWIPE_RELEASE_DURATION_MS = 80;
 const MAX_SWIPE_RELEASE_DURATION_MS = 360;
 const MIN_SWIPE_RELEASE_SCALAR = 0.1;
 const MAX_SWIPE_RELEASE_SCALAR = 1;
+const AXIS_LOCK_SLOP = 6;
+const AXIS_LOCK_BIAS = 2;
 const DEFAULT_SWIPE_OPEN_RATIO = 0.5;
 const VELOCITY_THRESHOLD = 0.1;
 const FALLBACK_SWIPE_OPEN_THRESHOLD = 40;
 const KEYBOARD_RESIZE_THRESHOLD = 60;
 const KEYBOARD_VISIBILITY_MARGIN = 16;
 const KEYBOARD_SCROLL_SLACK = 48;
+// Cadence of the settle-watching realign passes after focus moves with the keyboard open:
+// long enough for a smooth scroll to show progress between passes, short enough to recover
+// quickly from a scroll canceled by WebKit's reveal; the pass count covers CSS transitions
+// reacting to the focus change (e.g. a 260ms footer resize) with room to spare.
+const KEYBOARD_REALIGN_INTERVAL = 150;
+const KEYBOARD_REALIGN_MAX_PASSES = 4;
+// Frames the alignment waits for the scroll destination to stop moving (layout reacting to
+// the focus change, e.g. a footer resizing over a CSS transition) before scrolling anyway.
+const KEYBOARD_SETTLE_FRAME_LIMIT = 60;
 const INPUT_TAP_MOVE_THRESHOLD = 10;
 const INPUT_TAP_HIT_SLOP = 16;
 const KEYBOARD_INPUT_TYPES = new Set(['email', 'number', 'password', 'search', 'tel', 'text', 'url']);
@@ -80,6 +91,7 @@ function createRoot(rootId) {
         frontmostHeight: 0,
         hasNestedDrawer: false,
         nested: false,
+        modal: true,
         nestedOpenDialogCount: 0,
         transitionEnding: false,
         swiping: false,
@@ -339,10 +351,12 @@ export function updateViewport(
     snapToSequentialPoints,
     snapPoints,
     activeSnapPoint,
-    nested
+    nested,
+    modal
 ) {
     const root = getRoot(rootId);
     root.nested = !!nested;
+    root.modal = !!modal;
     root.isOpen = !!open;
     root.mounted = !!mounted;
     root.swipeDirection = swipeDirection || 'down';
@@ -579,7 +593,7 @@ function setupViewport(root) {
             return;
         }
 
-        const target = getElementAtPoint(doc, event.clientX, event.clientY);
+        const target = getElementAtPoint(element.getRootNode(), event.clientX, event.clientY);
         if (isSwipeIgnoredTarget(target) || isDrawerContentTarget(target) || event.pointerType === 'touch') {
             return;
         }
@@ -607,7 +621,7 @@ function setupViewport(root) {
             return;
         }
 
-        const pointTarget = getElementAtPoint(doc, touch.clientX, touch.clientY);
+        const pointTarget = getElementAtPoint(element.getRootNode(), touch.clientX, touch.clientY);
         const eventTarget = getEventTarget(event);
         const target = eventTarget instanceof Element ? eventTarget : null;
         if (target && !contains(element, target)) {
@@ -641,7 +655,8 @@ function setupViewport(root) {
             scrollTarget,
             hasCrossAxisScrollableContent,
             allowSwipe,
-            preserveNativeCrossAxisScroll: false
+            preserveNativeCrossAxisScroll: false,
+            drawerAxisAttributed: false
         };
         root.dismissSwipe?.start(event, element);
     };
@@ -664,7 +679,7 @@ function setupViewport(root) {
     };
 
     const onTouchEnd = (event) => {
-        virtualKeyboardTouchEnd(root, event, element);
+        virtualKeyboardTouchEnd(root, event);
         root.dismissSwipe?.end(event, element);
         resetTouchTrackingState(root);
     };
@@ -722,7 +737,7 @@ function createViewportSwipeOptions(root) {
             }
 
             const doc = popup.ownerDocument;
-            const target = getElementAtPoint(doc, position.x, position.y);
+            const target = getElementAtPoint(popup.getRootNode(), position.x, position.y);
             if (!target || !contains(popup, target)) {
                 return false;
             }
@@ -1148,8 +1163,20 @@ function createSwipeDismiss(options) {
             if (hasVertical) offsetY += damped.y;
         }
 
+        // Only rewrite drag styles when the drag offset actually changed. `syncDragStyles` writes the
+        // raw frozen transform and movement vars, relying on the consumer's `onProgress` to
+        // overwrite them with snap-point-corrected styles -- but `updateProgress` dedupes unchanged
+        // deltas and skips `onProgress`. A move that doesn't change the offset (e.g. the cursor
+        // pinned at a screen edge during an off-screen drag, jittering only on the ignored axis)
+        // would otherwise reinstate the raw styles with no correction, jumping the element to the
+        // uncorrected position.
+        const previousOffset = stateRef.dragOffset;
+        const offsetChanged = offsetX !== previousOffset.x || offsetY !== previousOffset.y;
+
         stateRef.dragOffset = { x: offsetX, y: offsetY };
-        syncDragStyles(true);
+        if (offsetChanged) {
+            syncDragStyles(true);
+        }
         recordSample(stateRef.dragOffset, event.timeStamp);
 
         const dragDeltaX = offsetX - stateRef.initialTransform.x;
@@ -1468,7 +1495,15 @@ function releaseViewportSwipe(root, details) {
         return shouldClose;
     }
 
-    if (isHorizontal(root.swipeDirection) || !root.popupHeight) {
+    // An unmeasured popup cannot resolve a snap target, so the release must snap back rather than
+    // fall through to the generic distance threshold, which would dismiss the drawer.
+    if (!root.popupHeight) {
+        clearSwipeRelease(root);
+        notifyFinalProgress(root, 0);
+        return false;
+    }
+
+    if (isHorizontal(root.swipeDirection)) {
         clearSwipeRelease(root);
         notifyFinalProgress(root, 0);
         return undefined;
@@ -2148,7 +2183,7 @@ function processViewportTouchMove(root, event, touchState, touch, element) {
     ) {
         return;
     }
-    if (preserveNativeCrossAxisScrollOnMove(touchState, touch, vertical)) {
+    if (shouldYieldTouchMove(touchState, event, touch, vertical)) {
         return;
     }
 
@@ -2461,25 +2496,102 @@ function syncVirtualKeyboard(root) {
         touchStart: null,
         focusedTarget: null,
         adjustment: null,
-        frame: 0
+        frame: 0,
+        programmaticFocus: false,
+        baseScroll: null
     };
+
+    // Alignment scroll bookkeeping: destination stability, whether a scroll was issued, and the
+    // last observed progress so delayed passes can distinguish moving from stalled.
+    let scrollElement = null;
+    let scrollDestination = 0;
+    let scrollChecks = 0;
+    let scrollObserved = -1;
+    let realignTimeout = 0;
+    let restorePreemptedFocus = null;
+
+    // WebKit's native reveal scroll can move the page even while the scroll lock hides overflow
+    // (e.g. when the software keyboard's previous/next field arrows move focus). While the drawer
+    // is modal, any window scroll during keyboard interaction is spurious, so pin the page to the
+    // position it had when the drawer opened. This module rebuilds the listener set far more often
+    // than upstream re-runs its effect, so the baseline is only re-captured while the keyboard is
+    // down -- re-capturing mid-interaction would pin the page to a reveal-scrolled position.
+    if (!keyboardState.baseScroll || getKeyboardVisualViewport(win) === null) {
+        keyboardState.baseScroll = { x: win.scrollX, y: win.scrollY };
+    }
 
     const resetInset = () => element.style.setProperty('--drawer-keyboard-inset', '0px');
     const restoreAdjustment = () => restoreKeyboardScrollAdjustment(keyboardState);
+    const clearRealignTimeout = () => {
+        clearTimeout(realignTimeout);
+        realignTimeout = 0;
+    };
     const clearFocused = () => {
         keyboardState.focusedTarget = null;
+        scrollElement = null;
         resetInset();
         restoreAdjustment();
         cancelAnimationFrame(keyboardState.frame);
         keyboardState.frame = 0;
+        clearRealignTimeout();
+    };
+    const restoreWindowScroll = () => {
+        const base = keyboardState.baseScroll;
+        if (
+            root.modal !== true ||
+            isVirtualKeyboardSuspended(root) ||
+            !keyboardState.focusedTarget ||
+            !base ||
+            getKeyboardVisualViewport(win) === null
+        ) {
+            return false;
+        }
+        if (win.scrollX !== base.x || win.scrollY !== base.y) {
+            // Force an instant jump: the two-argument form defaults `behavior` to `auto`, which
+            // obeys the page's `scroll-behavior`, so a global `scroll-behavior: smooth` would
+            // animate the restore. The measurements that follow assume the page is already back at
+            // rest, and a smooth restore also re-emits `scroll`, re-entering this handler.
+            win.scrollTo({ left: base.x, top: base.y, behavior: 'instant' });
+            return true;
+        }
+        return false;
+    };
+    const consumePreemptedFocus = () => {
+        restorePreemptedFocus?.();
+        restorePreemptedFocus = null;
+    };
+    // Focus moved by the drawer itself goes through `focusKeyboardInputWithoutPageScroll`, but
+    // native focus changes (the iOS keyboard's previous/next field arrows) commit WebKit's reveal
+    // scroll before `focusin` reaches us -- cancelling it afterwards visibly jitters the sheet.
+    // `focusout` on the outgoing field fires before focus lands, so override the incoming field's
+    // geometry there and restore it in `focusin`.
+    const preemptFocusReveal = (target, viewport) => {
+        consumePreemptedFocus();
+        // Native focus carries no preventScroll, so a fake off-screen rect would make WebKit scroll
+        // the drawer's own scroll containers thousands of pixels chasing it. Presenting the field
+        // as already centered in the visible band above the keyboard instead makes both the in-page
+        // reveal and the viewport pan no-ops.
+        const rect = target.getBoundingClientRect();
+        restorePreemptedFocus = overrideGeometryDuringFocus(
+            target,
+            (viewport.top + viewport.bottom - rect.top - rect.bottom) / 2
+        );
     };
     const align = () => {
+        // If focus never lands on a preempted target, the focusout-scheduled alignment still
+        // restores it on the next frame before paint.
+        consumePreemptedFocus();
+
         const target = keyboardState.focusedTarget;
         if (isVirtualKeyboardSuspended(root) || !target || !contains(element, target)) {
             resetInset();
             restoreAdjustment();
             return;
         }
+        // Undo any reveal scroll WebKit applied to the locked page before measuring, so the
+        // keyboard inset and alignment are computed against the resting viewport.
+        restoreWindowScroll();
+
         const viewport = getKeyboardVisualViewport(win);
         if (!viewport) {
             resetInset();
@@ -2513,21 +2625,78 @@ function syncVirtualKeyboard(root) {
             return;
         }
         const targetRect = target.getBoundingClientRect();
-        const targetCenter = (targetRect.top + targetRect.bottom) / 2;
-        const visibleCenter = (visibleTop + visibleBottom) / 2;
-        const nextScrollTop = clamp(
-            scrollTarget.scrollTop + targetCenter - visibleCenter,
+        const destination = Math.round(clamp(
+            scrollTarget.scrollTop + (targetRect.top + targetRect.bottom - visibleTop - visibleBottom) / 2,
             0,
             maxScrollTop
-        );
+        ));
+        const settled = scrollElement === scrollTarget &&
+            Math.abs(scrollDestination - destination) <= 1;
+
+        if (!settled) {
+            // Commit the scroll only once the destination holds across two consecutive checks.
+            // Layout may still be reacting to the focus change (e.g. a footer sized by
+            // `:focus-within` resizing over a transition), and scrolling toward a mid-transition
+            // destination overshoots, then visibly pulls back once corrected. The destination is
+            // scroll-position-invariant, so an in-flight scroll of the container itself never
+            // defers the commit.
+            const checks = scrollElement === scrollTarget ? scrollChecks + 1 : 1;
+            scrollElement = scrollTarget;
+            scrollDestination = destination;
+            scrollChecks = checks;
+            scrollObserved = -1;
+            // Re-check next frame; give up and scroll anyway if layout never settles.
+            if (checks <= KEYBOARD_SETTLE_FRAME_LIMIT) {
+                schedule();
+                return;
+            }
+        } else if (scrollObserved >= 0) {
+            // A scroll toward this destination is already out. Leave it alone while it has arrived
+            // or is still progressing -- re-issuing restarts the smooth-scroll easing curve, a
+            // visible stutter on every realign pass -- and re-issue only when it stalled short
+            // (WebKit cancels in-flight smooth scrolls when its native reveal for the focus
+            // resolves).
+            const current = scrollTarget.scrollTop;
+            if (Math.abs(current - destination) <= 1) {
+                return;
+            }
+            if (current !== scrollObserved) {
+                scrollObserved = current;
+                return;
+            }
+        }
+
+        scrollElement = scrollTarget;
+        scrollDestination = destination;
+        scrollChecks = 0;
+        scrollObserved = scrollTarget.scrollTop;
         const behavior = win.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
             ? 'auto'
             : 'smooth';
-        scrollTarget.scrollTo({ top: nextScrollTop, behavior });
+        scrollTarget.scrollTo({ top: destination, behavior });
     };
     const schedule = () => {
         cancelAnimationFrame(keyboardState.frame);
         keyboardState.frame = requestAnimationFrame(align);
+    };
+    // When focus moves with the keyboard already up, no viewport resize events follow to re-run
+    // alignment, and the single frame-scheduled pass is unreliable: WebKit resolves the reveal for
+    // the focus asynchronously (a UI-process round trip) and cancels any in-flight scroll the pass
+    // started when it lands, and layout reacting to the focus change (e.g. a footer sized by
+    // `:focus-within` and the keyboard inset) settles only after its transition, so the pass
+    // measures stale geometry. Re-align on an interval until both settle; the alignment's scroll
+    // bookkeeping observes before re-issuing, so passes that find the scroll on course are inert.
+    const scheduleDelayedRealign = () => {
+        let remainingPasses = KEYBOARD_REALIGN_MAX_PASSES;
+        const realign = () => {
+            align();
+            remainingPasses -= 1;
+            realignTimeout = remainingPasses > 0
+                ? setTimeout(realign, KEYBOARD_REALIGN_INTERVAL)
+                : 0;
+        };
+        clearRealignTimeout();
+        realignTimeout = setTimeout(realign, KEYBOARD_REALIGN_INTERVAL);
     };
     const capture = (target) => {
         if (isVirtualKeyboardSuspended(root)) {
@@ -2537,29 +2706,89 @@ function syncVirtualKeyboard(root) {
         if (!resolved || !contains(element, resolved)) {
             return false;
         }
+        // A new field starts a fresh alignment; the scroll bookkeeping must not carry over from the
+        // previous field's scroll.
+        if (keyboardState.focusedTarget !== resolved) {
+            scrollElement = null;
+        }
         keyboardState.focusedTarget = resolved;
         return true;
     };
     const onFocusIn = (event) => {
-        if (capture(getEventTarget(event))) {
-            schedule();
+        // The programmatic transition is over once focus lands, which happens before `.focus()`
+        // returns. Any later `focusout` is the consumer's own -- a focus handler that blurs or
+        // moves focus -- and must be reconciled rather than suppressed, so stop suppressing here
+        // instead of waiting for the focus call to return.
+        keyboardState.programmaticFocus = false;
+        consumePreemptedFocus();
+
+        if (!capture(getEventTarget(event))) {
+            // Focus landed outside any drawer keyboard input. The `focusout` on the previous field
+            // normally clears the tracked target, but the tap path suppresses that `focusout` via
+            // the programmatic flag, so a consumer focus handler that redirects focus out of the
+            // drawer would otherwise leave a stale target holding its inset, slack and pending
+            // realign. Reconcile against the real focus here. A handler that ends focus entirely
+            // emits no `focusin` to reconcile from; that case is covered by clearing the
+            // suppression flag above so its `focusout` is handled.
+            if (keyboardState.focusedTarget) {
+                clearFocused();
+            }
+            return;
         }
+        // Covers every way focus can land with the keyboard already up: native moves (the
+        // keyboard's previous/next arrows) and the tap path (which suppresses `focusout` handling
+        // via the programmatic flag).
+        if (getKeyboardVisualViewport(win) !== null) {
+            scheduleDelayedRealign();
+        }
+        schedule();
     };
     const onFocusOut = (event) => {
-        if (capture(event.relatedTarget)) {
-            schedule();
-        } else {
-            clearFocused();
+        // The blur inside `focusKeyboardInputWithoutPageScroll` is followed synchronously by a
+        // re-focus; clearing state here would drop the keyboard inset for a frame.
+        if (keyboardState.programmaticFocus) {
+            return;
         }
+        if (capture(event.relatedTarget)) {
+            const target = keyboardState.focusedTarget;
+            const viewport = getKeyboardVisualViewport(win);
+            // The delayed realign passes are scheduled by the `focusin` that follows once focus
+            // lands on the captured target.
+            if (target && viewport) {
+                preemptFocusReveal(target, viewport);
+            }
+            schedule();
+            return;
+        }
+        clearFocused();
     };
     const onViewportUpdate = () => {
         if (keyboardState.focusedTarget || capture(doc.activeElement)) {
             schedule();
         }
     };
+    const onWindowScroll = () => {
+        if (restoreWindowScroll()) {
+            // Recompute the keyboard inset once the page is back at rest; measurements taken
+            // mid-reveal (a non-zero visual viewport offset) inflate it and push the popup up.
+            schedule();
+        }
+    };
+    // Once the user puts a finger down they own the scroll position. Stop both the frame settle
+    // loop, which can center after changing layout settles, and the delayed passes, which can't
+    // distinguish a user scroll from a reveal scroll WebKit canceled. A later focus or viewport
+    // change reschedules alignment if it's still needed.
+    const onPointerDownCancelRealign = () => {
+        cancelAnimationFrame(keyboardState.frame);
+        keyboardState.frame = 0;
+        clearRealignTimeout();
+        scrollElement = null;
+    };
 
     doc.addEventListener('focusin', onFocusIn, { signal, capture: true });
     doc.addEventListener('focusout', onFocusOut, { signal, capture: true });
+    doc.addEventListener('pointerdown', onPointerDownCancelRealign, { signal, capture: true });
+    win.addEventListener('scroll', onWindowScroll, { signal });
     visualViewport?.addEventListener('resize', onViewportUpdate, { signal });
     visualViewport?.addEventListener('scroll', onViewportUpdate, { signal });
     if (capture(doc.activeElement)) {
@@ -2568,11 +2797,11 @@ function syncVirtualKeyboard(root) {
 
     root.virtualKeyboardCleanup = () => {
         abortController.abort();
+        consumePreemptedFocus();
         clearFocused();
         element.style.removeProperty('--drawer-keyboard-inset');
     };
 }
-
 function cleanupVirtualKeyboard(root) {
     root.virtualKeyboardCleanup?.();
     root.virtualKeyboardCleanup = null;
@@ -2610,7 +2839,7 @@ function virtualKeyboardTouchMove(root, event) {
     }
 }
 
-function virtualKeyboardTouchEnd(root, event, currentTarget) {
+function virtualKeyboardTouchEnd(root, event) {
     const keyboardState = root.virtualKeyboardState;
     const rootElement = root.viewportElement;
     if (
@@ -2627,10 +2856,10 @@ function virtualKeyboardTouchEnd(root, event, currentTarget) {
     }
 
     const touch = event.changedTouches[0] ?? event.touches[0];
-    const doc = currentTarget.ownerDocument;
+    const rootNode = rootElement.getRootNode();
     const nativeTarget = getEventTarget(event);
     const pointTarget = touch
-        ? resolveKeyboardTouchTargetFromPoint(doc, touch.clientX, touch.clientY)
+        ? resolveKeyboardTouchTargetFromPoint(rootNode, touch.clientX, touch.clientY)
         : null;
     if (pointTarget === KEYBOARD_TAP_BLOCKED) {
         virtualKeyboardTouchCancel(root);
@@ -2662,7 +2891,16 @@ function virtualKeyboardTouchEnd(root, event, currentTarget) {
         if (event.cancelable) {
             event.preventDefault();
         }
-        focusKeyboardInputWithoutPageScroll(focusTarget);
+        // The flag suppresses the `focusout` cleanup the intermediate blur would otherwise
+        // trigger, so the keyboard inset isn't dropped for a frame between the blur and the
+        // re-focus. It is cleared by the `focusin` that lands, so only that blur is suppressed;
+        // the `finally` is the backstop for a target that never takes focus.
+        keyboardState.programmaticFocus = true;
+        try {
+            focusKeyboardInputWithoutPageScroll(focusTarget);
+        } finally {
+            keyboardState.programmaticFocus = false;
+        }
         dispatchKeyboardClick(keyboardTarget.clickTarget, touch);
     }
     virtualKeyboardTouchCancel(root);
@@ -2756,8 +2994,8 @@ function getContentEditableHost(element) {
     return host;
 }
 
-function resolveKeyboardTouchTargetFromPoint(doc, x, y) {
-    const exact = getElementAtPoint(doc, x, y);
+function resolveKeyboardTouchTargetFromPoint(root, x, y) {
+    const exact = getElementAtPoint(root, x, y);
     const focusTarget = resolveKeyboardInputTarget(exact);
     if (focusTarget) {
         return {
@@ -2774,7 +3012,7 @@ function resolveKeyboardTouchTargetFromPoint(doc, x, y) {
         [INPUT_TAP_HIT_SLOP, 0],
         [-INPUT_TAP_HIT_SLOP, 0]
     ]) {
-        const target = resolveKeyboardInputTarget(getElementAtPoint(doc, x + offsetX, y + offsetY));
+        const target = resolveKeyboardInputTarget(getElementAtPoint(root, x + offsetX, y + offsetY));
         if (target) {
             return { focusTarget: target, clickTarget: target };
         }
@@ -2797,20 +3035,33 @@ function dispatchKeyboardClick(target, touch) {
 
 function focusKeyboardInputWithoutPageScroll(target) {
     const wasFocused = target.ownerDocument.activeElement === target;
+    // iOS Safari can still scroll the page for transformed sheets even with preventScroll.
+    // Move the input off-screen only for the synchronous focus call; `preventScroll` suppresses
+    // the in-page ancestor scrolling that would otherwise chase the fake rect.
+    const restoreStyles = overrideGeometryDuringFocus(target, -2000);
+    try {
+        if (wasFocused) target.blur();
+        target.focus({ preventScroll: true });
+    } finally {
+        restoreStyles();
+    }
+}
+
+// Overrides the painted geometry WebKit samples when an element gains focus. The rect is hidden
+// (opacity) rather than detached so layout is unaffected; the caller must restore synchronously
+// before the next paint.
+function overrideGeometryDuringFocus(target, translateY) {
     const previousOpacity = target.style.opacity;
     const previousTransform = target.style.transform;
     const previousTransition = target.style.transition;
     target.style.transition = 'none';
     target.style.opacity = '0';
-    target.style.transform = 'translateY(-2000px)';
-    try {
-        if (wasFocused) target.blur();
-        target.focus({ preventScroll: true });
-    } finally {
+    target.style.transform = `translateY(${translateY}px)`;
+    return () => {
         target.style.opacity = previousOpacity;
         target.style.transform = previousTransform;
         target.style.transition = previousTransition;
-    }
+    };
 }
 
 function findKeyboardScrollTarget(target, root) {
@@ -2909,12 +3160,28 @@ function canSwipeFromPendingScrollEdge(scrollTarget, deltaX, deltaY, directions)
     return null;
 }
 
-function preserveNativeCrossAxisScrollOnMove(touchState, touch, vertical) {
+// Arbitrates a touchmove between the drawer swipe and a native cross-axis scroll.
+// Returns `true` when the move must be left alone -- either because the cross axis already won the
+// gesture, or because neither axis has passed the slop yet and the gesture cannot be attributed.
+function shouldYieldTouchMove(touchState, event, touch, vertical) {
     if (touchState.preserveNativeCrossAxisScroll) {
         return true;
     }
-    if (touchState.allowSwipe === true || !touchState.hasCrossAxisScrollableContent) {
+    // Attribution happens once per gesture. Re-arbitrating after the drawer axis has won would let
+    // the pre-attribution branches below fire mid-drag (the slop is measured from the touch origin,
+    // which is never re-baselined), freezing the popup and dropping `preventDefault()`.
+    if (
+        touchState.drawerAxisAttributed ||
+        touchState.allowSwipe === true ||
+        !touchState.hasCrossAxisScrollableContent
+    ) {
         return false;
+    }
+    // A non-cancelable touchmove means the browser has already committed the gesture to a native
+    // scroll; claiming it for the swipe would drag the popup alongside the scrolling content.
+    if (!event.cancelable) {
+        touchState.preserveNativeCrossAxisScroll = true;
+        return true;
     }
     const drawerDelta = vertical
         ? touch.clientY - touchState.startY
@@ -2922,10 +3189,20 @@ function preserveNativeCrossAxisScrollOnMove(touchState, touch, vertical) {
     const crossDelta = vertical
         ? touch.clientX - touchState.startX
         : touch.clientY - touchState.startY;
-    if (Math.abs(crossDelta) < 6 || Math.abs(crossDelta) <= Math.abs(drawerDelta) + 2) {
+    const absDrawerDelta = Math.abs(drawerDelta);
+    const absCrossDelta = Math.abs(crossDelta);
+    if (absCrossDelta >= AXIS_LOCK_SLOP && absCrossDelta > absDrawerDelta + AXIS_LOCK_BIAS) {
+        touchState.preserveNativeCrossAxisScroll = true;
+        return true;
+    }
+    if (absDrawerDelta >= AXIS_LOCK_SLOP) {
+        touchState.drawerAxisAttributed = true;
         return false;
     }
-    touchState.preserveNativeCrossAxisScroll = true;
+    // Neither axis has traveled past the slop yet, so the gesture cannot be attributed. Leave the
+    // event alone: on iOS, `preventDefault()` on the first cancelable touchmove cancels native
+    // scrolling for the entire gesture, which would lock a cross-axis scroll that only passes the
+    // slop on a later move.
     return true;
 }
 
@@ -3016,13 +3293,15 @@ function isInteractiveElement(target) {
     );
 }
 
-function getElementAtPoint(doc, x, y) {
-    return typeof doc?.elementFromPoint === 'function' ? doc.elementFromPoint(x, y) : null;
+// `Document.elementFromPoint` retargets shadow content to the shadow host, which then fails
+// `contains()` checks against a popup inside that shadow root, so callers pass `getRootNode()`
+// (a document or a shadow root) rather than the owner document.
+function getElementAtPoint(root, x, y) {
+    return typeof root?.elementFromPoint === 'function' ? root.elementFromPoint(x, y) : null;
 }
 
 function getTargetAtPoint(element, position, event) {
-    const doc = element?.ownerDocument || document;
-    return getElementAtPoint(doc, position.x, position.y) ?? getEventTarget(event);
+    return getElementAtPoint(element?.getRootNode(), position.x, position.y) ?? getEventTarget(event);
 }
 
 function getEventTarget(event) {
