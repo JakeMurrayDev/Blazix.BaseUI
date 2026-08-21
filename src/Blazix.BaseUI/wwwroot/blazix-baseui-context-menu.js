@@ -38,7 +38,7 @@ export function initializeContextMenu(rootId, triggerElement, virtualAnchorEleme
   root.contextMenuHandler = (e) => handleContextMenu(rootId, e);
   root.touchStartHandler = (e) => handleTouchStart(rootId, e);
   root.touchMoveHandler = (e) => handleTouchMove(rootId, e);
-  root.touchEndHandler = () => handleTouchEnd(rootId);
+  root.touchEndHandler = () => cancelLongPress(root);
 
   // While the context menu is open, a right-click inside the trigger re-anchors the menu
   // to the new cursor (handled by the contextmenu event below) and must NOT dismiss it.
@@ -369,23 +369,28 @@ function handleTouchStart(rootId, event) {
   if (!root) return;
 
   if (root.disabled) {
+    cancelLongPress(root);
     return;
   }
 
-  if (event.touches.length !== 1) return;
+  if (event.touches.length !== 1) {
+    cancelLongPress(root);
+    return;
+  }
 
   event.stopPropagation();
 
   const touch = event.touches[0];
-  root.touchPosition = { x: touch.clientX, y: touch.clientY };
+  const touchPosition = { x: touch.clientX, y: touch.clientY };
+  root.touchPosition = touchPosition;
 
   root.longPressTimeoutId = setTimeout(() => {
     root.longPressTimeoutId = null;
-    if (!root.touchPosition || root.disabled) {
+    if (root.disabled) {
       return;
     }
 
-    const { x, y } = root.touchPosition;
+    const { x, y } = touchPosition;
     root.initialCursorPoint = { x, y };
     positionVirtualAnchor(root, x, y, true);
     root.dotNetRef.invokeMethodAsync('OnContextMenu', x, y, true);
@@ -394,24 +399,25 @@ function handleTouchStart(rootId, event) {
 
 function handleTouchMove(rootId, event) {
   const root = state.roots.get(rootId);
-  if (!root || root.disabled || root.longPressTimeoutId === null || !root.touchPosition) return;
+  if (!root) return;
 
-  if (event.touches.length !== 1) return;
+  if (event.touches.length !== 1) {
+    cancelLongPress(root);
+    return;
+  }
+
+  if (root.disabled || root.longPressTimeoutId === null || !root.touchPosition) return;
 
   const touch = event.touches[0];
   const deltaX = Math.abs(touch.clientX - root.touchPosition.x);
   const deltaY = Math.abs(touch.clientY - root.touchPosition.y);
 
   if (deltaX > TOUCH_MOVE_THRESHOLD || deltaY > TOUCH_MOVE_THRESHOLD) {
-    clearTimeout(root.longPressTimeoutId);
-    root.longPressTimeoutId = null;
+    cancelLongPress(root);
   }
 }
 
-function handleTouchEnd(rootId) {
-  const root = state.roots.get(rootId);
-  if (!root) return;
-
+function cancelLongPress(root) {
   if (root.longPressTimeoutId !== null) {
     clearTimeout(root.longPressTimeoutId);
     root.longPressTimeoutId = null;

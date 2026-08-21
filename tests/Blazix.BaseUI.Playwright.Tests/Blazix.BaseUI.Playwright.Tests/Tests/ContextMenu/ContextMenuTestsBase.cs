@@ -426,6 +426,80 @@ public abstract class ContextMenuTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that a second finger landing during a pending long-press cancels the gesture.
+    /// Putting a second finger down without lifting the first starts a pinch-zoom or two-finger
+    /// scroll, not a context-menu press.
+    /// </summary>
+    [Fact]
+    public virtual async Task SecondTouchStartDuringLongPress_CancelsPendingLongPress()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var invocationCount = await RunLongPressMultiTouchProbeAsync("touchstart");
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    /// <summary>
+    /// Tests that a multi-touch move during a pending long-press cancels the gesture, even when
+    /// the extra finger lands without the trigger seeing a second <c>touchstart</c>.
+    /// </summary>
+    [Fact]
+    public virtual async Task MultiTouchMoveDuringLongPress_CancelsPendingLongPress()
+    {
+        await NavigateAsync(CreateUrl("/tests/context-menu"));
+
+        var invocationCount = await RunLongPressMultiTouchProbeAsync("touchmove");
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    /// <summary>
+    /// Starts a single-finger long press against the context-menu module, then dispatches a
+    /// two-finger event of the given type and reports how many times the long-press callback
+    /// reached .NET.
+    /// </summary>
+    private async Task<int> RunLongPressMultiTouchProbeAsync(string secondEventType)
+    {
+        return await Page.EvaluateAsync<int>("""
+            async (secondEventType) => {
+                const module = await import('/_content/Blazix.BaseUI/blazix-baseui-context-menu.js');
+                const rootId = `pending-multitouch-${secondEventType}-${Date.now()}`;
+                const trigger = document.createElement('div');
+                const anchor = document.createElement('div');
+                let invocations = 0;
+
+                document.body.append(trigger, anchor);
+                module.initializeContextMenu(rootId, trigger, anchor, {
+                    invokeMethodAsync: () => {
+                        invocations += 1;
+                        return Promise.resolve();
+                    }
+                }, false);
+
+                const dispatch = (type, touches) => {
+                    const event = new Event(type, { bubbles: true, cancelable: true });
+                    Object.defineProperty(event, 'touches', { value: touches });
+                    trigger.dispatchEvent(event);
+                };
+
+                dispatch('touchstart', [{ clientX: 25, clientY: 35 }]);
+                dispatch(secondEventType, [
+                    { clientX: 25, clientY: 35 },
+                    { clientX: 80, clientY: 90 }
+                ]);
+
+                await new Promise(resolve => setTimeout(resolve, 650));
+                module.disposeContextMenu(rootId);
+                trigger.remove();
+                anchor.remove();
+
+                return invocations;
+            }
+            """, secondEventType);
+    }
+
+    /// <summary>
     /// Tests that releasing the context-menu gesture inside popup chrome does not cancel the menu.
     /// </summary>
     [Fact]
