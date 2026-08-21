@@ -36,4 +36,6 @@ public interface IComboboxRootContract
 
     Task Label_ShouldKeepTriggerAssociationWhenLabelIsReplaced();
     Task GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts();
+
+    Task Item_ShouldIgnoreAStationaryPointerEnterOnWebKit();
 }

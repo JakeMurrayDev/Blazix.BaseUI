@@ -160,6 +160,15 @@ function normalizeRect(rect, scale) {
     };
 }
 
+// WebKit fires zero-delta `mousemove`/`pointermove` events when a list scrolls beneath a stationary
+// pointer, which would move the highlight during keyboard navigation (base-ui #5265). Upstream's
+// `platform.engine.webkit` distinguishes WebKit from Blink by the legacy prefixed property name.
+const IS_WEBKIT_ENGINE = typeof CSS !== 'undefined' && !!CSS.supports?.('-webkit-backdrop-filter:none');
+
+export function isWebKitEngine() {
+    return IS_WEBKIT_ENGINE;
+}
+
 function isWebKit() {
     if (typeof navigator === 'undefined') return false;
     return /\bAppleWebKit\b/.test(navigator.userAgent) && !/\bChrome\b/.test(navigator.userAgent);

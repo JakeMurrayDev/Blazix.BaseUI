@@ -126,7 +126,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (!highlighted && (RootContext?.HighlightItemOnHover ?? true))
+        if (!highlighted && !IsStationaryPointer(e) && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };
@@ -152,7 +152,7 @@
 
     private Task HandleMouseMoveAsync(MouseEventArgs e)
     {
-        if (!highlighted && (RootContext?.HighlightItemOnHover ?? true))
+        if (!highlighted && !IsStationaryPointer(e) && (RootContext?.HighlightItemOnHover ?? true))
         {
             highlighted = true;
             state = state with { Highlighted = true };
@@ -164,4 +164,9 @@
             ? EventUtilities.InvokeOnMouseMoveAsync(AdditionalAttributes, e)
             : Task.CompletedTask;
     }
+
+    // WebKit reports zero-delta moves while the popup scrolls beneath a stationary cursor, which
+    // would drag the highlight onto whichever item slides under it (base-ui #5265).
+    private bool IsStationaryPointer(MouseEventArgs e) =>
+        PointerEventUtilities.IsStationaryWebKitPointer(RootContext?.IsWebKitEngine ?? false, e);
 }

@@ -595,6 +595,12 @@
         allowMouseSelection = false;
     }
 
+    // A stationary mouse cursor only exists on a pointing device, so touch interactions keep
+    // highlighting even though their synthesized events also report no movement.
+    private bool IsStationaryPointer(MouseEventArgs e) =>
+        pointerType != "touch"
+        && PointerEventUtilities.IsStationaryWebKitPointer(RootContext?.IsWebKitEngine ?? false, e);
+
     private static InteractionType ResolvePointerInteractionType(string? value)
     {
         return value switch
@@ -609,11 +615,13 @@
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
         // Hover highlighting comes from `listNavigation`, which React enables with
-        // `!readOnly && !disabled`, so a disabled root never highlights on hover.
+        // `!readOnly && !disabled`, so a disabled or read-only root never highlights on hover.
         // Item-level `disabled` is checked too, which is a deliberate deviation:
         // React's `disabledIndices` is empty, so hovering an individual disabled
         // item does highlight it there.
         if (!EffectiveDisabled
+            && !(RootContext?.ReadOnly ?? false)
+            && !IsStationaryPointer(e)
             && (RootContext?.HighlightItemOnHover ?? true)
             && !(RootContext?.KeyboardActive ?? false)
             && (RootContext?.SelectedIndex ?? -1) < 0
@@ -629,6 +637,8 @@
     private async Task HandleMouseMoveAsync(MouseEventArgs e)
     {
         if (!EffectiveDisabled
+            && !(RootContext?.ReadOnly ?? false)
+            && !IsStationaryPointer(e)
             && (RootContext?.HighlightItemOnHover ?? true)
             && !(RootContext?.KeyboardActive ?? false)
             && itemIndex >= 0

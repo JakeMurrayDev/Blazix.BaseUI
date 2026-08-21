@@ -23,4 +23,6 @@ public interface IMenuItemContract
     Task ClosesMenuOnClickByDefault();
     Task DoesNotCloseWhenCloseOnClickFalse();
     Task DoesNotActivateWhenDisabled();
+
+    Task IgnoresAStationaryPointerMoveOnWebKit();
 }

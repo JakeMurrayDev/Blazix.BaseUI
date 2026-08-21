@@ -31,4 +31,8 @@ public interface ISelectItemContract
     Task NativeButton_ShouldRenderAsButtonElementWithTypeButton();
     Task NonNativeButton_ShouldRenderAsDivWithRoleOption();
     Task DisabledItem_ShouldRemainFocusableWhenHighlighted();
+
+    Task IgnoresAStationaryPointerMoveOnWebKit();
+    Task HighlightsAStationaryPointerMoveOnOtherEngines();
+    Task DoesNotHighlightOnHoverWhenReadOnly();
 }

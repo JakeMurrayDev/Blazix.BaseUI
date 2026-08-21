@@ -25,6 +25,12 @@ internal sealed class AutocompleteRootContext<TValue> : IAutocompleteRootContext
     public bool Modal { get; set; }
     public bool OpenOnInputClick { get; set; }
     public bool HighlightItemOnHover { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the browser runs the WebKit engine, which reports zero-delta pointer
+    /// moves when a scrolling list slides beneath a stationary pointer.
+    /// </summary>
+    public bool IsWebKitEngine { get; set; }
     public bool KeepHighlight { get; set; }
     public bool LoopFocus { get; set; }
     public bool Mounted { get; set; }

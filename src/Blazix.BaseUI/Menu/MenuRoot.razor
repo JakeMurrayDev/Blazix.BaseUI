@@ -748,6 +748,13 @@
 
             await module.InvokeVoidAsync("setTriggerIds", rootId, knownTriggerIds);
 
+            // WebKit reports zero-delta pointer moves while a list scrolls beneath a stationary
+            // pointer; items use this to ignore them (base-ui #5265).
+            if (context is not null)
+            {
+                context.IsWebKitEngine = await module.InvokeAsync<bool>("isWebKitEngine");
+            }
+
             if (triggerElement.HasValue)
             {
                 await module.InvokeVoidAsync("setTriggerElement", rootId, triggerElement.Value);

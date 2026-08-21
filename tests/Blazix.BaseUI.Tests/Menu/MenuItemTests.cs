@@ -440,4 +440,24 @@ public class MenuItemTests : BunitContext, IMenuItemContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task IgnoresAStationaryPointerMoveOnWebKit()
+    {
+        JsInteropSetup.SetupWebKitEngine(JSInterop, true);
+
+        var cut = Render(CreateMenuItemInRoot());
+
+        // WebKit fires zero-delta moves while the popup scrolls beneath a stationary cursor, which
+        // would drag the highlight onto whichever item slides under it.
+        await cut.Find("[role='menuitem']").TriggerEventAsync("onmousemove",
+            new MouseEventArgs { MovementX = 0, MovementY = 0 });
+
+        cut.Find("[role='menuitem']").HasAttribute("data-highlighted").ShouldBeFalse();
+
+        await cut.Find("[role='menuitem']").TriggerEventAsync("onmousemove",
+            new MouseEventArgs { MovementX = 4, MovementY = 0 });
+
+        cut.Find("[role='menuitem']").HasAttribute("data-highlighted").ShouldBeTrue();
+    }
 }

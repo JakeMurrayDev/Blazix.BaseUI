@@ -501,6 +501,10 @@
             {
                 var module = await ModuleTask;
                 await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef);
+
+                // WebKit reports zero-delta pointer moves while a list scrolls beneath a stationary
+                // pointer; items use this to ignore them (base-ui #5265).
+                typedContext.IsWebKitEngine = await module.InvokeAsync<bool>("isWebKitEngine");
             }
             catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
             {

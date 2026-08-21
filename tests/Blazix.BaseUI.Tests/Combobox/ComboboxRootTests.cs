@@ -938,4 +938,24 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         cut.WaitForAssertion(() =>
             cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
     }
+
+    [Fact]
+    public async Task Item_ShouldIgnoreAStationaryPointerEnterOnWebKit()
+    {
+        JsInteropSetup.SetupWebKitEngine(JSInterop, true);
+
+        var cut = Render(CreateCombobox(defaultOpen: true));
+
+        // WebKit fires zero-delta moves while the list scrolls beneath a stationary cursor, which
+        // would drag the highlight onto whichever item slides under it.
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onpointerenter",
+            new PointerEventArgs { PointerType = "mouse", MovementX = 0, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeFalse();
+
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onpointerenter",
+            new PointerEventArgs { PointerType = "mouse", MovementX = 4, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeTrue();
+    }
 }

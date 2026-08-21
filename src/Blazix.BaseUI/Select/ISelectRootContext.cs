@@ -51,6 +51,12 @@ internal interface ISelectRootContext
     bool HighlightItemOnHover { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the browser runs the WebKit engine, which reports zero-delta pointer
+    /// moves when a scrolling list slides beneath a stationary pointer.
+    /// </summary>
+    bool IsWebKitEngine { get; set; }
+
+    /// <summary>
     /// Gets or sets the reason the select's open state last changed.
     /// </summary>
     SelectOpenChangeReason OpenChangeReason { get; set; }

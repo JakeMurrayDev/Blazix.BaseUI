@@ -297,7 +297,7 @@
 
     private async Task HandleMouseEnterAsync(MouseEventArgs e)
     {
-        if (itemIndex >= 0 && SubmenuContext?.ParentMenu is not null)
+        if (itemIndex >= 0 && !IsStationaryPointer(e) && SubmenuContext?.ParentMenu is not null)
         {
             SubmenuContext.ParentMenu.ActiveIndex = itemIndex;
             state = new MenuSubmenuTriggerState(state.Disabled, Highlighted: true, state.Open);
@@ -336,6 +336,11 @@
         state = new MenuSubmenuTriggerState(state.Disabled, state.Highlighted, Open: true);
         BuildComponentAttributes();
     }
+
+    // WebKit reports zero-delta moves while the popup scrolls beneath a stationary cursor, which
+    // would drag the highlight onto whichever item slides under it (base-ui #5265).
+    private bool IsStationaryPointer(MouseEventArgs e) =>
+        PointerEventUtilities.IsStationaryWebKitPointer(RootContext?.IsWebKitEngine ?? false, e);
 
     private void HandleMouseLeave(MouseEventArgs e)
     {

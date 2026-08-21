@@ -43,6 +43,12 @@ internal sealed class MenuRootContext
     public bool HighlightItemOnHover { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the browser runs the WebKit engine, which reports zero-delta pointer
+    /// moves when a scrolling list slides beneath a stationary pointer.
+    /// </summary>
+    public bool IsWebKitEngine { get; set; }
+
+    /// <summary>
     /// Gets or sets the reason the menu's open state last changed.
     /// </summary>
     public MenuOpenChangeReason MenuOpenChangeReason { get; set; }

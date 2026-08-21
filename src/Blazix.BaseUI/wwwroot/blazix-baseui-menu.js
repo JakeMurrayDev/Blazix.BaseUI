@@ -34,6 +34,10 @@ const IS_APPLE_PLATFORM = (() => {
 })();
 // Upstream's `isVirtualPointerEvent` only recognizes the Android TalkBack press shape when the
 // platform reports Android (base-ui #5384); `platform.os.android` maps to a user-agent check here.
+// WebKit fires zero-delta `mousemove`/`pointermove` events when a list scrolls beneath a stationary
+// pointer, which would move the highlight during keyboard navigation (base-ui #5265). Upstream's
+// `platform.engine.webkit` distinguishes WebKit from Blink by the legacy prefixed property name.
+const IS_WEBKIT_ENGINE = typeof CSS !== 'undefined' && !!CSS.supports?.('-webkit-backdrop-filter:none');
 const IS_ANDROID_PLATFORM = (() => {
     if (typeof navigator === 'undefined') return false;
     return /\bAndroid\b/i.test(navigator.userAgent);
@@ -1912,6 +1916,10 @@ export function isVoiceOverPlatform() {
 
 export function isAndroidPlatform() {
     return IS_ANDROID_PLATFORM;
+}
+
+export function isWebKitEngine() {
+    return IS_WEBKIT_ENGINE;
 }
 
 export function getItemIndex(rootId, element) {

@@ -53,6 +53,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public bool HighlightItemOnHover { get; set; }
 
     /// <inheritdoc />
+    public bool IsWebKitEngine { get; set; }
+
+    /// <inheritdoc />
     public SelectOpenChangeReason OpenChangeReason { get; set; }
 
     /// <inheritdoc />
