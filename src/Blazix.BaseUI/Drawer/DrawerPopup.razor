@@ -40,7 +40,9 @@
     private bool hasRendered;
     private bool shouldRender;
     private bool popupInitialized;
+#if DEBUG
     private bool missingViewportWarningLogged;
+#endif
     private DrawerPopupState state;
     private RenderElement<DrawerPopupState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();

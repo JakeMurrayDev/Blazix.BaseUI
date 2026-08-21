@@ -4,7 +4,45 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Generating the XML doc file surfaces pre-existing doc-comment defects that were never
+         visible before (the file was never produced): 109 diagnostics across 30 files —
+         undocumented public members (CS1591), unresolved crefs pointing at upstream React
+         concept names such as FloatingFocusManager/FloatingTree (CS1574), and param-tag
+         mismatches (CS1572/CS1573). Suppressed here so the ~852 files that ARE documented
+         reach consumers via IntelliSense now; fixing the backlog is tracked separately. -->
+    <NoWarn>$(NoWarn);CS1591;CS1572;CS1573;CS1574</NoWarn>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- PackageId is load-bearing: the static web asset BasePath derives from it, and the
+         library hard-codes './_content/Blazix.BaseUI/...' module import paths. Changing it
+         silently breaks every JS import. -->
+    <PackageId>Blazix.BaseUI</PackageId>
+    <Version>0.1.0-preview.1</Version>
+    <Authors>Jake Alexander Murray</Authors>
+    <Company>Jake Alexander Murray</Company>
+    <Product>Blazix.BaseUI</Product>
+    <Description>An unofficial Blazor port of the Base UI headless component library. Unstyled, accessible component primitives you compose and style yourself. Requires .NET 10.</Description>
+    <PackageTags>blazor;base-ui;csharp;javascript;components;headless;ui;accessibility;razor</PackageTags>
+    <PackageProjectUrl>https://github.com/JakeMurrayDev/Blazix.BaseUI</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/JakeMurrayDev/Blazix.BaseUI</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See CHANGELOG.md at https://github.com/JakeMurrayDev/Blazix.BaseUI/blob/master/CHANGELOG.md</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Blazix.BaseUI.Tests" />
@@ -18,6 +56,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.2" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup>

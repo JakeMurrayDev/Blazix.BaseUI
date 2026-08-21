@@ -1,0 +1,122 @@
+name: Release
+
+# Tag-driven publish. Pushing a `v*` tag packs and pushes to nuget.org.
+# workflow_dispatch packs and uploads the artifacts WITHOUT publishing, so a release
+# can be rehearsed safely — NuGet publishes are immutable and cannot be undone. The
+# publish steps require github.event_name == 'push', not just a v* ref, because a manual
+# dispatch can also target a v* tag (gh workflow run --ref v1.2.3) and would otherwise
+# satisfy a ref-only check.
+#
+# Publishing uses NuGet trusted publishing (OIDC), not a long-lived API key. The
+# workflow exchanges a short-lived GitHub OIDC token for a temporary nuget.org key.
+# This requires a trusted publishing policy on nuget.org:
+#   Account menu -> Trusted Publishing -> new policy
+#     Repository Owner: JakeMurrayDev
+#     Repository:       Blazix.BaseUI
+#     Workflow File:    release.yml     (file name only, no .github/workflows/ prefix)
+#     Environment:      (leave empty)
+# Renaming this file breaks the policy — update it on nuget.org if you do.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  release:
+    name: Pack and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # issue the OIDC token that nuget.org exchanges for a temporary key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # SourceLink embeds commit information; a shallow clone loses it.
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # scripts/validate-js-assets.mjs runs on every library build and falls back to
+      # `npx --yes terser@...` when the vendored terser is absent (it is gitignored).
+      # If npm is ever unreachable here, pass /p:SkipBlazixSourceValidation=true — but
+      # note that skips the check that minified JS matches its source.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          pkg_version="$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Blazix.BaseUI/Blazix.BaseUI.csproj | head -n1)"
+          echo "tag=$tag_version project=$pkg_version"
+          if [[ "$tag_version" != "$pkg_version" ]]; then
+            echo "::error::Tag v$tag_version does not match <Version>$pkg_version</Version> in Blazix.BaseUI.csproj."
+            exit 1
+          fi
+
+      - name: Pack
+        run: >
+          dotnet pack src/Blazix.BaseUI/Blazix.BaseUI.csproj
+          --configuration Release
+          --output ./artifacts
+          /p:ContinuousIntegrationBuild=true
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*
+          if-no-files-found: error
+
+      - name: Check the nuget.org user name is configured
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          NUGET_USER: ${{ secrets.NUGET_USER }}
+        run: |
+          if [[ -z "$NUGET_USER" ]]; then
+            echo "::error::NUGET_USER secret is not set. It is the nuget.org profile name (not an email address, and not an API key) used for the trusted publishing token exchange."
+            exit 1
+          fi
+
+      # Temporary keys are valid for one hour, so log in immediately before pushing.
+      - name: NuGet login (OIDC to short-lived API key)
+        id: login
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        # Pinned to a commit SHA, not the mutable v1 tag: this step mints a live nuget.org
+        # publishing key, so a repointed tag would run unreviewed code with that access.
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to nuget.org
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        working-directory: artifacts
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          # Push explicit file names rather than handing dotnet a wildcard. A glob has
+          # open defects: it can silently skip the adjacent .snupkg (NuGet/Home#11871)
+          # and stop after the first package (NuGet/Home#9867). Running from the
+          # artifacts directory also keeps the symbol package next to the working
+          # directory, since symbol discovery is relative to it. Bash's *.nupkg does not
+          # match .snupkg, so the symbol package is never pushed as a primary package --
+          # dotnet uploads it automatically alongside its .nupkg.
+          for pkg in *.nupkg; do
+            echo "Pushing $pkg"
+            dotnet nuget push "$pkg" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
