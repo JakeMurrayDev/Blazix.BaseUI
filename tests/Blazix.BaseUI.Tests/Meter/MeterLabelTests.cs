@@ -251,4 +251,67 @@ public class MeterLabelTests : BunitContext, IMeterLabelContract
         meter.HasAttribute("aria-labelledby").ShouldBeFalse();
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsAriaLabelledByWhenLabelIsReplaced()
+    {
+        var cut = Render<MeterLabelSwapHost>();
+        cut.Find("[role='meter']").GetAttribute("aria-labelledby").ShouldBe("meter-label-first");
+
+        await cut.InvokeAsync(() => cut.Instance.SwapLabel());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='meter']").GetAttribute("aria-labelledby").ShouldBe("meter-label-second"));
+    }
+
+    [Fact]
+    public async Task KeepsAriaLabelledByWhenReplacementLabelReusesTheSameId()
+    {
+        var cut = Render<MeterLabelSwapHost>(ps => ps.Add(p => p.ReuseId, true));
+        cut.Find("[role='meter']").GetAttribute("aria-labelledby").ShouldBe("meter-label-first");
+
+        await cut.InvokeAsync(() => cut.Instance.SwapLabel());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='meter']").GetAttribute("aria-labelledby").ShouldBe("meter-label-first"));
+    }
+}
+
+internal sealed class MeterLabelSwapHost : ComponentBase
+{
+    private bool useSecondLabel;
+
+    /// <summary>
+    /// Gets or sets whether the replacement label reuses the first label's explicit id.
+    /// </summary>
+    [Parameter]
+    public bool ReuseId { get; set; }
+
+    public void SwapLabel()
+    {
+        useSecondLabel = true;
+        StateHasChanged();
+    }
+
+    protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+    {
+        builder.OpenComponent<MeterRoot>(0);
+        builder.AddAttribute(1, "Value", 50.0);
+        builder.AddAttribute(2, "ChildContent", (RenderFragment)(inner =>
+        {
+            inner.OpenComponent<MeterLabel>(0);
+            inner.SetKey(useSecondLabel ? "second" : "first");
+            inner.AddAttribute(1, "AdditionalAttributes",
+                (IReadOnlyDictionary<string, object>)new Dictionary<string, object>
+                {
+                    { "id", useSecondLabel && !ReuseId ? "meter-label-second" : "meter-label-first" }
+                });
+            inner.AddAttribute(2, "ChildContent", (RenderFragment)(content =>
+            {
+                content.AddContent(0, "Usage");
+            }));
+            inner.CloseComponent();
+        }));
+        builder.CloseComponent();
+    }
 }

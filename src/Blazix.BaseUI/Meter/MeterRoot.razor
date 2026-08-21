@@ -18,6 +18,7 @@
     private const string VisuallyHiddenStyle = "clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0";
 
     private string? labelId;
+    private object? labelOwner;
     private string ariaValueText = string.Empty;
     private MeterRootContext? context;
     private MeterRootState state = new();
@@ -231,8 +232,24 @@
         return decimalValue.ToString("0.#############################", CultureInfo.InvariantCulture);
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (id is null)
+        {
+            // A replacement label registers before the previous instance is disposed, so a stale
+            // instance must not clear the current registration - even when both share an explicit id.
+            if (!ReferenceEquals(labelOwner, owner))
+            {
+                return;
+            }
+
+            labelOwner = null;
+        }
+        else
+        {
+            labelOwner = owner;
+        }
+
         if (labelId == id)
         {
             return;
