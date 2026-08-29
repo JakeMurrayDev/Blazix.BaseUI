@@ -11,8 +11,14 @@ Ticket: [#173](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/173) (tranc
 ## Delta Window
 
 MenuBar's transitive import graph is large because `Menubar.tsx` pulls in the whole Menu family
-and the shared floating layer; 20 commits in the window touch it. Only **one** touches
+and the shared floating layer; 20 commits in the window touch it. Adding the two test-only
+commits that change no file in the graph (`3c55b155c`, `a407327a8`) gives **22 (commit, MenuBar)
+pairs**, each dispositioned in its own row below. Only **one** touches
 `packages/react/src/menubar/` itself with runtime content.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+22 rows.
 
 **Outcome: no new ports.** The single menubar source hunk is architecturally moot, the Menu-family
 fixes are inherited from PR #209, and the shared fixes split between "already present from #158
@@ -58,15 +64,23 @@ tracked on #158.
 
 Batch 2 has **not** landed as of `4b2a7923`.
 
-| Upstream | MenuBar-side state | MenuBar-side symptom |
-|---|---|---|
-| `dc9a4577f` #5384 | Not ported (`grep isVirtual blazix-baseui-menu.js` → 0) | Activating a submenu trigger inside a menubar menu with Android TalkBack does not open the submenu. |
-| `9a5c3850f` #5265 | Not ported | In Safari, scrolling a long menubar menu under a stationary pointer moves the highlight to whichever item slides under the cursor. |
-| `595c0fa08` #5340 | Weaker guard at `Menu/MenuGroupLabel.razor:98` (Menu-owned) | Swapping a group label inside a menubar menu lets the outgoing instance clear the incoming one's id, so the group loses its accessible name. |
-| `8b2282a5e` #5388 | Unverified | Focus returning to the menubar trigger after a menu closes may use the wrong focus-visible modality. |
-| `7397c99ba` #5339 | Unblocked (PR #203), not yet evaluated | Popup-handle lifecycle. |
+The verdict on these rows is **defer-with-spec** in the rubric's own sense (Resolving
+uncertainty, tier 2; Q6.3) — "A deferral is a recorded debt, not a skip." The debt is owned by
+#158; the MenuBar-side symptom and evidence are written down here so the deferral is specified.
+
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `dc9a4577f` #5384 | **defer-with-spec → #158** | Activating a submenu trigger inside a menubar menu with Android TalkBack does not open the submenu. | Not ported: `grep isVirtual src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js` returns 0 hits, so no virtual/synthesized-pointer classification exists on the activation path menubar menus share with Menu. |
+| `9a5c3850f` #5265 | **defer-with-spec → #158** | In Safari, scrolling a long menubar menu under a stationary pointer moves the highlight to whichever item slides under the cursor. | Not ported: no zero-delta pointer-move guard exists in the list-navigation hover paths of `blazix-baseui-menu.js`. |
+| `595c0fa08` #5340 | **defer-with-spec → #158** | Swapping a group label inside a menubar menu lets the outgoing instance clear the incoming one's id, so the group loses its accessible name. | Weaker guard: `Menu/MenuGroupLabel.razor:98` tests `hasRegisteredId` ("did I ever register") rather than ownership. Menu-owned site; `MenuBarRoot` itself registers no label id. |
+| `8b2282a5e` #5388 | **defer-with-spec → #158** | Focus returning to the menubar trigger after a menu closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`); the close-time snapshot half is unconfirmed. |
+| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount are dropped, so a detached-trigger menubar menu does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against the port's handle system. |
 
 ## (a) skip — React-specific
+
+Every row in this table carries the verdict **(a) skip — React-specific**; the reason column is
+both the symptom restatement and the evidence. None changes DOM output, ARIA, focus order,
+keyboard/pointer behavior, timing constants or the public API surface.
 
 | Upstream | Why no MenuBar symptom |
 |---|---|
@@ -76,7 +90,8 @@ Batch 2 has **not** landed as of `4b2a7923`.
 | `b089a7ccc` #5309 | React 17 legacy-mode portal mounting; no legacy/concurrent split in the port's portal. |
 | `1e64978b1` #5372 | Re-render avoidance during lazy flip; the flip decision is unchanged, so the menu lands in the same place. |
 | `8f795a8fd` #5264 | `usePreviousValue` `!==` → `Object.is`. The port replicates no previous-value helper, so neither the `NaN` re-set loop nor the `+0`/`-0` miss has a local site. |
-| `006a72a99` #5341, `b38becd6e` #5337 | React effect ownership and effect timing. **Revisit-on-symptom** per #158; no MenuBar open/close divergence observed to date. |
+| `006a72a99` #5341 | Relocates which React component owns a cleanup effect. **Revisit-on-symptom** per #158; no MenuBar open/close divergence observed to date. |
+| `b38becd6e` #5337 | `useEffect` vs layout-effect timing. **Revisit-on-symptom** per #158; no MenuBar open/close divergence observed to date. |
 
 ## Test coverage
 
