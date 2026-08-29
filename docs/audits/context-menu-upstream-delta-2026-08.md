@@ -14,8 +14,12 @@ Exactly one upstream commit touches `packages/react/src/context-menu/` in the wi
 (`9d61f9291`). Per `docs/audits/METHODOLOGY.md` (Q3 corollary — the shared-utility lesson)
 the sweep also diffs everything ContextMenu composes: `packages/react/src/menu/`,
 `packages/react/src/floating-ui-react/`, `packages/react/src/utils/`, and
-`packages/react/src/internals/`. That widens the window to 24 (commit, ContextMenu) pairs,
-dispositioned below.
+`packages/react/src/internals/`. That widens the window to **26 (commit, ContextMenu) pairs**,
+each dispositioned in its own row below.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+26 rows.
 
 Local composition is by inheritance — `ContextMenuItem : MenuItem`,
 `ContextMenuPositioner : MenuPositioner`, `ContextMenuSubmenuTrigger : MenuSubmenuTrigger`,
@@ -67,20 +71,27 @@ so it is dispositioned once rather than across 12+ component sweeps. Batch 2 has
 as of local HEAD `4b2a7923`. Recorded here is the ContextMenu-side symptom and current state, so
 the ContextMenu record is not silently blank on them; the verdicts belong to #158.
 
-| Upstream | ContextMenu-side state | ContextMenu-side symptom |
-|---|---|---|
-| `dc9a4577f` #5384 | Not ported (`grep isVirtual blazix-baseui-menu.js` → 0 hits) | Activating a context-menu submenu trigger with Android TalkBack does not open the submenu. |
-| `9a5c3850f` #5265 | Not ported (no zero-delta pointer-move guard in the list-nav hover paths) | In Safari, scrolling a long context menu under a stationary pointer moves the highlight to whichever item slides under the cursor, fighting keyboard navigation. |
-| `595c0fa08` #5340 | Weaker guard — `Menu/MenuGroupLabel.razor:98` tests `hasRegisteredId` ("did I ever register") rather than ownership, inherited by `ContextMenuGroupLabel` | Swapping a context-menu group label lets the outgoing instance clear the incoming one's registered id, so the group loses its accessible name. |
-| `8b2282a5e` #5388 | Unverified | Return focus after closing a context menu may use the wrong focus-visible modality. |
-| `7397c99ba` #5339, `3b5715cc7` #5387, `071e89201` #5394 | Unblocked (Handle decision executed in PR #203), not yet evaluated | Popup-handle lifecycle. |
-| `6feeb1f54` #5357 | **(d:moot)** — resolved on #158 | No user-observable symptom: upstream replaced string literals with constants of identical value; the port models reasons as typed C# enums (`Menu/Enumerations.cs:39-112`), so literal drift is structurally impossible. |
+The verdict on these rows is **defer-with-spec** in the rubric's own sense (Resolving
+uncertainty, tier 2; Q6.3): "A deferral is a recorded debt, not a skip." The debt is owned by
+#158, and the ContextMenu-side symptom and evidence are written down here so the deferral is
+specified rather than blank.
+
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `dc9a4577f` #5384 | **defer-with-spec → #158** | Activating a context-menu submenu trigger with Android TalkBack does not open the submenu. | Not ported: `grep isVirtual src/Blazix.BaseUI/wwwroot/blazix-baseui-menu.js` returns 0 hits, so no virtual/synthesized-pointer classification exists on the activation path ContextMenu shares with Menu. |
+| `9a5c3850f` #5265 | **defer-with-spec → #158** | In Safari, scrolling a long context menu under a stationary pointer moves the highlight to whichever item slides under the cursor, fighting keyboard navigation. | Not ported: no zero-delta pointer-move guard exists in the list-navigation hover paths of `blazix-baseui-menu.js`. |
+| `595c0fa08` #5340 | **defer-with-spec → #158** | Swapping a context-menu group label lets the outgoing instance clear the incoming one's registered id, so the group loses its accessible name. | Weaker guard: `Menu/MenuGroupLabel.razor:98` tests `hasRegisteredId` ("did I ever register") rather than ownership, and `ContextMenuGroupLabel : MenuGroupLabel` inherits it. Contrast the instance-ownership pattern PR #206 established for `FieldsetLegend`. |
+| `8b2282a5e` #5388 | **defer-with-spec → #158** | Return focus after closing a context menu may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`), which may already give upstream's reset-on-open semantics; the close-time snapshot half is unconfirmed. |
+| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount can be dropped, so a detached-trigger context menu does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against the port's handle system. |
+| `3b5715cc7` #5387 | **defer-with-spec → #158** | Popup-handle state-machine regressions leave a detached-trigger context menu stuck open or unopenable. | Unblocked (PR #203), not yet evaluated. |
+| `071e89201` #5394 | **defer-with-spec → #158** | Unused handle attachments are made for triggers that never use them; no user-visible symptom is claimed upstream beyond the wasted attachment. | Unblocked (PR #203), not yet evaluated. |
+| `6feeb1f54` #5357 | **(d:moot)** — resolved on #158 | No user-observable symptom: upstream replaced string literals with constants of identical value. | The port models change reasons as typed C# enums (`Menu/Enumerations.cs:39-112`), so literal drift is structurally impossible. |
 
 ## React-specific commits — (a) skip
 
-Each restates as "no user-observable symptom in the Blazor port" for the reason given; none
-changes DOM output, ARIA, focus order, keyboard/pointer behavior, timing constants, or the
-public API surface.
+Every row in this table carries the verdict **(a) skip — React-specific**; the reason column is
+both the symptom restatement and the evidence. None changes DOM output, ARIA, focus order,
+keyboard/pointer behavior, timing constants, or the public API surface.
 
 | Upstream | Why no ContextMenu symptom |
 |---|---|
