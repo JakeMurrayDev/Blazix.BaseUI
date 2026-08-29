@@ -174,6 +174,29 @@ assert_json "
     if (result.titleBudget !== 40) throw new Error('a small delta must render at the full title budget');
 "
 
+# Force the hard-cap backstop. It only fires when headings and counts alone overflow at the smallest
+# title budget, which takes far more buckets than upstream produces; long directory names reach the
+# limit with fewer files.
+long_directory="$(printf 'd%.0s' $(seq 1 200))"
+overflow_paths=()
+for index in $(seq 1 150); do
+    overflow_paths+=("packages/react/src/${long_directory}${index}/file.ts")
+done
+commit "[all components] Overflow the issue body" "${overflow_paths[@]}"
+digest
+assert_json "
+    if (result.truncated !== true) throw new Error('expected the hard cap to fire');
+    if (result.titleBudget !== 0) throw new Error('expected the smallest title budget to be tried first');
+    if (result.issueBody.length > 60000) throw new Error('body exceeded the hard cap: ' + result.issueBody.length);
+    if (!result.issueBody.includes('Digest truncated')) throw new Error('truncation notice missing');
+    if (!result.issueBody.includes(result.compareUrl)) throw new Error('compare URL missing from the truncation notice');
+    // The exact Markdown the workflow appends after this script writes the body.
+    const runLink = '\\n[View workflow run](https://github.com/JakeMurrayDev/Blazix.BaseUI/actions/runs/32451705302)\\n';
+    if (result.issueBody.length + runLink.length > 65536) {
+        throw new Error('body plus the run link exceeds the GitHub issue body limit');
+    }
+"
+
 # A pin that is not an ancestor would produce a meaningless range, so it must fail loudly.
 expect_failure() {
     if node "$repo_root/scripts/upstream-watch-digest.mjs" --upstream "$upstream" --ref master --quiet "$@" \
@@ -214,4 +237,4 @@ for (const field of ['upstreamRepository', 'upstreamRef']) {
 }
 " "$repo_root/docs/upstream-pin.json"
 
-echo "Validated upstream watch bucketing, shared-bucket precedence, empty delta, remainder reporting, budget degradation, pin validation, and the committed pin record."
+echo "Validated upstream watch bucketing, shared-bucket precedence, empty delta, remainder reporting, budget degradation, the hard cap, pin validation, and the committed pin record."
