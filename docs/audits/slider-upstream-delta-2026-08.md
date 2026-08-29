@@ -13,8 +13,12 @@ Ticket: [#174](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/174) (tranc
 Four upstream commits touch `packages/react/src/slider/` in the window. Per
 `docs/audits/METHODOLOGY.md` (Q3 corollary) the sweep also walks Slider's transitive import
 graph — 161 files reached by BFS from `packages/react/src/slider` through `internals/*`,
-`utils/*`, `field/*`, and `packages/utils/*` — which surfaces 17 further commits, dispositioned
-below.
+`utils/*`, `field/*`, and `packages/utils/*` — which surfaces 18 further commits, for
+**22 (commit, Slider) pairs** in total, each dispositioned in its own row below.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+22 rows.
 
 `6f262b1c7` (#5391), the tranche-1 fix, landed in PR #205 before this refresh. This document is
 the staleness refresh on top of it and re-verifies that fix as present.
@@ -53,12 +57,24 @@ not silently blank on them.
 
 | Upstream | (commit, Slider) verdict | Reasoning |
 |---|---|---|
-| `db86f44d8` #5390, `d060189d4` #5290, `293a0f1ed` #5287 | **(d:already-present)** via Field/Form | Landed in PR #206. A Slider inside a Field inherits the fixed required-validity, `data-dirty` and first-invalid-focus behavior with no Slider-side code. |
+| `db86f44d8` #5390 | **(d:already-present)** via Field | A Slider inside a Field whose custom error was set and cleared kept reporting the stale required-validity. Landed PR #206; inherited with no Slider-side code. |
+| `d060189d4` #5290 | **(d:already-present)** via Field | A Slider inside a Field with a null control value reported the wrong `data-dirty` state. Landed PR #206; inherited with no Slider-side code. |
+| `293a0f1ed` #5287 | **(d:already-present)** via Form | Submitting a form focused the first invalid field in registration order rather than document order, so focus could jump past a Slider that appears earlier on the page. Landed PR #206; inherited with no Slider-side code. |
 | `8846f9937` #5383 | **(a) skip** | Form serialization of portalled `CheckboxGroup`/`RadioGroup` values. Slider renders no group and contributes a single named input per thumb, so no Slider symptom exists. |
 | `32cabb778` #5281 | **(a) skip — React-specific** | No runtime content beyond `FieldError`/`FieldItem`/`FieldsetLegend` cleanup; Field-owned. |
 | `595c0fa08` #5340 | **owned by [#158](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/158) batch 2** | `Slider/SliderLabel.razor:119` still clears the registered id unconditionally on dispose. Slider-side symptom: swapping the slider's label lets the outgoing instance clear the incoming one's id, so the slider loses its accessible name. Recorded on #158; not re-dispositioned here. |
-| `1a2ca3c9f` #5401, `166e8ac01` #5400, `071e89201` #5394, `3b5715cc7` #5387, `8b2282a5e` #5388, `7397c99ba` #5339, `b089a7ccc` #5309, `9a5c3850f` #5265, `dc9a4577f` #5384 | **(d:moot)** | Popup lifecycle, popup handles, focus-manager modality, list navigation and submenu activation. Slider renders no popup, opens no floating element and runs no list navigation; these reach its import graph only through shared barrel re-exports, not through any executed Slider path. |
-| `54cfcc188` #5386, `ee38be3e2` #5250, `006a72a99` #5341 | **(a) skip — React-specific** | TypeScript declaration emission, store-selector code size, and React effect-ownership relocation respectively. None changes DOM output, ARIA, focus order, keyboard/pointer behavior, timing constants or the public API surface. `006a72a99` remains **revisit-on-symptom** per #158; no Slider divergence observed. |
+| `1a2ca3c9f` #5401 | **(d:moot)** | Interrupting a closing popup released its locked size early, so the replacement animation started from a collapsed box. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `166e8ac01` #5400 | **(d:moot)** | Development-mode duplicate-trigger checking was quadratic in the number of registered popup triggers. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `071e89201` #5394 | **(d:moot)** | Popup handles were attached for triggers that never used them. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `3b5715cc7` #5387 | **(d:moot)** | Popup-handle state-machine regressions left a detached-trigger popup stuck open or unopenable. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `8b2282a5e` #5388 | **(d:moot)** | Return focus after a popup closed used a stale close modality, so the focus ring appeared for the wrong input type. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `7397c99ba` #5339 | **(d:moot)** | Popup-handle calls made during mount were dropped, so a detached-trigger popup did not respond to its handle. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `b089a7ccc` #5309 | **(d:moot)** | Under React 17 the popup subtree mounted a frame late on open. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `9a5c3850f` #5265 | **(d:moot)** | In Safari, scrolling a list under a stationary pointer moved the highlight to whichever item slid under the cursor. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `dc9a4577f` #5384 | **(d:moot)** | Activating a submenu trigger with Android TalkBack did not open the submenu. | Slider renders no popup, opens no floating element, has no popup handle and runs no list navigation. This commit reaches Slider's import graph only through shared barrel re-exports (`internals/*`, `floating-ui-react/*`), not through any executed Slider path, so the symptom has no local site. |
+| `54cfcc188` #5386 | **(a) skip — React-specific** | No user-observable symptom: TypeScript declaration emission for published internals. | No runtime content; nothing in DOM output, ARIA, focus order, keyboard/pointer behavior, timing constants or the public API surface changes. |
+| `ee38be3e2` #5250 | **(a) skip — React-specific** | No user-observable symptom: store-selector code size. | Shipped bytes only; the rendered Slider output is identical. |
+| `006a72a99` #5341 | **(a) skip — React-specific** | No user-observable symptom observed: the commit relocates which React component owns a cleanup effect. | Recorded **revisit-on-symptom** per #158; no Slider divergence in value-commit or drag teardown ordering has been observed to date. |
 
 ## Test coverage
 
