@@ -12,7 +12,7 @@ Ticket: [#168](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/168) (tranc
 
 NavigationMenu was the stalest surface on the audit-freshness matrix ([#147](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/147)). Its transitive import graph is 164 files; 16 commits in the window touch it, one of them NavigationMenu-owned. Adding `692bc8748` (#5370) — which does not touch the graph upstream but which PR #207 implemented for this component in Razor — gives **17 (commit, NavigationMenu) pairs**, each dispositioned in its own row below.
 
-Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin `1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in 17 rows.
+Every disposition row below carries the standard **Verified against** field — local HEAD `4b2a7923` + upstream pin `1a2ca3c9f` (2026-08-03), audited 2026-08-21. The value is identical in every row because the whole sweep ran against one tree and one pin.
 
 That one — `09124a6b2` (#5271) — is one of the five heavy refactors the delta inventory flagged for a source-side skim (`NavigationMenuTrigger` ±191 lines). This audit walked every hunk of it rather than accepting the "expand test coverage" title.
 
@@ -20,9 +20,9 @@ That one — `09124a6b2` (#5271) — is one of the five heavy refactors the delt
 
 ## NavigationMenu-owned commits
 
-| Upstream | Verdict | User-observable symptom | Evidence |
-|---|---|---|---|
-| `09124a6b2` #5271 | **split — (d:moot) / (d:already-present) / (a) skip per hunk** | See the per-hunk table below. | Nominally a test-coverage commit; its seven source hunks are dispositioned separately per Q6.1. |
+| Upstream | Verdict | User-observable symptom | Evidence | Verified against |
+|---|---|---|---|---|
+| `09124a6b2` #5271 | **split — (d:moot) / (d:already-present) / (a) skip per hunk** | See the per-hunk table below. | Nominally a test-coverage commit; its seven source hunks are dispositioned separately per Q6.1. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 ## `09124a6b2` (#5271) — per-hunk disposition (Q6.1)
 
@@ -38,11 +38,11 @@ That one — `09124a6b2` (#5271) — is one of the five heavy refactors the delt
 
 ## Shared-layer commits — inheritance verified
 
-| Upstream | Verdict | User-observable symptom | Evidence |
-|---|---|---|---|
-| `84ac4b797` #4485 | **(d:already-present)** | Pinch-zooming on a touch device dragged the open navigation-menu popup around the screen instead of leaving it anchored. | `blazix-baseui-navigation-menu.js:1376` and `:1419` pass `shiftLayoutViewport: true` into the shared positioner. Landed #158 batch 1 (PR #207). |
-| `692bc8748` #5370 | **(d:already-present)** | A left-anchored navigation-menu popup grew from the wrong edge while auto-resizing, so its content slid sideways instead of expanding in place. | `NavigationMenu/NavigationMenuPopup.razor:91-96` carries the logic in C# with an explicit `// Upstream #5370` reference — the one consumer PR #207 implemented in Razor rather than JS. |
-| `1a2ca3c9f` #5401 | **(d:moot)** | Interrupting a closing popup released its locked size as soon as the canceled animation's `finished` promise rejected, so the replacement animation started from a collapsed box and jumped. | Mechanism inspected: `syncPopupAutoSize` (`blazix-baseui-navigation-menu.js:1272-1305`). The port measures under `auto` and commits fixed pixel values inside a single `requestAnimationFrame`; it never schedules a release tied to `getAnimations().finished` (`grep getAnimations` on the module returns nothing). There is no animation-completion release that could mis-fire. Same reasoning as the Menu/ContextMenu determination on [#172](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/172). |
+| Upstream | Verdict | User-observable symptom | Evidence | Verified against |
+|---|---|---|---|---|
+| `84ac4b797` #4485 | **(d:already-present)** | Pinch-zooming on a touch device dragged the open navigation-menu popup around the screen instead of leaving it anchored. | `blazix-baseui-navigation-menu.js:1376` and `:1419` pass `shiftLayoutViewport: true` into the shared positioner. Landed #158 batch 1 (PR #207). | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `692bc8748` #5370 | **(d:already-present)** | A left-anchored navigation-menu popup grew from the wrong edge while auto-resizing, so its content slid sideways instead of expanding in place. | `NavigationMenu/NavigationMenuPopup.razor:91-96` carries the logic in C# with an explicit `// Upstream #5370` reference — the one consumer PR #207 implemented in Razor rather than JS. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `1a2ca3c9f` #5401 | **(d:moot)** | Interrupting a closing popup released its locked size as soon as the canceled animation's `finished` promise rejected, so the replacement animation started from a collapsed box and jumped. | Mechanism inspected: `syncPopupAutoSize` (`blazix-baseui-navigation-menu.js:1272-1305`). The port measures under `auto` and commits fixed pixel values inside a single `requestAnimationFrame`; it never schedules a release tied to `getAnimations().finished` (`grep getAnimations` on the module returns nothing). There is no animation-completion release that could mis-fire. Same reasoning as the Menu/ContextMenu determination on [#172](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/172). | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 ## Owned by #158 batch 2 — recorded, not re-dispositioned
 
@@ -53,19 +53,19 @@ uncertainty, tier 2; Q6.3) — "A deferral is a recorded debt, not a skip." The 
 #158; the NavigationMenu-side symptom and evidence are written down here so the deferral is
 specified.
 
-| Upstream | Verdict | User-observable symptom | Evidence |
-|---|---|---|---|
-| `8b2282a5e` #5388 | **defer-with-spec → #158** | Focus returning to the trigger after the menu closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`); the close-time snapshot half is unconfirmed. |
-| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount are dropped, so a detached-trigger navigation menu does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against the port's handle system. |
-| `3b5715cc7` #5387 | **defer-with-spec → #158** | Popup-handle state-machine regressions leave a detached-trigger navigation menu stuck open or unopenable. | Unblocked (PR #203), not yet evaluated. |
-| `071e89201` #5394 | **defer-with-spec → #158** | Unused handle attachments are made for triggers that never use them; upstream claims no user-visible symptom beyond the wasted attachment. | Unblocked (PR #203), not yet evaluated. |
+| Upstream | Verdict | User-observable symptom | Evidence | Verified against |
+|---|---|---|---|---|
+| `8b2282a5e` #5388 | **defer-with-spec → #158** | Focus returning to the trigger after the menu closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`); the close-time snapshot half is unconfirmed. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount are dropped, so a detached-trigger navigation menu does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against the port's handle system. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `3b5715cc7` #5387 | **defer-with-spec → #158** | Popup-handle state-machine regressions leave a detached-trigger navigation menu stuck open or unopenable. | Unblocked (PR #203), not yet evaluated. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `071e89201` #5394 | **defer-with-spec → #158** | Unused handle attachments are made for triggers that never use them; upstream claims no user-visible symptom beyond the wasted attachment. | Unblocked (PR #203), not yet evaluated. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 ## (d:moot) — reach the graph but not any executed NavigationMenu path
 
-| Upstream | Reasoning |
-|---|---|
-| `dc9a4577f` #5384 | Recognizes Android TalkBack synthesized presses so a **Menu** submenu trigger opens. NavigationMenu has no submenu trigger of that kind and does not share `blazix-baseui-menu.js`'s activation path. |
-| `9a5c3850f` #5265 | Ignores zero-delta WebKit pointer moves during **list** scrolling so a highlight does not follow the cursor. NavigationMenu runs no list navigation and has no highlighted item. |
+| Upstream | Reasoning | Verified against |
+|---|---|---|
+| `dc9a4577f` #5384 | Recognizes Android TalkBack synthesized presses so a **Menu** submenu trigger opens. NavigationMenu has no submenu trigger of that kind and does not share `blazix-baseui-menu.js`'s activation path. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `9a5c3850f` #5265 | Ignores zero-delta WebKit pointer moves during **list** scrolling so a highlight does not follow the cursor. NavigationMenu runs no list navigation and has no highlighted item. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 ## (a) skip — React-specific
 
@@ -73,15 +73,15 @@ Every row in this table carries the verdict **(a) skip — React-specific**; the
 both the symptom restatement and the evidence. None changes DOM output, ARIA, focus order,
 keyboard/pointer behavior, timing constants or the public API surface.
 
-| Upstream | Why no NavigationMenu symptom |
-|---|---|
-| `166e8ac01` #5400 | Development-mode-only duplicate-trigger warning cost; the port ships no equivalent dev diagnostic. |
-| `ee38be3e2` #5250 | Store-selector code size. Rendered output identical. |
-| `b089a7ccc` #5309 | React 17 legacy-mode portal mounting; `NavigationMenuPortal` has no legacy/concurrent split. |
-| `54cfcc188` #5386 | TypeScript declaration emission. No runtime content. |
-| `ce7358672` #5298 | Module export/packaging move. No runtime content. |
-| `1e64978b1` #5372 | Re-render avoidance during lazy flip; the flip decision is unchanged, so the popup lands in the same place. |
-| `006a72a99` #5341 | Relocates which React component owns a cleanup effect. **Revisit-on-symptom** per #158; no NavigationMenu open/close divergence observed to date. |
+| Upstream | Why no NavigationMenu symptom | Verified against |
+|---|---|---|
+| `166e8ac01` #5400 | Development-mode-only duplicate-trigger warning cost; the port ships no equivalent dev diagnostic. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `ee38be3e2` #5250 | Store-selector code size. Rendered output identical. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `b089a7ccc` #5309 | React 17 legacy-mode portal mounting; `NavigationMenuPortal` has no legacy/concurrent split. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `54cfcc188` #5386 | TypeScript declaration emission. No runtime content. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `ce7358672` #5298 | Module export/packaging move. No runtime content. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `1e64978b1` #5372 | Re-render avoidance during lazy flip; the flip decision is unchanged, so the popup lands in the same place. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `006a72a99` #5341 | Relocates which React component owns a cleanup effect. **Revisit-on-symptom** per #158; no NavigationMenu open/close divergence observed to date. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 ## Test coverage
 
