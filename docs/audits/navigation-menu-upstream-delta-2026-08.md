@@ -10,11 +10,19 @@ Ticket: [#168](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/168) (tranc
 
 ## Delta Window
 
-NavigationMenu was the stalest surface on the audit-freshness matrix ([#147](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/147)). Its transitive import graph is 164 files; 16 commits in the window touch it, one of them NavigationMenu-owned.
+NavigationMenu was the stalest surface on the audit-freshness matrix ([#147](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/147)). Its transitive import graph is 164 files; 16 commits in the window touch it, one of them NavigationMenu-owned. Adding `692bc8748` (#5370) — which does not touch the graph upstream but which PR #207 implemented for this component in Razor — gives **17 (commit, NavigationMenu) pairs**, each dispositioned in its own row below.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin `1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in 17 rows.
 
 That one — `09124a6b2` (#5271) — is one of the five heavy refactors the delta inventory flagged for a source-side skim (`NavigationMenuTrigger` ±191 lines). This audit walked every hunk of it rather than accepting the "expand test coverage" title.
 
 **Outcome: no ports.** The refactor decomposes into one genuine upstream bug fix whose symptom the port cannot reproduce, one already-present behavior, and five verified no-ops.
+
+## NavigationMenu-owned commits
+
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `09124a6b2` #5271 | **split — (d:moot) / (d:already-present) / (a) skip per hunk** | See the per-hunk table below. | Nominally a test-coverage commit; its seven source hunks are dispositioned separately per Q6.1. |
 
 ## `09124a6b2` (#5271) — per-hunk disposition (Q6.1)
 
@@ -40,10 +48,17 @@ That one — `09124a6b2` (#5271) — is one of the five heavy refactors the delt
 
 Batch 2 has **not** landed as of `4b2a7923`.
 
-| Upstream | NavigationMenu-side state | NavigationMenu-side symptom |
-|---|---|---|
-| `8b2282a5e` #5388 | Unverified | Focus returning to the trigger after the menu closes may use the wrong focus-visible modality. |
-| `7397c99ba` #5339, `3b5715cc7` #5387, `071e89201` #5394 | Unblocked (PR #203), not yet evaluated | Popup-handle lifecycle for detached triggers. |
+The verdict on these rows is **defer-with-spec** in the rubric's own sense (Resolving
+uncertainty, tier 2; Q6.3) — "A deferral is a recorded debt, not a skip." The debt is owned by
+#158; the NavigationMenu-side symptom and evidence are written down here so the deferral is
+specified.
+
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `8b2282a5e` #5388 | **defer-with-spec → #158** | Focus returning to the trigger after the menu closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`); the close-time snapshot half is unconfirmed. |
+| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount are dropped, so a detached-trigger navigation menu does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against the port's handle system. |
+| `3b5715cc7` #5387 | **defer-with-spec → #158** | Popup-handle state-machine regressions leave a detached-trigger navigation menu stuck open or unopenable. | Unblocked (PR #203), not yet evaluated. |
+| `071e89201` #5394 | **defer-with-spec → #158** | Unused handle attachments are made for triggers that never use them; upstream claims no user-visible symptom beyond the wasted attachment. | Unblocked (PR #203), not yet evaluated. |
 
 ## (d:moot) — reach the graph but not any executed NavigationMenu path
 
@@ -53,6 +68,10 @@ Batch 2 has **not** landed as of `4b2a7923`.
 | `9a5c3850f` #5265 | Ignores zero-delta WebKit pointer moves during **list** scrolling so a highlight does not follow the cursor. NavigationMenu runs no list navigation and has no highlighted item. |
 
 ## (a) skip — React-specific
+
+Every row in this table carries the verdict **(a) skip — React-specific**; the reason column is
+both the symptom restatement and the evidence. None changes DOM output, ARIA, focus order,
+keyboard/pointer behavior, timing constants or the public API surface.
 
 | Upstream | Why no NavigationMenu symptom |
 |---|---|
