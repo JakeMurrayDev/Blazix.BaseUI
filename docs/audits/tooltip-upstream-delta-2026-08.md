@@ -12,13 +12,22 @@ Ticket: [#171](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/171) (tranc
 
 Tooltip's transitive import graph is 144 files (BFS from `packages/react/src/tooltip` through
 `floating-ui-react/*`, `internals/*`, `utils/*` and `packages/utils/*`). Seventeen commits in the
-window touch it; one is Tooltip-owned.
+window touch it — **17 (commit, Tooltip) pairs**, each dispositioned in its own row below. One is
+Tooltip-owned.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+17 rows.
 
 **Outcome: no new ports.** The one Tooltip-owned commit is a normalization of a type union the
 port does not model, and the two shared popup fixes that reach the Tooltip viewport are already
 present with upstream references in the code.
 
 ## Tooltip-owned commits
+
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `67840f641` #5270 | **split — (a) skip / (d:moot) per hunk** | See the per-hunk table below. | Nominally a test-coverage commit; its two source hunks are dispositioned separately per Q6.1. |
 
 `67840f641` (#5270) is nominally a test-coverage commit with two source hunks; split disposition
 per Q6.1.
@@ -37,13 +46,17 @@ per Q6.1.
 
 ## Shared-layer commits owned by #158 batch 2 — recorded, not re-dispositioned
 
-Batch 2 has **not** landed as of `4b2a7923`. Verdicts belong to
-[#158](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/158).
+Batch 2 has **not** landed as of `4b2a7923`. The verdict on these rows is **defer-with-spec** in
+the rubric's own sense (Resolving uncertainty, tier 2; Q6.3) — "A deferral is a recorded debt,
+not a skip." The debt is owned by [#158](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/158);
+the Tooltip-side symptom and evidence are written down here so the deferral is specified.
 
-| Upstream | Tooltip-side state | Tooltip-side symptom |
-|---|---|---|
-| `8b2282a5e` #5388 | Unverified — `blazix-baseui-floating.js` tracks `lastInteractionType` per focus-manager instance, but the close-time snapshot half is unconfirmed | Focus returning to the trigger after a tooltip closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. |
-| `7397c99ba` #5339, `3b5715cc7` #5387, `071e89201` #5394 | Unblocked (the Handle surface decision was executed in PR #203), not yet evaluated | Popup-handle lifecycle for detached triggers; `Tooltip/TooltipHandle.cs` is the local surface. |
+| Upstream | Verdict | User-observable symptom | Evidence |
+|---|---|---|---|
+| `8b2282a5e` #5388 | **defer-with-spec → #158** | Focus returning to the trigger after a tooltip closes may use the wrong focus-visible modality, so a focus ring appears (or fails to appear) for the wrong input type. | Unverified: `blazix-baseui-floating.js:3267` tracks `lastInteractionType` per focus-manager instance and reads it at dispose (`:3664`), which may already give upstream's reset-on-open semantics; the close-time snapshot half is unconfirmed. |
+| `7397c99ba` #5339 | **defer-with-spec → #158** | Popup-handle calls made during mount are dropped, so a detached-trigger tooltip does not respond to its handle. | Unblocked — the Handle surface decision was ratified on #157 and executed in PR #203 — but not yet evaluated against `Tooltip/TooltipHandle.cs`. |
+| `3b5715cc7` #5387 | **defer-with-spec → #158** | Popup-handle state-machine regressions leave a detached-trigger tooltip stuck open or unopenable. | Unblocked (PR #203), not yet evaluated against `Tooltip/TooltipHandle.cs`. |
+| `071e89201` #5394 | **defer-with-spec → #158** | Unused handle attachments are made for triggers that never use them; upstream claims no user-visible symptom beyond the wasted attachment. | Unblocked (PR #203), not yet evaluated against `Tooltip/TooltipHandle.cs`. |
 
 ## (d:moot) — reach the graph but not any executed Tooltip path
 
