@@ -13,6 +13,7 @@ if (!window[STATE_KEY]) {
 }
 const state = window[STATE_KEY];
 state.tabPreActivationHandlers ??= new WeakMap();
+state.tabPressWatchers ??= new WeakMap();
 state.panelHandoffObservers ??= new WeakMap();
 state.panelVisibilityObservers ??= new WeakMap();
 
@@ -121,6 +122,45 @@ export function registerTab(listElement, tabElement, value) {
     observePanelVisibility(listElement);
     updateTabIndexes(listElement);
     notifyIndicatorRefs(listElement);
+}
+
+/**
+ * Watches for the end of a press that started on a tab. Upstream #5269 registers the release
+ * listener for every button, so a secondary press (context menu, middle click) cannot leave the
+ * tab stuck in the pressing state and suppress later focus activation. The listener is on the
+ * document, not the tab, so a release outside the tab still ends the press.
+ * @param {HTMLElement} tabElement - The tab the press started on.
+ * @param {object} dotNetRef - .NET reference notified once the press ends.
+ */
+export function watchTabPressEnd(tabElement, dotNetRef) {
+    if (!tabElement) return;
+
+    unwatchTabPressEnd(tabElement);
+
+    const doc = tabElement.ownerDocument || document;
+    const handlePointerEnd = () => {
+        unwatchTabPressEnd(tabElement);
+        dotNetRef.invokeMethodAsync('OnTabPressEnd').catch(() => { });
+    };
+
+    doc.addEventListener('pointerup', handlePointerEnd);
+    doc.addEventListener('pointercancel', handlePointerEnd);
+    state.tabPressWatchers.set(tabElement, { doc, handlePointerEnd });
+}
+
+/**
+ * Removes a pending press watcher registered by watchTabPressEnd.
+ * @param {HTMLElement} tabElement - The tab the press started on.
+ */
+export function unwatchTabPressEnd(tabElement) {
+    if (!tabElement) return;
+
+    const watcher = state.tabPressWatchers.get(tabElement);
+    if (!watcher) return;
+
+    watcher.doc.removeEventListener('pointerup', watcher.handlePointerEnd);
+    watcher.doc.removeEventListener('pointercancel', watcher.handlePointerEnd);
+    state.tabPressWatchers.delete(tabElement);
 }
 
 export function unregisterTab(listElement, tabElement) {

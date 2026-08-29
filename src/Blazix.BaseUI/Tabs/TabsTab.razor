@@ -23,6 +23,10 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private bool hasRendered;
+    private bool isPressing;
+    private bool isMainButton;
+    private ElementReference? registeredElement;
+    private DotNetObjectReference<TabsTab<TValue>>? dotNetRef;
     private bool previousActive;
     private bool previousDisabled;
     private Orientation previousOrientation;
@@ -208,6 +212,14 @@
         }
         else if (hasRendered && Element.HasValue)
         {
+            // A Render template can swap the host element. The list keys its registration and its
+            // resize observer by element, so the previous element must be released or it lingers as
+            // a phantom tab and keeps being observed.
+            if (registeredElement.HasValue && registeredElement.Value.Id != Element.Value.Id)
+            {
+                await UnregisterFromListAsync(registeredElement.Value);
+            }
+
             RootContext?.RegisterTabInfo(Value, Element.Value, tabId, Disabled);
             await RegisterWithListAsync();
         }
@@ -232,11 +244,17 @@
 
                 await module.DisposeAsync();
             }
-            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
+            catch (Exception ex) when (
+                ex is JSDisconnectedException or
+                TaskCanceledException or
+                ObjectDisposedException)
             {
-                _ = ex; // Expected during circuit disconnect - safe to ignore.
+                _ = ex; // Expected during circuit disconnect or teardown - safe to ignore.
             }
         }
+
+        dotNetRef?.Dispose();
+        dotNetRef = null;
     }
 
     private void BuildComponentAttributes()
@@ -268,6 +286,7 @@
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);
         attrs["onfocus"] = EventCallback.Factory.Create<FocusEventArgs>(this, HandleFocusAsync);
+        attrs["onpointerdown"] = EventCallback.Factory.Create<PointerEventArgs>(this, HandlePointerDownAsync);
 
         if (orientationValue is not null)
         {
@@ -292,6 +311,7 @@
             var module = await moduleTask.Value;
             var serializedValue = SerializeValue(Value);
             await module.InvokeVoidAsync("registerTab", ListContext.TabsListElement.Value, Element.Value, serializedValue);
+            registeredElement = Element.Value;
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -299,9 +319,10 @@
         }
     }
 
-    private async Task UnregisterFromListAsync()
+    private async Task UnregisterFromListAsync(ElementReference? element = null)
     {
-        if (ListContext?.TabsListElement is null || !ListContext.TabsListElement.HasValue || !Element.HasValue)
+        var target = element ?? Element;
+        if (ListContext?.TabsListElement is null || !ListContext.TabsListElement.HasValue || !target.HasValue)
         {
             return;
         }
@@ -309,7 +330,13 @@
         try
         {
             var module = await moduleTask.Value;
-            await module.InvokeVoidAsync("unregisterTab", ListContext.TabsListElement.Value, Element.Value);
+            await module.InvokeVoidAsync("unregisterTab", ListContext.TabsListElement.Value, target.Value);
+            await module.InvokeVoidAsync("unwatchTabPressEnd", target.Value);
+
+            if (registeredElement.HasValue && registeredElement.Value.Id == target.Value.Id)
+            {
+                registeredElement = null;
+            }
         }
         catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
         {
@@ -380,12 +407,60 @@
 
     private async Task HandleFocusAsync(FocusEventArgs e)
     {
-        if (!Disabled && ListContext?.ActivateOnFocus == true && !IsActive)
+        // A press with a secondary button (context menu, middle click) may focus the tab, but must
+        // not activate it. Keyboard and touch focus arrive with no press in progress.
+        if (!Disabled && ListContext?.ActivateOnFocus == true && !IsActive && (!isPressing || isMainButton))
         {
             await ActivateTabAsync(e);
         }
 
         await EventUtilities.InvokeOnFocusAsync(AdditionalAttributes, e);
+    }
+
+    private async Task HandlePointerDownAsync(PointerEventArgs e)
+    {
+        if (!Disabled && !IsActive)
+        {
+            isPressing = true;
+            isMainButton = e.Button == 0;
+
+            await WatchPressEndAsync();
+        }
+
+        await EventUtilities.InvokeOnPointerDownAsync(AdditionalAttributes, e);
+    }
+
+    /// <summary>
+    /// Called from JavaScript once the press that started on this tab is released or canceled,
+    /// wherever in the document that happens.
+    /// </summary>
+    [JSInvokable]
+    public void OnTabPressEnd()
+    {
+        isPressing = false;
+        isMainButton = false;
+    }
+
+    private async Task WatchPressEndAsync()
+    {
+        if (!Element.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await moduleTask.Value;
+            dotNetRef ??= DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("watchTabPressEnd", Element.Value, dotNetRef);
+        }
+        catch (Exception ex) when (
+            ex is JSDisconnectedException or
+            TaskCanceledException or
+            ObjectDisposedException)
+        {
+            _ = ex; // Expected during circuit disconnect or teardown - safe to ignore.
+        }
     }
 
     private async Task ActivateTabAsync(EventArgs? sourceEventArgs = null)

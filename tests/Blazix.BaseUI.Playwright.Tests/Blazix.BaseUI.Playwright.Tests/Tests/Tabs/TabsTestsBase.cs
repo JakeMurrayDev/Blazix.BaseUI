@@ -314,6 +314,63 @@ public abstract class TabsTestsBase : TestBase
     #region ActivateOnFocus
 
     [Fact]
+    public virtual async Task ActivateOnFocus_SecondaryPress_DoesNotActivateTab()
+    {
+        await NavigateAsync(CreateUrl("/tests/tabs").WithActivateOnFocus(true).Build());
+        await WaitForTabsJsAsync();
+        await WaitForDelayAsync(500);
+
+        var tab1 = GetByTestId("tab-1");
+        var tab2 = GetByTestId("tab-2");
+        await Assertions.Expect(tab1).ToHaveAttributeAsync("aria-selected", "true");
+
+        // A right-click focuses the tab on most platforms, but must not select it.
+        await tab2.ClickAsync(new LocatorClickOptions { Button = MouseButton.Right });
+        await WaitForDelayAsync(300);
+
+        await Assertions.Expect(tab2).ToHaveAttributeAsync("aria-selected", "false");
+        await Assertions.Expect(tab1).ToHaveAttributeAsync("aria-selected", "true");
+    }
+
+    [Fact]
+    public virtual async Task ActivateOnFocus_AfterSecondaryPressReleasedOutside_FocusStillActivates()
+    {
+        await NavigateAsync(CreateUrl("/tests/tabs").WithActivateOnFocus(true).Build());
+        await WaitForTabsJsAsync();
+        await WaitForDelayAsync(500);
+
+        // Upstream #5269: the release listener is registered for every button and lives on the
+        // document, so a secondary press released away from the tab cannot leave it stuck in the
+        // pressing state. A stuck tab would refuse to activate on a later focus.
+        //
+        // Arrow-key navigation cannot show this: `setFocusedTab` in blazix-baseui-tabs.js
+        // activates through the list's OnNavigateToTab callback and never reaches the tab's own
+        // focus handler. Programmatic focus does reach it, so that is what this drives.
+        var tab1 = GetByTestId("tab-1");
+        var tab2 = GetByTestId("tab-2");
+
+        var box = await tab2.BoundingBoxAsync();
+        Assert.NotNull(box);
+
+        await Page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+        await Page.Mouse.DownAsync(new MouseDownOptions { Button = MouseButton.Right });
+        await Page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height + 120);
+        await Page.Mouse.UpAsync(new MouseUpOptions { Button = MouseButton.Right });
+        await WaitForDelayAsync(300);
+
+        // The secondary press must not have selected it.
+        await Assertions.Expect(tab2).ToHaveAttributeAsync("aria-selected", "false");
+
+        // Focus must now activate it again: the press ended, so nothing is suppressed.
+        await tab1.FocusAsync();
+        await WaitForDelayAsync(100);
+        await tab2.FocusAsync();
+
+        await Assertions.Expect(tab2).ToHaveAttributeAsync("aria-selected", "true",
+            new LocatorAssertionsToHaveAttributeOptions { Timeout = 5000 * TimeoutMultiplier });
+    }
+
+    [Fact]
     public virtual async Task ActivateOnFocus_ArrowRight_ActivatesTab()
     {
         await NavigateAsync(CreateUrl("/tests/tabs").WithActivateOnFocus(true).Build());
