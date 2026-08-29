@@ -6,9 +6,9 @@
 > (b)/(c) port rows name their covering test or record a one-line infeasibility reason,
 > (a)/(d) verdicts restate the user-observable symptom rather than naming a React mechanism.
 
-- **Upstream pin:** `1a2ca3c9f8a39bd8c0dda939a7a23b72da226124` (2026-08-03)
-- **Batch 1:** local base `90c20c55`, PR [#207](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/207), 2026-08-20
-- **Batch 2:** local base `4b2a7923`, 2026-08-21
+- **Upstream pin:** `1a2ca3c9f8a39bd8c0dda939a7a23b72da226124` (origin/master, 2026-08-03)
+- **Batch 1:** verified against local HEAD `90c20c55`, PR [#207](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/207), 2026-08-20
+- **Batch 2:** verified against local HEAD `4b2a7923`, PR [#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229), 2026-08-21
 
 The ~19-commit shared cluster is owned by this one ticket rather than being re-dispositioned
 across the twelve popup-family component sweeps, so those sweeps diff against an already-fixed
@@ -51,8 +51,8 @@ pattern PR [#206](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/206) estab
 | Menu — group label | **(b)** | Same, on the group's `aria-labelledby`. | `MenuGroupContext.SetLabelId(object, string?)`, applied by `MenuGroup` and `MenuRadioGroup`. Test `MenuGroupLabelTests.KeepsGroupAriaLabelledByWhenSupersededLabelUnmounts`. |
 | Autocomplete — group label | **(b)** | Same, on the group's `aria-labelledby`. | `AutocompleteGroupContext.SetLabelId(object, string?)`. Test `AutocompleteRootTests.GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts`. |
 | Progress | **(b)** | Replacing `Progress.Label` left the progress bar without an accessible name. Not on the residue list recorded on #158; found by sweeping every `SetLabelId` sink. | `ProgressRootContext.SetLabelIdAction` takes the instance. Test `ProgressLabelTests.KeepsAriaLabelledByWhenLabelIsReplaced`. |
-| Accordion — trigger id | **(b), hardened** | The registration is re-asserted on every parameter set, so a stale clear self-heals in the following render; the guard removes the intermediate render in which the panel's `aria-labelledby` is absent. | `AccordionItemContext.SetTriggerId(object, string?)`. Test `AccordionTriggerTests.KeepsPanelAriaLabelledByWhenTriggerIsReplaced` locks in the invariant. |
-| Toast — title and description | **(b), hardened** | Same shape as Accordion's trigger id: `ToastTitle`/`ToastDescription` re-register on every parameter set, so the drop of `aria-labelledby`/`aria-describedby` is transient. | `ToastRootContext.SetTitleId`/`SetDescriptionId` take the instance. Test `ToastTests.TitleAndDescriptionRegistrationsSurviveAReplacement`. |
+| Accordion — trigger id | **(b), hardened** | The trigger re-registers on every parameter set, so an applied clear is restored by the render it schedules; the panel's `aria-labelledby` is absent only for that intermediate render. | `AccordionItemContext.SetTriggerId(object, string?)`. Test `AccordionTriggerTests.KeepsPanelAriaLabelledByWhenTriggerIsReplaced` drives a stale clear from a non-owner and asserts the item does not re-render — the only externally observable difference, since the DOM value is restored within the same flush. |
+| Toast — title and description | **(b), hardened** | Same shape as Accordion's trigger id: `ToastTitle`/`ToastDescription` re-register on every parameter set, so the drop of `aria-labelledby`/`aria-describedby` lasts one render. | `ToastRootContext.SetTitleId`/`SetDescriptionId` take the instance. Test `ToastTests.TitleAndDescriptionRegistrationsSurviveAReplacement` drives a stale clear from a non-owner and asserts the toast does not re-render. |
 | Accordion / Collapsible — panel id | **(b)**, divergent in the opposite direction | Neither panel cleared its registration at all, so removing the panel while the item was open left the trigger's `aria-controls` pointing at an element no longer in the document. Upstream introduced a `null` sentinel for exactly this. | `AccordionPanel`/`CollapsiblePanel` clear on dispose through the ownership guard; both triggers drop `aria-controls` when the id is cleared. Tests `AccordionPanelTests.DropsTriggerAriaControlsWhenPanelIsRemoved`, `CollapsiblePanelTests.DropsTriggerAriaControlsWhenPanelIsRemoved`. |
 | Meter | — | Dispositioned and ported separately on PR [#224](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/224). | `docs/audits/meter-upstream-delta-2026-08.md`. |
 

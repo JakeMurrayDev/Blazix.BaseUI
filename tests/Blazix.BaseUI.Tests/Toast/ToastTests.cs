@@ -828,7 +828,7 @@ public class ToastTests : BunitContext, IToastContract
         Func<bool>? shouldRenderLabelParts = null,
         RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
         RenderFragment? headerContent = null,
-        Func<string>? labelPartKey = null)
+        Action<ToastRootContext?>? captureRootContext = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -874,7 +874,7 @@ public class ToastTests : BunitContext, IToastContract
                                 includeArrow: false,
                                 shouldRenderLabelParts,
                                 titleRender,
-                                labelPartKey);
+                                captureRootContext);
                         }
                     }
                 }));
@@ -889,7 +889,7 @@ public class ToastTests : BunitContext, IToastContract
         bool includeArrow,
         Func<bool>? shouldRenderLabelParts = null,
         RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
-        Func<string>? labelPartKey = null)
+        Action<ToastRootContext?>? captureRootContext = null)
     {
         var sequence = 0;
 
@@ -913,10 +913,6 @@ public class ToastTests : BunitContext, IToastContract
                 if (shouldRenderLabelParts?.Invoke() ?? true)
                 {
                     contentBuilder.OpenComponent<ToastTitle>(0);
-                    if (labelPartKey is not null)
-                    {
-                        contentBuilder.SetKey($"title-{labelPartKey()}");
-                    }
                     contentBuilder.AddAttribute(1, "Id", $"title-{toast.Id}");
                     if (titleRender is not null)
                     {
@@ -925,11 +921,15 @@ public class ToastTests : BunitContext, IToastContract
                     contentBuilder.CloseComponent();
 
                     contentBuilder.OpenComponent<ToastDescription>(10);
-                    if (labelPartKey is not null)
-                    {
-                        contentBuilder.SetKey($"description-{labelPartKey()}");
-                    }
                     contentBuilder.AddAttribute(11, "Id", $"description-{toast.Id}");
+                    contentBuilder.CloseComponent();
+                }
+
+                if (captureRootContext is not null)
+                {
+                    contentBuilder.OpenComponent<CascadingValueCapture<ToastRootContext>>(15);
+                    contentBuilder.AddAttribute(16, "OnCaptured",
+                        EventCallback.Factory.Create<ToastRootContext?>(captureRootContext, captureRootContext));
                     contentBuilder.CloseComponent();
                 }
 
@@ -963,11 +963,11 @@ public class ToastTests : BunitContext, IToastContract
     }
 
     [Fact]
-    public Task TitleAndDescriptionRegistrationsSurviveAReplacement()
+    public async Task TitleAndDescriptionRegistrationsSurviveAReplacement()
     {
         var manager = new ToastManager();
-        var partKey = "first";
-        var cut = RenderProvider(manager, labelPartKey: () => partKey);
+        ToastRootContext? rootContext = null;
+        var cut = RenderProvider(manager, captureRootContext: context => rootContext = context);
 
         manager.Add(new ToastManagerAddOptions
         {
@@ -984,17 +984,28 @@ public class ToastTests : BunitContext, IToastContract
             root.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
         });
 
-        // The replacement parts reuse the same ids, so an id-equality guard would not reject the
-        // outgoing instances' clears.
-        partKey = "second";
-        cut.Render();
+        rootContext.ShouldNotBeNull();
 
-        // The parts re-register on every parameter set, so a stale clear is self-healing here; this
-        // locks in the invariant the ownership guard makes unconditional.
+        // The shape a replaced part takes: Blazor disposes the outgoing instance after the
+        // replacement has registered, so its clear arrives from an instance that no longer owns the
+        // registration. Driven directly because a rendered swap re-registers in the same flush.
+        // The replacement ids are identical, so an id-equality guard would not reject either clear.
+        // The parts re-register on every parameter set, so an applied clear is restored by the
+        // render it schedules. The observable difference is that render: an ignored clear does not
+        // re-render the toast at all.
+        var toastRoot = cut.FindComponent<ToastRoot>();
+        var renderCountBeforeStaleClear = toastRoot.RenderCount;
+
+        await cut.InvokeAsync(() =>
+        {
+            rootContext.SetTitleId(new object(), null);
+            rootContext.SetDescriptionId(new object(), null);
+        });
+
+        toastRoot.RenderCount.ShouldBe(renderCountBeforeStaleClear);
+
         var swappedRoot = cut.Find("[data-toast-id='swapped-parts']");
         swappedRoot.GetAttribute("aria-labelledby").ShouldBe("title-swapped-parts");
         swappedRoot.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
-
-        return Task.CompletedTask;
     }
 }
