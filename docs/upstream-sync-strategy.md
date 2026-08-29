@@ -35,6 +35,45 @@ so the work is classifying and transferring upstream behavior changes, not build
 4. **Sweeps** — executed per the cycle's ordering; every commit in scope gets a standard disposition
    row per the rubric. Closing the epic closes the cycle.
 
+## Upstream watch ([#156](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/156))
+
+[`.github/workflows/upstream-watch.yml`](../.github/workflows/upstream-watch.yml) runs on the 1st of
+each month, diffs the recorded pin against upstream `master`, and posts the delta as one
+`upstream-sync`-labelled issue titled `Upstream watch digest — YYYY-MM`. A sweep-verdict cycle's epic
+links that month's digest issue. `workflow_dispatch` refreshes the current month's issue in place,
+for off-schedule evaluations.
+
+It runs on **GitHub Actions, cloning `mui/base-ui` directly** rather than on a local schedule. The
+vendored `.base-ui` clone is gitignored and exists only on a maintainer's machine, where isolated
+worktree sessions cannot run git against it; a runner-side clone removes that dependency along with
+the need for a machine to be awake. The watch **only reports** — it renders no verdict and exits
+zero on any delta size, so a failed run means the watch broke, never that upstream moved.
+
+The pin lives in [`docs/upstream-pin.json`](upstream-pin.json), the machine-readable record the
+digest diffs from. The atomic per-cycle re-pin is one edit to that file, landed at cycle start
+alongside the epic:
+
+| Field | Meaning |
+| --- | --- |
+| `pin` | 40-character SHA every sweep in the cycle audits against |
+| `pinCommittedOn` | date of that upstream commit |
+| `cycle` / `cycleIssue` | the cycle that set it, and its epic |
+| `upstreamRepository` / `upstreamRef` | what the watch clones and diffs against |
+
+Buckets are one per `packages/react/src/<component>/` directory, plus the mandatory **shared**
+bucket covering `floating-ui-react/`, `utils/` and `internals/` — FloatingFocusManager, the popups
+utilities, positioning and composite. It sorts first and over-includes on purpose: the failure it
+exists to prevent is a *missed* shared fix, per the corollary in
+[docs/audits/METHODOLOGY.md](audits/METHODOLOGY.md). A commit lands in every bucket it touches, so
+bucket counts sum above the distinct commit total — the rubric's (commit, component) granularity.
+Paths outside `packages/react/src/` are reported in their own buckets rather than dropped.
+
+Run it by hand against a local clone with:
+
+```sh
+node scripts/upstream-watch-digest.mjs --upstream .base-ui --ref origin/master
+```
+
 ## Tracking shape ([#152](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/152))
 
 - **One epic per sweep-verdict cycle**, carrying the cycle's identity: the pin SHA the cycle audits

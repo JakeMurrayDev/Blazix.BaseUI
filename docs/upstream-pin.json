@@ -1,0 +1,8 @@
+{
+  "upstreamRepository": "mui/base-ui",
+  "upstreamRef": "master",
+  "pin": "1a2ca3c9f8a39bd8c0dda939a7a23b72da226124",
+  "pinCommittedOn": "2026-08-03",
+  "cycle": 1,
+  "cycleIssue": 157
+}
