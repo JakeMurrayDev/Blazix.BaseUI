@@ -13,10 +13,15 @@ Ticket: [#170](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/170) (tranc
 
 ## Delta Window
 
-Tabs' transitive import graph is 140 files. Thirteen commits in the window touch it; two are
-Tabs-owned, one of which (`9f7867437`, #5279) is a "expand test coverage" commit carrying seven
-source hunks. Walking those hunks — rather than trusting the title — is what produced this
-refresh's two ports.
+Tabs' transitive import graph is 140 files, and thirteen commits in the window touch it. Adding
+the docs-only `e00174866` (#5306), which changes no file in the graph, gives **14 (commit, Tabs)
+pairs**, each dispositioned in its own row below. Two are Tabs-owned, one of which
+(`9f7867437`, #5279) is an "expand test coverage" commit carrying seven source hunks. Walking
+those hunks — rather than trusting the title — is what produced this refresh's two ports.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+14 rows.
 
 ## Tabs-owned commits
 
@@ -39,11 +44,27 @@ refresh's two ports.
 
 ## Shared-layer commits
 
+All of these are `(d:moot)` or `(a) skip` for Tabs. An earlier draft of this table listed
+`8b2282a5e`, `7397c99ba`, `3b5715cc7` and `071e89201` as "owned by #158 batch 2", and
+dispositioned `071e89201` a second time as `(d:moot)` in the next row — a contradiction that
+splitting the grouped rows exposed. Tabs has no popup surface at all, so the popup-handle and
+focus-manager commits are moot here rather than deferred; #158 still owns them for the
+components that do have one.
+
 | Upstream | Verdict | User-observable symptom | Evidence |
 |---|---|---|---|
-| `8b2282a5e` #5388, `7397c99ba` #5339, `3b5715cc7` #5387, `071e89201` #5394 | **owned by [#158](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/158) batch 2** | Focus-manager close modality and popup-handle lifecycle. | Batch 2 has not landed as of `4b2a7923`. Recorded, not re-dispositioned. |
-| `1a2ca3c9f` #5401, `166e8ac01` #5400, `071e89201` #5394, `b089a7ccc` #5309, `dc9a4577f` #5384, `9a5c3850f` #5265 | **(d:moot)** | Popup lifecycle, dev-mode trigger registration, React 17 portal mounting, submenu activation and list-navigation hover. | Tabs renders no popup, opens no floating element and runs no list navigation of that kind; these reach the import graph through shared barrel re-exports, not through any executed Tabs path. |
-| `54cfcc188` #5386, `ee38be3e2` #5250, `006a72a99` #5341 | **(a) skip — React-specific** | Declaration emission, selector code size, effect-ownership relocation. None changes DOM output, ARIA, focus order, keyboard/pointer behavior, timing constants or the public API. `006a72a99` stays **revisit-on-symptom** per #158. |
+| `8b2282a5e` #5388 | **(d:moot)** | Return focus after a popup closed used a stale close modality, so the focus ring appeared for the wrong input type. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `7397c99ba` #5339 | **(d:moot)** | Popup-handle calls made during mount were dropped, so a detached-trigger popup did not respond to its handle. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `3b5715cc7` #5387 | **(d:moot)** | Popup-handle state-machine regressions left a detached-trigger popup stuck open or unopenable. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `071e89201` #5394 | **(d:moot)** | Popup handles were attached for triggers that never used them. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `1a2ca3c9f` #5401 | **(d:moot)** | Interrupting a closing popup released its locked size early, so the replacement animation started from a collapsed box. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `166e8ac01` #5400 | **(d:moot)** | Development-mode duplicate-trigger checking was quadratic in the number of registered popup triggers. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `b089a7ccc` #5309 | **(d:moot)** | Under React 17 the popup subtree mounted a frame late on open. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `dc9a4577f` #5384 | **(d:moot)** | Activating a submenu trigger with Android TalkBack did not open the submenu. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `9a5c3850f` #5265 | **(d:moot)** | In Safari, scrolling a list under a stationary pointer moved the highlight to whichever item slid under the cursor. | Tabs renders no popup, opens no floating element, has no portal, positioner or popup handle (`ls src/Blazix.BaseUI/Tabs/` — Root, List, Tab, Panel, Indicator only) and runs no floating list navigation. This commit reaches Tabs' import graph through shared barrel re-exports only, not through any executed Tabs path, so the symptom has no local site. |
+| `54cfcc188` #5386 | **(a) skip — React-specific** | No user-observable symptom: TypeScript declaration emission for published internals. | No runtime content; nothing in DOM output, ARIA, focus order, keyboard/pointer behavior, timing constants or the public API surface changes. |
+| `ee38be3e2` #5250 | **(a) skip — React-specific** | No user-observable symptom: store-selector code size. | Shipped bytes only; the rendered Tabs output is identical. |
+| `006a72a99` #5341 | **(a) skip — React-specific** | No user-observable symptom observed: the commit relocates which React component owns a cleanup effect. | Recorded **revisit-on-symptom** per #158; no Tabs activation or panel-mount ordering divergence has been observed to date. |
 
 ## Note on the local architecture
 
