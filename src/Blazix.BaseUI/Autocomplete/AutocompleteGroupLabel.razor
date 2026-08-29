@@ -58,7 +58,7 @@
     protected override void OnInitialized()
     {
         labelId = Id ?? Guid.NewGuid().ToIdString();
-        GroupContext?.SetLabelId(labelId);
+        GroupContext?.SetLabelId(this, labelId);
         BuildComponentAttributes();
     }
 
@@ -68,7 +68,7 @@
         if (Id is not null && Id != labelId)
         {
             labelId = Id;
-            GroupContext?.SetLabelId(labelId);
+            GroupContext?.SetLabelId(this, labelId);
         }
 
         BuildComponentAttributes();
@@ -77,7 +77,7 @@
     /// <inheritdoc />
     public void Dispose()
     {
-        GroupContext?.SetLabelId(null);
+        GroupContext?.SetLabelId(this, null);
     }
 
     private void BuildComponentAttributes()

@@ -827,7 +827,8 @@ public class ToastTests : BunitContext, IToastContract
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes = null,
         Func<bool>? shouldRenderLabelParts = null,
         RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
-        RenderFragment? headerContent = null)
+        RenderFragment? headerContent = null,
+        Action<ToastRootContext?>? captureRootContext = null)
     {
         return Render<ToastProvider>(parameters => parameters
             .Add(p => p.Timeout, 0)
@@ -872,7 +873,8 @@ public class ToastTests : BunitContext, IToastContract
                                 closeAdditionalAttributes,
                                 includeArrow: false,
                                 shouldRenderLabelParts,
-                                titleRender);
+                                titleRender,
+                                captureRootContext);
                         }
                     }
                 }));
@@ -886,7 +888,8 @@ public class ToastTests : BunitContext, IToastContract
         IReadOnlyDictionary<string, object>? closeAdditionalAttributes,
         bool includeArrow,
         Func<bool>? shouldRenderLabelParts = null,
-        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null)
+        RenderFragment<RenderProps<ToastTitleState>>? titleRender = null,
+        Action<ToastRootContext?>? captureRootContext = null)
     {
         var sequence = 0;
 
@@ -922,6 +925,14 @@ public class ToastTests : BunitContext, IToastContract
                     contentBuilder.CloseComponent();
                 }
 
+                if (captureRootContext is not null)
+                {
+                    contentBuilder.OpenComponent<CascadingValueCapture<ToastRootContext>>(15);
+                    contentBuilder.AddAttribute(16, "OnCaptured",
+                        EventCallback.Factory.Create<ToastRootContext?>(captureRootContext, captureRootContext));
+                    contentBuilder.CloseComponent();
+                }
+
                 contentBuilder.OpenComponent<ToastAction>(20);
                 contentBuilder.AddAttribute(21, "AdditionalAttributes", new Dictionary<string, object>
                 {
@@ -949,5 +960,52 @@ public class ToastTests : BunitContext, IToastContract
             rootBuilder.CloseComponent();
         }));
         builder.CloseComponent();
+    }
+
+    [Fact]
+    public async Task TitleAndDescriptionRegistrationsSurviveAReplacement()
+    {
+        var manager = new ToastManager();
+        ToastRootContext? rootContext = null;
+        var cut = RenderProvider(manager, captureRootContext: context => rootContext = context);
+
+        manager.Add(new ToastManagerAddOptions
+        {
+            Id = "swapped-parts",
+            Title = "Swapped title",
+            Description = "Swapped description",
+            Timeout = 0
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            var root = cut.Find("[data-toast-id='swapped-parts']");
+            root.GetAttribute("aria-labelledby").ShouldBe("title-swapped-parts");
+            root.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
+        });
+
+        rootContext.ShouldNotBeNull();
+
+        // The shape a replaced part takes: Blazor disposes the outgoing instance after the
+        // replacement has registered, so its clear arrives from an instance that no longer owns the
+        // registration. Driven directly because a rendered swap re-registers in the same flush.
+        // The replacement ids are identical, so an id-equality guard would not reject either clear.
+        // The parts re-register on every parameter set, so an applied clear is restored by the
+        // render it schedules. The observable difference is that render: an ignored clear does not
+        // re-render the toast at all.
+        var toastRoot = cut.FindComponent<ToastRoot>();
+        var renderCountBeforeStaleClear = toastRoot.RenderCount;
+
+        await cut.InvokeAsync(() =>
+        {
+            rootContext.SetTitleId(new object(), null);
+            rootContext.SetDescriptionId(new object(), null);
+        });
+
+        toastRoot.RenderCount.ShouldBe(renderCountBeforeStaleClear);
+
+        var swappedRoot = cut.Find("[data-toast-id='swapped-parts']");
+        swappedRoot.GetAttribute("aria-labelledby").ShouldBe("title-swapped-parts");
+        swappedRoot.GetAttribute("aria-describedby").ShouldBe("description-swapped-parts");
     }
 }

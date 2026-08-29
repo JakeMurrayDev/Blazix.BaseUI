@@ -32,6 +32,7 @@ internal interface IAutocompleteRootContext
     bool Modal { get; }
     bool OpenOnInputClick { get; }
     bool HighlightItemOnHover { get; }
+    bool IsWebKitEngine { get; set; }
     bool KeepHighlight { get; }
     bool LoopFocus { get; }
     bool Mounted { get; }

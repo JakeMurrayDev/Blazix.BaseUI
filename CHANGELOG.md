@@ -36,6 +36,17 @@ the `v0.1.0-preview.1` tag has published successfully.
   delete the attribute. Detached triggers remain fully supported on `MenuRoot` and the other popup
   roots. This landed deliberately before the first publish; after `1.0.0` it would be a major bump.
 
+- **Breaking:** `LabelableContext.SetLabelId` now takes the registering component instance
+  alongside the id (`Action<object, string?>` instead of `Action<string?>`)
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
+
+  Blazor initializes a replacement component before disposing the outgoing one, so a label that
+  cleared its registration on dispose could drop its replacement's registration and leave the
+  control without an accessible name. Ownership is tracked by instance, which an id-equality check
+  cannot do when both instances resolve the same id. **Migration:** only code that constructs a
+  `LabelableContext` directly is affected — pass `(_, id) => ...` where it passed `id => ...`. This
+  landed deliberately before the first publish; after `1.0.0` it would be a major bump.
+
 ### Fixed
 
 Cycle-1 upstream parity sweep — behavioral gaps against upstream Base UI, by component family:
@@ -58,6 +69,20 @@ Cycle-1 upstream parity sweep — behavioral gaps against upstream Base UI, by c
   ([#209](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/209)).
 - **Combobox / Autocomplete** — six named upstream changes ported
   ([#211](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/211)).
+- **All components with registered ids** — replacing a label, a toast title or description, an
+  accordion trigger, or a collapsible panel no longer drops the accessible name or leaves
+  `aria-controls` pointing at a removed element
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
+- **Menu** — a submenu trigger now opens on an Android TalkBack press instead of waiting for hover
+  that a screen reader never produces
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
+- **Select / Combobox / Autocomplete / Menu** — in Safari, scrolling a list under a stationary
+  pointer no longer drags the highlight onto whichever item slides under the cursor; a read-only
+  Select no longer highlights on hover
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
+- **Shared floating layer / Select** — a popup no longer returns focus with a visible focus ring
+  left over from a previous open session
+  ([#229](https://github.com/JakeMurrayDev/Blazix.BaseUI/pull/229)).
 
 ### Known issues
 

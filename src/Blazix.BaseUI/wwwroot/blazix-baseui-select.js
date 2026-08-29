@@ -160,6 +160,15 @@ function normalizeRect(rect, scale) {
     };
 }
 
+// WebKit fires zero-delta `mousemove`/`pointermove` events when a list scrolls beneath a stationary
+// pointer, which would move the highlight during keyboard navigation (base-ui #5265). Upstream's
+// `platform.engine.webkit` distinguishes WebKit from Blink by the legacy prefixed property name.
+const IS_WEBKIT_ENGINE = typeof CSS !== 'undefined' && !!CSS.supports?.('-webkit-backdrop-filter:none');
+
+export function isWebKitEngine() {
+    return IS_WEBKIT_ENGINE;
+}
+
 function isWebKit() {
     if (typeof navigator === 'undefined') return false;
     return /\bAppleWebKit\b/.test(navigator.userAgent) && !/\bChrome\b/.test(navigator.userAgent);
@@ -1601,6 +1610,22 @@ export function initializeTrigger(rootId, triggerElement, triggerDotNetRef) {
 export function getLastInteractionType(rootId) {
     const rootState = state.roots.get(rootId);
     return rootState?.lastInteractionType || 'none';
+}
+
+/**
+ * Returns the interaction type that closed the popup and clears it, so the next open session
+ * resolves its own modality instead of inheriting this one (base-ui #5388). Clearing on read rather
+ * than on open is deliberate: `setRootOpen` sees several closed-to-open transitions per
+ * user-visible open while the .NET open state settles, so its rising edge is not a session
+ * boundary.
+ */
+export function consumeCloseInteractionType(rootId) {
+    const rootState = state.roots.get(rootId);
+    if (!rootState) return 'none';
+
+    const closeInteractionType = rootState.lastInteractionType || 'none';
+    rootState.lastInteractionType = 'none';
+    return closeInteractionType;
 }
 
 export function disposeTrigger(rootId) {

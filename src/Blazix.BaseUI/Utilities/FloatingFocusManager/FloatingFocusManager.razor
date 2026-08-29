@@ -270,8 +270,10 @@
                     try
                     {
                         var module = await moduleTask.Value;
+                        // Freezes the modality for the disposal that follows, so the value the
+                        // callback sees is the one the return focus uses (base-ui #5388).
                         closeInteractionType = await module.InvokeAsync<string>(
-                            "getLastInteractionType", managerId);
+                            "captureCloseInteractionType", managerId);
                     }
                     catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException)
                     {

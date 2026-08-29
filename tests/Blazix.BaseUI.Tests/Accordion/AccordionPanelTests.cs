@@ -523,4 +523,48 @@ public class AccordionPanelTests : BunitContext, IAccordionPanelContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task DropsTriggerAriaControlsWhenPanelIsRemoved()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, removePanel => builder =>
+        {
+            builder.OpenComponent<AccordionRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", new[] { "item" });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<AccordionItem<string>>(0);
+                innerBuilder.AddAttribute(1, "Value", "item");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<AccordionHeader>(0);
+                    itemBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(tb => tb.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    if (!removePanel)
+                    {
+                        itemBuilder.OpenComponent<AccordionPanel>(2);
+                        itemBuilder.AddAttribute(3, "KeepMounted", true);
+                        itemBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(pb => pb.AddContent(0, "Panel Content")));
+                        itemBuilder.CloseComponent();
+                    }
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-controls").ShouldBe(cut.Find("[role='region']").Id));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").HasAttribute("aria-controls").ShouldBeFalse());
+    }
 }

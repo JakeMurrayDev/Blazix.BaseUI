@@ -240,7 +240,7 @@
 
     private async Task HandlePointerEnterAsync(PointerEventArgs e)
     {
-        if (RootContext is not null && !disabled && RootContext.HighlightItemOnHover)
+        if (RootContext is not null && !disabled && !IsStationaryPointer(e) && RootContext.HighlightItemOnHover)
         {
             RootContext.KeyboardActive = false;
             await RootContext.HighlightIndexAsync(itemIndex, ComboboxHighlightReason.Pointer);
@@ -251,13 +251,19 @@
 
     private async Task HandlePointerMoveAsync(PointerEventArgs e)
     {
-        if (RootContext is not null)
+        if (RootContext is not null && !IsStationaryPointer(e))
         {
             RootContext.KeyboardActive = false;
         }
 
         await EventUtilities.InvokeOnPointerMoveAsync(AdditionalAttributes, e);
     }
+
+    // A stationary cursor only exists on a pointing device, so touch interactions keep highlighting
+    // even though their events also report no movement.
+    private bool IsStationaryPointer(PointerEventArgs e) =>
+        e.PointerType != "touch"
+        && PointerEventUtilities.IsStationaryWebKitPointer(RootContext?.IsWebKitEngine ?? false, e);
 
     private async Task HandlePointerLeaveAsync(PointerEventArgs e)
     {

@@ -51,14 +51,16 @@ internal interface IAccordionItemContext
     /// <summary>
     /// Sets the ID of the associated panel element.
     /// </summary>
-    /// <param name="id">The panel element ID.</param>
-    void SetPanelId(string id);
+    /// <param name="owner">The panel instance registering or clearing the ID.</param>
+    /// <param name="id">The panel element ID, or <see langword="null"/> to clear it.</param>
+    void SetPanelId(object owner, string? id);
 
     /// <summary>
     /// Sets the ID of the associated trigger element.
     /// </summary>
+    /// <param name="owner">The trigger instance registering or clearing the ID.</param>
     /// <param name="id">The trigger element ID.</param>
-    void SetTriggerId(string? id);
+    void SetTriggerId(object owner, string? id);
 
     /// <summary>
     /// Sets whether the associated panel is mounted for transition purposes.
@@ -80,6 +82,9 @@ internal interface IAccordionItemContext
 /// <typeparam name="TValue">The type of the value used to identify accordion items.</typeparam>
 internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
 {
+    private readonly RegisteredIdOwner panelIdOwner = new();
+    private readonly RegisteredIdOwner triggerIdOwner = new();
+
     /// <summary>The parent root context.</summary>
     public AccordionRootContext<TValue> RootContext { get; set; } = null!;
 
@@ -96,10 +101,10 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     public Func<MouseEventArgs?, ElementReference?, Task> TriggerHandler { get; set; } = null!;
 
     /// <summary>The action invoked to set the panel ID.</summary>
-    public Action<string> PanelIdSetter { get; set; } = null!;
+    public Action<object, string?> PanelIdSetter { get; set; } = null!;
 
     /// <summary>The action invoked to set the trigger ID.</summary>
-    public Action<string?> TriggerIdSetter { get; set; } = null!;
+    public Action<object, string?> TriggerIdSetter { get; set; } = null!;
 
     /// <summary>The action invoked to set the panel mounted state.</summary>
     public Action<bool> PanelMountedSetter { get; set; } = null!;
@@ -123,17 +128,24 @@ internal sealed class AccordionItemContext<TValue> : IAccordionItemContext
     public bool Hidden { get; set; }
 
     /// <inheritdoc />
-    public void SetPanelId(string id)
+    public void SetPanelId(object owner, string? id)
     {
-        PanelId = id;
-        PanelIdSetter(id);
+        if (!panelIdOwner.ShouldApply(owner, id)) return;
+
+        var next = id ?? string.Empty;
+        if (PanelId == next) return;
+
+        PanelId = next;
+        PanelIdSetter(owner, id);
     }
 
     /// <inheritdoc />
-    public void SetTriggerId(string? id)
+    public void SetTriggerId(object owner, string? id)
     {
+        if (!triggerIdOwner.ShouldApply(owner, id)) return;
+
         TriggerId = id;
-        TriggerIdSetter(id);
+        TriggerIdSetter(owner, id);
     }
 
     /// <inheritdoc />

@@ -17,6 +17,7 @@
 @code {
     private const string VisuallyHiddenStyle = "clip-path:inset(50%);overflow:hidden;white-space:nowrap;border:0;padding:0;width:1px;height:1px;margin:-1px;position:fixed;top:0;left:0";
 
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? labelId;
     private string ariaValueText = string.Empty;
     private double? clampedValue;
@@ -242,8 +243,10 @@
         return !string.IsNullOrEmpty(formattedValue) ? formattedValue : $"{value}%";
     }
 
-    private void SetLabelId(string? id)
+    private void SetLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
+
         if (labelId == id)
         {
             return;

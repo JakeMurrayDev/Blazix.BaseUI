@@ -873,4 +873,89 @@ public class ComboboxRootTests : BunitContext, IComboboxRootContract
         openStates.ShouldBeEmpty();
         cut.Find("input[role='combobox']").GetAttribute("aria-expanded").ShouldBe("false");
     }
+
+    [Fact]
+    public async Task Label_ShouldKeepTriggerAssociationWhenLabelIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<ComboboxRoot<string>>(0);
+            builder.AddAttribute(1, nameof(ComboboxRoot<string>.Items), Fruits);
+            builder.AddAttribute(2, nameof(ComboboxRoot<string>.ChildContent), (RenderFragment)(childBuilder =>
+            {
+                childBuilder.OpenComponent<ComboboxLabel>(0);
+                childBuilder.SetKey(swapped ? "second" : "first");
+                childBuilder.AddAttribute(1, nameof(ComboboxLabel.ChildContent), (RenderFragment)(b => b.AddContent(0, "Favorite fruit")));
+                childBuilder.CloseComponent();
+
+                childBuilder.OpenComponent<ComboboxTrigger>(10);
+                childBuilder.AddAttribute(11, nameof(ComboboxTrigger.ChildContent), (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                childBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        // The label id is derived from the root id, so the replacement registers the same value the
+        // outgoing instance is about to clear.
+        var labelId = cut.Find("button").GetAttribute("aria-labelledby");
+        labelId.ShouldNotBeNullOrEmpty();
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-labelledby").ShouldBe(labelId));
+    }
+
+    [Fact]
+    public async Task GroupLabel_ShouldKeepGroupAssociationWhenSupersededLabelUnmounts()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, removeFirst => builder =>
+        {
+            builder.OpenComponent<ComboboxGroup>(0);
+            builder.AddAttribute(1, nameof(ComboboxGroup.ChildContent), (RenderFragment)(groupBuilder =>
+            {
+                if (!removeFirst)
+                {
+                    groupBuilder.OpenComponent<ComboboxGroupLabel>(0);
+                    groupBuilder.SetKey("first");
+                    groupBuilder.AddAttribute(1, nameof(ComboboxGroupLabel.Id), "label-a");
+                    groupBuilder.CloseComponent();
+                }
+
+                groupBuilder.OpenComponent<ComboboxGroupLabel>(10);
+                groupBuilder.SetKey("second");
+                groupBuilder.AddAttribute(11, nameof(ComboboxGroupLabel.Id), "label-b");
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+    }
+
+    [Fact]
+    public async Task Item_ShouldIgnoreAStationaryPointerEnterOnWebKit()
+    {
+        JsInteropSetup.SetupWebKitEngine(JSInterop, true);
+
+        var cut = Render(CreateCombobox(defaultOpen: true));
+
+        // WebKit fires zero-delta moves while the list scrolls beneath a stationary cursor, which
+        // would drag the highlight onto whichever item slides under it.
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onpointerenter",
+            new PointerEventArgs { PointerType = "mouse", MovementX = 0, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeFalse();
+
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onpointerenter",
+            new PointerEventArgs { PointerType = "mouse", MovementX = 4, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeTrue();
+    }
 }

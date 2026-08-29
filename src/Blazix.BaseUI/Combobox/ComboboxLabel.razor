@@ -93,7 +93,8 @@
         }
 
         labelId = $"{RootContext.RootId}-label";
-        LabelableContext?.SetLabelId(labelId);
+        LabelableContext?.SetLabelId(this, labelId);
+        RootContext.LabelIdOwner.ShouldApply(this, labelId);
         RootContext.LabelId = labelId;
         RootContext.NotifyStateChanged();
         FieldContext?.Subscribe(this);
@@ -112,7 +113,8 @@
             if (newId != labelId)
             {
                 labelId = newId;
-                LabelableContext?.SetLabelId(labelId);
+                LabelableContext?.SetLabelId(this, labelId);
+                RootContext.LabelIdOwner.ShouldApply(this, labelId);
                 RootContext.LabelId = labelId;
                 RootContext.NotifyStateChanged();
             }
@@ -149,9 +151,12 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        LabelableContext?.SetLabelId(null);
+        LabelableContext?.SetLabelId(this, null);
 
-        if (RootContext is not null && RootContext.LabelId == labelId)
+        // The label id is derived from the root id, so every instance resolves the same value and
+        // an id-equality guard would never reject a stale clear. Ownership is tracked by instance:
+        // Blazor initializes a replacement label before disposing the outgoing one.
+        if (RootContext is not null && RootContext.LabelIdOwner.ShouldApply(this, null))
         {
             RootContext.LabelId = null;
             RootContext.NotifyStateChanged();

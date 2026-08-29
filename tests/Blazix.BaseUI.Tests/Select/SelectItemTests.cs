@@ -13,6 +13,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         string? defaultValue = null,
         bool defaultOpen = false,
         bool rootDisabled = false,
+        bool readOnly = false,
         bool disabledItem = false,
         bool useNativeButton = false,
         string? firstItemLabel = null,
@@ -26,6 +27,7 @@ public class SelectItemTests : BunitContext, ISelectItemContract
             if (defaultValue is not null) builder.AddAttribute(i++, "DefaultValue", defaultValue);
             builder.AddAttribute(i++, "DefaultOpen", defaultOpen);
             if (rootDisabled) builder.AddAttribute(i++, "Disabled", true);
+            if (readOnly) builder.AddAttribute(i++, "ReadOnly", true);
             builder.AddAttribute(i++, "HighlightItemOnHover", highlightItemOnHover);
             builder.AddAttribute(i++, "ChildContent", (RenderFragment)(innerBuilder =>
             {
@@ -417,5 +419,48 @@ public class SelectItemTests : BunitContext, ISelectItemContract
         items[1].GetAttribute("aria-disabled").ShouldBe("true");
         // Native `disabled` attribute must NOT be set — that would strip focusability.
         items[1].HasAttribute("disabled").ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task IgnoresAStationaryPointerMoveOnWebKit()
+    {
+        JsInteropSetup.SetupWebKitEngine(JSInterop, true);
+
+        var cut = Render(CreateSelectWithItems(defaultOpen: true));
+
+        // WebKit fires zero-delta moves while the list scrolls beneath a stationary cursor, which
+        // would drag the highlight onto whichever item slides under it.
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onmousemove",
+            new MouseEventArgs { MovementX = 0, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeFalse();
+
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onmousemove",
+            new MouseEventArgs { MovementX = 4, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task HighlightsAStationaryPointerMoveOnOtherEngines()
+    {
+        JsInteropSetup.SetupWebKitEngine(JSInterop, false);
+
+        var cut = Render(CreateSelectWithItems(defaultOpen: true));
+
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onmousemove",
+            new MouseEventArgs { MovementX = 0, MovementY = 0 });
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task DoesNotHighlightOnHoverWhenReadOnly()
+    {
+        var cut = Render(CreateSelectWithItems(defaultOpen: true, readOnly: true));
+
+        await cut.FindAll("[role='option']")[0].TriggerEventAsync("onmouseenter", new MouseEventArgs());
+
+        cut.FindAll("[role='option']")[0].HasAttribute("data-highlighted").ShouldBeFalse();
     }
 }

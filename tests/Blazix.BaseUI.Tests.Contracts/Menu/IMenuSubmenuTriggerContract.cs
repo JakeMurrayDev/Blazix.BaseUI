@@ -17,4 +17,7 @@ public interface IMenuSubmenuTriggerContract
     Task CloseDelayDefaultsToZero();
     Task HighlightsOnMouseEnter();
     Task DoesNotToggleOnClickWhenOpenOnHover();
+
+    Task OpensOnAVirtualPressWhenOpenOnHover();
+    Task DoesNotOpenOnAnOrdinaryMousePressWhenOpenOnHover();
 }

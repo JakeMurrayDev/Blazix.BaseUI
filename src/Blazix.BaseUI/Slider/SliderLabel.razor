@@ -74,7 +74,7 @@
         if (Context is not null)
         {
             labelId = Context.RootLabelId ?? Guid.NewGuid().ToIdString();
-            Context.SetLabelId(labelId);
+            Context.SetLabelId(this, labelId);
         }
 
         state = Context?.State ?? SliderRootState.Default;
@@ -116,7 +116,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        Context?.SetLabelId(null);
+        Context?.SetLabelId(this, null);
 
         if (moduleTask?.IsValueCreated == true && renderElementReference?.Element is { } element)
         {

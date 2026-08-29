@@ -167,7 +167,7 @@ public class FormTests : BunitContext, IFormContract
             ControlId: null,
             SetControlId: _ => { },
             LabelId: null,
-            SetLabelId: _ => { },
+            SetLabelId: (_, _) => { },
             MessageIds: [],
             UpdateMessageIds: (_, _) => { });
 

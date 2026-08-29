@@ -321,4 +321,37 @@ public class CollapsiblePanelTests : BunitContext, ICollapsiblePanelContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task DropsTriggerAriaControlsWhenPanelIsRemoved()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, removePanel => builder =>
+        {
+            builder.OpenComponent<CollapsibleRoot>(0);
+            builder.AddAttribute(1, "DefaultOpen", true);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<CollapsibleTrigger>(0);
+                innerBuilder.AddAttribute(1, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Toggle")));
+                innerBuilder.CloseComponent();
+
+                if (!removePanel)
+                {
+                    innerBuilder.OpenComponent<CollapsiblePanel>(2);
+                    innerBuilder.AddAttribute(3, "KeepMounted", true);
+                    innerBuilder.AddAttribute(4, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Panel")));
+                    innerBuilder.CloseComponent();
+                }
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").GetAttribute("aria-controls").ShouldNotBeNullOrEmpty());
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("button").HasAttribute("aria-controls").ShouldBeFalse());
+    }
 }

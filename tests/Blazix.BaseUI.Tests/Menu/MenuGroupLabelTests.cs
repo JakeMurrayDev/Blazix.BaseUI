@@ -191,4 +191,37 @@ public class MenuGroupLabelTests : BunitContext, IMenuGroupLabelContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsGroupAriaLabelledByWhenSupersededLabelUnmounts()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, removeFirst => builder =>
+        {
+            builder.OpenComponent<MenuGroup>(0);
+            builder.AddAttribute(1, "ChildContent", (RenderFragment)(groupBuilder =>
+            {
+                if (!removeFirst)
+                {
+                    groupBuilder.OpenComponent<MenuGroupLabel>(0);
+                    groupBuilder.SetKey("first");
+                    groupBuilder.AddMultipleAttributes(1, new Dictionary<string, object> { ["id"] = "label-a" });
+                    groupBuilder.CloseComponent();
+                }
+
+                groupBuilder.OpenComponent<MenuGroupLabel>(10);
+                groupBuilder.SetKey("second");
+                groupBuilder.AddMultipleAttributes(11, new Dictionary<string, object> { ["id"] = "label-b" });
+                groupBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='group']").GetAttribute("aria-labelledby").ShouldBe("label-b"));
+    }
 }

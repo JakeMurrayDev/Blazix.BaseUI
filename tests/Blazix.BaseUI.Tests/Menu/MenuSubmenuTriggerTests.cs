@@ -309,4 +309,48 @@ public class MenuSubmenuTriggerTests : BunitContext, IMenuSubmenuTriggerContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public Task OpensOnAVirtualPressWhenOpenOnHover()
+    {
+        var cut = Render(CreateSubmenuTriggerInRoot(submenuDefaultOpen: false, openOnHover: true));
+
+        var submenuTrigger = cut.Find("[role='menuitem'][aria-haspopup='menu']");
+
+        // A screen reader activation reports a mouse-like pointer with no hit area, which hover can
+        // never open because there is no pointer movement to wait for.
+        submenuTrigger.PointerDown(new PointerEventArgs
+        {
+            PointerType = "mouse",
+            Width = 0,
+            Height = 0,
+            Pressure = 0,
+            Detail = 0
+        });
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='menuitem'][aria-haspopup='menu']").GetAttribute("aria-expanded").ShouldBe("true"));
+
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task DoesNotOpenOnAnOrdinaryMousePressWhenOpenOnHover()
+    {
+        var cut = Render(CreateSubmenuTriggerInRoot(submenuDefaultOpen: false, openOnHover: true));
+
+        var submenuTrigger = cut.Find("[role='menuitem'][aria-haspopup='menu']");
+        submenuTrigger.PointerDown(new PointerEventArgs
+        {
+            PointerType = "mouse",
+            Width = 1,
+            Height = 1,
+            Pressure = 0.5f,
+            Detail = 1
+        });
+
+        cut.Find("[role='menuitem'][aria-haspopup='menu']").GetAttribute("aria-expanded").ShouldBe("false");
+
+        return Task.CompletedTask;
+    }
 }

@@ -45,5 +45,5 @@ internal sealed class ProgressRootContext
     /// Gets or sets the callback used by <see cref="ProgressLabel"/> to register its id
     /// with the root for <c>aria-labelledby</c> association.
     /// </summary>
-    public Action<string?> SetLabelIdAction { get; set; } = _ => { };
+    public Action<object, string?> SetLabelIdAction { get; set; } = (_, _) => { };
 }

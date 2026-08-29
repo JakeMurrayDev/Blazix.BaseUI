@@ -3295,6 +3295,9 @@ export function createFloatingFocusManager(options) {
 
     // Document-level interaction tracking (F11)
     let lastInteractionType = '';
+    // Frozen at close time so the modality handed to `ReturnFocusCallback` and the one used for the
+    // return-focus ring cannot diverge across the interop round trip that separates them (#5388).
+    let closeInteractionSnapshot = null;
     let isPointerDown = false;
     let pointerDownOutside = false;
 
@@ -3629,6 +3632,10 @@ export function createFloatingFocusManager(options) {
         restoreFocusMode,
         get tabbableIndex() { return tabbableIndex; },
         get lastInteractionType() { return lastInteractionType; },
+        captureCloseInteractionType() {
+            closeInteractionSnapshot = lastInteractionType;
+            return closeInteractionSnapshot;
+        },
         handleTabIndex,
 
         dispose(shouldReturnFocus = true) {
@@ -3670,6 +3677,9 @@ export function createFloatingFocusManager(options) {
                 if (preventReturnFocus) {
                     preventReturnFocus = false;
                 } else {
+                    // A single snapshot for every close-modality read below, matching upstream's
+                    // `const closeType = closeTypeRef.current` (#5388).
+                    const closeInteraction = closeInteractionSnapshot ?? lastInteractionType;
                     const active = activeElement(doc);
                     // Don't return focus if activeElement has moved somewhere meaningful
                     const hasMoved = active && active !== doc.body && !contains(floatingElement, active);
@@ -3678,7 +3688,7 @@ export function createFloatingFocusManager(options) {
                     // If the last interaction was pointer, focus is NOT inside the floating element,
                     // and isPointerDown is false, this indicates a hover-close where focus was never
                     // in the popup — don't steal focus back to the trigger.
-                    const isHoverClose = lastInteractionType === 'pointer' &&
+                    const isHoverClose = closeInteraction === 'pointer' &&
                         !isPointerDown &&
                         active && !contains(floatingElement, active);
 
@@ -3691,7 +3701,7 @@ export function createFloatingFocusManager(options) {
                             : this.returnFocusElement || returnTarget;
                         // When the close was driven by the keyboard, return focus with a
                         // visible focus ring so the trigger shows :focus-visible (#5093).
-                        const returnFocusVisible = lastInteractionType === 'keyboard';
+                        const returnFocusVisible = closeInteraction === 'keyboard';
                         if (returnEl?.isConnected) {
                             enqueueFocus(returnEl, { preventScroll: true, focusVisible: returnFocusVisible });
                         } else if (returnFocusFallback?.isConnected) {
@@ -3733,6 +3743,16 @@ export function disposeFloatingFocusManager(managerId, shouldReturnFocus = true,
 export function getLastInteractionType(managerId) {
     const manager = focusManagers.get(managerId);
     return manager?.lastInteractionType ?? '';
+}
+
+/**
+ * Captures the interaction type that closed the popup and freezes it for the manager's teardown.
+ * Called immediately before disposal, so the modality reported to `ReturnFocusCallback` is the same
+ * one the return focus uses even though an interop round trip separates the two.
+ */
+export function captureCloseInteractionType(managerId) {
+    const manager = focusManagers.get(managerId);
+    return manager?.captureCloseInteractionType() ?? '';
 }
 
 /**

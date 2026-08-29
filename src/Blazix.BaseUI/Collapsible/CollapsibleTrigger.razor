@@ -184,7 +184,9 @@
             AccessibilityUtilities.ApplyButtonAttributes(attrs, disabled, focusableWhenDisabled: true);
         }
 
-        if (Context.Open)
+        // A removed panel clears its registration, so drop `aria-controls` rather than pointing it
+        // at an element that is no longer in the document (base-ui #5340).
+        if (Context.Open && !string.IsNullOrEmpty(Context.PanelId))
             attrs["aria-controls"] = Context.PanelId;
 
         attrs["aria-expanded"] = Context.Open ? "true" : "false";

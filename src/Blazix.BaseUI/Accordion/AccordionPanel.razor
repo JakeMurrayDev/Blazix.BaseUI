@@ -23,6 +23,7 @@
     private readonly Lazy<Task<IJSObjectReference>> moduleTask;
 
     private string? defaultId;
+    private string? registeredPanelId;
     private double? measuredHeight;
     private double? measuredWidth;
     private bool hasRendered;
@@ -52,10 +53,14 @@
                 string.IsNullOrEmpty(ItemContext?.PanelId)
                     ? defaultId ??= Guid.NewGuid().ToIdString()
                     : ItemContext.PanelId);
-            if (id != ItemContext?.PanelId)
+            // Registered even when the panel adopts the item's pre-generated id, so the item knows
+            // which instance owns the registration and can drop it when that instance unmounts.
+            if (id != registeredPanelId)
             {
-                ItemContext?.SetPanelId(id);
+                ItemContext?.SetPanelId(this, id);
+                registeredPanelId = id;
             }
+
             return id;
         }
     }
@@ -267,6 +272,10 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        // A replacement panel registers before this instance is disposed, so the item ignores the
+        // clear unless this instance is still the registered owner.
+        ItemContext?.SetPanelId(this, null);
+
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
             try

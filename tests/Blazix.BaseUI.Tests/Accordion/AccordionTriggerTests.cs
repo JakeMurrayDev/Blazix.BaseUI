@@ -289,4 +289,62 @@ public class AccordionTriggerTests : BunitContext, IAccordionTriggerContract
 
         return Task.CompletedTask;
     }
+
+    [Fact]
+    public async Task KeepsPanelAriaLabelledByWhenTriggerIsReplaced()
+    {
+        IAccordionItemContext? itemContext = null;
+
+        var cut = Render(builder =>
+        {
+            builder.OpenComponent<AccordionRoot<string>>(0);
+            builder.AddAttribute(1, "DefaultValue", new[] { "item" });
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<AccordionItem<string>>(0);
+                innerBuilder.AddAttribute(1, "Value", "item");
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(itemBuilder =>
+                {
+                    itemBuilder.OpenComponent<CascadingValueCapture<IAccordionItemContext>>(0);
+                    itemBuilder.AddAttribute(1, "OnCaptured",
+                        EventCallback.Factory.Create<IAccordionItemContext?>(this, context => itemContext = context));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionHeader>(10);
+                    itemBuilder.AddAttribute(11, "ChildContent", (RenderFragment)(headerBuilder =>
+                    {
+                        headerBuilder.OpenComponent<AccordionTrigger>(0);
+                        headerBuilder.AddAttribute(1, "AdditionalAttributes",
+                            (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { ["id"] = "accordion-trigger" });
+                        headerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(tb => tb.AddContent(0, "Trigger")));
+                        headerBuilder.CloseComponent();
+                    }));
+                    itemBuilder.CloseComponent();
+
+                    itemBuilder.OpenComponent<AccordionPanel>(20);
+                    itemBuilder.AddAttribute(21, "KeepMounted", true);
+                    itemBuilder.AddAttribute(22, "ChildContent", (RenderFragment)(pb => pb.AddContent(0, "Panel Content")));
+                    itemBuilder.CloseComponent();
+                }));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        });
+
+        cut.Find("[role='region']").GetAttribute("aria-labelledby").ShouldBe("accordion-trigger");
+        itemContext.ShouldNotBeNull();
+
+        // The shape a replaced trigger takes: Blazor disposes the outgoing instance after the
+        // replacement has registered, so its clear arrives from an instance that no longer owns the
+        // registration. The replacement resolves the same id, so an id-equality guard would not
+        // reject it. The trigger re-registers on every parameter set, so an applied clear is
+        // restored by the render it schedules — the observable difference is that render.
+        var item = cut.FindComponent<AccordionItem<string>>();
+        var renderCountBeforeStaleClear = item.RenderCount;
+
+        await cut.InvokeAsync(() => itemContext.SetTriggerId(new object(), null));
+
+        item.RenderCount.ShouldBe(renderCountBeforeStaleClear);
+        cut.Find("[role='region']").GetAttribute("aria-labelledby").ShouldBe("accordion-trigger");
+    }
 }

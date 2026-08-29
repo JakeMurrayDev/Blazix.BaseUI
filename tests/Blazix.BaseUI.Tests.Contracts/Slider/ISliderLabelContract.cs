@@ -25,4 +25,6 @@ public interface ISliderLabelContract
 
     // Accessibility integration
     Task RegistersLabelIdToRoot();
+
+    Task KeepsRootAriaLabelledByWhenLabelIsReplaced();
 }

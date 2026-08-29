@@ -41,6 +41,7 @@
     private int lastUsedThumbIndex = -1;
     private bool dragging;
     private string? defaultId;
+    private readonly RegisteredIdOwner labelIdOwner = new();
     private string? localLabelId;
     private ElementReference? controlElement;
     private ElementReference? indicatorElement;
@@ -553,8 +554,9 @@
         return explicitAriaLabelledBy ?? LabelableContext?.LabelId ?? localLabelId;
     }
 
-    private void SetLocalLabelId(string? id)
+    private void SetLocalLabelId(object owner, string? id)
     {
+        if (!labelIdOwner.ShouldApply(owner, id)) return;
         localLabelId = id;
         context.LabelId = ResolveLabelId();
         BuildComponentAttributes();

@@ -50,7 +50,7 @@
 
             if (id != registeredPanelId)
             {
-                Context?.SetPanelId(id);
+                Context?.SetPanelId(this, id);
                 registeredPanelId = id;
             }
 
@@ -250,6 +250,10 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        // A replacement panel registers before this instance is disposed, so the root ignores the
+        // clear unless this instance is still the registered owner.
+        Context?.SetPanelId(this, null);
+
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
             try

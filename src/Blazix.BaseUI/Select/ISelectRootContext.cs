@@ -51,6 +51,12 @@ internal interface ISelectRootContext
     bool HighlightItemOnHover { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the browser runs the WebKit engine, which reports zero-delta pointer
+    /// moves when a scrolling list slides beneath a stationary pointer.
+    /// </summary>
+    bool IsWebKitEngine { get; set; }
+
+    /// <summary>
     /// Gets or sets the reason the select's open state last changed.
     /// </summary>
     SelectOpenChangeReason OpenChangeReason { get; set; }
@@ -203,6 +209,12 @@ internal interface ISelectRootContext
     /// Mirrors the React store's <c>labelId</c> slot.
     /// </summary>
     string? LabelId { get; set; }
+
+    /// <summary>
+    /// Tracks which <c>SelectLabel</c> instance currently owns <see cref="LabelId"/>, so a label
+    /// replaced in place cannot have its registration cleared by the outgoing instance.
+    /// </summary>
+    RegisteredIdOwner LabelIdOwner { get; }
 
     /// <summary>
     /// Raises the <see cref="StateChanged"/> event so descendants (e.g., the trigger)

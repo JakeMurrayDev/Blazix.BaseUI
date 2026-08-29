@@ -30,7 +30,7 @@ internal sealed class CollapsibleRootContext
     public Func<Task<bool>> HandleBeforeMatch { get; set; } = null!;
 
     /// <summary>The callback to register the panel element identifier.</summary>
-    public Action<string> SetPanelId { get; set; } = null!;
+    public Action<object, string?> SetPanelId { get; set; } = null!;
 
     /// <summary>The callback to update the transition status.</summary>
     public Action<TransitionStatus> SetTransitionStatus { get; set; } = null!;

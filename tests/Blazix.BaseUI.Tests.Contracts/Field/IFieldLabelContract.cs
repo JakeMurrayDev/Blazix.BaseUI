@@ -5,4 +5,6 @@ public interface IFieldLabelContract
     Task RendersAsLabelByDefault();
     Task RendersWithCustomRender();
     Task SetsHtmlForReferencingControlAutomatically();
+
+    Task KeepsControlAriaLabelledByWhenLabelIsReplaced();
 }

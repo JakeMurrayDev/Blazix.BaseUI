@@ -1371,6 +1371,10 @@
             var directionStr = EffectiveDirection.ToAttributeString() ?? "ltr";
             await module.InvokeVoidAsync("initializeRoot", rootId, dotNetRef, false, modal, directionStr, ReadOnly, ResolvedDisabled);
 
+            // WebKit reports zero-delta pointer moves while a list scrolls beneath a stationary
+            // pointer; items use this to ignore them (base-ui #5265).
+            context.IsWebKitEngine = await module.InvokeAsync<bool>("isWebKitEngine");
+
             if (triggerElement.HasValue)
             {
                 await module.InvokeVoidAsync("setTriggerElement", rootId, triggerElement.Value);
@@ -1434,7 +1438,9 @@
         try
         {
             var module = await ModuleTask.Value;
-            var lastInteractionType = await module.InvokeAsync<string>("getLastInteractionType", rootId);
+            // Consumes the value so a session closed without a pointer or key press does not
+            // inherit the previous session's modality (base-ui #5388).
+            var lastInteractionType = await module.InvokeAsync<string>("consumeCloseInteractionType", rootId);
             var resolved = ParseInteractionType(lastInteractionType);
             if (resolved != InteractionType.None)
             {

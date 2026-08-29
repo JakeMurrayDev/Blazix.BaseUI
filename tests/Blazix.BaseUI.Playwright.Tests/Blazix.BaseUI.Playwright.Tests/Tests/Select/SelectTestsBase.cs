@@ -1205,6 +1205,70 @@ public abstract class SelectTestsBase : TestBase
     }
 
     /// <summary>
+    /// Tests that reading the close modality clears it, so a session closed by neither a pointer
+    /// nor a key does not inherit the previous session's modality (base-ui #5388).
+    /// </summary>
+    [Fact]
+    public virtual async Task Js_ReadingTheCloseModalityClearsIt()
+    {
+        await NavigateAsync(CreateUrl("/tests/select"));
+
+        var interactionTypes = await Page.EvaluateAsync<string[]>(
+            """
+            async () => {
+                const select = await import('/_content/Blazix.BaseUI/blazix-baseui-select.min.js');
+
+                const rootId = `reset-modality-${crypto.randomUUID()}`;
+                const dotNetRef = { invokeMethodAsync: async () => {} };
+                const trigger = document.createElement('button');
+                const positioner = document.createElement('div');
+                const popup = document.createElement('div');
+                trigger.type = 'button';
+                popup.setAttribute('role', 'listbox');
+                positioner.append(popup);
+                document.body.append(trigger, positioner);
+
+                try {
+                    select.initializeRoot(rootId, dotNetRef, false, false, 'ltr', false, false);
+                    select.setTriggerElement(rootId, trigger);
+                    select.initializePopup(rootId, popup, dotNetRef, false);
+                    select.setPopupElement(rootId, popup);
+                    select.registerPositioner(rootId, positioner);
+
+                    select.setRootOpen(rootId, true, null);
+                    popup.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: 'ArrowDown',
+                        bubbles: true,
+                        cancelable: true,
+                    }));
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+
+                    // The keyboard-driven close reports its own modality.
+                    const firstClose = select.consumeCloseInteractionType(rootId);
+
+                    // A second session that nobody interacted with must not inherit it. The
+                    // rising edge of `setRootOpen` is not a session boundary here, so the
+                    // reopen below deliberately repeats it.
+                    select.setRootOpen(rootId, false, null);
+                    select.setRootOpen(rootId, true, null);
+                    select.setRootOpen(rootId, false, null);
+                    select.setRootOpen(rootId, true, null);
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    const secondClose = select.consumeCloseInteractionType(rootId);
+
+                    return [firstClose, secondClose];
+                } finally {
+                    select.disposeRoot(rootId);
+                    positioner.remove();
+                    trigger.remove();
+                }
+            }
+            """);
+
+        Assert.Equal(["keyboard", "none"], interactionTypes);
+    }
+
+    /// <summary>
     /// Verifies that a renamed root receives the controlled pre-open positioning
     /// result on the next open revision.
     /// </summary>

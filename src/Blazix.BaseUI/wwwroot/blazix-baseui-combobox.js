@@ -12,6 +12,19 @@ import {
 const stateKey = Symbol.for('Blazix.BaseUI.Combobox.State');
 const pendingInlineSelectionKey = Symbol.for('Blazix.BaseUI.Combobox.PendingInlineSelection');
 
+// WebKit fires zero-delta `pointermove` events when a list scrolls beneath a stationary pointer,
+// which would clear the keyboard-navigation modality mid-scroll (base-ui #5265). Upstream's
+// `platform.engine.webkit` distinguishes WebKit from Blink by the legacy prefixed property name.
+const IS_WEBKIT_ENGINE = typeof CSS !== 'undefined' && !!CSS.supports?.('-webkit-backdrop-filter:none');
+
+function isStationaryWebKitPointer(event) {
+  return IS_WEBKIT_ENGINE && event.movementX === 0 && event.movementY === 0;
+}
+
+export function isWebKitEngine() {
+  return IS_WEBKIT_ENGINE;
+}
+
 if (!window[stateKey]) {
   window[stateKey] = {
     roots: new Map(),
@@ -345,7 +358,10 @@ function attachKeyboardHandlers(root, element, key) {
     scheduleFocusOutClose(root);
   };
 
-  const onPointerActivity = () => {
+  const onPointerActivity = (event) => {
+    if (event?.type === 'pointermove' && isStationaryWebKitPointer(event)) {
+      return;
+    }
     root.dotNetRef.invokeMethodAsync('OnKeyboardActiveChange', false).catch(() => {});
   };
 

@@ -10,6 +10,11 @@ if (!window[STATE_KEY]) {
 }
 const state = window[STATE_KEY];
 
+// WebKit fires zero-delta `mousemove`/`pointermove` events when a list scrolls beneath a stationary
+// pointer, which would move the highlight during keyboard navigation (base-ui #5265). Upstream's
+// `platform.engine.webkit` distinguishes WebKit from Blink by the legacy prefixed property name.
+const IS_WEBKIT_ENGINE = typeof CSS !== 'undefined' && !!CSS.supports?.('-webkit-backdrop-filter:none');
+
 const DEFAULTS = {
     orientation: 'vertical',
     loop: false,
@@ -136,6 +141,8 @@ function handleKeyDown(event, element, options) {
 }
 
 function handlePointerMove(event, element, options) {
+    if (IS_WEBKIT_ENGINE && event.movementX === 0 && event.movementY === 0) return;
+
     const item = event.target.closest(options.itemSelector);
     if (!item || isItemDisabled(item, options)) return;
     if (document.activeElement === item) return;

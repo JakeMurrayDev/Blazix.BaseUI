@@ -221,6 +221,33 @@ public class ProgressLabelTests : BunitContext, IProgressLabelContract
     }
 
     [Fact]
+    public async Task KeepsAriaLabelledByWhenLabelIsReplaced()
+    {
+        var cut = Render<ComponentSwapHost>(ps => ps.Add(p => p.Content, swapped => builder =>
+        {
+            builder.OpenComponent<ProgressRoot>(0);
+            builder.AddAttribute(1, "Value", 50.0);
+            builder.AddAttribute(2, "ChildContent", (RenderFragment)(innerBuilder =>
+            {
+                innerBuilder.OpenComponent<ProgressLabel>(0);
+                innerBuilder.SetKey(swapped ? "second" : "first");
+                innerBuilder.AddAttribute(1, "AdditionalAttributes",
+                    (IReadOnlyDictionary<string, object>)new Dictionary<string, object> { ["id"] = "progress-label" });
+                innerBuilder.AddAttribute(2, "ChildContent", (RenderFragment)(b => b.AddContent(0, "Loading")));
+                innerBuilder.CloseComponent();
+            }));
+            builder.CloseComponent();
+        }));
+
+        cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label");
+
+        await cut.InvokeAsync(() => cut.Instance.Swap());
+
+        cut.WaitForAssertion(() =>
+            cut.Find("[role='progressbar']").GetAttribute("aria-labelledby").ShouldBe("progress-label"));
+    }
+
+    [Fact]
     public Task CleansUpLabelIdOnDispose()
     {
         // Render with label present
@@ -326,8 +353,8 @@ internal sealed class ProgressLabelContextSwitchHost : ComponentBase
             State = new ProgressRootState(ProgressStatus.Progressing),
             Status = ProgressStatus.Progressing,
             SetLabelIdAction = useSecondContext
-                ? id => SecondRegisteredId = id
-                : id => FirstRegisteredId = id
+                ? (_, id) => SecondRegisteredId = id
+                : (_, id) => FirstRegisteredId = id
         };
     }
 }

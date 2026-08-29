@@ -74,13 +74,13 @@
             ToastRenderFragmentUtilities.IsRenderableValue(RootContext?.Toast.Title);
         state = new ToastTitleState(RootContext?.Toast.Type);
         BuildComponentAttributes();
-        RootContext?.SetTitleId(shouldRender ? ResolvedId : null);
+        RootContext?.SetTitleId(this, shouldRender ? ResolvedId : null);
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        RootContext?.SetTitleId(null);
+        RootContext?.SetTitleId(this, null);
     }
 
     private string ResolvedId => Id ?? AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId);

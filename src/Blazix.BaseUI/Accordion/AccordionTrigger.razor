@@ -37,7 +37,7 @@
             var id = AttributeUtilities.GetIdOrDefault(AdditionalAttributes, () => defaultId ??= Guid.NewGuid().ToIdString());
             if (id != ItemContext?.TriggerId)
             {
-                ItemContext?.SetTriggerId(id);
+                ItemContext?.SetTriggerId(this, id);
             }
             return id;
         }
@@ -199,7 +199,7 @@
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        ItemContext?.SetTriggerId(null);
+        ItemContext?.SetTriggerId(this, null);
 
         if (moduleTask.IsValueCreated && Element.HasValue)
         {
@@ -231,7 +231,9 @@
 
         attrs["aria-expanded"] = ItemContext.Open ? "true" : "false";
 
-        if (ItemContext.Open)
+        // A removed panel clears its registration, so drop `aria-controls` rather than pointing it
+        // at an element that is no longer in the document (base-ui #5340).
+        if (ItemContext.Open && !string.IsNullOrEmpty(ItemContext.PanelId))
             attrs["aria-controls"] = ItemContext.PanelId;
 
         attrs["onclick"] = EventCallback.Factory.Create<MouseEventArgs>(this, HandleClickAsync);

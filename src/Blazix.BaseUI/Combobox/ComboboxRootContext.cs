@@ -24,6 +24,7 @@ internal interface IComboboxRootContext
     string? ListId { get; set; }
     string? PopupId { get; set; }
     string? LabelId { get; set; }
+    RegisteredIdOwner LabelIdOwner { get; }
     string? Name { get; }
     string? Form { get; }
     bool Disabled { get; }
@@ -34,6 +35,7 @@ internal interface IComboboxRootContext
     bool Modal { get; }
     bool OpenOnInputClick { get; }
     bool HighlightItemOnHover { get; }
+    bool IsWebKitEngine { get; set; }
     bool KeepHighlight { get; }
     bool LoopFocus { get; }
     bool Multiple { get; }
@@ -117,6 +119,9 @@ internal sealed class ComboboxRootContext<TValue> : IComboboxRootContext, IDispo
     public string? ListId { get; set; }
     public string? PopupId { get; set; }
     public string? LabelId { get; set; }
+
+    public RegisteredIdOwner LabelIdOwner { get; } = new();
+
     public string? Name { get; set; }
     public string? Form { get; set; }
     public bool Disabled { get; set; }
@@ -128,6 +133,12 @@ internal sealed class ComboboxRootContext<TValue> : IComboboxRootContext, IDispo
     public bool Modal { get; set; }
     public bool OpenOnInputClick { get; set; }
     public bool HighlightItemOnHover { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the browser runs the WebKit engine, which reports zero-delta pointer
+    /// moves when a scrolling list slides beneath a stationary pointer.
+    /// </summary>
+    public bool IsWebKitEngine { get; set; }
     public bool KeepHighlight { get; set; }
     public bool LoopFocus { get; set; }
     public bool Multiple { get; set; }

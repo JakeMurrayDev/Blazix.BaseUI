@@ -234,18 +234,18 @@
             "Auto-generation is only supported for string type.");
     }
 
-    private void SetPanelId(string id)
+    private void SetPanelId(object owner, string? id)
     {
-        panelId = id;
+        panelId = id ?? string.Empty;
         if (collapsibleContext is not null)
         {
-            collapsibleContext.PanelId = id;
+            collapsibleContext.PanelId = panelId;
         }
 
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private void SetTriggerId(string? id)
+    private void SetTriggerId(object owner, string? id)
     {
         triggerId = id ?? string.Empty;
         _ = InvokeAsync(StateHasChanged);

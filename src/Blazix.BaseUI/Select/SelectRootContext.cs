@@ -53,6 +53,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
     public bool HighlightItemOnHover { get; set; }
 
     /// <inheritdoc />
+    public bool IsWebKitEngine { get; set; }
+
+    /// <inheritdoc />
     public SelectOpenChangeReason OpenChangeReason { get; set; }
 
     /// <inheritdoc />
@@ -176,6 +179,9 @@ internal sealed class SelectRootContext<TValue> : ISelectRootContext, IDisposabl
 
     /// <inheritdoc />
     public string? LabelId { get; set; }
+
+    /// <inheritdoc />
+    public RegisteredIdOwner LabelIdOwner { get; } = new();
 
     /// <inheritdoc />
     public Func<Task> ClearHighlightsAsync { get; init; } = null!;

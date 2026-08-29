@@ -24,6 +24,8 @@
     private Lazy<Task<IJSObjectReference>>? moduleTask;
     private DotNetObjectReference<ToastRoot>? dotNetRef;
     private ToastRootState state = new(TransitionStatus.Undefined, false, false, null, false, null);
+    private readonly RegisteredIdOwner titleIdOwner = new();
+    private readonly RegisteredIdOwner descriptionIdOwner = new();
     private ToastRootContext rootContext = null!;
     private RenderElement<ToastRootState>? renderElementReference;
     private Dictionary<string, object> componentAttributes = new();
@@ -380,8 +382,10 @@
         return EventUtilities.InvokeOnKeyDownAsync(AdditionalAttributes, e);
     }
 
-    private void SetTitleId(string? id)
+    private void SetTitleId(object owner, string? id)
     {
+        if (!titleIdOwner.ShouldApply(owner, id)) return;
+
         if (rootContext.TitleId == id)
         {
             return;
@@ -392,8 +396,10 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
-    private void SetDescriptionId(string? id)
+    private void SetDescriptionId(object owner, string? id)
     {
+        if (!descriptionIdOwner.ShouldApply(owner, id)) return;
+
         if (rootContext.DescriptionId == id)
         {
             return;

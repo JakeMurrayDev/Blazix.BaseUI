@@ -29,7 +29,7 @@ internal sealed class SliderRootContext
     public SliderRootState State { get; set; } = SliderRootState.Default;
     public string? LabelId { get; set; }
     public string? RootLabelId { get; set; }
-    public Action<string?> SetLabelId { get; set; } = null!;
+    public Action<object, string?> SetLabelId { get; set; } = null!;
     public NumberFormatOptions? FormatOptions { get; set; }
     public string? Locale { get; set; }
     public FieldValidation? Validation { get; set; }

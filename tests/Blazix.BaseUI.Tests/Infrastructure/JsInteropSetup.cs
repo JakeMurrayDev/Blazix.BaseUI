@@ -799,6 +799,8 @@ public static class JsInteropSetup
             module.SetupVoid("initializeTrigger", _ => true).SetVoidResult();
             module.SetupVoid("disposeTrigger", _ => true).SetVoidResult();
             module.Setup<string>("getLastInteractionType", _ => true).SetResult("none");
+            module.Setup<string>("consumeCloseInteractionType", _ => true).SetResult("none");
+            module.Setup<string>("captureCloseInteractionType", _ => true).SetResult("none");
             module.Setup<string>("applyScrollLock", _ => true).SetResult("scroll-lock-token");
             module.SetupVoid("releaseScrollLock", _ => true).SetVoidResult();
             module.SetupVoid("initializePopup", _ => true).SetVoidResult();
@@ -845,6 +847,30 @@ public static class JsInteropSetup
             module.SetupVoid("registerCorner", _ => true).SetVoidResult();
             module.SetupVoid("unregisterCorner", _ => true).SetVoidResult();
             return module;
+        }
+    }
+
+    /// <summary>
+    /// Reports the WebKit engine flag that Select, Combobox, Autocomplete, and Menu roots read at
+    /// first render to decide whether zero-delta pointer moves should be ignored.
+    /// </summary>
+    public static void SetupWebKitEngine(BunitJSInterop jsInterop, bool isWebKitEngine)
+    {
+        string[] paths =
+        [
+            "./_content/Blazix.BaseUI/blazix-baseui-select.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-select.min.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-menu.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-menu.min.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-combobox.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-combobox.min.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-autocomplete.js",
+            "./_content/Blazix.BaseUI/blazix-baseui-autocomplete.min.js"
+        ];
+
+        foreach (var path in paths)
+        {
+            jsInterop.SetupModule(path).Setup<bool>("isWebKitEngine", _ => true).SetResult(isWebKitEngine);
         }
     }
 }

@@ -13,6 +13,8 @@
 </CascadingValue>
 
 @code {
+    private readonly RegisteredIdOwner panelIdOwner = new();
+    private bool panelCleared;
     private string defaultPanelId = string.Empty;
     private bool isOpen;
     private string? panelId;
@@ -26,7 +28,9 @@
 
     private bool CurrentOpen => IsControlled ? Open!.Value : isOpen;
 
-    private string CurrentPanelId => panelId ?? defaultPanelId;
+    // Cleared once the registered panel is removed, so the trigger stops pointing `aria-controls`
+    // at an element that is no longer in the document (base-ui #5340).
+    private string CurrentPanelId => panelCleared ? string.Empty : (panelId ?? defaultPanelId);
 
     /// <summary>
     /// Gets or sets whether the collapsible panel is currently open.
@@ -144,12 +148,16 @@
     /// <summary>
     /// Registers the panel element identifier so the trigger can reference it via <c>aria-controls</c>.
     /// </summary>
-    /// <param name="id">The panel element identifier.</param>
-    internal void SetPanelId(string id)
+    /// <param name="owner">The panel instance registering or clearing the identifier.</param>
+    /// <param name="id">The panel element identifier, or <see langword="null"/> to clear it.</param>
+    internal void SetPanelId(object owner, string? id)
     {
-        if (panelId != id)
+        if (!panelIdOwner.ShouldApply(owner, id)) return;
+
+        if (panelId != id || panelCleared != (id is null))
         {
             panelId = id;
+            panelCleared = id is null;
             context.PanelId = CurrentPanelId;
             _ = InvokeAsync(StateHasChanged);
         }
