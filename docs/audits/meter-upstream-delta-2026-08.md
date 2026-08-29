@@ -21,14 +21,14 @@ Meter's transitive import graph is 36 files (BFS from `packages/react/src/meter`
 it. Adding `086eeaded` (#5312), whose Meter side is a single test file and so changes no file in
 the graph, gives **2 (commit, Meter) pairs**, each dispositioned in its own row below.
 
-Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
-`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
-each row.
+Every disposition row below carries the standard **Verified against** field — local HEAD
+`4b2a7923` + upstream pin `1a2ca3c9f` (2026-08-03), audited 2026-08-21. The value is identical in
+every row because the whole sweep ran against one tree and one pin.
 
-| Upstream | Verdict | User-observable symptom | Evidence |
-|---|---|---|---|
-| `595c0fa08` #5340 | **(b) port — C#/Razor** | Swapping the meter's label component let the outgoing instance clear the incoming one's registered id, so the meter lost its accessible name: `aria-labelledby` pointed at nothing. Blazor makes this the common case rather than a race, because it disposes a removed component **after** its replacement has initialized — the reverse of React's cleanup ordering. | Ported in this change set. `Meter/MeterRootContext.cs` — `SetLabelIdAction` becomes `Action<object, string?>`; `Meter/MeterRoot.razor` tracks `labelOwner` and ignores a clear from a stale instance; `Meter/MeterLabel.razor` passes `this`. Ownership is tracked by **instance**, not by id value, so a replacement reusing the same explicit id also survives — the pattern PR #206 established for `FieldsetLegend`. Covered by `MeterLabelTests.KeepsAriaLabelledByWhenLabelIsReplaced` and `KeepsAriaLabelledByWhenReplacementLabelReusesTheSameId`. |
-| `086eeaded` #5312 | **(a) skip — React-specific** | No runtime content on the Meter side — the commit adds `MeterLabel.test.tsx` and nothing else under `meter/`. | Its source hunks are all Progress (`ProgressRoot.tsx`, `ProgressValue.tsx`) and belong to the Progress record; the Progress clamped-value fix `c02319dfc` (#5389) landed in PR #201. |
+| Upstream | Verdict | User-observable symptom | Evidence | Verified against |
+|---|---|---|---|---|
+| `595c0fa08` #5340 | **(b) port — C#/Razor** | Swapping the meter's label component let the outgoing instance clear the incoming one's registered id, so the meter lost its accessible name: `aria-labelledby` pointed at nothing. Blazor makes this the common case rather than a race, because it disposes a removed component **after** its replacement has initialized — the reverse of React's cleanup ordering. | Ported in this change set. `Meter/MeterRootContext.cs` — `SetLabelIdAction` becomes `Action<object, string?>`; `Meter/MeterRoot.razor` tracks `labelOwner` and ignores a clear from a stale instance; `Meter/MeterLabel.razor` passes `this`. Ownership is tracked by **instance**, not by id value, so a replacement reusing the same explicit id also survives — the pattern PR #206 established for `FieldsetLegend`. Covered by `MeterLabelTests.KeepsAriaLabelledByWhenLabelIsReplaced` and `KeepsAriaLabelledByWhenReplacementLabelReusesTheSameId`. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
+| `086eeaded` #5312 | **(a) skip — React-specific** | No runtime content on the Meter side — the commit adds `MeterLabel.test.tsx` and nothing else under `meter/`. | Its source hunks are all Progress (`ProgressRoot.tsx`, `ProgressValue.tsx`) and belong to the Progress record; the Progress clamped-value fix `c02319dfc` (#5389) landed in PR #201. | `4b2a7923` + `1a2ca3c9f` · 2026-08-21 |
 
 `595c0fa08` is nominally owned by the shared-layer sweep
 [#158](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/158), whose 2026-08-20 correction
