@@ -19,4 +19,6 @@ public interface IMeterLabelContract
     Task NotifiesParentOfLabelId();
     Task UpdatesParentWhenIdChanges();
     Task CleansUpLabelIdOnDispose();
+    Task KeepsAriaLabelledByWhenLabelIsReplaced();
+    Task KeepsAriaLabelledByWhenReplacementLabelReusesTheSameId();
 }

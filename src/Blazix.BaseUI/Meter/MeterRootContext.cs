@@ -37,5 +37,9 @@ internal sealed class MeterRootContext
     /// Gets or sets the callback used by <see cref="MeterLabel"/> to register its id
     /// with the root for <c>aria-labelledby</c> association.
     /// </summary>
-    public Action<string?> SetLabelIdAction { get; set; } = null!;
+    /// <remarks>
+    /// A clear is ignored unless the owner passed as the first argument is still the
+    /// registered label.
+    /// </remarks>
+    public Action<object, string?> SetLabelIdAction { get; set; } = null!;
 }

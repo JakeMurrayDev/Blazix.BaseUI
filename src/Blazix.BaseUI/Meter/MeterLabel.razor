@@ -76,7 +76,7 @@
     {
         if (registeredLabelId is not null)
         {
-            Context?.SetLabelIdAction(null);
+            Context?.SetLabelIdAction(this, null);
             registeredLabelId = null;
         }
     }
@@ -100,7 +100,7 @@
         }
 
         registeredLabelId = id;
-        Context!.SetLabelIdAction(id);
+        Context!.SetLabelIdAction(this, id);
     }
 
     private void SetDefaultAttribute(Dictionary<string, object> attrs, string attribute, object value)
