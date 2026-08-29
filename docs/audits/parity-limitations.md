@@ -58,10 +58,14 @@ explicit reviewed edit, never a side effect of whichever revision `.base-ui` hap
 
 Three things still lag that pin, and every one of them bounds what may be claimed:
 
-1. **No harness run at the new pin has been recorded.** The only committed run evidence — #178's
-   4356 findings, 4149 blocking — was produced against `bdcb685f…` and describes the port as it was
-   before the cycle-1 sweeps. It does not transfer. A full serial re-run is A-3.1 prerequisite (c),
-   still outstanding.
+1. **No comparison run at the new pin has been *reported*.** The re-baseline itself did run the
+   comparison — `BaselineGenerator.RunAsync` drives `ParityRunner` in `WriteBaseline` mode, which is
+   why per-fixture blocking-leg counts exist for `1a2ca3c9f…` at all (26 of 29 fixtures still report
+   2 blocking legs). But a write-baseline run **commits no report**, so it yields no citable
+   `(fixture, leg, step, nodePath, kind, property)` identities and no per-kind counts. The only
+   committed run evidence — #178's 4356 findings, 4149 blocking — was produced against `bdcb685f…`
+   and describes the port as it was before the cycle-1 sweeps; it does not transfer. A full serial
+   re-run and a committed report are A-3.1 prerequisites (c) and (d), both still outstanding.
 2. **The Blazor fixture ports are still frozen at `bdcb685f…` class surfaces.** Five contract tests
    fail on exactly this — `CalibrationFixtureContractTests.FrozenRazorPortsCarryTheExactUpstreamTailwindClassMultisets`,
    `Task16BatchAFixtureContractTests.PreservesEveryUpstreamTailwindClassMultiset`,
@@ -235,8 +239,9 @@ What the evidence does support, stated in full:
 > component-wide parity, and it says nothing about upstream `1a2ca3c9f`.
 
 That statement is now **historical**: the baselines it was produced against were superseded on
-2026-08-21 (§2). It remains the only recorded run evidence, and it still describes `bdcb685f…`.
-No re-run at the current pin has been recorded, so nothing stronger may be claimed yet.
+2026-08-21 (§2). It remains the only *reported* run evidence, and it still describes `bdcb685f…`.
+The re-baseline ran the comparison at the new pin but committed no report (§2), so no finding
+identity or per-kind count at `1a2ca3c9f…` is citable and nothing stronger may be claimed yet.
 
 ## 7. CI coverage, and what is deliberately not automated
 
