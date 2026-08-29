@@ -18,7 +18,12 @@ Ticket: [#169](https://github.com/JakeMurrayDev/Blazix.BaseUI/issues/169) (tranc
 
 Meter's transitive import graph is 36 files (BFS from `packages/react/src/meter` through
 `internals/*`, `utils/*` and `packages/utils/*`). Exactly **one** commit in the window touches
-it.
+it. Adding `086eeaded` (#5312), whose Meter side is a single test file and so changes no file in
+the graph, gives **2 (commit, Meter) pairs**, each dispositioned in its own row below.
+
+Every row shares the same **Verified against** value — local HEAD `4b2a7923`, upstream pin
+`1a2ca3c9f` (2026-08-03), audited 2026-08-21 — so it is stated once here rather than repeated in
+each row.
 
 | Upstream | Verdict | User-observable symptom | Evidence |
 |---|---|---|---|
